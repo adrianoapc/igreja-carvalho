@@ -368,49 +368,128 @@ export function IntegracaoCriarDialog({
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="clientId">
-            Client ID
-            {isEditMode && <span className="text-xs text-muted-foreground ml-1">(opcional - deixe em branco para manter)</span>}
-          </Label>
-          <Input
-            id="clientId"
-            placeholder="Insira o Client ID"
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-            disabled={loading}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="clientSecret">Client Secret</Label>
-          <Input
-            id="clientSecret"
-            type="password"
-            placeholder="Insira o Client Secret"
-            value={clientSecret}
-            onChange={(e) => setClientSecret(e.target.value)}
-            disabled={loading}
-          />
-        </div>
-
-        {(provedor === "getnet" || provedor === "santander") && (
-          <div className="space-y-2">
-            <Label htmlFor="applicationKey">
-              Application Key
-              {provedor === "santander" && (
+        {provedor === "santander" && (
+          <div className="rounded-md border border-border p-3 space-y-3 bg-muted/30">
+            <p className="text-sm font-medium">Credenciais Open Banking (Cash Management)</p>
+            <p className="text-xs text-muted-foreground">
+              Aplicação <strong>Cash Management / Open Banking</strong> no portal Santander Developers.
+              Usadas para saldo, extrato e sincronização.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="clientId">
+                Client ID (Open Banking)
+                {isEditMode && <span className="text-xs text-muted-foreground ml-1">(opcional - mantém atual se em branco)</span>}
+              </Label>
+              <Input
+                id="clientId"
+                placeholder="Client ID da app Open Banking"
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="clientSecret">Client Secret (Open Banking)</Label>
+              <Input
+                id="clientSecret"
+                type="password"
+                placeholder="Client Secret da app Open Banking"
+                value={clientSecret}
+                onChange={(e) => setClientSecret(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="applicationKey">
+                Application Key
                 <span className="text-xs text-muted-foreground ml-1">(geralmente igual ao Client ID)</span>
-              )}
-            </Label>
-            <Input
-              id="applicationKey"
-              type="password"
-              placeholder="Insira a Application Key"
-              value={applicationKey}
-              onChange={(e) => setApplicationKey(e.target.value)}
-              disabled={loading}
-            />
+              </Label>
+              <Input
+                id="applicationKey"
+                type="password"
+                placeholder="Application Key (X-Application-Key)"
+                value={applicationKey}
+                onChange={(e) => setApplicationKey(e.target.value)}
+                disabled={loading}
+              />
+            </div>
           </div>
+        )}
+
+        {provedor === "santander" && (
+          <div className="rounded-md border border-border p-3 space-y-3 bg-muted/30">
+            <p className="text-sm font-medium">Credenciais PIX</p>
+            <p className="text-xs text-muted-foreground">
+              Aplicação <strong>PIX</strong> separada no portal Santander Developers.
+              Usadas para criar cobranças, buscar PIX recebidos e webhooks.
+              Se deixar em branco, o sistema usa as credenciais de Open Banking como fallback (legado).
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="pixClientId">Client ID (PIX)</Label>
+              <Input
+                id="pixClientId"
+                placeholder="Client ID da app PIX"
+                value={pixClientId}
+                onChange={(e) => setPixClientId(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pixClientSecret">Client Secret (PIX)</Label>
+              <Input
+                id="pixClientSecret"
+                type="password"
+                placeholder="Client Secret da app PIX"
+                value={pixClientSecret}
+                onChange={(e) => setPixClientSecret(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+          </div>
+        )}
+
+        {provedor !== "santander" && (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="clientId">
+                Client ID
+                {isEditMode && <span className="text-xs text-muted-foreground ml-1">(opcional - mantém atual se em branco)</span>}
+              </Label>
+              <Input
+                id="clientId"
+                placeholder="Insira o Client ID"
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="clientSecret">Client Secret</Label>
+              <Input
+                id="clientSecret"
+                type="password"
+                placeholder="Insira o Client Secret"
+                value={clientSecret}
+                onChange={(e) => setClientSecret(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+
+            {provedor === "getnet" && (
+              <div className="space-y-2">
+                <Label htmlFor="applicationKey">Application Key</Label>
+                <Input
+                  id="applicationKey"
+                  type="password"
+                  placeholder="Insira a Application Key"
+                  value={applicationKey}
+                  onChange={(e) => setApplicationKey(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+            )}
+          </>
         )}
 
         <div className="space-y-2">
