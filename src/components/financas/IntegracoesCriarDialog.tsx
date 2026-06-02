@@ -80,8 +80,8 @@ export function IntegracaoCriarDialog({
             setProvedor(data.provedor);
             setCnpj(data.cnpj);
             setAtivo(data.status === "ativo");
-            // @ts-expect-error tipo_auth pode não estar nos types gerados ainda
-            const t = (data.tipo_auth ?? "token") as TipoAuth;
+            const t = ((data as { tipo_auth?: string }).tipo_auth ?? "token") as TipoAuth;
+
             setTipoAuth(t === "sftp" ? "sftp" : "token");
           }
         } catch (err) {
