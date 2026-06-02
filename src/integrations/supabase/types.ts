@@ -4777,6 +4777,100 @@ export type Database = {
           },
         ]
       }
+      integracoes_execucoes_log: {
+        Row: {
+          acao: string
+          arquivo_modified_at: string | null
+          arquivo_nome: string | null
+          arquivo_tamanho: number | null
+          created_at: string
+          created_by: string | null
+          duracao_ms: number | null
+          erro_mensagem: string | null
+          erro_stack: string | null
+          filial_id: string | null
+          finalizado_em: string | null
+          id: string
+          igreja_id: string
+          iniciado_em: string
+          integracao_id: string
+          metadata: Json
+          provedor: string
+          status: string
+          total_ignorado: number | null
+          total_inserido: number | null
+          total_recebido: number | null
+        }
+        Insert: {
+          acao: string
+          arquivo_modified_at?: string | null
+          arquivo_nome?: string | null
+          arquivo_tamanho?: number | null
+          created_at?: string
+          created_by?: string | null
+          duracao_ms?: number | null
+          erro_mensagem?: string | null
+          erro_stack?: string | null
+          filial_id?: string | null
+          finalizado_em?: string | null
+          id?: string
+          igreja_id: string
+          iniciado_em?: string
+          integracao_id: string
+          metadata?: Json
+          provedor: string
+          status: string
+          total_ignorado?: number | null
+          total_inserido?: number | null
+          total_recebido?: number | null
+        }
+        Update: {
+          acao?: string
+          arquivo_modified_at?: string | null
+          arquivo_nome?: string | null
+          arquivo_tamanho?: number | null
+          created_at?: string
+          created_by?: string | null
+          duracao_ms?: number | null
+          erro_mensagem?: string | null
+          erro_stack?: string | null
+          filial_id?: string | null
+          finalizado_em?: string | null
+          id?: string
+          igreja_id?: string
+          iniciado_em?: string
+          integracao_id?: string
+          metadata?: Json
+          provedor?: string
+          status?: string
+          total_ignorado?: number | null
+          total_inserido?: number | null
+          total_recebido?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integracoes_execucoes_log_filial_id_fkey"
+            columns: ["filial_id"]
+            isOneToOne: false
+            referencedRelation: "filiais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integracoes_execucoes_log_igreja_id_fkey"
+            columns: ["igreja_id"]
+            isOneToOne: false
+            referencedRelation: "igrejas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integracoes_execucoes_log_integracao_id_fkey"
+            columns: ["integracao_id"]
+            isOneToOne: false
+            referencedRelation: "integracoes_financeiras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integracoes_financeiras: {
         Row: {
           cnpj: string
