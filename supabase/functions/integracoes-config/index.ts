@@ -18,10 +18,14 @@ type CreateIntegracaoPayload = {
   cnpj: string;
   ativo?: boolean;
 
-  // credenciais (opcionais, dependendo do provedor)
+  // Credenciais Open Banking / Cash Management (ou genéricas)
   client_id?: string | null;
   client_secret?: string | null;
   application_key?: string | null;
+
+  // Credenciais PIX (Santander: aplicação PIX separada no portal Developers)
+  pix_client_id?: string | null;
+  pix_client_secret?: string | null;
 
   // PFX (base64)
   pfx_blob?: string | null;
@@ -35,12 +39,13 @@ type UpdateIntegracaoPayload = {
   cnpj: string;
   ativo?: boolean;
 
-  // credenciais (opcionais - se fornecido um, todos os outros devem ser fornecidos)
   client_id?: string | null;
   client_secret?: string | null;
   application_key?: string | null;
 
-  // PFX (base64)
+  pix_client_id?: string | null;
+  pix_client_secret?: string | null;
+
   pfx_blob?: string | null;
   pfx_password?: string | null;
 };
