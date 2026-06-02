@@ -40,6 +40,9 @@ export default function Integracoes() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [importingId, setImportingId] = useState<string | null>(null);
+  const [logsIntegracaoId, setLogsIntegracaoId] = useState<string | null>(null);
+
 
   // Buscar integrações
   const { data: integracoes, isLoading, error } = useQuery({
