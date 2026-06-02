@@ -111,6 +111,25 @@ export function IntegracaoCriarDialog({
     }
   }, [isEditMode, open, integracaoId]);
 
+  // Carregar contas da igreja para o select de "Conta destino" no modo SFTP
+  useEffect(() => {
+    if (!open || !igrejaId) return;
+    (async () => {
+      const { data } = await supabase
+        .from("contas")
+        .select("id, nome, banco")
+        .eq("igreja_id", igrejaId)
+        .eq("ativo", true)
+        .order("nome");
+      setContas(
+        (data || []).map((c: any) => ({
+          id: c.id,
+          label: `${c.nome}${c.banco ? ` (${c.banco})` : ""}`,
+        }))
+      );
+    })();
+  }, [open, igrejaId]);
+
   useEffect(() => {
     if (!open) {
       setTimeout(() => {
@@ -127,12 +146,16 @@ export function IntegracaoCriarDialog({
         setSftpUsername("");
         setSftpPassword("");
         setSftpPath("");
+        setSftpFilePattern(".csv");
+        setSftpLayout("settlement_v1");
+        setSftpContaId("");
         setAtivo(true);
         setProvedor("santander");
         setTipoAuth("token");
       }, 200);
     }
   }, [open]);
+
 
   const handlePfxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
