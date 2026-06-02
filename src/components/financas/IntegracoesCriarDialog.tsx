@@ -81,8 +81,17 @@ export function IntegracaoCriarDialog({
             setCnpj(data.cnpj);
             setAtivo(data.status === "ativo");
             const t = ((data as { tipo_auth?: string }).tipo_auth ?? "token") as TipoAuth;
-
             setTipoAuth(t === "sftp" ? "sftp" : "token");
+
+            // Hidrata config não-sensível do SFTP (port/path), se houver
+            const cfg = (data as { config?: Record<string, unknown> | null }).config ?? {};
+            const sftpCfg = (cfg as Record<string, unknown>).sftp as
+              | { port?: string | number; path?: string }
+              | undefined;
+            if (sftpCfg) {
+              if (sftpCfg.port != null) setSftpPort(String(sftpCfg.port));
+              if (sftpCfg.path != null) setSftpPath(String(sftpCfg.path));
+            }
           }
         } catch (err) {
           console.error("Error loading integration:", err);
@@ -152,14 +161,15 @@ export function IntegracaoCriarDialog({
     return null;
   };
 
+  // Em SFTP, reaproveitamos os campos secrets já criptografados:
+  //   client_id = username, client_secret = password, application_key = host
+  // port e path vão em integracoes_financeiras.config.sftp (não-sensível).
   const buildSecretsPayload = (pfxBase64?: string | null) => {
     if (effectiveTipoAuth === "sftp") {
       return {
-        sftp_host: sftpHost || undefined,
-        sftp_port: sftpPort || undefined,
-        sftp_username: sftpUsername || undefined,
-        sftp_password: sftpPassword || undefined,
-        sftp_path: sftpPath || undefined,
+        client_id: sftpUsername || undefined,
+        client_secret: sftpPassword || undefined,
+        application_key: sftpHost || undefined,
       };
     }
     return {
@@ -171,6 +181,14 @@ export function IntegracaoCriarDialog({
       pfx_blob: pfxBase64 ?? undefined,
       pfx_password: pfxPassword || undefined,
     };
+  };
+
+  const buildConfigPayload = (): Record<string, unknown> | undefined => {
+    if (effectiveTipoAuth !== "sftp") return undefined;
+    const sftp: Record<string, unknown> = {};
+    if (sftpPort) sftp.port = sftpPort;
+    if (sftpPath) sftp.path = sftpPath;
+    return Object.keys(sftp).length ? { sftp } : undefined;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -191,6 +209,7 @@ export function IntegracaoCriarDialog({
 
     const send = async (pfxBase64: string | null) => {
       try {
+        const cfg = buildConfigPayload();
         const body: Record<string, unknown> = {
           action,
           igreja_id: igrejaId,
@@ -198,6 +217,7 @@ export function IntegracaoCriarDialog({
           ativo,
           tipo_auth: effectiveTipoAuth,
           ...buildSecretsPayload(pfxBase64),
+          ...(cfg ? { config: cfg } : {}),
         };
         if (isEditMode) {
           body.id = integracaoId;

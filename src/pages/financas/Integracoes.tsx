@@ -93,11 +93,44 @@ export default function Integracoes() {
 
   const handleTest = async (integracao: Integracao) => {
     console.log('[Integracoes] Testando integração:', integracao.id, integracao.provedor);
-    
-    if (integracao.provedor !== "santander") {
-      toast.info("Teste disponível apenas para Santander no momento");
+
+    // Getnet via SFTP: usa edge function getnet-sftp
+    if (
+      integracao.provedor === "getnet" &&
+      (integracao as { tipo_auth?: string }).tipo_auth === "sftp"
+    ) {
+      setTestingId(integracao.id);
+      try {
+        const { data, error } = await supabase.functions.invoke("getnet-sftp", {
+          body: { action: "test_connection", integracao_id: integracao.id },
+        });
+        if (error) {
+          toast.error(`Erro no teste: ${error.message}`);
+          return;
+        }
+        if (data?.success) {
+          toast.success("Conexão SFTP OK!", {
+            description: `${data.host}:${data.port} — ${data.files_count} arquivo(s) em ${data.path}`,
+          });
+        } else {
+          toast.error("Falha na conexão SFTP", {
+            description: data?.error || "Verifique credenciais e endereço",
+          });
+        }
+      } catch (err) {
+        console.error("SFTP test exception:", err);
+        toast.error("Erro ao testar conexão SFTP");
+      } finally {
+        setTestingId(null);
+      }
       return;
     }
+
+    if (integracao.provedor !== "santander") {
+      toast.info("Teste disponível apenas para Santander e Getnet (SFTP) no momento");
+      return;
+    }
+
 
     setTestingId(integracao.id);
     try {
