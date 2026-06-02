@@ -220,8 +220,12 @@ export function IntegracaoCriarDialog({
     const sftp: Record<string, unknown> = {};
     if (sftpPort) sftp.port = sftpPort;
     if (sftpPath) sftp.path = sftpPath;
+    if (sftpFilePattern) sftp.file_pattern = sftpFilePattern;
+    if (sftpLayout) sftp.layout = sftpLayout;
+    if (sftpContaId) sftp.conta_id = sftpContaId;
     return Object.keys(sftp).length ? { sftp } : undefined;
   };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
