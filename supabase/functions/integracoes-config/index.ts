@@ -314,7 +314,7 @@ async function handleUpdateIntegracao(
   );
   if (!hasPermission) return json(403, { error: "Insufficient permissions" });
 
-  // Atualizar metadados (cnpj, status, tipo_auth se fornecido)
+  // Atualizar metadados (cnpj, status, tipo_auth, config se fornecidos)
   const status = ativo === false ? "inativo" : "ativo";
   const updateFields: Record<string, unknown> = {
     cnpj: cnpj.replace(/\D/g, ""),
@@ -323,6 +323,18 @@ async function handleUpdateIntegracao(
   };
   if (payload.tipo_auth === "token" || payload.tipo_auth === "sftp") {
     updateFields.tipo_auth = payload.tipo_auth;
+  }
+
+  // Merge de config (preserva chaves existentes)
+  if (payload.config && typeof payload.config === "object") {
+    const { data: existingIntegracao } = await supabaseAdmin
+      .from("integracoes_financeiras")
+      .select("config")
+      .eq("id", id)
+      .maybeSingle();
+    const currentConfig =
+      (existingIntegracao?.config as Record<string, unknown> | null) ?? {};
+    updateFields.config = { ...currentConfig, ...payload.config };
   }
 
   const { error: updateError } = await supabaseAdmin
@@ -347,12 +359,7 @@ async function handleUpdateIntegracao(
     payload.pix_client_id ||
     payload.pix_client_secret ||
     payload.pfx_blob ||
-    payload.pfx_password ||
-    payload.sftp_host ||
-    payload.sftp_port ||
-    payload.sftp_username ||
-    payload.sftp_password ||
-    payload.sftp_path;
+    payload.pfx_password;
 
   if (hasSecrets) {
     console.log("[integracoes-config] Encrypting updated credentials (partial)...");
@@ -368,11 +375,6 @@ async function handleUpdateIntegracao(
     const c5 = enc(payload.pix_client_secret); if (c5) patch.pix_client_secret = c5;
     const c6 = enc(payload.pfx_blob); if (c6) patch.pfx_blob = c6;
     const c7 = enc(payload.pfx_password); if (c7) patch.pfx_password = c7;
-    const s1 = enc(payload.sftp_host); if (s1) patch.sftp_host = s1;
-    const s2 = enc(payload.sftp_port); if (s2) patch.sftp_port = s2;
-    const s3 = enc(payload.sftp_username); if (s3) patch.sftp_username = s3;
-    const s4 = enc(payload.sftp_password); if (s4) patch.sftp_password = s4;
-    const s5 = enc(payload.sftp_path); if (s5) patch.sftp_path = s5;
 
 
     const { data: existing } = await supabaseAdmin
