@@ -81,8 +81,17 @@ export function IntegracaoCriarDialog({
             setCnpj(data.cnpj);
             setAtivo(data.status === "ativo");
             const t = ((data as { tipo_auth?: string }).tipo_auth ?? "token") as TipoAuth;
-
             setTipoAuth(t === "sftp" ? "sftp" : "token");
+
+            // Hidrata config não-sensível do SFTP (port/path), se houver
+            const cfg = (data as { config?: Record<string, unknown> | null }).config ?? {};
+            const sftpCfg = (cfg as Record<string, unknown>).sftp as
+              | { port?: string | number; path?: string }
+              | undefined;
+            if (sftpCfg) {
+              if (sftpCfg.port != null) setSftpPort(String(sftpCfg.port));
+              if (sftpCfg.path != null) setSftpPath(String(sftpCfg.path));
+            }
           }
         } catch (err) {
           console.error("Error loading integration:", err);
