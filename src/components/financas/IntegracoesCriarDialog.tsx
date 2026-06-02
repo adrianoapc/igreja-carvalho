@@ -39,6 +39,8 @@ export function IntegracaoCriarDialog({
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [applicationKey, setApplicationKey] = useState("");
+  const [pixClientId, setPixClientId] = useState("");
+  const [pixClientSecret, setPixClientSecret] = useState("");
   const [pfxFile, setPfxFile] = useState<File | null>(null);
   const [pfxPassword, setPfxPassword] = useState("");
   const [ativo, setAtivo] = useState(true);
@@ -66,8 +68,7 @@ export function IntegracaoCriarDialog({
             setProvedor(data.provedor);
             setCnpj(data.cnpj);
             setAtivo(data.status === "ativo");
-            // Não carregamos clientId, clientSecret, applicationKey do banco por motivos de segurança
-            // O usuário precisa fornecer novamente ao editar
+            // Secrets nunca são carregados (criptografados); usuário re-fornece se quiser trocar
           }
         } catch (error) {
           console.error("Error loading integration:", error);
@@ -87,6 +88,8 @@ export function IntegracaoCriarDialog({
         setClientId("");
         setClientSecret("");
         setApplicationKey("");
+        setPixClientId("");
+        setPixClientSecret("");
         setPfxFile(null);
         setPfxPassword("");
         setAtivo(true);
@@ -216,9 +219,11 @@ export function IntegracaoCriarDialog({
                     action: "update_integracao",
                     id: integracaoId,
                     cnpj,
-                    client_id: clientId,
-                    client_secret: clientSecret,
+                    client_id: clientId || undefined,
+                    client_secret: clientSecret || undefined,
                     application_key: applicationKey || undefined,
+                    pix_client_id: pixClientId || undefined,
+                    pix_client_secret: pixClientSecret || undefined,
                     pfx_blob: base64,
                     pfx_password: pfxPassword,
                     ativo,
@@ -274,6 +279,8 @@ export function IntegracaoCriarDialog({
                   client_id: clientId,
                   client_secret: clientSecret,
                   application_key: applicationKey || undefined,
+                  pix_client_id: pixClientId || undefined,
+                  pix_client_secret: pixClientSecret || undefined,
                   pfx_blob: base64,
                   pfx_password: pfxPassword,
                   ativo,
@@ -361,49 +368,128 @@ export function IntegracaoCriarDialog({
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="clientId">
-            Client ID
-            {isEditMode && <span className="text-xs text-muted-foreground ml-1">(opcional - deixe em branco para manter)</span>}
-          </Label>
-          <Input
-            id="clientId"
-            placeholder="Insira o Client ID"
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-            disabled={loading}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="clientSecret">Client Secret</Label>
-          <Input
-            id="clientSecret"
-            type="password"
-            placeholder="Insira o Client Secret"
-            value={clientSecret}
-            onChange={(e) => setClientSecret(e.target.value)}
-            disabled={loading}
-          />
-        </div>
-
-        {(provedor === "getnet" || provedor === "santander") && (
-          <div className="space-y-2">
-            <Label htmlFor="applicationKey">
-              Application Key
-              {provedor === "santander" && (
+        {provedor === "santander" && (
+          <div className="rounded-md border border-border p-3 space-y-3 bg-muted/30">
+            <p className="text-sm font-medium">Credenciais Open Banking (Cash Management)</p>
+            <p className="text-xs text-muted-foreground">
+              Aplicação <strong>Cash Management / Open Banking</strong> no portal Santander Developers.
+              Usadas para saldo, extrato e sincronização.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="clientId">
+                Client ID (Open Banking)
+                {isEditMode && <span className="text-xs text-muted-foreground ml-1">(opcional - mantém atual se em branco)</span>}
+              </Label>
+              <Input
+                id="clientId"
+                placeholder="Client ID da app Open Banking"
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="clientSecret">Client Secret (Open Banking)</Label>
+              <Input
+                id="clientSecret"
+                type="password"
+                placeholder="Client Secret da app Open Banking"
+                value={clientSecret}
+                onChange={(e) => setClientSecret(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="applicationKey">
+                Application Key
                 <span className="text-xs text-muted-foreground ml-1">(geralmente igual ao Client ID)</span>
-              )}
-            </Label>
-            <Input
-              id="applicationKey"
-              type="password"
-              placeholder="Insira a Application Key"
-              value={applicationKey}
-              onChange={(e) => setApplicationKey(e.target.value)}
-              disabled={loading}
-            />
+              </Label>
+              <Input
+                id="applicationKey"
+                type="password"
+                placeholder="Application Key (X-Application-Key)"
+                value={applicationKey}
+                onChange={(e) => setApplicationKey(e.target.value)}
+                disabled={loading}
+              />
+            </div>
           </div>
+        )}
+
+        {provedor === "santander" && (
+          <div className="rounded-md border border-border p-3 space-y-3 bg-muted/30">
+            <p className="text-sm font-medium">Credenciais PIX</p>
+            <p className="text-xs text-muted-foreground">
+              Aplicação <strong>PIX</strong> separada no portal Santander Developers.
+              Usadas para criar cobranças, buscar PIX recebidos e webhooks.
+              Se deixar em branco, o sistema usa as credenciais de Open Banking como fallback (legado).
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="pixClientId">Client ID (PIX)</Label>
+              <Input
+                id="pixClientId"
+                placeholder="Client ID da app PIX"
+                value={pixClientId}
+                onChange={(e) => setPixClientId(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pixClientSecret">Client Secret (PIX)</Label>
+              <Input
+                id="pixClientSecret"
+                type="password"
+                placeholder="Client Secret da app PIX"
+                value={pixClientSecret}
+                onChange={(e) => setPixClientSecret(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+          </div>
+        )}
+
+        {provedor !== "santander" && (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="clientId">
+                Client ID
+                {isEditMode && <span className="text-xs text-muted-foreground ml-1">(opcional - mantém atual se em branco)</span>}
+              </Label>
+              <Input
+                id="clientId"
+                placeholder="Insira o Client ID"
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="clientSecret">Client Secret</Label>
+              <Input
+                id="clientSecret"
+                type="password"
+                placeholder="Insira o Client Secret"
+                value={clientSecret}
+                onChange={(e) => setClientSecret(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+
+            {provedor === "getnet" && (
+              <div className="space-y-2">
+                <Label htmlFor="applicationKey">Application Key</Label>
+                <Input
+                  id="applicationKey"
+                  type="password"
+                  placeholder="Insira a Application Key"
+                  value={applicationKey}
+                  onChange={(e) => setApplicationKey(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+            )}
+          </>
         )}
 
         <div className="space-y-2">

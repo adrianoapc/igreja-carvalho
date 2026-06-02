@@ -18,10 +18,14 @@ type CreateIntegracaoPayload = {
   cnpj: string;
   ativo?: boolean;
 
-  // credenciais (opcionais, dependendo do provedor)
+  // Credenciais Open Banking / Cash Management (ou genéricas)
   client_id?: string | null;
   client_secret?: string | null;
   application_key?: string | null;
+
+  // Credenciais PIX (Santander: aplicação PIX separada no portal Developers)
+  pix_client_id?: string | null;
+  pix_client_secret?: string | null;
 
   // PFX (base64)
   pfx_blob?: string | null;
@@ -35,12 +39,13 @@ type UpdateIntegracaoPayload = {
   cnpj: string;
   ativo?: boolean;
 
-  // credenciais (opcionais - se fornecido um, todos os outros devem ser fornecidos)
   client_id?: string | null;
   client_secret?: string | null;
   application_key?: string | null;
 
-  // PFX (base64)
+  pix_client_id?: string | null;
+  pix_client_secret?: string | null;
+
   pfx_blob?: string | null;
   pfx_password?: string | null;
 };
@@ -224,41 +229,28 @@ async function handleCreateIntegracao(
     payload.client_id ||
     payload.client_secret ||
     payload.application_key ||
+    payload.pix_client_id ||
+    payload.pix_client_secret ||
     payload.pfx_blob ||
     payload.pfx_password;
 
   if (hasSecrets) {
     console.log("[integracoes-config] Encrypting sensitive credentials...");
 
-    const encryptedClientId = payload.client_id
-      ? encryptData(payload.client_id, derivedKey)
-      : null;
-
-    const encryptedClientSecret = payload.client_secret
-      ? encryptData(payload.client_secret, derivedKey)
-      : null;
-
-    const encryptedApplicationKey = payload.application_key
-      ? encryptData(payload.application_key, derivedKey)
-      : null;
-
-    const encryptedPfxPassword = payload.pfx_password
-      ? encryptData(payload.pfx_password, derivedKey)
-      : null;
-
-    const encryptedPfxBlob = payload.pfx_blob
-      ? encryptData(payload.pfx_blob, derivedKey)
-      : null;
+    const enc = (v?: string | null) =>
+      v ? encryptData(v, derivedKey) : null;
 
     const { error: secretsError } = await supabaseAdmin
       .from("integracoes_financeiras_secrets")
       .insert({
         integracao_id: integracao.id,
-        pfx_blob: encryptedPfxBlob,
-        pfx_password: encryptedPfxPassword,
-        client_id: encryptedClientId,
-        client_secret: encryptedClientSecret,
-        application_key: encryptedApplicationKey,
+        pfx_blob: enc(payload.pfx_blob),
+        pfx_password: enc(payload.pfx_password),
+        client_id: enc(payload.client_id),
+        client_secret: enc(payload.client_secret),
+        application_key: enc(payload.application_key),
+        pix_client_id: enc(payload.pix_client_id),
+        pix_client_secret: enc(payload.pix_client_secret),
       });
 
     if (secretsError) {
@@ -328,53 +320,50 @@ async function handleUpdateIntegracao(
     return json(500, { error: "Failed to update integration" });
   }
 
-  // Se fornecidas novas credenciais, atualizar secrets
+  // Atualização parcial: só re-encripta campos fornecidos, preservando os demais.
   const hasSecrets =
     payload.client_id ||
     payload.client_secret ||
     payload.application_key ||
+    payload.pix_client_id ||
+    payload.pix_client_secret ||
     payload.pfx_blob ||
     payload.pfx_password;
 
   if (hasSecrets) {
-    console.log("[integracoes-config] Encrypting updated credentials...");
+    console.log("[integracoes-config] Encrypting updated credentials (partial)...");
 
-    const encryptedClientId = payload.client_id
-      ? encryptData(payload.client_id, derivedKey)
-      : null;
+    const enc = (v?: string | null) =>
+      v ? encryptData(v, derivedKey) : undefined;
 
-    const encryptedClientSecret = payload.client_secret
-      ? encryptData(payload.client_secret, derivedKey)
-      : null;
+    const patch: Record<string, string> = {};
+    const c1 = enc(payload.client_id); if (c1) patch.client_id = c1;
+    const c2 = enc(payload.client_secret); if (c2) patch.client_secret = c2;
+    const c3 = enc(payload.application_key); if (c3) patch.application_key = c3;
+    const c4 = enc(payload.pix_client_id); if (c4) patch.pix_client_id = c4;
+    const c5 = enc(payload.pix_client_secret); if (c5) patch.pix_client_secret = c5;
+    const c6 = enc(payload.pfx_blob); if (c6) patch.pfx_blob = c6;
+    const c7 = enc(payload.pfx_password); if (c7) patch.pfx_password = c7;
 
-    const encryptedApplicationKey = payload.application_key
-      ? encryptData(payload.application_key, derivedKey)
-      : null;
-
-    const encryptedPfxPassword = payload.pfx_password
-      ? encryptData(payload.pfx_password, derivedKey)
-      : null;
-
-    const encryptedPfxBlob = payload.pfx_blob
-      ? encryptData(payload.pfx_blob, derivedKey)
-      : null;
-
-    // Deletar secrets antigos e inserir novos
-    await supabaseAdmin
+    const { data: existing } = await supabaseAdmin
       .from("integracoes_financeiras_secrets")
-      .delete()
-      .eq("integracao_id", id);
+      .select("id")
+      .eq("integracao_id", id)
+      .maybeSingle();
 
-    const { error: secretsError } = await supabaseAdmin
-      .from("integracoes_financeiras_secrets")
-      .insert({
-        integracao_id: id,
-        pfx_blob: encryptedPfxBlob,
-        pfx_password: encryptedPfxPassword,
-        client_id: encryptedClientId,
-        client_secret: encryptedClientSecret,
-        application_key: encryptedApplicationKey,
-      });
+    let secretsError: unknown = null;
+    if (existing?.id) {
+      const { error } = await supabaseAdmin
+        .from("integracoes_financeiras_secrets")
+        .update(patch)
+        .eq("integracao_id", id);
+      secretsError = error;
+    } else {
+      const { error } = await supabaseAdmin
+        .from("integracoes_financeiras_secrets")
+        .insert({ integracao_id: id, ...patch });
+      secretsError = error;
+    }
 
     if (secretsError) {
       console.error(
@@ -385,9 +374,10 @@ async function handleUpdateIntegracao(
     }
 
     console.log(
-      "[integracoes-config] Secrets updated and encrypted successfully"
+      "[integracoes-config] Secrets updated (partial) successfully"
     );
   }
+
 
   return json(200, { success: true });
 }

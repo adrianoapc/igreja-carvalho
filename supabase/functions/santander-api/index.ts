@@ -962,15 +962,21 @@ Deno.serve(async (req) => {
     // Decrypt credentials
     const derivedKey = deriveKey(encryptionKey)
 
-    let clientId: string | null = null
-    let clientSecret: string | null = null
+    // Open Banking (Cash Management) credentials
+    let obClientId: string | null = null
+    let obClientSecret: string | null = null
+    // PIX API credentials (aplicação PIX separada no portal Santander Developers)
+    let pixClientId: string | null = null
+    let pixClientSecret: string | null = null
     let applicationKey: string | null = null
     let pfxBlob: string | null = null
     let pfxPassword: string | null = null
 
     try {
-      if (secrets.client_id) clientId = decryptData(secrets.client_id, derivedKey)
-      if (secrets.client_secret) clientSecret = decryptData(secrets.client_secret, derivedKey)
+      if (secrets.client_id) obClientId = decryptData(secrets.client_id, derivedKey)
+      if (secrets.client_secret) obClientSecret = decryptData(secrets.client_secret, derivedKey)
+      if (secrets.pix_client_id) pixClientId = decryptData(secrets.pix_client_id, derivedKey)
+      if (secrets.pix_client_secret) pixClientSecret = decryptData(secrets.pix_client_secret, derivedKey)
       if (secrets.application_key) applicationKey = decryptData(secrets.application_key, derivedKey)
       if (secrets.pfx_blob) pfxBlob = decryptData(secrets.pfx_blob, derivedKey)
       if (secrets.pfx_password) pfxPassword = decryptData(secrets.pfx_password, derivedKey)
@@ -979,8 +985,17 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: `Falha na descriptografia: ${error instanceof Error ? error.message : String(error)}` }, 500)
     }
 
+    // Fallback: se não houver credenciais PIX específicas, usa as de Open Banking (legado)
+    const effectivePixClientId = pixClientId || obClientId
+    const effectivePixClientSecret = pixClientSecret || obClientSecret
+
+    // Escolhe credenciais conforme a ação
+    const clientId = isPixAction ? effectivePixClientId : obClientId
+    const clientSecret = isPixAction ? effectivePixClientSecret : obClientSecret
+
     if (!clientId || !clientSecret) {
-      return jsonResponse({ error: 'Client ID ou Secret não encontrado' }, 400)
+      const tipo = isPixAction ? 'PIX' : 'Open Banking'
+      return jsonResponse({ error: `Credenciais ${tipo} (client_id/client_secret) não configuradas` }, 400)
     }
 
     if (!applicationKey) {
@@ -988,13 +1003,18 @@ Deno.serve(async (req) => {
     }
 
     // Diagnóstico de credenciais decodificadas (sem expor secrets)
-    console.log('[santander-api] Decoded creds lengths:', {
-      clientId: clientId?.length,
-      clientId_prefix: clientId ? clientId.substring(0, 4) + '...' : null,
-      clientSecret: clientSecret?.length,
-      applicationKey: applicationKey?.length,
-      pfxBlob: pfxBlob?.length,
-      pfxPassword: pfxPassword?.length,
+    console.log('[santander-api] Credential selection:', {
+      action,
+      isPixAction,
+      using: isPixAction ? (pixClientId ? 'pix_creds' : 'ob_creds_fallback') : 'ob_creds',
+      hasObCreds: !!(obClientId && obClientSecret),
+      hasPixCreds: !!(pixClientId && pixClientSecret),
+      clientId_len: clientId.length,
+      clientId_prefix: clientId.substring(0, 4) + '...',
+      clientSecret_len: clientSecret.length,
+      applicationKey_len: applicationKey.length,
+      pfxBlob_len: pfxBlob?.length,
+      pfxPassword_len: pfxPassword?.length,
     })
 
     // Create mTLS HttpClient
