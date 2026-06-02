@@ -229,41 +229,28 @@ async function handleCreateIntegracao(
     payload.client_id ||
     payload.client_secret ||
     payload.application_key ||
+    payload.pix_client_id ||
+    payload.pix_client_secret ||
     payload.pfx_blob ||
     payload.pfx_password;
 
   if (hasSecrets) {
     console.log("[integracoes-config] Encrypting sensitive credentials...");
 
-    const encryptedClientId = payload.client_id
-      ? encryptData(payload.client_id, derivedKey)
-      : null;
-
-    const encryptedClientSecret = payload.client_secret
-      ? encryptData(payload.client_secret, derivedKey)
-      : null;
-
-    const encryptedApplicationKey = payload.application_key
-      ? encryptData(payload.application_key, derivedKey)
-      : null;
-
-    const encryptedPfxPassword = payload.pfx_password
-      ? encryptData(payload.pfx_password, derivedKey)
-      : null;
-
-    const encryptedPfxBlob = payload.pfx_blob
-      ? encryptData(payload.pfx_blob, derivedKey)
-      : null;
+    const enc = (v?: string | null) =>
+      v ? encryptData(v, derivedKey) : null;
 
     const { error: secretsError } = await supabaseAdmin
       .from("integracoes_financeiras_secrets")
       .insert({
         integracao_id: integracao.id,
-        pfx_blob: encryptedPfxBlob,
-        pfx_password: encryptedPfxPassword,
-        client_id: encryptedClientId,
-        client_secret: encryptedClientSecret,
-        application_key: encryptedApplicationKey,
+        pfx_blob: enc(payload.pfx_blob),
+        pfx_password: enc(payload.pfx_password),
+        client_id: enc(payload.client_id),
+        client_secret: enc(payload.client_secret),
+        application_key: enc(payload.application_key),
+        pix_client_id: enc(payload.pix_client_id),
+        pix_client_secret: enc(payload.pix_client_secret),
       });
 
     if (secretsError) {
