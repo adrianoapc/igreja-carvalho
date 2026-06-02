@@ -633,8 +633,54 @@ export function IntegracaoCriarDialog({
                   disabled={loading}
                 />
               </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="sftpFilePattern">Extensão / padrão de arquivo</Label>
+                  <Input
+                    id="sftpFilePattern"
+                    placeholder=".csv"
+                    value={sftpFilePattern}
+                    onChange={(e) => setSftpFilePattern(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sftpLayout">Layout do arquivo</Label>
+                  <Select value={sftpLayout} onValueChange={setSftpLayout}>
+                    <SelectTrigger id="sftpLayout">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="settlement_v1">
+                        Getnet — Settlement v1 (CSV)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sftpContaId">Conta bancária destino</Label>
+                <Select value={sftpContaId} onValueChange={setSftpContaId}>
+                  <SelectTrigger id="sftpContaId">
+                    <SelectValue placeholder="Selecione a conta para receber os extratos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contas.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Os lançamentos importados via SFTP serão associados a esta conta.
+                </p>
+              </div>
             </div>
           )}
+
 
           <div className="flex items-center justify-between py-2">
             <Label htmlFor="ativo">Ativo</Label>
