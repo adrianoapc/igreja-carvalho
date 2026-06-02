@@ -328,8 +328,12 @@ export function IntegracaoCriarDialog({
     <ResponsiveDialog
       open={open}
       onOpenChange={onOpenChange}
+      dialogContentProps={{
+        className:
+          "sm:max-w-4xl max-h-[90vh] flex flex-col gap-0 p-0",
+      }}
     >
-      <DialogHeader>
+      <DialogHeader className="px-6 pt-6 pb-4 border-b">
         <DialogTitle>
           {isEditMode ? "Editar Integração Financeira" : "Nova Integração Financeira"}
         </DialogTitle>
@@ -340,195 +344,210 @@ export function IntegracaoCriarDialog({
         </DialogDescription>
       </DialogHeader>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="provedor">Provedor</Label>
-          <Select value={provedor} onValueChange={setProvedor}>
-            <SelectTrigger id="provedor">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PROVEDORES.map((p) => (
-                <SelectItem key={p} value={p}>
-                  {p.charAt(0).toUpperCase() + p.slice(1).replace(/_/g, " ")}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="cnpj">CNPJ</Label>
-          <Input
-            id="cnpj"
-            placeholder="00.000.000/0000-00"
-            value={cnpj}
-            onChange={(e) => setCnpj(e.target.value)}
-            disabled={loading}
-          />
-        </div>
-
-        {provedor === "santander" && (
-          <div className="rounded-md border border-border p-3 space-y-3 bg-muted/30">
-            <p className="text-sm font-medium">Credenciais Open Banking (Cash Management)</p>
-            <p className="text-xs text-muted-foreground">
-              Aplicação <strong>Cash Management / Open Banking</strong> no portal Santander Developers.
-              Usadas para saldo, extrato e sincronização.
-            </p>
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col flex-1 min-h-0"
+      >
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {/* Linha 1: Provedor + CNPJ lado a lado */}
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="clientId">
-                Client ID (Open Banking)
-                {isEditMode && <span className="text-xs text-muted-foreground ml-1">(opcional - mantém atual se em branco)</span>}
-              </Label>
-              <Input
-                id="clientId"
-                placeholder="Client ID da app Open Banking"
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                disabled={loading}
-              />
+              <Label htmlFor="provedor">Provedor</Label>
+              <Select value={provedor} onValueChange={setProvedor}>
+                <SelectTrigger id="provedor">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROVEDORES.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p.charAt(0).toUpperCase() + p.slice(1).replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="clientSecret">Client Secret (Open Banking)</Label>
+              <Label htmlFor="cnpj">CNPJ</Label>
               <Input
-                id="clientSecret"
-                type="password"
-                placeholder="Client Secret da app Open Banking"
-                value={clientSecret}
-                onChange={(e) => setClientSecret(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="applicationKey">
-                Application Key
-                <span className="text-xs text-muted-foreground ml-1">(geralmente igual ao Client ID)</span>
-              </Label>
-              <Input
-                id="applicationKey"
-                type="password"
-                placeholder="Application Key (X-Application-Key)"
-                value={applicationKey}
-                onChange={(e) => setApplicationKey(e.target.value)}
+                id="cnpj"
+                placeholder="00.000.000/0000-00"
+                value={cnpj}
+                onChange={(e) => setCnpj(e.target.value)}
                 disabled={loading}
               />
             </div>
           </div>
-        )}
 
-        {provedor === "santander" && (
-          <div className="rounded-md border border-border p-3 space-y-3 bg-muted/30">
-            <p className="text-sm font-medium">Credenciais PIX</p>
-            <p className="text-xs text-muted-foreground">
-              Aplicação <strong>PIX</strong> separada no portal Santander Developers.
-              Usadas para criar cobranças, buscar PIX recebidos e webhooks.
-              Se deixar em branco, o sistema usa as credenciais de Open Banking como fallback (legado).
-            </p>
-            <div className="space-y-2">
-              <Label htmlFor="pixClientId">Client ID (PIX)</Label>
-              <Input
-                id="pixClientId"
-                placeholder="Client ID da app PIX"
-                value={pixClientId}
-                onChange={(e) => setPixClientId(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="pixClientSecret">Client Secret (PIX)</Label>
-              <Input
-                id="pixClientSecret"
-                type="password"
-                placeholder="Client Secret da app PIX"
-                value={pixClientSecret}
-                onChange={(e) => setPixClientSecret(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-          </div>
-        )}
+          {provedor === "santander" && (
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Coluna Open Banking */}
+              <div className="rounded-md border border-border p-3 space-y-3 bg-muted/30">
+                <div>
+                  <p className="text-sm font-medium">Open Banking (Cash Management)</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    App <strong>Cash Management</strong> no portal Santander Developers. Usadas para saldo, extrato e sync.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clientId">
+                    Client ID
+                    {isEditMode && <span className="text-xs text-muted-foreground ml-1">(opcional)</span>}
+                  </Label>
+                  <Input
+                    id="clientId"
+                    placeholder="Client ID Open Banking"
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clientSecret">Client Secret</Label>
+                  <Input
+                    id="clientSecret"
+                    type="password"
+                    placeholder="Client Secret Open Banking"
+                    value={clientSecret}
+                    onChange={(e) => setClientSecret(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="applicationKey">
+                    Application Key
+                    <span className="text-xs text-muted-foreground ml-1">(geralmente = Client ID)</span>
+                  </Label>
+                  <Input
+                    id="applicationKey"
+                    type="password"
+                    placeholder="X-Application-Key"
+                    value={applicationKey}
+                    onChange={(e) => setApplicationKey(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
 
-        {provedor !== "santander" && (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="clientId">
-                Client ID
-                {isEditMode && <span className="text-xs text-muted-foreground ml-1">(opcional - mantém atual se em branco)</span>}
-              </Label>
-              <Input
-                id="clientId"
-                placeholder="Insira o Client ID"
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                disabled={loading}
-              />
+              {/* Coluna PIX */}
+              <div className="rounded-md border border-border p-3 space-y-3 bg-muted/30">
+                <div>
+                  <p className="text-sm font-medium">PIX</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    App <strong>PIX</strong> separada. Usada para cobranças, recebidos e webhooks. Em branco = usa OB como fallback.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pixClientId">Client ID (PIX)</Label>
+                  <Input
+                    id="pixClientId"
+                    placeholder="Client ID PIX"
+                    value={pixClientId}
+                    onChange={(e) => setPixClientId(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pixClientSecret">Client Secret (PIX)</Label>
+                  <Input
+                    id="pixClientSecret"
+                    type="password"
+                    placeholder="Client Secret PIX"
+                    value={pixClientSecret}
+                    onChange={(e) => setPixClientSecret(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
             </div>
+          )}
 
-            <div className="space-y-2">
-              <Label htmlFor="clientSecret">Client Secret</Label>
-              <Input
-                id="clientSecret"
-                type="password"
-                placeholder="Insira o Client Secret"
-                value={clientSecret}
-                onChange={(e) => setClientSecret(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-
-            {provedor === "getnet" && (
+          {provedor !== "santander" && (
+            <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="applicationKey">Application Key</Label>
+                <Label htmlFor="clientId">
+                  Client ID
+                  {isEditMode && <span className="text-xs text-muted-foreground ml-1">(opcional)</span>}
+                </Label>
                 <Input
-                  id="applicationKey"
-                  type="password"
-                  placeholder="Insira a Application Key"
-                  value={applicationKey}
-                  onChange={(e) => setApplicationKey(e.target.value)}
+                  id="clientId"
+                  placeholder="Insira o Client ID"
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
                   disabled={loading}
                 />
               </div>
-            )}
-          </>
-        )}
 
-        <div className="space-y-2">
-          <Label htmlFor="pfxFile">
-            Arquivo PFX
-            {isEditMode && <span className="text-xs text-muted-foreground ml-1">(opcional - deixe em branco para manter)</span>}
-          </Label>
-          <Input
-            id="pfxFile"
-            type="file"
-            accept=".pfx"
-            onChange={handlePfxChange}
-            disabled={loading}
-          />
-          {pfxFile && (
-            <p className="text-sm text-muted-foreground">
-              ✓ {pfxFile.name}
-            </p>
+              <div className="space-y-2">
+                <Label htmlFor="clientSecret">Client Secret</Label>
+                <Input
+                  id="clientSecret"
+                  type="password"
+                  placeholder="Insira o Client Secret"
+                  value={clientSecret}
+                  onChange={(e) => setClientSecret(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+
+              {provedor === "getnet" && (
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="applicationKey">Application Key</Label>
+                  <Input
+                    id="applicationKey"
+                    type="password"
+                    placeholder="Insira a Application Key"
+                    value={applicationKey}
+                    onChange={(e) => setApplicationKey(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+              )}
+            </div>
           )}
+
+          {/* PFX + senha lado a lado */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="pfxFile">
+                Arquivo PFX
+                {isEditMode && <span className="text-xs text-muted-foreground ml-1">(opcional)</span>}
+              </Label>
+              <Input
+                id="pfxFile"
+                type="file"
+                accept=".pfx"
+                onChange={handlePfxChange}
+                disabled={loading}
+              />
+              {pfxFile && (
+                <p className="text-sm text-muted-foreground truncate">
+                  ✓ {pfxFile.name}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pfxPassword">Senha do PFX</Label>
+              <Input
+                id="pfxPassword"
+                type="password"
+                placeholder="Senha do arquivo PFX"
+                value={pfxPassword}
+                onChange={(e) => setPfxPassword(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between py-2">
+            <Label htmlFor="ativo">Ativo</Label>
+            <Switch id="ativo" checked={ativo} onCheckedChange={setAtivo} />
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="pfxPassword">Senha do PFX</Label>
-          <Input
-            id="pfxPassword"
-            type="password"
-            placeholder="Insira a senha do arquivo PFX"
-            value={pfxPassword}
-            onChange={(e) => setPfxPassword(e.target.value)}
-            disabled={loading}
-          />
-        </div>
-
-        <div className="flex items-center justify-between py-2">
-          <Label htmlFor="ativo">Ativo</Label>
-          <Switch id="ativo" checked={ativo} onCheckedChange={setAtivo} />
-        </div>
-
-        <div className="flex gap-2 justify-end pt-4">
+        {/* Footer fixo */}
+        <div className="flex gap-2 justify-end px-6 py-4 border-t bg-background">
           <Button
             type="button"
             variant="outline"
@@ -549,3 +568,4 @@ export function IntegracaoCriarDialog({
     </ResponsiveDialog>
   );
 }
+
