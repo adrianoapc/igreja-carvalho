@@ -4843,11 +4843,6 @@ export type Database = {
           pfx_password: string | null
           pix_client_id: string | null
           pix_client_secret: string | null
-          sftp_host: string | null
-          sftp_password: string | null
-          sftp_path: string | null
-          sftp_port: string | null
-          sftp_username: string | null
         }
         Insert: {
           application_key?: string | null
@@ -4860,11 +4855,6 @@ export type Database = {
           pfx_password?: string | null
           pix_client_id?: string | null
           pix_client_secret?: string | null
-          sftp_host?: string | null
-          sftp_password?: string | null
-          sftp_path?: string | null
-          sftp_port?: string | null
-          sftp_username?: string | null
         }
         Update: {
           application_key?: string | null
@@ -4877,11 +4867,6 @@ export type Database = {
           pfx_password?: string | null
           pix_client_id?: string | null
           pix_client_secret?: string | null
-          sftp_host?: string | null
-          sftp_password?: string | null
-          sftp_path?: string | null
-          sftp_port?: string | null
-          sftp_username?: string | null
         }
         Relationships: [
           {
