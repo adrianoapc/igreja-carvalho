@@ -4838,6 +4838,8 @@ export type Database = {
           integracao_id: string
           pfx_blob: string | null
           pfx_password: string | null
+          pix_client_id: string | null
+          pix_client_secret: string | null
         }
         Insert: {
           application_key?: string | null
@@ -4848,6 +4850,8 @@ export type Database = {
           integracao_id: string
           pfx_blob?: string | null
           pfx_password?: string | null
+          pix_client_id?: string | null
+          pix_client_secret?: string | null
         }
         Update: {
           application_key?: string | null
@@ -4858,6 +4862,8 @@ export type Database = {
           integracao_id?: string
           pfx_blob?: string | null
           pfx_password?: string | null
+          pix_client_id?: string | null
+          pix_client_secret?: string | null
         }
         Relationships: [
           {
