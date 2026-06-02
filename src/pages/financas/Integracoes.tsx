@@ -12,9 +12,11 @@ import {
 } from "@/components/ui/table";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit2, Trash2, TestTube2, Loader2 } from "lucide-react";
+import { Plus, Edit2, Trash2, TestTube2, Loader2, Download, History } from "lucide-react";
 import { toast } from "sonner";
 import { IntegracaoCriarDialog } from "@/components/financas/IntegracoesCriarDialog";
+import { IntegracaoLogsDialog } from "@/components/financas/IntegracaoLogsDialog";
+
 import {
   AlertDialog,
   AlertDialogAction,
