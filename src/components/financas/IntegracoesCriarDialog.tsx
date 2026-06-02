@@ -279,6 +279,8 @@ export function IntegracaoCriarDialog({
                   client_id: clientId,
                   client_secret: clientSecret,
                   application_key: applicationKey || undefined,
+                  pix_client_id: pixClientId || undefined,
+                  pix_client_secret: pixClientSecret || undefined,
                   pfx_blob: base64,
                   pfx_password: pfxPassword,
                   ativo,
