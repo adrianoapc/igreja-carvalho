@@ -453,6 +453,14 @@ export default function Integracoes() {
         }}
       />
 
+      <IntegracaoLogsDialog
+        open={!!logsIntegracaoId}
+        onOpenChange={(open) => !open && setLogsIntegracaoId(null)}
+        integracaoId={logsIntegracaoId}
+      />
+
+
+
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
