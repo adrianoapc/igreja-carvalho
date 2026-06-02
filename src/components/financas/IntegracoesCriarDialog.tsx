@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +17,6 @@ import { useFilialId } from "@/hooks/useFilialId";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
 
 interface IntegracaoCriarDialogProps {
   open: boolean;
@@ -27,6 +26,7 @@ interface IntegracaoCriarDialogProps {
 }
 
 const PROVEDORES = ["santander", "getnet", "api_generico"] as const;
+type TipoAuth = "token" | "sftp";
 
 export function IntegracaoCriarDialog({
   open,
@@ -35,7 +35,10 @@ export function IntegracaoCriarDialog({
   integracaoId,
 }: IntegracaoCriarDialogProps) {
   const [provedor, setProvedor] = useState<string>("santander");
+  const [tipoAuth, setTipoAuth] = useState<TipoAuth>("token");
   const [cnpj, setCnpj] = useState("");
+
+  // Token credentials
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [applicationKey, setApplicationKey] = useState("");
@@ -43,6 +46,14 @@ export function IntegracaoCriarDialog({
   const [pixClientSecret, setPixClientSecret] = useState("");
   const [pfxFile, setPfxFile] = useState<File | null>(null);
   const [pfxPassword, setPfxPassword] = useState("");
+
+  // SFTP credentials
+  const [sftpHost, setSftpHost] = useState("");
+  const [sftpPort, setSftpPort] = useState("22");
+  const [sftpUsername, setSftpUsername] = useState("");
+  const [sftpPassword, setSftpPassword] = useState("");
+  const [sftpPath, setSftpPath] = useState("");
+
   const [ativo, setAtivo] = useState(true);
   const [loading, setLoading] = useState(false);
   const isEditMode = !!integracaoId;
@@ -51,36 +62,37 @@ export function IntegracaoCriarDialog({
   const { filialId } = useFilialId();
   const queryClient = useQueryClient();
 
-  // Carregar dados da integração ao abrir em modo edição
+  // Santander sempre exige certificado (mTLS) — força token
+  const isSantander = provedor === "santander";
+  const effectiveTipoAuth: TipoAuth = isSantander ? "token" : tipoAuth;
+
   useEffect(() => {
     if (isEditMode && open && integracaoId) {
-      const loadIntegracao = async () => {
+      const load = async () => {
         try {
           const { data, error } = await supabase
             .from("integracoes_financeiras")
             .select("*")
             .eq("id", integracaoId)
             .single();
-
           if (error) throw error;
-
           if (data) {
             setProvedor(data.provedor);
             setCnpj(data.cnpj);
             setAtivo(data.status === "ativo");
-            // Secrets nunca são carregados (criptografados); usuário re-fornece se quiser trocar
+            // @ts-expect-error tipo_auth pode não estar nos types gerados ainda
+            const t = (data.tipo_auth ?? "token") as TipoAuth;
+            setTipoAuth(t === "sftp" ? "sftp" : "token");
           }
-        } catch (error) {
-          console.error("Error loading integration:", error);
+        } catch (err) {
+          console.error("Error loading integration:", err);
           toast.error("Erro ao carregar dados da integração");
         }
       };
-
-      loadIntegracao();
+      load();
     }
   }, [isEditMode, open, integracaoId]);
 
-  // Limpar form ao fechar
   useEffect(() => {
     if (!open) {
       setTimeout(() => {
@@ -92,8 +104,14 @@ export function IntegracaoCriarDialog({
         setPixClientSecret("");
         setPfxFile(null);
         setPfxPassword("");
+        setSftpHost("");
+        setSftpPort("22");
+        setSftpUsername("");
+        setSftpPassword("");
+        setSftpPath("");
         setAtivo(true);
         setProvedor("santander");
+        setTipoAuth("token");
       }, 200);
     }
   }, [open]);
@@ -107,220 +125,128 @@ export function IntegracaoCriarDialog({
     }
   };
 
+  const validateBeforeSubmit = (): string | null => {
+    if (!cnpj.trim()) return "CNPJ é obrigatório";
+
+    if (effectiveTipoAuth === "sftp") {
+      if (!isEditMode) {
+        if (!sftpHost.trim()) return "Endereço (host) SFTP é obrigatório";
+        if (!sftpUsername.trim()) return "Usuário SFTP é obrigatório";
+        if (!sftpPassword.trim()) return "Senha SFTP é obrigatória";
+      }
+      return null;
+    }
+
+    // Token mode
+    if (!isEditMode) {
+      if (!clientId.trim()) return "Client ID é obrigatório";
+      if (!clientSecret.trim()) return "Client Secret é obrigatório";
+      if (isSantander) {
+        if (!pfxFile) return "Arquivo PFX é obrigatório";
+        if (!pfxPassword.trim()) return "Senha do PFX é obrigatória";
+      }
+      if (provedor === "getnet" && !applicationKey.trim()) {
+        return "Application Key é obrigatória para Getnet";
+      }
+    }
+    return null;
+  };
+
+  const buildSecretsPayload = (pfxBase64?: string | null) => {
+    if (effectiveTipoAuth === "sftp") {
+      return {
+        sftp_host: sftpHost || undefined,
+        sftp_port: sftpPort || undefined,
+        sftp_username: sftpUsername || undefined,
+        sftp_password: sftpPassword || undefined,
+        sftp_path: sftpPath || undefined,
+      };
+    }
+    return {
+      client_id: clientId || undefined,
+      client_secret: clientSecret || undefined,
+      application_key: applicationKey || undefined,
+      pix_client_id: pixClientId || undefined,
+      pix_client_secret: pixClientSecret || undefined,
+      pfx_blob: pfxBase64 ?? undefined,
+      pfx_password: pfxPassword || undefined,
+    };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!igrejaId) {
       toast.error("Igreja não identificada");
       return;
     }
-
-    if (!cnpj.trim()) {
-      toast.error("CNPJ é obrigatório");
+    const err = validateBeforeSubmit();
+    if (err) {
+      toast.error(err);
       return;
-    }
-
-    // Em modo criação, todas as credenciais são obrigatórias
-    if (!isEditMode) {
-      if (!clientId.trim()) {
-        toast.error("Client ID é obrigatório");
-        return;
-      }
-
-      if (!clientSecret.trim()) {
-        toast.error("Client Secret é obrigatório");
-        return;
-      }
-
-      if (!pfxFile) {
-        toast.error("Arquivo PFX é obrigatório");
-        return;
-      }
-
-      if (!pfxPassword.trim()) {
-        toast.error("Senha do PFX é obrigatória");
-        return;
-      }
-
-      if (provedor === "getnet" && !applicationKey.trim()) {
-        toast.error("Application Key é obrigatória para Getnet");
-        return;
-      }
-    } else {
-      // Em modo edição, se fornecer credenciais, todas são obrigatórias
-      const hasCredentials = clientId.trim() || clientSecret.trim() || pfxFile || applicationKey.trim();
-      if (hasCredentials) {
-        if (!clientId.trim()) {
-          toast.error("Client ID é obrigatório quando atualizando credenciais");
-          return;
-        }
-        if (!clientSecret.trim()) {
-          toast.error("Client Secret é obrigatório quando atualizando credenciais");
-          return;
-        }
-        if (!pfxFile) {
-          toast.error("Arquivo PFX é obrigatório quando atualizando credenciais");
-          return;
-        }
-        if (!pfxPassword.trim()) {
-          toast.error("Senha do PFX é obrigatória quando atualizando credenciais");
-          return;
-        }
-        if (provedor === "getnet" && !applicationKey.trim()) {
-          toast.error("Application Key é obrigatória para Getnet");
-          return;
-        }
-      }
     }
 
     setLoading(true);
 
-    try {
-      if (isEditMode && integracaoId) {
-        // Modo edição
-        if (!pfxFile) {
-          // Atualizar apenas metadados (sem credenciais)
-          const { error } = await supabase
-            .from("integracoes_financeiras")
-            .update({
-              cnpj,
-              status: ativo ? "ativo" : "inativo",
-            })
-            .eq("id", integracaoId)
-            .eq("igreja_id", igrejaId);
+    const action = isEditMode ? "update_integracao" : "create_integracao";
 
-          if (error) throw error;
-
-          toast.success("Integração atualizada com sucesso!");
-          await queryClient.invalidateQueries({
-            queryKey: ["integracoes_financeiras"],
-          });
-
-          onOpenChange(false);
-          onSuccess?.();
-          setLoading(false);
-        } else {
-          // Atualizar com novas credenciais
-          const reader = new FileReader();
-          reader.onload = async (event) => {
-            const base64 = (event.target?.result as string)?.split(",")[1];
-
-            if (!base64) {
-              toast.error("Erro ao ler arquivo PFX");
-              setLoading(false);
-              return;
-            }
-
-            try {
-              const { error } = await supabase.functions.invoke(
-                "integracoes-config",
-                {
-                  body: {
-                    action: "update_integracao",
-                    id: integracaoId,
-                    cnpj,
-                    client_id: clientId || undefined,
-                    client_secret: clientSecret || undefined,
-                    application_key: applicationKey || undefined,
-                    pix_client_id: pixClientId || undefined,
-                    pix_client_secret: pixClientSecret || undefined,
-                    pfx_blob: base64,
-                    pfx_password: pfxPassword,
-                    ativo,
-                    igreja_id: igrejaId,
-                  },
-                }
-              );
-
-              if (error) {
-                console.error("Edge Function error:", error);
-                toast.error(error?.message || "Erro ao atualizar integração");
-                setLoading(false);
-                return;
-              }
-
-              toast.success("Integração atualizada com sucesso!");
-              await queryClient.invalidateQueries({
-                queryKey: ["integracoes_financeiras"],
-              });
-
-              onOpenChange(false);
-              onSuccess?.();
-            } catch (err) {
-              console.error("Error updating integration:", err);
-              toast.error("Erro ao atualizar integração");
-            } finally {
-              setLoading(false);
-            }
-          };
-
-          reader.readAsDataURL(pfxFile);
-        }
-      } else {
-        // Modo criação (código original)
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-          const base64 = (event.target?.result as string)?.split(",")[1];
-
-          if (!base64) {
-            toast.error("Erro ao ler arquivo PFX");
-            setLoading(false);
-            return;
-          }
-
-          try {
-            const { data, error } = await supabase.functions.invoke(
-              "integracoes-config",
-              {
-                body: {
-                  action: "create_integracao",
-                  provedor,
-                  cnpj,
-                  client_id: clientId,
-                  client_secret: clientSecret,
-                  application_key: applicationKey || undefined,
-                  pix_client_id: pixClientId || undefined,
-                  pix_client_secret: pixClientSecret || undefined,
-                  pfx_blob: base64,
-                  pfx_password: pfxPassword,
-                  ativo,
-                  igreja_id: igrejaId,
-                  filial_id: filialId || undefined,
-                },
-              }
-            );
-
-            if (error) {
-              console.error("Edge Function error:", error);
-              toast.error(
-                error?.message || "Erro ao salvar integração"
-              );
-              return;
-            }
-
-            toast.success("Integração criada com sucesso!");
-
-            // Invalidate queries
-            await queryClient.invalidateQueries({
-              queryKey: ["integracoes_financeiras"],
-            });
-
-            onOpenChange(false);
-            onSuccess?.();
-          } catch (err) {
-            console.error("Error creating integration:", err);
-            toast.error("Erro ao criar integração");
-          } finally {
-            setLoading(false);
-          }
+    const send = async (pfxBase64: string | null) => {
+      try {
+        const body: Record<string, unknown> = {
+          action,
+          igreja_id: igrejaId,
+          cnpj,
+          ativo,
+          tipo_auth: effectiveTipoAuth,
+          ...buildSecretsPayload(pfxBase64),
         };
+        if (isEditMode) {
+          body.id = integracaoId;
+        } else {
+          body.provedor = provedor;
+          body.filial_id = filialId || undefined;
+        }
 
-        reader.readAsDataURL(pfxFile);
+        const { error } = await supabase.functions.invoke("integracoes-config", {
+          body,
+        });
+
+        if (error) {
+          console.error("Edge Function error:", error);
+          toast.error(error?.message || "Erro ao salvar integração");
+          return;
+        }
+
+        toast.success(
+          isEditMode
+            ? "Integração atualizada com sucesso!"
+            : "Integração criada com sucesso!"
+        );
+        await queryClient.invalidateQueries({
+          queryKey: ["integracoes_financeiras"],
+        });
+        onOpenChange(false);
+        onSuccess?.();
+      } catch (err2) {
+        console.error("Error saving integration:", err2);
+        toast.error("Erro ao salvar integração");
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Error in handleSubmit:", error);
-      toast.error("Erro ao processar integração");
-      setLoading(false);
+    };
+
+    if (effectiveTipoAuth === "token" && pfxFile) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = (event.target?.result as string)?.split(",")[1] ?? null;
+        send(base64);
+      };
+      reader.onerror = () => {
+        toast.error("Erro ao ler arquivo PFX");
+        setLoading(false);
+      };
+      reader.readAsDataURL(pfxFile);
+    } else {
+      send(null);
     }
   };
 
@@ -329,8 +255,7 @@ export function IntegracaoCriarDialog({
       open={open}
       onOpenChange={onOpenChange}
       dialogContentProps={{
-        className:
-          "sm:max-w-4xl max-h-[90vh] flex flex-col gap-0 p-0",
+        className: "sm:max-w-4xl max-h-[90vh] flex flex-col gap-0 p-0",
       }}
     >
       <DialogHeader className="px-6 pt-6 pb-4 border-b">
@@ -344,16 +269,13 @@ export function IntegracaoCriarDialog({
         </DialogDescription>
       </DialogHeader>
 
-      <form
-        onSubmit={handleSubmit}
-        className="flex flex-col flex-1 min-h-0"
-      >
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-          {/* Linha 1: Provedor + CNPJ lado a lado */}
+          {/* Provedor + CNPJ */}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="provedor">Provedor</Label>
-              <Select value={provedor} onValueChange={setProvedor}>
+              <Select value={provedor} onValueChange={setProvedor} disabled={isEditMode}>
                 <SelectTrigger id="provedor">
                   <SelectValue />
                 </SelectTrigger>
@@ -379,20 +301,50 @@ export function IntegracaoCriarDialog({
             </div>
           </div>
 
-          {provedor === "santander" && (
+          {/* Tipo de Autenticação — escondido para Santander (sempre mTLS/token) */}
+          {!isSantander && (
+            <div className="space-y-2">
+              <Label htmlFor="tipoAuth">Tipo de Integração</Label>
+              <Select
+                value={tipoAuth}
+                onValueChange={(v) => setTipoAuth(v as TipoAuth)}
+              >
+                <SelectTrigger id="tipoAuth">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="token">
+                    Token (Client ID / Client Secret)
+                  </SelectItem>
+                  <SelectItem value="sftp">SFTP (Host / Usuário / Senha)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Algumas conciliadoras (ex.: Getnet) entregam extratos via SFTP em vez de
+                API com token.
+              </p>
+            </div>
+          )}
+
+          {/* ====== MODO TOKEN ====== */}
+          {effectiveTipoAuth === "token" && isSantander && (
             <div className="grid gap-4 md:grid-cols-2">
-              {/* Coluna Open Banking */}
               <div className="rounded-md border border-border p-3 space-y-3 bg-muted/30">
                 <div>
                   <p className="text-sm font-medium">Open Banking (Cash Management)</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    App <strong>Cash Management</strong> no portal Santander Developers. Usadas para saldo, extrato e sync.
+                    App <strong>Cash Management</strong> no portal Santander Developers.
+                    Usadas para saldo, extrato e sync.
                   </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="clientId">
                     Client ID
-                    {isEditMode && <span className="text-xs text-muted-foreground ml-1">(opcional)</span>}
+                    {isEditMode && (
+                      <span className="text-xs text-muted-foreground ml-1">
+                        (opcional)
+                      </span>
+                    )}
                   </Label>
                   <Input
                     id="clientId"
@@ -416,7 +368,9 @@ export function IntegracaoCriarDialog({
                 <div className="space-y-2">
                   <Label htmlFor="applicationKey">
                     Application Key
-                    <span className="text-xs text-muted-foreground ml-1">(geralmente = Client ID)</span>
+                    <span className="text-xs text-muted-foreground ml-1">
+                      (geralmente = Client ID)
+                    </span>
                   </Label>
                   <Input
                     id="applicationKey"
@@ -429,12 +383,12 @@ export function IntegracaoCriarDialog({
                 </div>
               </div>
 
-              {/* Coluna PIX */}
               <div className="rounded-md border border-border p-3 space-y-3 bg-muted/30">
                 <div>
                   <p className="text-sm font-medium">PIX</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    App <strong>PIX</strong> separada. Usada para cobranças, recebidos e webhooks. Em branco = usa OB como fallback.
+                    App <strong>PIX</strong> separada. Usada para cobranças, recebidos e
+                    webhooks. Em branco = usa OB como fallback.
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -462,12 +416,14 @@ export function IntegracaoCriarDialog({
             </div>
           )}
 
-          {provedor !== "santander" && (
+          {effectiveTipoAuth === "token" && !isSantander && (
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="clientId">
                   Client ID
-                  {isEditMode && <span className="text-xs text-muted-foreground ml-1">(opcional)</span>}
+                  {isEditMode && (
+                    <span className="text-xs text-muted-foreground ml-1">(opcional)</span>
+                  )}
                 </Label>
                 <Input
                   id="clientId"
@@ -506,39 +462,123 @@ export function IntegracaoCriarDialog({
             </div>
           )}
 
-          {/* PFX + senha lado a lado */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="pfxFile">
-                Arquivo PFX
-                {isEditMode && <span className="text-xs text-muted-foreground ml-1">(opcional)</span>}
-              </Label>
-              <Input
-                id="pfxFile"
-                type="file"
-                accept=".pfx"
-                onChange={handlePfxChange}
-                disabled={loading}
-              />
-              {pfxFile && (
-                <p className="text-sm text-muted-foreground truncate">
-                  ✓ {pfxFile.name}
-                </p>
-              )}
-            </div>
+          {/* PFX só faz sentido em modo token */}
+          {effectiveTipoAuth === "token" && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="pfxFile">
+                  Arquivo PFX
+                  {(isEditMode || !isSantander) && (
+                    <span className="text-xs text-muted-foreground ml-1">(opcional)</span>
+                  )}
+                </Label>
+                <Input
+                  id="pfxFile"
+                  type="file"
+                  accept=".pfx"
+                  onChange={handlePfxChange}
+                  disabled={loading}
+                />
+                {pfxFile && (
+                  <p className="text-sm text-muted-foreground truncate">
+                    ✓ {pfxFile.name}
+                  </p>
+                )}
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="pfxPassword">Senha do PFX</Label>
-              <Input
-                id="pfxPassword"
-                type="password"
-                placeholder="Senha do arquivo PFX"
-                value={pfxPassword}
-                onChange={(e) => setPfxPassword(e.target.value)}
-                disabled={loading}
-              />
+              <div className="space-y-2">
+                <Label htmlFor="pfxPassword">Senha do PFX</Label>
+                <Input
+                  id="pfxPassword"
+                  type="password"
+                  placeholder="Senha do arquivo PFX"
+                  value={pfxPassword}
+                  onChange={(e) => setPfxPassword(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* ====== MODO SFTP ====== */}
+          {effectiveTipoAuth === "sftp" && (
+            <div className="rounded-md border border-border p-3 space-y-3 bg-muted/30">
+              <div>
+                <p className="text-sm font-medium">Credenciais SFTP</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  O sistema fará download dos arquivos de extrato do servidor SFTP do
+                  provedor.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-[1fr_120px]">
+                <div className="space-y-2">
+                  <Label htmlFor="sftpHost">
+                    Host / Endereço
+                    {isEditMode && (
+                      <span className="text-xs text-muted-foreground ml-1">
+                        (opcional)
+                      </span>
+                    )}
+                  </Label>
+                  <Input
+                    id="sftpHost"
+                    placeholder="sftp.provedor.com.br"
+                    value={sftpHost}
+                    onChange={(e) => setSftpHost(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sftpPort">Porta</Label>
+                  <Input
+                    id="sftpPort"
+                    placeholder="22"
+                    value={sftpPort}
+                    onChange={(e) => setSftpPort(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="sftpUsername">Usuário</Label>
+                  <Input
+                    id="sftpUsername"
+                    placeholder="usuario_sftp"
+                    value={sftpUsername}
+                    onChange={(e) => setSftpUsername(e.target.value)}
+                    disabled={loading}
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sftpPassword">Senha</Label>
+                  <Input
+                    id="sftpPassword"
+                    type="password"
+                    placeholder="Senha SFTP"
+                    value={sftpPassword}
+                    onChange={(e) => setSftpPassword(e.target.value)}
+                    disabled={loading}
+                    autoComplete="new-password"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sftpPath">Caminho remoto (opcional)</Label>
+                <Input
+                  id="sftpPath"
+                  placeholder="/extratos/ ou /out/"
+                  value={sftpPath}
+                  onChange={(e) => setSftpPath(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-between py-2">
             <Label htmlFor="ativo">Ativo</Label>
@@ -546,7 +586,6 @@ export function IntegracaoCriarDialog({
           </div>
         </div>
 
-        {/* Footer fixo */}
         <div className="flex gap-2 justify-end px-6 py-4 border-t bg-background">
           <Button
             type="button"
@@ -568,4 +607,3 @@ export function IntegracaoCriarDialog({
     </ResponsiveDialog>
   );
 }
-
