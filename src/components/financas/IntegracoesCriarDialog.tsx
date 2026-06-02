@@ -39,6 +39,8 @@ export function IntegracaoCriarDialog({
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [applicationKey, setApplicationKey] = useState("");
+  const [pixClientId, setPixClientId] = useState("");
+  const [pixClientSecret, setPixClientSecret] = useState("");
   const [pfxFile, setPfxFile] = useState<File | null>(null);
   const [pfxPassword, setPfxPassword] = useState("");
   const [ativo, setAtivo] = useState(true);
@@ -66,8 +68,7 @@ export function IntegracaoCriarDialog({
             setProvedor(data.provedor);
             setCnpj(data.cnpj);
             setAtivo(data.status === "ativo");
-            // Não carregamos clientId, clientSecret, applicationKey do banco por motivos de segurança
-            // O usuário precisa fornecer novamente ao editar
+            // Secrets nunca são carregados (criptografados); usuário re-fornece se quiser trocar
           }
         } catch (error) {
           console.error("Error loading integration:", error);
@@ -87,6 +88,8 @@ export function IntegracaoCriarDialog({
         setClientId("");
         setClientSecret("");
         setApplicationKey("");
+        setPixClientId("");
+        setPixClientSecret("");
         setPfxFile(null);
         setPfxPassword("");
         setAtivo(true);
