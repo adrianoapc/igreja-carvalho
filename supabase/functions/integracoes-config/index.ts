@@ -214,6 +214,7 @@ async function handleCreateIntegracao(
 
   // Criar integração (service role)
   const status = payload.ativo === false ? "inativo" : "ativo";
+  const tipo_auth = payload.tipo_auth === "sftp" ? "sftp" : "token";
 
   const { data: integracao, error: integracaoError } = await supabaseAdmin
     .from("integracoes_financeiras")
@@ -223,12 +224,13 @@ async function handleCreateIntegracao(
       cnpj: cnpj.replace(/\D/g, ""),
       provedor,
       status,
+      tipo_auth,
       config: {
         created_by: userId,
       },
     })
     .select(
-      "id, igreja_id, filial_id, cnpj, provedor, status, config, created_at, updated_at"
+      "id, igreja_id, filial_id, cnpj, provedor, status, tipo_auth, config, created_at, updated_at"
     )
     .single();
 
@@ -248,7 +250,12 @@ async function handleCreateIntegracao(
     payload.pix_client_id ||
     payload.pix_client_secret ||
     payload.pfx_blob ||
-    payload.pfx_password;
+    payload.pfx_password ||
+    payload.sftp_host ||
+    payload.sftp_port ||
+    payload.sftp_username ||
+    payload.sftp_password ||
+    payload.sftp_path;
 
   if (hasSecrets) {
     console.log("[integracoes-config] Encrypting sensitive credentials...");
@@ -267,6 +274,11 @@ async function handleCreateIntegracao(
         application_key: enc(payload.application_key),
         pix_client_id: enc(payload.pix_client_id),
         pix_client_secret: enc(payload.pix_client_secret),
+        sftp_host: enc(payload.sftp_host),
+        sftp_port: enc(payload.sftp_port),
+        sftp_username: enc(payload.sftp_username),
+        sftp_password: enc(payload.sftp_password),
+        sftp_path: enc(payload.sftp_path),
       });
 
     if (secretsError) {
@@ -286,6 +298,7 @@ async function handleCreateIntegracao(
       "[integracoes-config] Secrets encrypted and stored successfully"
     );
   }
+
 
   return json(201, { success: true, integracao });
 }
