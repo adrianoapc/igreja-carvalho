@@ -210,6 +210,34 @@ export default function Integracoes() {
     }
   };
 
+  const handleImport = async (integracao: Integracao) => {
+    setImportingId(integracao.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("getnet-sftp", {
+        body: { action: "import_extrato", integracao_id: integracao.id },
+      });
+      if (error) {
+        toast.error(`Erro na importação: ${error.message}`);
+        return;
+      }
+      if (data?.success) {
+        toast.success(`Importação concluída: ${data.arquivo}`, {
+          description: `Recebido: ${data.total_recebido} · Inserido: ${data.total_inserido} · Ignorado: ${data.total_ignorado}`,
+        });
+      } else {
+        toast.error("Falha na importação", {
+          description: data?.error || "Veja o histórico para detalhes",
+        });
+      }
+    } catch (err) {
+      console.error("Import exception:", err);
+      toast.error("Erro ao importar extrato");
+    } finally {
+      setImportingId(null);
+    }
+  };
+
+
   const getProviderLabel = (provedor: string) => {
     const labels: Record<string, string> = {
       santander: "Santander",
