@@ -172,7 +172,7 @@ function decryptData(encrypted: unknown, key: Uint8Array): string {
   }
 }
 
-function pfxToPem(pfxData: string, password?: string): { cert: string; key: string } {
+function pfxToPem(pfxData: string, password?: string): { cert: string; key: string; certInfo?: Record<string, unknown> } {
   try {
     let pfxDer: string
     
@@ -219,7 +219,27 @@ function pfxToPem(pfxData: string, password?: string): { cert: string; key: stri
     }
     const key = forge.pki.privateKeyToPem(keyBag.key)
 
-    return { cert, key }
+    // Diagnóstico: extrai metadados do certificado
+    const c: any = certBag.cert
+    const getAttr = (attrs: any[], name: string) =>
+      attrs?.find((a: any) => a.name === name || a.shortName === name)?.value
+    const now = new Date()
+    const certInfo: Record<string, unknown> = {
+      subject_CN: getAttr(c.subject.attributes, 'commonName'),
+      subject_O: getAttr(c.subject.attributes, 'organizationName'),
+      subject_OU: getAttr(c.subject.attributes, 'organizationalUnitName'),
+      subject_full: c.subject.attributes.map((a: any) => `${a.shortName || a.name}=${a.value}`).join(', '),
+      issuer_CN: getAttr(c.issuer.attributes, 'commonName'),
+      issuer_O: getAttr(c.issuer.attributes, 'organizationName'),
+      validFrom: c.validity.notBefore.toISOString(),
+      validTo: c.validity.notAfter.toISOString(),
+      isExpired: now > c.validity.notAfter,
+      notYetValid: now < c.validity.notBefore,
+      daysUntilExpiry: Math.floor((c.validity.notAfter.getTime() - now.getTime()) / 86400000),
+      serialNumber: c.serialNumber,
+    }
+
+    return { cert, key, certInfo }
   } catch (error) {
     throw new Error(`PFX conversion failed: ${error instanceof Error ? error.message : String(error)}`)
   }
