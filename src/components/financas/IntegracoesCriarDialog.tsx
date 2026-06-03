@@ -655,6 +655,9 @@ export function IntegracaoCriarDialog({
                       <SelectItem value="settlement_v1">
                         Getnet — Settlement v1 (CSV)
                       </SelectItem>
+                      <SelectItem value="extrato_eletronico_v10">
+                        Getnet — Extrato Eletrônico v10.1 (TXT posicional)
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

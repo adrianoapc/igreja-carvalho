@@ -30,7 +30,8 @@ const ACAO_LABEL: Record<string, string> = {
   test_connection: "Teste de conexão",
   list_files: "Listar arquivos",
   download_file: "Download",
-  import_extrato: "Importar extrato",
+  import_extrato: "Importar extrato (lote)",
+  import_extrato_arquivo: "Processar arquivo",
 };
 
 function statusBadge(status: string) {
