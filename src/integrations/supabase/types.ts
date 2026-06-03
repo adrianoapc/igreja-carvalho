@@ -4023,6 +4023,130 @@ export type Database = {
           },
         ]
       }
+      getnet_analitico: {
+        Row: {
+          arquivo_nome: string
+          cartao_truncado: string | null
+          codigo_autorizacao: string | null
+          created_at: string
+          filial_id: string | null
+          forma_captura: string | null
+          id: string
+          igreja_id: string
+          integracao_id: string
+          nsu_cv: string
+          raw_line: string | null
+          rv: string
+          status: string | null
+          updated_at: string
+          valor_transacao: number
+        }
+        Insert: {
+          arquivo_nome: string
+          cartao_truncado?: string | null
+          codigo_autorizacao?: string | null
+          created_at?: string
+          filial_id?: string | null
+          forma_captura?: string | null
+          id?: string
+          igreja_id: string
+          integracao_id: string
+          nsu_cv: string
+          raw_line?: string | null
+          rv: string
+          status?: string | null
+          updated_at?: string
+          valor_transacao: number
+        }
+        Update: {
+          arquivo_nome?: string
+          cartao_truncado?: string | null
+          codigo_autorizacao?: string | null
+          created_at?: string
+          filial_id?: string | null
+          forma_captura?: string | null
+          id?: string
+          igreja_id?: string
+          integracao_id?: string
+          nsu_cv?: string
+          raw_line?: string | null
+          rv?: string
+          status?: string | null
+          updated_at?: string
+          valor_transacao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "getnet_analitico_integracao_id_fkey"
+            columns: ["integracao_id"]
+            isOneToOne: false
+            referencedRelation: "integracoes_financeiras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      getnet_resumo: {
+        Row: {
+          arquivo_nome: string
+          codigo_produto: string | null
+          created_at: string
+          data_rv: string
+          filial_id: string | null
+          forma_captura: string | null
+          id: string
+          igreja_id: string
+          integracao_id: string
+          raw_line: string | null
+          rv: string
+          sinal: string | null
+          updated_at: string
+          valor_bruto: number
+          valor_liquido: number
+        }
+        Insert: {
+          arquivo_nome: string
+          codigo_produto?: string | null
+          created_at?: string
+          data_rv: string
+          filial_id?: string | null
+          forma_captura?: string | null
+          id?: string
+          igreja_id: string
+          integracao_id: string
+          raw_line?: string | null
+          rv: string
+          sinal?: string | null
+          updated_at?: string
+          valor_bruto: number
+          valor_liquido: number
+        }
+        Update: {
+          arquivo_nome?: string
+          codigo_produto?: string | null
+          created_at?: string
+          data_rv?: string
+          filial_id?: string | null
+          forma_captura?: string | null
+          id?: string
+          igreja_id?: string
+          integracao_id?: string
+          raw_line?: string | null
+          rv?: string
+          sinal?: string | null
+          updated_at?: string
+          valor_bruto?: number
+          valor_liquido?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "getnet_resumo_integracao_id_fkey"
+            columns: ["integracao_id"]
+            isOneToOne: false
+            referencedRelation: "integracoes_financeiras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       igrejas: {
         Row: {
           admin_responsavel_id: string | null
