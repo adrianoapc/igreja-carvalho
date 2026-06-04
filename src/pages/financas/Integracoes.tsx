@@ -16,6 +16,7 @@ import { Plus, Edit2, Trash2, TestTube2, Loader2, Download, History } from "luci
 import { toast } from "sonner";
 import { IntegracaoCriarDialog } from "@/components/financas/IntegracoesCriarDialog";
 import { IntegracaoLogsDialog } from "@/components/financas/IntegracaoLogsDialog";
+import { WebhookStatusBadge } from "@/components/financas/IntegracaoWebhookTab";
 
 import {
   AlertDialog,
