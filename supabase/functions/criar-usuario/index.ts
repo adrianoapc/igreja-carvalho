@@ -130,8 +130,9 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
 
-    if (!supabaseUrl || !supabaseServiceKey) {
+    if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
       return new Response(
         JSON.stringify({ error: "Environment variables not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -140,21 +141,48 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // ========== CRIAR USUÁRIO ==========
-    if (action === "create_user") {
-      if (!authHeader) {
+    // Para actions privilegiadas (create_user/reset_password), validar JWT + role.
+    // recovery_otp é público por design.
+    if (action === "create_user" || action === "reset_password") {
+      if (!authHeader?.startsWith("Bearer ")) {
         return new Response(
           JSON.stringify({ error: "Authorization header missing" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+      const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error: userErr } = await userClient.auth.getUser();
+      if (userErr || !user) {
+        return new Response(
+          JSON.stringify({ error: "Não autenticado" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+      const allowed = new Set(["admin", "admin_igreja", "super_admin"]);
+      if (!roles?.some((r: any) => allowed.has(r.role))) {
+        return new Response(
+          JSON.stringify({ error: "Permissão insuficiente" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
 
+    // ========== CRIAR USUÁRIO ==========
+    if (action === "create_user") {
       if (!email || !password || !profile_id) {
         return new Response(
           JSON.stringify({ error: "Missing required fields: email, password, profile_id" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+
 
       try {
         // Criar usuário via Admin API
@@ -250,19 +278,14 @@ serve(async (req) => {
 
     // ========== RESETAR SENHA ==========
     } else if (action === "reset_password") {
-      if (!authHeader) {
-        return new Response(
-          JSON.stringify({ error: "Authorization header missing" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
       if (!password || !profile_id) {
         return new Response(
           JSON.stringify({ error: "Missing required fields: password, profile_id" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+
 
       try {
         const { data: profile, error: fetchError } = await supabase

@@ -55,6 +55,34 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Verificar se o usuário é admin/super_admin da igreja alvo
+    const serviceClientAuthz = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: rolesAuthz } = await serviceClientAuthz
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id);
+    const isSuper = rolesAuthz?.some((r: any) => r.role === "super_admin");
+    let authorized = !!isSuper;
+    if (!authorized) {
+      const { data: profile } = await serviceClientAuthz
+        .from("profiles")
+        .select("igreja_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const isChurchAdmin = rolesAuthz?.some((r: any) =>
+        ["admin", "admin_igreja"].includes(r.role)
+      );
+      authorized = !!(isChurchAdmin && profile?.igreja_id === p_igreja_id);
+    }
+    if (!authorized) {
+      return new Response(
+        JSON.stringify({ error: "Sem permissão para esta igreja" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+
+
     // Use service role to call the RPC with the server-side encryption key
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
     const { error } = await serviceClient.rpc("set_webhook_secret", {

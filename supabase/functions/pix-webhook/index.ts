@@ -116,9 +116,43 @@ serve(async (req) => {
       );
     }
 
+    // Validar shared secret (Santander deve enviar header X-Webhook-Secret)
+    const expectedSecret = Deno.env.get("PIX_WEBHOOK_SECRET");
+    if (!expectedSecret) {
+      console.error("[pix-webhook] PIX_WEBHOOK_SECRET não configurado");
+      return new Response(
+        JSON.stringify({ error: "Webhook não configurado" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const providedSecret =
+      req.headers.get("x-webhook-secret") ||
+      req.headers.get("X-Webhook-Secret") ||
+      "";
+    // Comparação tempo-constante
+    const enc = new TextEncoder();
+    const a = enc.encode(providedSecret);
+    const b = enc.encode(expectedSecret);
+    let secretOk = a.length === b.length;
+    const len = Math.max(a.length, b.length);
+    let diff = a.length ^ b.length;
+    for (let i = 0; i < len; i++) {
+      diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
+    }
+    secretOk = secretOk && diff === 0;
+    if (!secretOk) {
+      console.warn("[pix-webhook] Secret inválido ou ausente");
+      return new Response(
+        JSON.stringify({ error: "Não autorizado" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Parse do payload
     const payload: PixWebhookPayload = await req.json();
     console.log("[pix-webhook] Recebido payload:", JSON.stringify(payload));
+
+
 
     // Validar estrutura do payload
     if (!payload.pix || !Array.isArray(payload.pix) || payload.pix.length === 0) {
