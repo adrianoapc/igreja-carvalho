@@ -335,6 +335,7 @@ export default function Integracoes() {
                 <TableHead>Provedor</TableHead>
                 <TableHead>CNPJ</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Webhook</TableHead>
                 <TableHead>Filial</TableHead>
                 <TableHead>Criado em</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -348,6 +349,13 @@ export default function Integracoes() {
                   </TableCell>
                   <TableCell>{integracao.cnpj}</TableCell>
                   <TableCell>{getStatusBadge(integracao.status)}</TableCell>
+                  <TableCell>
+                    {integracao.provedor === "santander" ? (
+                      <WebhookStatusBadge ultimoEvento={lastPixEvent ?? null} />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {integracao.filial_id ? "Específica" : "Geral"}
                   </TableCell>
