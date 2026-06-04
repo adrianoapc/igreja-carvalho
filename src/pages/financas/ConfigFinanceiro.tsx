@@ -393,43 +393,9 @@ export default function ConfigFinanceiro() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-soft">
-        <CardHeader className="p-4 md:p-6">
-          <CardTitle className="text-lg">Integração com Provedores</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 md:p-6 pt-0 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Tipo de provedor</Label>
-              <Input
-                value={form.provider_tipo || ""}
-                onChange={(e) => setField("provider_tipo", e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Webhook URL</Label>
-              <Input
-                value={form.webhook_url || ""}
-                onChange={(e) => setField("webhook_url", e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Hint de segredo</Label>
-              <Input
-                value={form.secret_hint || ""}
-                onChange={(e) => setField("secret_hint", e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Estratégia de sincronização</Label>
-              <Input
-                value={form.sync_strategy || ""}
-                onChange={(e) => setField("sync_strategy", e.target.value)}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Bloco legado "Integração com Provedores" removido.
+          Webhooks e credenciais agora vivem em /financas/integracoes (aba "Webhook"). */}
+
 
       <Card className="shadow-soft">
         <CardHeader className="p-4 md:p-6">

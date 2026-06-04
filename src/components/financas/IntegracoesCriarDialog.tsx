@@ -17,6 +17,8 @@ import { useFilialId } from "@/hooks/useFilialId";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { IntegracaoWebhookTab } from "@/components/financas/IntegracaoWebhookTab";
 
 interface IntegracaoCriarDialogProps {
   open: boolean;
@@ -326,7 +328,19 @@ export function IntegracaoCriarDialog({
       </DialogHeader>
 
       <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <Tabs defaultValue="credenciais" className="flex flex-col flex-1 min-h-0">
+          <TabsList className="mx-6 mt-3 grid w-[calc(100%-3rem)] grid-cols-2">
+            <TabsTrigger value="credenciais">Credenciais</TabsTrigger>
+            <TabsTrigger value="webhook" disabled={!isEditMode && !igrejaId}>
+              Webhook
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent
+            value="credenciais"
+            className="flex-1 overflow-y-auto px-6 py-4 space-y-4 mt-0 data-[state=inactive]:hidden"
+            forceMount
+          >
           {/* Provedor + CNPJ */}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
@@ -689,7 +703,16 @@ export function IntegracaoCriarDialog({
             <Label htmlFor="ativo">Ativo</Label>
             <Switch id="ativo" checked={ativo} onCheckedChange={setAtivo} />
           </div>
-        </div>
+          </TabsContent>
+
+          <TabsContent
+            value="webhook"
+            className="flex-1 overflow-y-auto px-6 py-4 mt-0 data-[state=inactive]:hidden"
+            forceMount
+          >
+            <IntegracaoWebhookTab igrejaId={igrejaId} provedor={provedor} />
+          </TabsContent>
+        </Tabs>
 
         <div className="flex gap-2 justify-end px-6 py-4 border-t bg-background">
           <Button
@@ -710,5 +733,6 @@ export function IntegracaoCriarDialog({
         </div>
       </form>
     </ResponsiveDialog>
+
   );
 }

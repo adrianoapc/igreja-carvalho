@@ -16,6 +16,7 @@ import { Plus, Edit2, Trash2, TestTube2, Loader2, Download, History } from "luci
 import { toast } from "sonner";
 import { IntegracaoCriarDialog } from "@/components/financas/IntegracoesCriarDialog";
 import { IntegracaoLogsDialog } from "@/components/financas/IntegracaoLogsDialog";
+import { WebhookStatusBadge } from "@/components/financas/IntegracaoWebhookTab";
 
 import {
   AlertDialog,
@@ -62,6 +63,23 @@ export default function Integracoes() {
       return data || [];
     },
     enabled: !!igrejaId,
+  });
+
+  // Buscar último evento de webhook PIX por igreja (apenas Santander hoje)
+  const { data: lastPixEvent } = useQuery({
+    queryKey: ["pix_webhook_last_event", igrejaId],
+    queryFn: async () => {
+      if (!igrejaId) return null;
+      const { data } = await supabase
+        .from("pix_webhook_temp")
+        .select("data_recebimento")
+        .eq("igreja_id", igrejaId)
+        .order("data_recebimento", { ascending: false })
+        .limit(1);
+      return data?.[0]?.data_recebimento ?? null;
+    },
+    enabled: !!igrejaId,
+    refetchInterval: 60000,
   });
 
   const handleDelete = async () => {
@@ -317,6 +335,7 @@ export default function Integracoes() {
                 <TableHead>Provedor</TableHead>
                 <TableHead>CNPJ</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Webhook</TableHead>
                 <TableHead>Filial</TableHead>
                 <TableHead>Criado em</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -330,6 +349,13 @@ export default function Integracoes() {
                   </TableCell>
                   <TableCell>{integracao.cnpj}</TableCell>
                   <TableCell>{getStatusBadge(integracao.status)}</TableCell>
+                  <TableCell>
+                    {integracao.provedor === "santander" ? (
+                      <WebhookStatusBadge ultimoEvento={lastPixEvent ?? null} />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {integracao.filial_id ? "Específica" : "Geral"}
                   </TableCell>
