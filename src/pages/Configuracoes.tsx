@@ -241,20 +241,38 @@ export default function Configuracoes() {
               </Button>
             ))}
             {(isAdmin || checkPermission("financeiro.admin")) && (
-              <Button
-                variant="ghost"
-                className="w-full justify-between h-auto py-3 px-4"
-                onClick={() => navigate("/financas/config-financeiro")}
-              >
-                <div className="flex items-center gap-3">
-                  <Settings className="h-5 w-5 text-muted-foreground" />
-                  <div className="text-left">
-                    <div className="font-medium">Configuração Financeira</div>
-                    <div className="text-xs text-muted-foreground">Conferência cega e integrações</div>
+              <>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between h-auto py-3 px-4"
+                  onClick={() => navigate("/financas/integracoes")}
+                >
+                  <div className="flex items-center gap-3">
+                    <Webhook className="h-5 w-5 text-muted-foreground" />
+                    <div className="text-left">
+                      <div className="font-medium">Integrações Financeiras e Webhooks</div>
+                      <div className="text-xs text-muted-foreground">
+                        Santander, Getnet e webhooks de recebimento PIX
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </Button>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between h-auto py-3 px-4"
+                  onClick={() => navigate("/financas/config-financeiro")}
+                >
+                  <div className="flex items-center gap-3">
+                    <Settings className="h-5 w-5 text-muted-foreground" />
+                    <div className="text-left">
+                      <div className="font-medium">Configuração Financeira</div>
+                      <div className="text-xs text-muted-foreground">Conferência cega e parâmetros gerais</div>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </>
             )}
           </CardContent>
         </Card>
