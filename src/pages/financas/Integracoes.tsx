@@ -65,6 +65,23 @@ export default function Integracoes() {
     enabled: !!igrejaId,
   });
 
+  // Buscar último evento de webhook PIX por igreja (apenas Santander hoje)
+  const { data: lastPixEvent } = useQuery({
+    queryKey: ["pix_webhook_last_event", igrejaId],
+    queryFn: async () => {
+      if (!igrejaId) return null;
+      const { data } = await supabase
+        .from("pix_webhook_temp")
+        .select("data_recebimento")
+        .eq("igreja_id", igrejaId)
+        .order("data_recebimento", { ascending: false })
+        .limit(1);
+      return data?.[0]?.data_recebimento ?? null;
+    },
+    enabled: !!igrejaId,
+    refetchInterval: 60000,
+  });
+
   const handleDelete = async () => {
     if (!deleteId) return;
 
