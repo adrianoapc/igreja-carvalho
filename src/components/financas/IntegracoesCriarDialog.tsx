@@ -703,7 +703,16 @@ export function IntegracaoCriarDialog({
             <Label htmlFor="ativo">Ativo</Label>
             <Switch id="ativo" checked={ativo} onCheckedChange={setAtivo} />
           </div>
-        </div>
+          </TabsContent>
+
+          <TabsContent
+            value="webhook"
+            className="flex-1 overflow-y-auto px-6 py-4 mt-0 data-[state=inactive]:hidden"
+            forceMount
+          >
+            <IntegracaoWebhookTab igrejaId={igrejaId} provedor={provedor} />
+          </TabsContent>
+        </Tabs>
 
         <div className="flex gap-2 justify-end px-6 py-4 border-t bg-background">
           <Button
@@ -724,5 +733,6 @@ export function IntegracaoCriarDialog({
         </div>
       </form>
     </ResponsiveDialog>
+
   );
 }
