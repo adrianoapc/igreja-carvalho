@@ -17,6 +17,8 @@ import { useFilialId } from "@/hooks/useFilialId";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { IntegracaoWebhookTab } from "@/components/financas/IntegracaoWebhookTab";
 
 interface IntegracaoCriarDialogProps {
   open: boolean;
