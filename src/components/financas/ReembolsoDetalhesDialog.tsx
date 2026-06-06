@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import {
   Clock,
   CheckCircle,
@@ -223,7 +223,7 @@ export function ReembolsoDetalhesDialog({
             </div>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 px-6 py-4">
+          <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
             {/* Informações do Solicitante */}
             {solicitacao.solicitante_nome && (
               <div className="mb-4 p-3 bg-muted/30 rounded-lg">
@@ -365,7 +365,7 @@ export function ReembolsoDetalhesDialog({
                 <p className="text-sm">{solicitacao.observacoes}</p>
               </div>
             )}
-          </ScrollArea>
+          </div>
 
           {/* Footer */}
           <div className="px-6 py-4 border-t shrink-0">

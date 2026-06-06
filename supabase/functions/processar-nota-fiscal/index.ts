@@ -392,18 +392,47 @@ serve(async (req) => {
     );
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    // Choose provider (prefer Gemini, fallback to OpenAI)
+    // Choose provider:
+    // - PDFs: prefer Lovable AI Gateway (Gemini supports PDFs natively), then Gemini direct
+    // - Images: prefer Gemini direct, then OpenAI, then Lovable AI Gateway
     const GEMINI_API_KEY =
       Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_API_KEY");
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    const provider = GEMINI_API_KEY
-      ? "gemini"
-      : OPENAI_API_KEY
-      ? "openai"
-      : null;
+
+    let provider: "gemini" | "openai" | "lovable" | null = null;
+    if (isPdf) {
+      provider = LOVABLE_API_KEY
+        ? "lovable"
+        : GEMINI_API_KEY
+        ? "gemini"
+        : null;
+      if (!provider) {
+        console.error(
+          "[processar-nota-fiscal] PDF recebido mas nenhum provedor compatível com PDF está configurado (LOVABLE_API_KEY ou GEMINI_API_KEY). OpenAI não aceita PDFs."
+        );
+        return new Response(
+          JSON.stringify({
+            error:
+              "Processamento de PDFs indisponível: configure LOVABLE_API_KEY ou GEMINI_API_KEY.",
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    } else {
+      provider = GEMINI_API_KEY
+        ? "gemini"
+        : OPENAI_API_KEY
+        ? "openai"
+        : LOVABLE_API_KEY
+        ? "lovable"
+        : null;
+    }
     if (!provider) {
       console.error(
-        "Nenhum provedor de IA configurado (GEMINI_API_KEY/GOOGLE_API_KEY ou OPENAI_API_KEY)"
+        "Nenhum provedor de IA configurado (LOVABLE_API_KEY, GEMINI_API_KEY/GOOGLE_API_KEY ou OPENAI_API_KEY)"
       );
       return new Response(
         JSON.stringify({ error: "Serviço de processamento não configurado" }),
@@ -413,6 +442,7 @@ serve(async (req) => {
         }
       );
     }
+
 
     // Use service role client to fetch config and financial options
     // supabaseService already created above (line 260)
@@ -525,7 +555,104 @@ serve(async (req) => {
         throw new Error("Resposta da IA não contém dados estruturados");
       }
       notaFiscalData = JSON.parse(toolCall.function.arguments);
+    } else if (provider === "lovable") {
+      // Lovable AI Gateway (OpenAI-compatible) – supports PDFs via Gemini models
+      const lovableModel = model?.startsWith("google/")
+        ? model
+        : "google/gemini-2.5-flash";
+      const promptText = isPdf
+        ? "Extraia as informações deste documento PDF de nota fiscal e sugira a categorização financeira mais adequada."
+        : "Extraia as informações desta imagem de nota fiscal e sugira a categorização financeira mais adequada.";
+
+      const lvResp = await fetch(
+        "https://ai.gateway.lovable.dev/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: lovableModel,
+            messages: [
+              { role: "system", content: enhancedPrompt },
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: promptText },
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: `data:${effectiveMimeType};base64,${imageBase64}`,
+                    },
+                  },
+                ],
+              },
+            ],
+            tools: [
+              {
+                type: "function",
+                function: {
+                  name: "extrair_nota_fiscal",
+                  description:
+                    "Extrai informações estruturadas de uma nota fiscal e sugere categorização",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      fornecedor_cnpj_cpf: { type: "string" },
+                      fornecedor_nome: { type: "string" },
+                      data_emissao: { type: "string" },
+                      valor_total: { type: "number" },
+                      data_vencimento: { type: "string" },
+                      descricao: { type: "string" },
+                      numero_nota: { type: "string" },
+                      tipo_documento: {
+                        type: "string",
+                        enum: ["nfe", "nfce", "cupom_fiscal", "recibo", "outro"],
+                      },
+                      categoria_sugerida_id: { type: "string" },
+                      categoria_sugerida_nome: { type: "string" },
+                      subcategoria_sugerida_id: { type: "string" },
+                      subcategoria_sugerida_nome: { type: "string" },
+                      centro_custo_sugerido_id: { type: "string" },
+                      centro_custo_sugerido_nome: { type: "string" },
+                    },
+                    required: [
+                      "fornecedor_nome",
+                      "data_emissao",
+                      "valor_total",
+                      "descricao",
+                    ],
+                    additionalProperties: false,
+                  },
+                },
+              },
+            ],
+            tool_choice: {
+              type: "function",
+              function: { name: "extrair_nota_fiscal" },
+            },
+          }),
+        }
+      );
+
+      if (!lvResp.ok) {
+        const errorText = await lvResp.text();
+        console.error("Lovable AI Gateway erro:", lvResp.status, errorText);
+        throw new Error("Erro ao processar documento via Lovable AI Gateway");
+      }
+      const lvData = await lvResp.json();
+      const toolCall = lvData.choices?.[0]?.message?.tool_calls?.[0];
+      if (!toolCall || toolCall.function?.name !== "extrair_nota_fiscal") {
+        console.error(
+          "Lovable AI Gateway: resposta sem tool_call estruturada",
+          JSON.stringify(lvData).slice(0, 500)
+        );
+        throw new Error("Resposta da IA não contém dados estruturados");
+      }
+      notaFiscalData = JSON.parse(toolCall.function.arguments);
     } else {
+
       // Gemini
       const geminiModelId = model?.startsWith("google/")
         ? model.split("/")[1]
