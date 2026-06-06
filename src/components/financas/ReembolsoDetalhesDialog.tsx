@@ -223,7 +223,7 @@ export function ReembolsoDetalhesDialog({
             </div>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 px-6 py-4">
+          <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
             {/* Informações do Solicitante */}
             {solicitacao.solicitante_nome && (
               <div className="mb-4 p-3 bg-muted/30 rounded-lg">
