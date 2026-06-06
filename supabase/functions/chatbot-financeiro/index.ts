@@ -489,7 +489,7 @@ serve(async (req) => {
     const { data: candidatosAutorizados, error: authError } = await supabase
       .from("profiles")
       .select(
-        "id, nome, telefone, autorizado_bot_financeiro, created_at, data_nascimento"
+        "id, nome, telefone, autorizado_bot_financeiro, autorizado_lancar_despesas, autorizado_lancar_depositos, autorizado_lancar_reembolsos, created_at, data_nascimento"
       )
       .eq("autorizado_bot_financeiro", true)
       .eq("igreja_id", igrejaId)
@@ -606,8 +606,38 @@ serve(async (req) => {
                               texto.includes("depósito") || texto.includes("deposito");
       const isGatilho = isReembolso || isContaUnica || isDespesas || isTransferencia;
 
+      // Permissões granulares (sub-flags). Default: false se ausente.
+      const podeDespesas = !!membroAutorizado.autorizado_lancar_despesas;
+      const podeDepositos = !!membroAutorizado.autorizado_lancar_depositos;
+      const podeReembolsos = !!membroAutorizado.autorizado_lancar_reembolsos;
+
+      // Monta lista textual de permissões liberadas
+      const listarPermitidos = () => {
+        const itens: string[] = [];
+        if (podeDespesas) itens.push("• *Despesas* — registrar gastos");
+        if (podeDespesas) itens.push("• *Nova Conta* — registrar conta a pagar");
+        if (podeDepositos) itens.push("• *Transferência* — depósito entre contas");
+        if (podeReembolsos) itens.push("• *Reembolso* — solicitar ressarcimento");
+        return itens.join("\n");
+      };
+
+      const respostaSemPermissao = (fluxoNome: string) => {
+        const liberados = listarPermitidos();
+        const corpo = liberados
+          ? `\n\nO que você pode fazer:\n${liberados}`
+          : "\n\nVocê ainda não tem nenhuma permissão financeira liberada. Procure a secretaria.";
+        return new Response(
+          JSON.stringify({
+            text: `❌ Você não tem autorização para lançar *${fluxoNome}*.${corpo}`,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      };
+
       // Fluxo TRANSFERENCIA - depósito entre contas
       if (isTransferencia) {
+        if (!podeDepositos) return respostaSemPermissao("Transferência / Depósito");
+
         // Buscar contas disponíveis e mapeamentos configurados
         const { data: contasAtivas } = await supabase
           .from("contas")
@@ -674,6 +704,8 @@ serve(async (req) => {
 
       // Fluxo DESPESAS - pergunta forma de pagamento primeiro
       if (isDespesas) {
+        if (!podeDespesas) return respostaSemPermissao("Despesas");
+
         const metaDadosInicial: MetaDados = {
           contexto: "FINANCEIRO",
           fluxo: "DESPESAS",
@@ -707,6 +739,9 @@ serve(async (req) => {
 
       // Fluxos existentes: REEMBOLSO e CONTA_UNICA
       if (isGatilho) {
+        if (isReembolso && !podeReembolsos) return respostaSemPermissao("Reembolso");
+        if (isContaUnica && !podeDespesas) return respostaSemPermissao("Nova Conta");
+
         const metaDadosInicial: MetaDados = {
           contexto: "FINANCEIRO",
           fluxo: isReembolso ? "REEMBOLSO" : "CONTA_UNICA",
@@ -739,10 +774,19 @@ serve(async (req) => {
         );
       }
 
+      // Menu inicial: lista apenas o que esta pessoa pode fazer
+      const opcoes: string[] = [];
+      if (podeDespesas) opcoes.push("• *Despesas* - registrar gastos (dinheiro, PIX, cartão)");
+      if (podeReembolsos) opcoes.push("• *Reembolso* - solicitar ressarcimento pessoal");
+      if (podeDespesas) opcoes.push("• *Nova Conta* - registrar conta a pagar");
+      if (podeDepositos) opcoes.push("• *Transferência* - movimentar entre contas (depósito)");
+
+      const textoMenu = opcoes.length > 0
+        ? `Olá! Sou o assistente financeiro. Para iniciar:\n\n${opcoes.join("\n")}`
+        : "Olá! Você está autorizado no bot financeiro, mas ainda não tem nenhum tipo de lançamento liberado. Procure a secretaria para configurar suas permissões.";
+
       return new Response(
-        JSON.stringify({
-          text: "Olá! Sou o assistente financeiro. Para iniciar:\n\n• *Despesas* - registrar gastos (dinheiro, PIX, cartão)\n• *Reembolso* - solicitar ressarcimento pessoal\n• *Nova Conta* - registrar conta a pagar\n• *Transferência* - movimentar entre contas (depósito)",
-        }),
+        JSON.stringify({ text: textoMenu }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
