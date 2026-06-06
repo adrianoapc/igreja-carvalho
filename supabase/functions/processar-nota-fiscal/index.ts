@@ -392,18 +392,47 @@ serve(async (req) => {
     );
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    // Choose provider (prefer Gemini, fallback to OpenAI)
+    // Choose provider:
+    // - PDFs: prefer Lovable AI Gateway (Gemini supports PDFs natively), then Gemini direct
+    // - Images: prefer Gemini direct, then OpenAI, then Lovable AI Gateway
     const GEMINI_API_KEY =
       Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_API_KEY");
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    const provider = GEMINI_API_KEY
-      ? "gemini"
-      : OPENAI_API_KEY
-      ? "openai"
-      : null;
+
+    let provider: "gemini" | "openai" | "lovable" | null = null;
+    if (isPdf) {
+      provider = LOVABLE_API_KEY
+        ? "lovable"
+        : GEMINI_API_KEY
+        ? "gemini"
+        : null;
+      if (!provider) {
+        console.error(
+          "[processar-nota-fiscal] PDF recebido mas nenhum provedor compatível com PDF está configurado (LOVABLE_API_KEY ou GEMINI_API_KEY). OpenAI não aceita PDFs."
+        );
+        return new Response(
+          JSON.stringify({
+            error:
+              "Processamento de PDFs indisponível: configure LOVABLE_API_KEY ou GEMINI_API_KEY.",
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    } else {
+      provider = GEMINI_API_KEY
+        ? "gemini"
+        : OPENAI_API_KEY
+        ? "openai"
+        : LOVABLE_API_KEY
+        ? "lovable"
+        : null;
+    }
     if (!provider) {
       console.error(
-        "Nenhum provedor de IA configurado (GEMINI_API_KEY/GOOGLE_API_KEY ou OPENAI_API_KEY)"
+        "Nenhum provedor de IA configurado (LOVABLE_API_KEY, GEMINI_API_KEY/GOOGLE_API_KEY ou OPENAI_API_KEY)"
       );
       return new Response(
         JSON.stringify({ error: "Serviço de processamento não configurado" }),
@@ -413,6 +442,7 @@ serve(async (req) => {
         }
       );
     }
+
 
     // Use service role client to fetch config and financial options
     // supabaseService already created above (line 260)
