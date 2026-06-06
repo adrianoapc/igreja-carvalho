@@ -22,6 +22,9 @@ const dadosAdicionaisSchema = z.object({
   necessidades_especiais: z.string().max(500).nullable(),
   observacoes: z.string().max(1000).nullable(),
   autorizado_bot_financeiro: z.boolean().nullable(),
+  autorizado_lancar_despesas: z.boolean().nullable(),
+  autorizado_lancar_depositos: z.boolean().nullable(),
+  autorizado_lancar_reembolsos: z.boolean().nullable(),
 });
 
 interface EditarDadosAdicionaisDialogProps {
@@ -40,6 +43,9 @@ interface EditarDadosAdicionaisDialogProps {
     necessidades_especiais: string | null;
     observacoes: string | null;
     autorizado_bot_financeiro: boolean | null;
+    autorizado_lancar_despesas?: boolean | null;
+    autorizado_lancar_depositos?: boolean | null;
+    autorizado_lancar_reembolsos?: boolean | null;
   };
   onSuccess: () => void;
 }
@@ -64,6 +70,9 @@ export function EditarDadosAdicionaisDialog({
     necessidades_especiais: dadosAtuais.necessidades_especiais || "",
     observacoes: dadosAtuais.observacoes || "",
     autorizado_bot_financeiro: dadosAtuais.autorizado_bot_financeiro || false,
+    autorizado_lancar_despesas: dadosAtuais.autorizado_lancar_despesas || false,
+    autorizado_lancar_depositos: dadosAtuais.autorizado_lancar_depositos || false,
+    autorizado_lancar_reembolsos: dadosAtuais.autorizado_lancar_reembolsos || false,
   });
   const { toast } = useToast();
 
@@ -81,9 +90,34 @@ export function EditarDadosAdicionaisDialog({
         necessidades_especiais: dadosAtuais.necessidades_especiais || "",
         observacoes: dadosAtuais.observacoes || "",
         autorizado_bot_financeiro: dadosAtuais.autorizado_bot_financeiro || false,
+        autorizado_lancar_despesas: dadosAtuais.autorizado_lancar_despesas || false,
+        autorizado_lancar_depositos: dadosAtuais.autorizado_lancar_depositos || false,
+        autorizado_lancar_reembolsos: dadosAtuais.autorizado_lancar_reembolsos || false,
       });
     }
   }, [open, dadosAtuais]);
+
+  const handleMasterToggle = (checked: boolean) => {
+    if (checked) {
+      // Quando liga o mestre pela primeira vez, sugere todas as 3 sub-permissões
+      setFormData({
+        ...formData,
+        autorizado_bot_financeiro: true,
+        autorizado_lancar_despesas: true,
+        autorizado_lancar_depositos: true,
+        autorizado_lancar_reembolsos: true,
+      });
+    } else {
+      // Quando desliga o mestre, desliga tudo
+      setFormData({
+        ...formData,
+        autorizado_bot_financeiro: false,
+        autorizado_lancar_despesas: false,
+        autorizado_lancar_depositos: false,
+        autorizado_lancar_reembolsos: false,
+      });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,6 +125,9 @@ export function EditarDadosAdicionaisDialog({
     try {
       const validatedData = dadosAdicionaisSchema.parse(formData);
       setLoading(true);
+
+      // Se o mestre está desligado, garante que as sub-flags sejam false
+      const masterOn = !!validatedData.autorizado_bot_financeiro;
 
       const { error } = await supabase
         .from("profiles")
@@ -105,7 +142,10 @@ export function EditarDadosAdicionaisDialog({
           alergias: validatedData.alergias || null,
           necessidades_especiais: validatedData.necessidades_especiais || null,
           observacoes: validatedData.observacoes || null,
-          autorizado_bot_financeiro: validatedData.autorizado_bot_financeiro,
+          autorizado_bot_financeiro: masterOn,
+          autorizado_lancar_despesas: masterOn ? !!validatedData.autorizado_lancar_despesas : false,
+          autorizado_lancar_depositos: masterOn ? !!validatedData.autorizado_lancar_depositos : false,
+          autorizado_lancar_reembolsos: masterOn ? !!validatedData.autorizado_lancar_reembolsos : false,
         })
         .eq("id", pessoaId);
 
@@ -274,24 +314,84 @@ export function EditarDadosAdicionaisDialog({
               />
             </div>
 
-            <div className="col-span-2 border-t pt-4 mt-2">
+            <div className="col-span-2 border-t pt-4 mt-2 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="autorizado_bot_financeiro" className="text-base">
                     Autorizado Bot Financeiro
                   </Label>
                   <p className="text-sm text-muted-foreground">
-                    Permite enviar solicitações de reembolso via WhatsApp
+                    Libera o uso do bot financeiro no WhatsApp
                   </p>
                 </div>
                 <Switch
                   id="autorizado_bot_financeiro"
                   checked={formData.autorizado_bot_financeiro}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, autorizado_bot_financeiro: checked })
-                  }
+                  onCheckedChange={handleMasterToggle}
                 />
               </div>
+
+              {formData.autorizado_bot_financeiro && (
+                <div className="ml-4 pl-4 border-l-2 border-muted space-y-3">
+                  <p className="text-xs text-muted-foreground -mt-1">
+                    O que esta pessoa pode lançar pelo bot:
+                  </p>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="autorizado_lancar_despesas" className="text-sm font-medium">
+                        Lançar Despesas
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Despesas e Nova Conta
+                      </p>
+                    </div>
+                    <Switch
+                      id="autorizado_lancar_despesas"
+                      checked={formData.autorizado_lancar_despesas}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, autorizado_lancar_despesas: checked })
+                      }
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="autorizado_lancar_depositos" className="text-sm font-medium">
+                        Lançar Depósitos
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Transferências entre contas
+                      </p>
+                    </div>
+                    <Switch
+                      id="autorizado_lancar_depositos"
+                      checked={formData.autorizado_lancar_depositos}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, autorizado_lancar_depositos: checked })
+                      }
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="autorizado_lancar_reembolsos" className="text-sm font-medium">
+                        Solicitar Reembolso
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Ressarcimento pessoal
+                      </p>
+                    </div>
+                    <Switch
+                      id="autorizado_lancar_reembolsos"
+                      checked={formData.autorizado_lancar_reembolsos}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, autorizado_lancar_reembolsos: checked })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
