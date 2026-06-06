@@ -365,7 +365,7 @@ export function ReembolsoDetalhesDialog({
                 <p className="text-sm">{solicitacao.observacoes}</p>
               </div>
             )}
-          </ScrollArea>
+          </div>
 
           {/* Footer */}
           <div className="px-6 py-4 border-t shrink-0">
