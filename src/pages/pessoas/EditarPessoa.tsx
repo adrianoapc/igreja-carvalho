@@ -66,6 +66,9 @@ interface Pessoa {
   tipo_sanguineo: string | null;
   observacoes: string | null;
   autorizado_bot_financeiro: boolean | null;
+  autorizado_lancar_despesas: boolean | null;
+  autorizado_lancar_depositos: boolean | null;
+  autorizado_lancar_reembolsos: boolean | null;
   disponibilidade_agenda: DisponibilidadeAgenda | null;
 }
 
@@ -532,6 +535,9 @@ export default function EditarPessoa() {
           necessidades_especiais: pessoa.necessidades_especiais,
           observacoes: pessoa.observacoes,
           autorizado_bot_financeiro: pessoa.autorizado_bot_financeiro,
+          autorizado_lancar_despesas: pessoa.autorizado_lancar_despesas,
+          autorizado_lancar_depositos: pessoa.autorizado_lancar_depositos,
+          autorizado_lancar_reembolsos: pessoa.autorizado_lancar_reembolsos,
         }}
         onSuccess={fetchPessoa}
       />

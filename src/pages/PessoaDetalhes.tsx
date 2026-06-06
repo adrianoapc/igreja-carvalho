@@ -117,6 +117,9 @@ interface PessoaDetalhesData {
   tipo_sanguineo: string | null;
   observacoes: string | null;
   autorizado_bot_financeiro: boolean | null;
+  autorizado_lancar_despesas: boolean | null;
+  autorizado_lancar_depositos: boolean | null;
+  autorizado_lancar_reembolsos: boolean | null;
   is_admin?: boolean;
   created_at: string | null;
   updated_at: string | null;
@@ -998,15 +1001,21 @@ export default function PessoaDetalhes() {
                       </div>
                       <div className="col-span-2 border-t pt-3 mt-2">
                         <p className="text-muted-foreground mb-1">
-                          Autorizado Bot Financeiro
+                          Bot Financeiro
                         </p>
-                        <p className="font-medium">
-                          {pessoa.autorizado_bot_financeiro ? (
-                            <span className="text-green-600">Sim</span>
-                          ) : (
-                            <span className="text-muted-foreground">Não</span>
-                          )}
-                        </p>
+                        {pessoa.autorizado_bot_financeiro ? (
+                          <p className="font-medium text-sm">
+                            <span className="text-green-600">Autorizado</span>
+                            <span className="text-muted-foreground"> · </span>
+                            <span>Despesas {pessoa.autorizado_lancar_despesas ? "✓" : "✗"}</span>
+                            <span className="text-muted-foreground"> · </span>
+                            <span>Depósitos {pessoa.autorizado_lancar_depositos ? "✓" : "✗"}</span>
+                            <span className="text-muted-foreground"> · </span>
+                            <span>Reembolso {pessoa.autorizado_lancar_reembolsos ? "✓" : "✗"}</span>
+                          </p>
+                        ) : (
+                          <p className="font-medium text-muted-foreground">Não autorizado</p>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -1116,6 +1125,9 @@ export default function PessoaDetalhes() {
               necessidades_especiais: pessoa.necessidades_especiais,
               observacoes: pessoa.observacoes,
               autorizado_bot_financeiro: pessoa.autorizado_bot_financeiro,
+              autorizado_lancar_despesas: pessoa.autorizado_lancar_despesas,
+              autorizado_lancar_depositos: pessoa.autorizado_lancar_depositos,
+              autorizado_lancar_reembolsos: pessoa.autorizado_lancar_reembolsos,
             }}
             onSuccess={fetchPessoa}
           />

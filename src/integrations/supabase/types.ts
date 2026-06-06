@@ -7746,6 +7746,9 @@ export type Database = {
           aceitou_jesus: boolean | null
           alergias: string | null
           autorizado_bot_financeiro: boolean | null
+          autorizado_lancar_depositos: boolean
+          autorizado_lancar_despesas: boolean
+          autorizado_lancar_reembolsos: boolean
           avatar_url: string | null
           bairro: string | null
           batizado: boolean | null
@@ -7804,6 +7807,9 @@ export type Database = {
           aceitou_jesus?: boolean | null
           alergias?: string | null
           autorizado_bot_financeiro?: boolean | null
+          autorizado_lancar_depositos?: boolean
+          autorizado_lancar_despesas?: boolean
+          autorizado_lancar_reembolsos?: boolean
           avatar_url?: string | null
           bairro?: string | null
           batizado?: boolean | null
@@ -7862,6 +7868,9 @@ export type Database = {
           aceitou_jesus?: boolean | null
           alergias?: string | null
           autorizado_bot_financeiro?: boolean | null
+          autorizado_lancar_depositos?: boolean
+          autorizado_lancar_despesas?: boolean
+          autorizado_lancar_reembolsos?: boolean
           avatar_url?: string | null
           bairro?: string | null
           batizado?: boolean | null
