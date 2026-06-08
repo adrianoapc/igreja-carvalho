@@ -99,8 +99,16 @@ export function EditarContatosDialog({
           .select("*")
           .eq("profile_id", pessoaId);
 
-        let lista = (contatosData || []).map((c) => ({
-          ...c,
+        let lista: Array<{
+          id?: string;
+          tipo: string;
+          valor: string;
+          rotulo: string;
+          is_primary: boolean;
+          is_whatsapp: boolean;
+          is_login: boolean;
+        }> = (contatosData || []).map((c) => ({
+          id: c.id,
           tipo: c.tipo || "celular",
           valor: c.valor || "",
           rotulo: c.rotulo || "",
@@ -108,6 +116,7 @@ export function EditarContatosDialog({
           is_whatsapp: !!c.is_whatsapp,
           is_login: !!c.is_login,
         }));
+
 
         // Fallback: se não houver contatos, semear a partir dos campos legados em profiles
         if (lista.length === 0) {
