@@ -93,25 +93,66 @@ export function EditarContatosDialog({
         numero: dadosAtuais.numero || "",
         complemento: dadosAtuais.complemento || "",
       });
-      supabase
-        .from("profile_contatos")
-        .select("*")
-        .eq("profile_id", pessoaId)
-        .then(({ data }) => {
-          setContatos(
-            (data || []).map((c) => ({
-              ...c,
-              tipo: c.tipo || "celular",
-              valor: c.valor || "",
-              rotulo: c.rotulo || "",
-              is_primary: !!c.is_primary,
-              is_whatsapp: !!c.is_whatsapp,
-              is_login: !!c.is_login,
-            })),
-          );
-        });
+      (async () => {
+        const { data: contatosData } = await supabase
+          .from("profile_contatos")
+          .select("*")
+          .eq("profile_id", pessoaId);
+
+        let lista: Array<{
+          id?: string;
+          tipo: string;
+          valor: string;
+          rotulo: string;
+          is_primary: boolean;
+          is_whatsapp: boolean;
+          is_login: boolean;
+        }> = (contatosData || []).map((c) => ({
+          id: c.id,
+          tipo: c.tipo || "celular",
+          valor: c.valor || "",
+          rotulo: c.rotulo || "",
+          is_primary: !!c.is_primary,
+          is_whatsapp: !!c.is_whatsapp,
+          is_login: !!c.is_login,
+        }));
+
+
+        // Fallback: se não houver contatos, semear a partir dos campos legados em profiles
+        if (lista.length === 0) {
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("email, telefone")
+            .eq("id", pessoaId)
+            .maybeSingle();
+          const seed: typeof lista = [];
+          if (prof?.telefone) {
+            seed.push({
+              tipo: "celular",
+              valor: prof.telefone,
+              rotulo: "Pessoal",
+              is_primary: true,
+              is_whatsapp: false,
+              is_login: false,
+            });
+          }
+          if (prof?.email) {
+            seed.push({
+              tipo: "email",
+              valor: prof.email,
+              rotulo: "Pessoal",
+              is_primary: true,
+              is_whatsapp: false,
+              is_login: false,
+            });
+          }
+          lista = seed;
+        }
+        setContatos(lista);
+      })();
     }
   }, [open, pessoaId, dadosAtuais]);
+
 
   // Adicionar novo contato
   const handleAddContato = () => {
@@ -181,6 +222,37 @@ export function EditarContatosDialog({
           .insert(contatosInsert);
         if (error) throw error;
       }
+
+      // Sincroniza campos legados em profiles para que a tela de detalhes reflita a edição
+      const telefonePrincipal =
+        contatos.find(
+          (c) => (c.tipo === "celular" || c.tipo === "fixo") && c.is_primary && c.valor.trim(),
+        ) ||
+        contatos.find(
+          (c) => (c.tipo === "celular" || c.tipo === "fixo") && c.valor.trim(),
+        );
+      const emailPrincipal =
+        contatos.find((c) => c.tipo === "email" && c.is_primary && c.valor.trim()) ||
+        contatos.find((c) => c.tipo === "email" && c.valor.trim());
+
+      const { error: profErr } = await supabase
+        .from("profiles")
+        .update({
+          telefone: telefonePrincipal
+            ? removerFormatacao(telefonePrincipal.valor)
+            : null,
+          email: emailPrincipal ? emailPrincipal.valor.trim() : null,
+          cep: formData.cep ? removerFormatacao(formData.cep) : null,
+          cidade: formData.cidade || null,
+          bairro: formData.bairro || null,
+          estado: formData.estado || null,
+          endereco: formData.endereco || null,
+          numero: formData.numero || null,
+          complemento: formData.complemento || null,
+        })
+        .eq("id", pessoaId);
+      if (profErr) throw profErr;
+
       toast({ title: "Sucesso", description: "Contatos atualizados!" });
       onSuccess();
       onOpenChange(false);
