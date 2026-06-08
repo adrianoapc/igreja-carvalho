@@ -222,6 +222,37 @@ export function EditarContatosDialog({
           .insert(contatosInsert);
         if (error) throw error;
       }
+
+      // Sincroniza campos legados em profiles para que a tela de detalhes reflita a edição
+      const telefonePrincipal =
+        contatos.find(
+          (c) => (c.tipo === "celular" || c.tipo === "fixo") && c.is_primary && c.valor.trim(),
+        ) ||
+        contatos.find(
+          (c) => (c.tipo === "celular" || c.tipo === "fixo") && c.valor.trim(),
+        );
+      const emailPrincipal =
+        contatos.find((c) => c.tipo === "email" && c.is_primary && c.valor.trim()) ||
+        contatos.find((c) => c.tipo === "email" && c.valor.trim());
+
+      const { error: profErr } = await supabase
+        .from("profiles")
+        .update({
+          telefone: telefonePrincipal
+            ? removerFormatacao(telefonePrincipal.valor)
+            : null,
+          email: emailPrincipal ? emailPrincipal.valor.trim() : null,
+          cep: formData.cep ? removerFormatacao(formData.cep) : null,
+          cidade: formData.cidade || null,
+          bairro: formData.bairro || null,
+          estado: formData.estado || null,
+          endereco: formData.endereco || null,
+          numero: formData.numero || null,
+          complemento: formData.complemento || null,
+        })
+        .eq("id", pessoaId);
+      if (profErr) throw profErr;
+
       toast({ title: "Sucesso", description: "Contatos atualizados!" });
       onSuccess();
       onOpenChange(false);
