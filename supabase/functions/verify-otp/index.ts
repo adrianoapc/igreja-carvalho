@@ -9,6 +9,14 @@ const corsHeaders = {
 
 const MAX_TENTATIVAS = 5;
 
+async function hashCodigo(codigo: string): Promise<string> {
+  const data = new TextEncoder().encode(codigo);
+  const buf = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -32,19 +40,21 @@ serve(async (req) => {
     }
 
     const telefoneLimpo = telefone.replace(/\D/g, "");
+    const hashInformado = await hashCodigo(String(codigo).trim());
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Buscar o OTP mais recente não expirado para o telefone
+    // Buscar OTP mais recente não expirado e não usado para o número
     const { data: otp, error: otpError } = await supabase
       .from("otp_verificacao")
-      .select("*")
+      .select("id, codigo_hash, tentativas, profile_id, igreja_id")
       .eq("telefone", telefoneLimpo)
       .eq("tipo", "whatsapp")
       .eq("usado", false)
+      .not("codigo_hash", "is", null)
       .gt("expira_em", new Date().toISOString())
       .order("created_at", { ascending: false })
       .limit(1)
@@ -52,10 +62,10 @@ serve(async (req) => {
 
     if (otpError) {
       console.error("[verify-otp] Erro ao buscar OTP:", otpError);
-      return new Response(JSON.stringify({ error: "Erro ao verificar código" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Erro ao verificar código" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     if (!otp) {
@@ -65,7 +75,7 @@ serve(async (req) => {
       );
     }
 
-    // Bloquear se excedeu tentativas (verificar antes de comparar código)
+    // Bloquear se já excedeu o limite de tentativas
     if (otp.tentativas >= MAX_TENTATIVAS) {
       await supabase
         .from("otp_verificacao")
@@ -73,31 +83,29 @@ serve(async (req) => {
         .eq("id", otp.id);
 
       return new Response(
-        JSON.stringify({
-          error: "Número máximo de tentativas excedido. Solicite um novo código.",
-        }),
+        JSON.stringify({ error: "Número máximo de tentativas excedido. Solicite um novo código." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // Incrementar tentativas antes de checar o código (proteção contra timing/brute-force)
+    // Incrementar tentativas ANTES de comparar (proteção contra brute-force por timing)
     await supabase
       .from("otp_verificacao")
       .update({ tentativas: otp.tentativas + 1 })
       .eq("id", otp.id);
 
-    if (otp.codigo !== String(codigo).trim()) {
+    if (otp.codigo_hash !== hashInformado) {
       const restantes = MAX_TENTATIVAS - (otp.tentativas + 1);
       return new Response(
         JSON.stringify({
           error: "Código incorreto",
-          tentativas_restantes: restantes > 0 ? restantes : 0,
+          tentativas_restantes: Math.max(0, restantes),
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // Código correto — marcar como usado
+    // Código correto — invalidar OTP
     await supabase
       .from("otp_verificacao")
       .update({ usado: true })
@@ -114,9 +122,9 @@ serve(async (req) => {
     );
   } catch (err) {
     console.error("[verify-otp] Erro não tratado:", err);
-    return new Response(JSON.stringify({ error: "Erro interno do servidor" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: "Erro interno do servidor" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   }
 });
