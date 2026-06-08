@@ -9,13 +9,25 @@ const corsHeaders = {
 
 // Janela de rate-limiting: max 3 códigos a cada 5 minutos por número
 const RATE_LIMIT_MAX = 3;
-const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
+const RATE_LIMIT_WINDOW_MIN = 5;
 
 // Expiração do OTP
 const OTP_TTL_MS = 5 * 60 * 1000; // 5 minutos
 
+// Gera 6 dígitos com CSPRNG e rejection sampling para distribuição uniforme.
+// Rejeita valores acima do maior múltiplo de 1 000 000 que cabe em Uint32,
+// eliminando o módulo bias que apareceria sem essa precaução.
 function gerarCodigo(): string {
-  return String(Math.floor(Math.random() * 1_000_000)).padStart(6, "0");
+  const LIMIT = 1_000_000;
+  const UINT32_MAX = 0xFFFF_FFFF;
+  const THRESHOLD = UINT32_MAX - (UINT32_MAX % LIMIT);
+  const buf = new Uint32Array(1);
+  let v: number;
+  do {
+    crypto.getRandomValues(buf);
+    v = buf[0];
+  } while (v > THRESHOLD);
+  return String(v % LIMIT).padStart(6, "0");
 }
 
 async function hashCodigo(codigo: string): Promise<string> {
@@ -115,62 +127,51 @@ serve(async (req) => {
 
     const phoneNumberId = numero.phone_number_id;
 
-    // 2. Rate limiting — contar OTPs criados na janela de tempo por número de destino
-    const janela = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString();
-    const { count: recentes, error: rateError } = await supabase
-      .from("otp_verificacao")
-      .select("id", { count: "exact", head: true })
-      .eq("telefone", telefoneLimpo)
-      .eq("tipo", "whatsapp")
-      .gte("created_at", janela);
-
-    if (rateError) {
-      console.error("[send-otp] Erro ao checar rate limit:", rateError);
-    } else if ((recentes ?? 0) >= RATE_LIMIT_MAX) {
-      return new Response(
-        JSON.stringify({ error: "Muitas tentativas. Aguarde alguns minutos antes de solicitar um novo código." }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    // 3. Invalidar OTPs anteriores ativos do mesmo número (mesmo gerador — retry seguro)
-    await supabase
-      .from("otp_verificacao")
-      .update({ usado: true })
-      .eq("telefone", telefoneLimpo)
-      .eq("tipo", "whatsapp")
-      .eq("usado", false);
-
-    // 4. Gerar código e seu hash — guardar ANTES do envio (retry idempotente)
+    // 2–4. Gerar código + reservar atomicamente via RPC.
+    // A função reservar_otp_whatsapp usa pg_try_advisory_xact_lock para serializar
+    // requisições concorrentes do mesmo número, eliminando a race TOCTOU entre
+    // o check de rate-limit e a inserção do novo registro.
     const codigo = gerarCodigo();
     const hash = await hashCodigo(codigo);
     const expiraEm = new Date(Date.now() + OTP_TTL_MS).toISOString();
 
-    const { data: otpRow, error: insertError } = await supabase
-      .from("otp_verificacao")
-      .insert({
-        telefone: telefoneLimpo,
-        codigo: "HASHED",        // placeholder — campo NOT NULL herdado do schema
-        codigo_hash: hash,
-        tipo: "whatsapp",
-        expira_em: expiraEm,
-        usado: false,
-        tentativas: 0,
-        ...(profile_id ? { profile_id } : {}),
-        igreja_id,
-      })
-      .select("id")
-      .single();
+    const { data: reserva, error: reservaError } = await supabase.rpc(
+      "reservar_otp_whatsapp",
+      {
+        p_telefone:    telefoneLimpo,
+        p_codigo_hash: hash,
+        p_expira_em:   expiraEm,
+        p_igreja_id:   igreja_id,
+        p_profile_id:  profile_id ?? null,
+        p_rate_max:    RATE_LIMIT_MAX,
+        p_janela_min:  RATE_LIMIT_WINDOW_MIN,
+      },
+    );
 
-    if (insertError || !otpRow) {
-      console.error("[send-otp] Erro ao inserir OTP:", insertError);
+    if (reservaError) {
+      console.error("[send-otp] Erro na RPC reservar_otp_whatsapp:", reservaError);
       return new Response(
         JSON.stringify({ error: "Erro ao gerar código" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const otpId = otpRow.id;
+    if (reserva.status === "rate_limited") {
+      return new Response(
+        JSON.stringify({ error: "Muitas tentativas. Aguarde alguns minutos antes de solicitar um novo código." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (reserva.status === "lock_timeout") {
+      // Outro request para o mesmo número está em andamento agora; retornar 429 é seguro
+      return new Response(
+        JSON.stringify({ error: "Requisição em andamento para este número. Tente novamente em instantes." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const otpId: string = reserva.otp_id;
 
     // 5. Enviar via WhatsApp Cloud API
     // Código entra duas vezes: body (parâmetro do texto) e botão copy-code (sub_type url, index 0)
