@@ -21,7 +21,6 @@ import { AniversariosDashboard } from "@/components/pessoas/AniversariosDashboar
 import { LinksExternosCard } from "@/components/pessoas/LinksExternosCard";
 import { PerfisPendentes } from "@/components/pessoas/PerfisPendentes";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
-import { CadastrarPessoaDialog } from "@/components/pessoas/CadastrarPessoaDialog";
 import { AtividadeRecenteSummary } from "@/components/pessoas/AtividadeRecemSummary";
 
 export default function Pessoas() {
@@ -33,7 +32,6 @@ export default function Pessoas() {
     loading: authLoading,
   } = useAuthContext();
   const [searchTerm, setSearchTerm] = useState("");
-  const [cadastrarOpen, setCadastrarOpen] = useState(false);
   const [stats, setStats] = useState([
     {
       title: "Total de Pessoas",
@@ -254,7 +252,7 @@ export default function Pessoas() {
                 </Button>
               )}
             </div>
-            <Button onClick={() => setCadastrarOpen(true)} className="shrink-0">
+            <Button onClick={() => navigate("/pessoas/cadastrar")} className="shrink-0">
               <Plus className="w-4 h-4 mr-2" />
               Cadastrar Pessoa
             </Button>
@@ -472,15 +470,6 @@ export default function Pessoas() {
       {/* Recent Activity Summary */}
       <AtividadeRecenteSummary />
 
-      {/* Dialog de Cadastro */}
-      <CadastrarPessoaDialog
-        open={cadastrarOpen}
-        onOpenChange={setCadastrarOpen}
-        onSuccess={() => {
-          // Recarregar estatísticas
-          window.location.reload();
-        }}
-      />
     </div>
   );
 }

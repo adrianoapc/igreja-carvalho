@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PublicHeader } from "@/components/layout/PublicHeader";
-import { Users, UserPlus, Heart, Coffee } from "lucide-react";
+import { UserPlus, Heart, Coffee } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
@@ -88,32 +88,6 @@ export default function CadastroIndex() {
             )}
 
             <div className="space-y-3">
-              <div className="space-y-2">
-                <h3 className="font-semibold text-foreground">Membro</h3>
-                <p className="text-sm text-muted-foreground">
-                  Se você é membro da igreja, mantenha seus dados de cadastro
-                  atualizados aqui.
-                </p>
-                <Button
-                  className="w-full"
-                  onClick={() =>
-                    navigate(buildCadastroPath("/cadastro/membro"))
-                  }
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  Atualizar meu perfil de membro
-                </Button>
-              </div>
-
-              <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-border" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">ou</span>
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <h3 className="font-semibold text-foreground">Visitante</h3>
                 <p className="text-sm text-muted-foreground">

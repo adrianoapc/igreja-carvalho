@@ -69,6 +69,7 @@ const InscricaoPublica = lazy(() => import("./pages/InscricaoPublica"));
 
 // Pessoas
 const PessoasIndex = lazy(() => import("./pages/pessoas/index"));
+const CadastrarPessoa = lazy(() => import("./pages/pessoas/CadastrarPessoa"));
 const PessoasTodos = lazy(() => import("./pages/pessoas/Todos"));
 const PessoasMembros = lazy(() => import("./pages/pessoas/Membros"));
 const PessoasVisitantes = lazy(() => import("./pages/pessoas/Visitantes"));
@@ -468,6 +469,14 @@ const App = () => (
                       element={
                         <AuthGate>
                           <PessoasIndex />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/pessoas/cadastrar"
+                      element={
+                        <AuthGate>
+                          <CadastrarPessoa />
                         </AuthGate>
                       }
                     />

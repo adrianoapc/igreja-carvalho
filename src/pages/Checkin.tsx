@@ -27,6 +27,14 @@ interface EventoInfo {
   tipo: string;
 }
 
+function mascararNome(nome: string): string {
+  const partes = nome.trim().split(" ");
+  if (partes.length === 1) return partes[0];
+  const primeiro = partes[0];
+  const ultimo = partes[partes.length - 1];
+  return `${primeiro} ${ultimo.charAt(0)}.`;
+}
+
 export default function Checkin() {
   const { tipo, id } = useParams<{ tipo: string; id: string }>();
   const navigate = useNavigate();
@@ -252,7 +260,7 @@ export default function Checkin() {
                   Presença Confirmada!
                 </h3>
                 <p className="text-lg mt-2">
-                  Olá, <span className="font-semibold">{pessoaNome}</span>!
+                  Olá, <span className="font-semibold">{mascararNome(pessoaNome)}</span>!
                 </p>
                 <p className="text-muted-foreground mt-1">
                   Sua presença foi registrada com sucesso.
