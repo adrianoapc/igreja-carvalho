@@ -10626,7 +10626,6 @@ export type Database = {
           filial_id: string | null
           id: string
           igreja_id: string | null
-          secret: string | null
           secret_encrypted: string | null
           secret_hint: string | null
           tipo: string
@@ -10640,7 +10639,6 @@ export type Database = {
           filial_id?: string | null
           id?: string
           igreja_id?: string | null
-          secret?: string | null
           secret_encrypted?: string | null
           secret_hint?: string | null
           tipo: string
@@ -10654,7 +10652,6 @@ export type Database = {
           filial_id?: string | null
           id?: string
           igreja_id?: string | null
-          secret?: string | null
           secret_encrypted?: string | null
           secret_hint?: string | null
           tipo?: string
