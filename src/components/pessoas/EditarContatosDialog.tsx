@@ -93,25 +93,57 @@ export function EditarContatosDialog({
         numero: dadosAtuais.numero || "",
         complemento: dadosAtuais.complemento || "",
       });
-      supabase
-        .from("profile_contatos")
-        .select("*")
-        .eq("profile_id", pessoaId)
-        .then(({ data }) => {
-          setContatos(
-            (data || []).map((c) => ({
-              ...c,
-              tipo: c.tipo || "celular",
-              valor: c.valor || "",
-              rotulo: c.rotulo || "",
-              is_primary: !!c.is_primary,
-              is_whatsapp: !!c.is_whatsapp,
-              is_login: !!c.is_login,
-            })),
-          );
-        });
+      (async () => {
+        const { data: contatosData } = await supabase
+          .from("profile_contatos")
+          .select("*")
+          .eq("profile_id", pessoaId);
+
+        let lista = (contatosData || []).map((c) => ({
+          ...c,
+          tipo: c.tipo || "celular",
+          valor: c.valor || "",
+          rotulo: c.rotulo || "",
+          is_primary: !!c.is_primary,
+          is_whatsapp: !!c.is_whatsapp,
+          is_login: !!c.is_login,
+        }));
+
+        // Fallback: se não houver contatos, semear a partir dos campos legados em profiles
+        if (lista.length === 0) {
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("email, telefone")
+            .eq("id", pessoaId)
+            .maybeSingle();
+          const seed: typeof lista = [];
+          if (prof?.telefone) {
+            seed.push({
+              tipo: "celular",
+              valor: prof.telefone,
+              rotulo: "Pessoal",
+              is_primary: true,
+              is_whatsapp: false,
+              is_login: false,
+            });
+          }
+          if (prof?.email) {
+            seed.push({
+              tipo: "email",
+              valor: prof.email,
+              rotulo: "Pessoal",
+              is_primary: true,
+              is_whatsapp: false,
+              is_login: false,
+            });
+          }
+          lista = seed;
+        }
+        setContatos(lista);
+      })();
     }
   }, [open, pessoaId, dadosAtuais]);
+
 
   // Adicionar novo contato
   const handleAddContato = () => {
