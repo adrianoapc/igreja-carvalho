@@ -15,7 +15,7 @@ import { EditarDadosEclesiasticosDialog } from "@/components/pessoas/EditarDados
 import { EditarDadosAdicionaisDialog } from "@/components/pessoas/EditarDadosAdicionaisDialog";
 import { EditarStatusDialog } from "@/components/pessoas/EditarStatusDialog";
 import { ConfigurarDisponibilidadeDialog } from "@/components/membros/ConfigurarDisponibilidadeDialog";
-import { ArrowLeft, Check, Clock, Edit, Mail, MapPin, Phone, Shield, Sparkles, User, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Check, Clock, Edit, MapPin, Phone, Shield, Sparkles, User, ChevronDown, ChevronUp } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatarCEP, formatarTelefone } from "@/lib/validators";
 
@@ -90,10 +90,21 @@ const TABS = [
   { id: "extras", label: "Extras", icon: Sparkles },
 ];
 
+interface ProfileContato {
+  id: string;
+  tipo: string;
+  valor: string;
+  rotulo: string;
+  is_primary: boolean;
+  is_whatsapp: boolean;
+  is_login: boolean;
+}
+
 export default function EditarPessoa() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [pessoa, setPessoa] = useState<Pessoa | null>(null);
+  const [contatos, setContatos] = useState<ProfileContato[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("pessoais");
   const [editarPessoaisOpen, setEditarPessoaisOpen] = useState(false);
@@ -106,17 +117,53 @@ export default function EditarPessoa() {
   const fetchPessoa = useCallback(async () => {
     if (!id) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", id)
-      .single();
+
+    const [{ data, error }, { data: contatosData }] = await Promise.all([
+      supabase.from("profiles").select("*").eq("id", id).single(),
+      supabase
+        .from("profile_contatos")
+        .select("id, tipo, valor, rotulo, is_primary, is_whatsapp, is_login")
+        .eq("profile_id", id)
+        .order("is_primary", { ascending: false }),
+    ]);
 
     if (!error && data) {
       setPessoa({
         ...data,
         disponibilidade_agenda: data.disponibilidade_agenda as unknown as DisponibilidadeAgenda | null,
       } as Pessoa);
+    }
+
+    const contatosLista = (contatosData as ProfileContato[]) ?? [];
+    if (contatosLista.length > 0) {
+      setContatos(contatosLista);
+    } else if (data) {
+      const fallbackContatos: ProfileContato[] = [];
+      if (data.telefone) {
+        fallbackContatos.push({
+          id: `legacy-tel-${data.id}`,
+          tipo: "celular",
+          valor: data.telefone,
+          rotulo: "Pessoal",
+          is_primary: true,
+          is_whatsapp: false,
+          is_login: false,
+        });
+      }
+      if (data.email) {
+        fallbackContatos.push({
+          id: `legacy-email-${data.id}`,
+          tipo: "email",
+          valor: data.email,
+          rotulo: "Pessoal",
+          is_primary: true,
+          is_whatsapp: false,
+          is_login: false,
+        });
+      }
+      setContatos(fallbackContatos);
+    } else {
+      setContatos([]);
     }
     setLoading(false);
   }, [id]);
@@ -289,48 +336,100 @@ export default function EditarPessoa() {
 
         {/* Contatos */}
         {activeTab === "contatos" && (
-          <Card>
-            <CardHeader className="p-4 md:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <CardTitle className="text-base md:text-lg flex items-center gap-2">
-                <Phone className="w-5 h-5 text-primary" />
-                Contatos
-              </CardTitle>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setEditarContatosOpen(true)}
-                className="w-full sm:w-auto text-xs"
-              >
-                <Edit className="w-4 h-4 mr-2" />
-                Editar
-              </Button>
-            </CardHeader>
-            <CardContent className="p-4 md:p-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Info 
-                  label="Telefone" 
-                  value={pessoa.telefone ? formatarTelefone(pessoa.telefone) : null}
-                  icon={<Phone className="w-4 h-4 text-muted-foreground" />} 
-                />
-                <Info 
-                  label="E-mail" 
-                  value={pessoa.email}
-                  icon={<Mail className="w-4 h-4 text-muted-foreground" />} 
-                />
-                <Info 
-                  label="CEP" 
-                  value={pessoa.cep ? formatarCEP(pessoa.cep) : null}
-                  icon={<MapPin className="w-4 h-4 text-muted-foreground" />} 
-                />
-                <Info label="Endereço" value={pessoa.endereco} />
-                <Info label="Bairro" value={pessoa.bairro} />
-                <Info 
-                  label="Cidade/UF" 
-                  value={pessoa.cidade ? `${pessoa.cidade}${pessoa.estado ? ` - ${pessoa.estado}` : ""}` : null} 
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <div className="space-y-4">
+            {/* Endereço */}
+            <Card>
+              <CardHeader className="p-4 md:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-primary" />
+                  Endereço
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditarContatosOpen(true)}
+                  className="w-full sm:w-auto text-xs"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Editar
+                </Button>
+              </CardHeader>
+              <CardContent className="p-4 md:p-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Info
+                    label="CEP"
+                    value={pessoa.cep ? formatarCEP(pessoa.cep) : null}
+                    icon={<MapPin className="w-4 h-4 text-muted-foreground" />}
+                  />
+                  <Info label="Endereço" value={pessoa.endereco} />
+                  <Info label="Bairro" value={pessoa.bairro} />
+                  <Info
+                    label="Cidade/UF"
+                    value={pessoa.cidade ? `${pessoa.cidade}${pessoa.estado ? ` - ${pessoa.estado}` : ""}` : null}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Lista de contatos de profile_contatos */}
+            <Card>
+              <CardHeader className="p-4 md:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                  <Phone className="w-5 h-5 text-primary" />
+                  Contatos
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditarContatosOpen(true)}
+                  className="w-full sm:w-auto text-xs"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Editar
+                </Button>
+              </CardHeader>
+              <CardContent className="p-4 md:p-5">
+                {contatos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhum contato cadastrado.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {contatos.map((c) => (
+                      <div key={c.id} className="flex items-start justify-between gap-2 py-2 border-b last:border-0">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                            {c.tipo === "celular" ? "Celular" : c.tipo === "fixo" ? "Fixo" : c.tipo === "email" ? "E-mail" : c.tipo === "instagram" ? "Instagram" : c.tipo}
+                            {c.rotulo ? ` · ${c.rotulo}` : ""}
+                          </span>
+                          <span className="text-sm font-medium">
+                            {(c.tipo === "celular" || c.tipo === "fixo")
+                              ? formatarTelefone(c.valor)
+                              : c.valor}
+                          </span>
+                        </div>
+                        <div className="flex gap-1 flex-wrap justify-end">
+                          {c.is_primary && (
+                            <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                              Principal
+                            </Badge>
+                          )}
+                          {c.is_whatsapp && (
+                            <Badge variant="outline" className="text-xs px-1.5 py-0 text-green-600 border-green-400">
+                              WhatsApp
+                            </Badge>
+                          )}
+                          {c.is_login && (
+                            <Badge variant="outline" className="text-xs px-1.5 py-0 text-blue-600 border-blue-400">
+                              Login
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* Igreja */}

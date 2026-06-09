@@ -7,6 +7,7 @@ import {
   Users,
   UserPlus,
   UserCheck,
+  UserRoundPen,
   PhoneCall,
   ArrowRight,
   FileEdit,
@@ -32,12 +33,13 @@ export default function Pessoas() {
     loading: authLoading,
   } = useAuthContext();
   const [searchTerm, setSearchTerm] = useState("");
+  const [contatosCount, setContatosCount] = useState(0);
   const [stats, setStats] = useState([
     {
       title: "Total de Pessoas",
       value: "0",
       icon: Users,
-      description: "Todas as pessoas cadastradas",
+      description: "Todos os cadastrados",
       color: "bg-blue-50 text-blue-700 border-blue-100",
       action: () => navigate("/pessoas/todos"),
     },
@@ -45,29 +47,36 @@ export default function Pessoas() {
       title: "Visitantes",
       value: "0",
       icon: UserPlus,
-      description: "Aguardando conversão",
+      description: "Visitam pela primeira vez",
       color: "bg-amber-50 text-amber-700 border-amber-100",
       action: () => navigate("/pessoas/visitantes"),
+    },
+    {
+      title: "Contatos Agendados",
+      value: contatosCount.toString(),
+      icon: PhoneCall,
+      description: "Acompanhar visitantes",
+      color: "bg-orange-50 text-orange-700 border-orange-100",
+      action: () => navigate("/pessoas/contatos"),
     },
     {
       title: "Frequentadores",
       value: "0",
       icon: UserCheck,
-      description: "Com acesso ao app",
+      description: "Visitaram +1 vez - Não membros",
       color: "bg-purple-50 text-purple-700 border-purple-100",
       action: () => navigate("/pessoas/frequentadores"),
     },
     {
       title: "Membros",
       value: "0",
-      icon: Users,
+      icon: UserRoundPen,
       description: "Membros ativos",
       color: "bg-green-50 text-green-700 border-green-100",
       action: () => navigate("/pessoas/membros"),
     },
   ]);
 
-  const [contatosCount, setContatosCount] = useState(0);
   const [pendentesCount, setPendentesCount] = useState(0);
   const [aceitaramJesus, setAceitaramJesus] = useState<
     Array<{
@@ -109,8 +118,9 @@ export default function Pessoas() {
         setStats((prev) => [
           { ...prev[0], value: total.toString() },
           { ...prev[1], value: visitantes.toString() },
-          { ...prev[2], value: frequentadores.toString() },
-          { ...prev[3], value: membros.toString() },
+          prev[2],
+          { ...prev[3], value: frequentadores.toString() },
+          { ...prev[4], value: membros.toString() },
         ]);
 
         // Buscar contatos agendados (filtrados por igreja/filial)
@@ -129,9 +139,20 @@ export default function Pessoas() {
         const { count } = await contatosQuery;
 
         setContatosCount(count || 0);
+        setStats((prev) => [
+          prev[0],
+          prev[1],
+          { ...prev[2], value: (count || 0).toString() },
+          prev[3],
+          prev[4],
+        ]);
 
         // Buscar alterações pendentes (filtradas)
-        console.log('[Dashboard Pessoas] Buscando pendentes:', { igrejaId, filialId, isAllFiliais });
+        console.log("[Dashboard Pessoas] Buscando pendentes:", {
+          igrejaId,
+          filialId,
+          isAllFiliais,
+        });
         let pendentesQuery = supabase
           .from("alteracoes_perfil_pendentes")
           .select("*", { count: "exact", head: true })
@@ -140,8 +161,12 @@ export default function Pessoas() {
         if (!isAllFiliais && filialId) {
           pendentesQuery = pendentesQuery.eq("filial_id", filialId);
         }
-        const { count: pendentes, error: pendentesError } = await pendentesQuery;
-        console.log('[Dashboard Pessoas] Resultado pendentes:', { pendentes, pendentesError });
+        const { count: pendentes, error: pendentesError } =
+          await pendentesQuery;
+        console.log("[Dashboard Pessoas] Resultado pendentes:", {
+          pendentes,
+          pendentesError,
+        });
 
         setPendentesCount(pendentes || 0);
 
@@ -184,7 +209,7 @@ export default function Pessoas() {
       description: "Visualizar e editar perfis de membros",
       icon: Users,
       path: "/pessoas/membros",
-      count: stats[3].value,
+      count: stats[4].value,
       label: "ativos",
     },
     {
@@ -200,7 +225,7 @@ export default function Pessoas() {
       description: "Pessoas com múltiplas visitas",
       icon: UserCheck,
       path: "/pessoas/frequentadores",
-      count: stats[2].value,
+      count: stats[3].value,
       label: "ativos",
     },
   ];
@@ -260,7 +285,7 @@ export default function Pessoas() {
         </CardContent>
       </Card>
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-6">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -271,7 +296,7 @@ export default function Pessoas() {
               } ${stat.color}`}
               onClick={stat.action}
             >
-              <CardContent className="p-4 md:p-6">
+              <CardContent className="p-6 md:p-6">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs md:text-sm font-semibold opacity-75 truncate">
@@ -293,6 +318,9 @@ export default function Pessoas() {
           );
         })}
       </div>
+
+      {/* Aniversários Dashboard */}
+      <AniversariosDashboard />
 
       {/* Quick Actions */}
       <Card className="border-0 bg-slate-50">
@@ -332,14 +360,19 @@ export default function Pessoas() {
                   <div
                     className={`p-2 md:p-3 rounded-full bg-white/60 flex-shrink-0`}
                   >
-                    <Icon className={`w-5 h-5 md:w-6 md:h-6 ${iconColors[index]} opacity-70`} />
+                    <Icon
+                      className={`w-5 h-5 md:w-6 md:h-6 ${iconColors[index]} opacity-70`}
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                       <h3 className="font-semibold text-sm md:text-base truncate">
                         {action.title}
                       </h3>
-                      <Badge variant="secondary" className="text-xs w-fit font-bold">
+                      <Badge
+                        variant="secondary"
+                        className="text-xs w-fit font-bold"
+                      >
                         {action.count} {action.label}
                       </Badge>
                     </div>
@@ -382,7 +415,9 @@ export default function Pessoas() {
             <PerfisPendentes />
           ) : (
             <div className="text-center py-4 text-orange-700">
-              <p className="text-sm">✓ Nenhuma alteração pendente de aprovação</p>
+              <p className="text-sm">
+                ✓ Nenhuma alteração pendente de aprovação
+              </p>
               <p className="text-xs mt-1 text-orange-600">
                 Alterações externas de perfis aparecerão aqui
               </p>
@@ -401,7 +436,10 @@ export default function Pessoas() {
             <CardTitle className="text-lg md:text-xl flex items-center gap-2">
               <Heart className="h-5 w-5 text-red-600 fill-red-600" />
               <span className="text-red-800">Aceitaram Jesus</span>
-              <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-100">
+              <Badge
+                variant="secondary"
+                className="bg-red-100 text-red-800 border-red-100"
+              >
                 {aceitaramJesus.length}
               </Badge>
             </CardTitle>
@@ -463,9 +501,6 @@ export default function Pessoas() {
           </CardContent>
         </Card>
       )}
-
-      {/* Aniversários Dashboard */}
-      <AniversariosDashboard />
 
       {/* Recent Activity Summary */}
       <AtividadeRecenteSummary />

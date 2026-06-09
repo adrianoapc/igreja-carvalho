@@ -10,6 +10,26 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Alterado
 
+#### 👤 Padronização de Contatos em Pessoas + Backfill Legado (8 Jun/2026)
+
+- **Tipo**: fix + data-migration + consistência UX
+- **Resumo**: Unificado o consumo de contatos para priorizar `profile_contatos` em listagens de Pessoas, Membros e Visitantes, com fallback seguro para campos legados de `profiles` e badges de metadados de contato.
+- **Módulos afetados**: Pessoas (`todos`, `membros`, `visitantes`), Cadastro de Pessoa, Perfil/Detalhes
+- **Impacto no usuário**:
+  - Busca e visualização de contato mais consistentes entre telas.
+  - Exibição de indicadores `WhatsApp` e `Login` quando definidos no contato principal.
+  - Redução de casos de "Nenhum contato cadastrado" para registros legados.
+
+**Arquivos modificados/criados:**
+
+- `supabase/migrations/20260608190000_sanitize_backfill_profile_contatos.sql`
+- `src/pages/pessoas/Todos.tsx`
+- `src/pages/pessoas/Membros.tsx`
+- `src/pages/pessoas/Visitantes.tsx`
+- `src/pages/PessoaDetalhes.tsx`
+- `src/pages/pessoas/EditarPessoa.tsx`
+- `src/components/pessoas/CadastrarPessoaDialog.tsx`
+
 #### ☕ Cadastro Público Café V&P (28 Mar/2026)
 
 - **Tipo**: feature + ux + backend

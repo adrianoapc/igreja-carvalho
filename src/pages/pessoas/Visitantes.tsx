@@ -60,6 +60,8 @@ interface Visitante {
   nome: string;
   telefone: string | null;
   email: string | null;
+  contato_whatsapp?: boolean;
+  contato_login?: boolean;
   avatar_url?: string | null;
   data_primeira_visita: string | null;
   data_ultima_visita: string | null;
@@ -70,6 +72,15 @@ interface Visitante {
   recebeu_brinde: boolean | null;
   status: "visitante" | "frequentador" | "membro";
   user_id: string | null;
+}
+
+interface ProfileContato {
+  profile_id: string;
+  tipo: string;
+  valor: string;
+  is_primary: boolean;
+  is_whatsapp: boolean;
+  is_login: boolean;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -117,7 +128,52 @@ export default function Visitantes() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setAllVisitantes(data || []);
+
+      const visitantesBase = data || [];
+      const profileIds = visitantesBase.map((v) => v.id);
+      const contatosPorPerfil = new Map<string, ProfileContato[]>();
+
+      if (profileIds.length > 0) {
+        const { data: contatosData, error: contatosError } = await supabase
+          .from("profile_contatos")
+          .select("profile_id, tipo, valor, is_primary, is_whatsapp, is_login")
+          .in("profile_id", profileIds);
+
+        if (contatosError) throw contatosError;
+
+        (contatosData || []).forEach((contato) => {
+          const key = contato.profile_id;
+          const lista = contatosPorPerfil.get(key) || [];
+          lista.push(contato as ProfileContato);
+          contatosPorPerfil.set(key, lista);
+        });
+      }
+
+      const pickContato = (
+        contatos: ProfileContato[],
+        tipos: string[],
+      ): ProfileContato | undefined => {
+        return (
+          contatos.find((c) => tipos.includes(c.tipo) && c.is_primary) ||
+          contatos.find((c) => tipos.includes(c.tipo))
+        );
+      };
+
+      const visitantesComContato: Visitante[] = visitantesBase.map((visitante) => {
+        const contatos = contatosPorPerfil.get(visitante.id) || [];
+        const contatoTelefone = pickContato(contatos, ["celular", "fixo", "telefone"]);
+        const contatoEmail = pickContato(contatos, ["email"]);
+
+        return {
+          ...visitante,
+          telefone: contatoTelefone?.valor || visitante.telefone || null,
+          email: contatoEmail?.valor || visitante.email || null,
+          contato_whatsapp: Boolean(contatoTelefone?.is_whatsapp),
+          contato_login: Boolean(contatoEmail?.is_login),
+        };
+      });
+
+      setAllVisitantes(visitantesComContato);
       setCurrentPage(1);
     } catch (error) {
       console.error("Erro ao buscar visitantes:", error);
@@ -340,6 +396,20 @@ export default function Visitantes() {
                             <span className="truncate">{visitante.email}</span>
                           </span>
                         )}
+                        {(visitante.contato_whatsapp || visitante.contato_login) && (
+                          <div className="flex items-center gap-1 pt-1">
+                            {visitante.contato_whatsapp && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-green-600 border-green-400">
+                                WhatsApp
+                              </Badge>
+                            )}
+                            {visitante.contato_login && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-blue-600 border-blue-400">
+                                Login
+                              </Badge>
+                            )}
+                          </div>
+                        )}
                         {visitante.data_primeira_visita && (
                           <span className="flex items-center gap-2">
                             <Calendar className="w-4 h-4" />
@@ -457,6 +527,20 @@ export default function Visitantes() {
                           <Mail className="w-4 h-4" />
                           <span className="truncate">{visitante.email}</span>
                         </span>
+                      )}
+                      {(visitante.contato_whatsapp || visitante.contato_login) && (
+                        <div className="flex items-center gap-1 pt-0.5">
+                          {visitante.contato_whatsapp && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-green-600 border-green-400">
+                              WhatsApp
+                            </Badge>
+                          )}
+                          {visitante.contato_login && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-blue-600 border-blue-400">
+                              Login
+                            </Badge>
+                          )}
+                        </div>
                       )}
                       {visitante.data_primeira_visita && (
                         <span className="flex items-center gap-1 text-sm text-muted-foreground">

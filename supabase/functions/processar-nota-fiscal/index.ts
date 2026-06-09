@@ -16,9 +16,9 @@ const FUNCTION_NAME = "processar-nota-fiscal";
 
 // Default config if not in database
 const DEFAULT_MODEL = "google/gemini-2.5-pro";
-const DEFAULT_VISION_PROMPT = `Você é um assistente especializado em extrair informações de notas fiscais brasileiras (NFe, NFCe, cupons fiscais, etc).
-             
-Analise a imagem da nota fiscal e extraia as seguintes informações:
+const DEFAULT_VISION_PROMPT = `Você é um assistente especializado em extrair informações de notas fiscais, cupons fiscais e recibos brasileiros (NFe, NFCe, cupons fiscais, recibos, etc).
+
+Analise o documento e extraia as seguintes informações:
 - CNPJ ou CPF do fornecedor/emissor
 - Nome/Razão Social do fornecedor
 - Data de emissão (formato YYYY-MM-DD)
@@ -26,6 +26,20 @@ Analise a imagem da nota fiscal e extraia as seguintes informações:
 - Data de vencimento (se houver, formato YYYY-MM-DD)
 - Descrição dos itens/serviços
 - Número da nota fiscal
+
+## DICIONÁRIO — COMO IDENTIFICAR O "valor_total" CORRETO
+O campo "valor_total" deve ser SEMPRE o valor final efetivamente cobrado/pago pelo cliente. Em cupons e recibos brasileiros, esse valor costuma aparecer perto de termos como:
+- "Total", "Total a pagar", "Valor total", "Total da compra", "Valor pago", "Total geral"
+
+NUNCA use como "valor_total" linhas que representam vantagem, desconto ou troco — mesmo que o valor delas pareça em destaque no documento:
+- "Bônus" / "Bônus na compra" / "Você ganhou"
+- "Desconto" / "Você economizou" / "Economia" / "Cupom aplicado"
+- "Cashback" / "Pontos fidelidade" / "Pontuação"
+- "Troco" / "Valor recebido"
+
+Exemplo: se o cupom mostra "Bônus na compra: R$ 12,50" em destaque e, mais abaixo, "Total: R$ 87,40", o "valor_total" correto é R$ 87,40 — o bônus NÃO é o valor da compra, é uma vantagem concedida ao cliente.
+
+Em caso de dúvida entre dois valores candidatos, prefira sempre o que está identificado como "Total"/"Total a pagar"/"Valor pago" sobre qualquer valor rotulado como benefício, desconto ou economia.
 
 Retorne os dados no formato estruturado solicitado. Se algum campo não estiver visível, retorne null.`;
 
