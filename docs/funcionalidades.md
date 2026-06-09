@@ -171,7 +171,7 @@ Substituiu o modal monolítico `CadastrarPessoaDialog` por uma **página wizard 
 
 #### Check-in com OTP via WhatsApp
 
-O check-in de eventos usa verificação de identidade por código OTP enviado via WhatsApp (integração Make.com).
+O check-in de eventos usa verificação de identidade por código OTP enviado via WhatsApp (WhatsApp Cloud API / Meta).
 
 - **Rota**: `/checkin/:tipo/:id` (público, sem autenticação)
 - **Componente**: `src/pages/Checkin.tsx`
