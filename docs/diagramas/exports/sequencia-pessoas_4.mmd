@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant U as Usuário (staff)
+    participant FE as EditarContatosDialog
+    participant SB as Supabase
+    participant DB as Banco (Postgres)
+    participant Q as Fila chatbot_queue
+
+    U->>FE: Edita contatos da pessoa
+    FE->>SB: UPDATE profiles.profile_contatos
+    SB->>DB: Sanitizar + persistir profile_contatos
+    DB-->>SB: Registro atualizado
+    alt novos contatos adicionados
+        DB->>Q: Enfileirar payload para chatbot
+    end
+    SB-->>FE: Sucesso
+    FE-->>U: Confirma atualização
