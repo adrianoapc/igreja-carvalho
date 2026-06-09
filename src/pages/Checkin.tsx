@@ -100,11 +100,11 @@ const iniciarContadorReenvio = () => {
       } else if (tipo === "aula") {
         const { data, error } = await supabase
           .from("aulas")
-          .select("id, tema, data_inicio, modalidade")
+          .select("id, tema, data_inicio, modalidade, igreja_id")
           .eq("id", id)
           .maybeSingle();
         if (error) throw error;
-        if (data) setEvento({ id: data.id, titulo: data.tema || "Aula", data: data.data_inicio, tipo: data.modalidade || "presencial" });
+        if (data) setEvento({ id: data.id, titulo: data.tema || "Aula", data: data.data_inicio, tipo: data.modalidade || "presencial", igreja_id: data.igreja_id });
       }
     } catch {
       toast.error("Evento não encontrado");
