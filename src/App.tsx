@@ -67,6 +67,11 @@ const CadastroCafeVP = lazy(() => import("./pages/cadastro/CafeVP"));
 // Inscrição Pública (QR Code)
 const InscricaoPublica = lazy(() => import("./pages/InscricaoPublica"));
 
+// Recepção
+const HubRecepcao = lazy(() => import("./pages/recepcao/index"));
+const RecepcaoVisitante = lazy(() => import("./pages/recepcao/Visitante"));
+const RecepcaoFrequentador = lazy(() => import("./pages/recepcao/Frequentador"));
+
 // Pessoas
 const PessoasIndex = lazy(() => import("./pages/pessoas/index"));
 const CadastrarPessoa = lazy(() => import("./pages/pessoas/CadastrarPessoa"));
@@ -369,6 +374,30 @@ const App = () => (
                       element={
                         <AuthGate>
                           <Chamada />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/recepcao"
+                      element={
+                        <AuthGate>
+                          <HubRecepcao />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/recepcao/visitante"
+                      element={
+                        <AuthGate>
+                          <RecepcaoVisitante />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/recepcao/frequentador"
+                      element={
+                        <AuthGate>
+                          <RecepcaoFrequentador />
                         </AuthGate>
                       }
                     />
