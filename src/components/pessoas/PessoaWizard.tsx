@@ -168,20 +168,23 @@ for (const check of checks) {
 
       if (error) throw error;
 
-      if (checkboxes.deseja_contato && tipo === "visitante" && newData) {
-        const dataContato = new Date();
-        dataContato.setDate(dataContato.getDate() + 3);
-        await supabase.from("visitante_contatos").insert({
-          visitante_id: newData.id,
-          membro_responsavel_id: user.id,
-          data_contato: dataContato.toISOString(),
-          tipo_contato: "telefonico",
-          status: "agendado",
-          observacoes: "Contato automático agendado após registro",
-          igreja_id: igrejaId,
-          filial_id: filialId,
-        });
-      }
+if (checkboxes.deseja_contato && tipo === "visitante" && newData) {
+  const dataContato = new Date();
+  dataContato.setDate(dataContato.getDate() + 3);
+
+  const { error: contatoError } = await supabase.from("visitante_contatos").insert({
+    visitante_id: newData.id,
+    membro_responsavel_id: user.id,
+    data_contato: dataContato.toISOString(),
+    tipo_contato: "telefonico",
+    status: "agendado",
+    observacoes: "Contato automático agendado após registro",
+    igreja_id: igrejaId,
+    filial_id: filialId,
+  });
+
+  if (contatoError) throw contatoError;
+}
 
       const tipoLabel = tipo === "visitante" ? "Visitante" : tipo === "frequentador" ? "Frequentador" : "Membro";
       toast({ title: "Cadastro realizado!", description: `${tipoLabel} ${dadosBasicos.nome} cadastrado com sucesso.` });
