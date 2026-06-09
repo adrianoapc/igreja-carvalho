@@ -49,21 +49,28 @@ export function StepDadosMembro({ data, onChange, disabled }: Props) {
   const { buscarCep, loading: cepLoading, error: cepError } = useCepAutocomplete();
   const { toast } = useToast();
 
-  const handleCepBlur = async () => {
-    const dados = await buscarCep(data.cep);
-    if (dados) {
-      onChange({
-        ...data,
-        logradouro: dados.logradouro || data.logradouro,
-        bairro: dados.bairro || data.bairro,
-        cidade: dados.localidade || data.cidade,
-        estado: dados.uf || data.estado,
-      });
-    }
-    if (cepError) {
-      toast({ title: "Aviso", description: cepError, variant: "destructive" });
-    }
-  };
+const handleCepBlur = async () => {
+  const cepLimpo = data.cep.replace(/\D/g, "");
+  if (cepLimpo.length !== 8) return;
+
+  const dados = await buscarCep(data.cep);
+  if (!dados) {
+    toast({
+      title: "CEP inválido",
+      description: "Não foi possível localizar o CEP informado.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  onChange({
+    ...data,
+    logradouro: dados.logradouro || data.logradouro,
+    bairro: dados.bairro || data.bairro,
+    cidade: dados.localidade || data.cidade,
+    estado: dados.uf || data.estado,
+  });
+};
 
   return (
     <div className="space-y-5">
