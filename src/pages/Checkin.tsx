@@ -65,15 +65,26 @@ export default function Checkin() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
 
-  const iniciarContadorReenvio = () => {
-    setReenvioSegundos(60);
-    timerRef.current = setInterval(() => {
-      setReenvioSegundos((s) => {
-        if (s <= 1) { clearInterval(timerRef.current!); return 0; }
-        return s - 1;
-      });
-    }, 1000);
-  };
+const iniciarContadorReenvio = () => {
+  if (timerRef.current) {
+    clearInterval(timerRef.current);
+    timerRef.current = null;
+  }
+
+  setReenvioSegundos(60);
+  timerRef.current = setInterval(() => {
+    setReenvioSegundos((s) => {
+      if (s <= 1) {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        return 0;
+      }
+      return s - 1;
+    });
+  }, 1000);
+};
 
   const loadEvento = async () => {
     if (!tipo || !id) return;
