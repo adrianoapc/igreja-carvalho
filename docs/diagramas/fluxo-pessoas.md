@@ -12,10 +12,41 @@ flowchart TD
     E -->|Nao| G[Escolher proxima acao]
     F --> G
     G --> H{Criar ou editar?}
-    H -->|Criar| I[Criar pessoa<br/>igreja_id automático]
+    H -->|Criar| I[Navegar para /pessoas/cadastrar<br/>PessoaWizard]
     H -->|Editar| J[Editar pessoa<br/>validar igreja_id]
-    I --> K[Salvar cadastro<br/>INSERT profiles]
+    I --> I1{Selecionar tipo}
+    I1 -->|Visitante/Frequentador| I2[Step 1: Dados básicos<br/>Step 2: Complementar<br/>Step 3: Finalizar]
+    I1 -->|Membro| I3[Step 1: Dados básicos<br/>Step 2: Dados do membro<br/>Step 3: Complementar<br/>Step 4: Finalizar]
+    I2 --> K[Salvar cadastro<br/>INSERT profiles]
+    I3 --> K
     J --> K
     K --> L[Recarregar/atualizar listagem<br/>scoped por igreja]
     L --> M([Fim])
+```
+
+## Fluxo de Check-in com OTP (QR Code do Evento)
+
+```mermaid
+flowchart TD
+    QR([Escanear QR Code]) --> T[Digitar telefone]
+    T --> OTP[Edge: send-otp<br/>WhatsApp envia código]
+    OTP --> C[Digitar código 6 dígitos]
+    C --> V{Edge: verify-otp}
+    V -->|Inválido| E[Exibe erro<br/>tentativas restantes]
+    E --> C
+    V -->|Válido| CI[Edge: checkin-evento<br/>registra presença]
+    CI --> S{Encontrou perfil?}
+    S -->|Sim| OK[Presença confirmada<br/>nome mascarado]
+    S -->|Não| NF[Redireciona para<br/>/cadastro/visitante]
+```
+
+## Fluxo de Cadastro Público de Visitante
+
+```mermaid
+flowchart TD
+    A([Acessar /cadastro/visitante]) --> S1[Step 1: Nome + Sexo + Aniversário]
+    S1 --> S2[Step 2: Telefone + Email]
+    S2 --> S3[Step 3: Como conheceu + Obs + Checkboxes]
+    S3 --> SUB[Edge: cadastro-publico<br/>action: cadastrar_visitante]
+    SUB --> OK([Tela de sucesso])
 ```

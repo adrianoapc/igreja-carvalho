@@ -138,18 +138,63 @@ O Super Admin Portal é um subsistema separado para gestão SaaS de múltiplas i
 ### 1.7 Módulo Pessoas / Membros
 
 - **Objetivo**: Centralizar o cadastro unificado de visitantes, frequentadores e membros, permitindo listar, buscar/filtrar e manter dados completos de perfil e status.
-- **Funcionalidades principais**: listar (ordenado por nome via `profiles`), buscar/filtrar por nome/telefone/email/status, criar pessoa, editar pessoa (dados pessoais, contatos, eclesiásticos, adicionais, status), exportar listagens e navegar para detalhes.
+- **Funcionalidades principais**: listar (ordenado por nome via `profiles`), buscar/filtrar por nome/telefone/email/status, criar pessoa via wizard multi-etapas, editar pessoa (dados pessoais, contatos, eclesiásticos, adicionais, status), exportar listagens e navegar para detalhes.
 - **Campos/atributos (profiles)**: `id`, `nome`, `email`, `telefone`, `avatar_url`, `status` (`visitante` | `frequentador` | `membro`), `data_primeira_visita`, `numero_visitas`, `user_id`, `sexo`, `data_nascimento`, `estado_civil`, `data_casamento`, `rg`, `cpf`, `alergias`, `necessidades_especiais`, `cep`, `cidade`, `bairro`, `estado`, `endereco`, `entrou_por`, `data_entrada`, `status_igreja`, `data_conversao`, `batizado`, `data_batismo`, `e_lider`, `e_pastor`, `escolaridade`, `profissao`, `nacionalidade`, `naturalidade`, `entrevistado_por`, `cadastrado_por`, `tipo_sanguineo`, `observacoes`.
-- **Regras de negócio**: status permitido limitado a `visitante`/`frequentador`/`membro`; filtros locais por nome/telefone/email/status na listagem; criação/edição persiste em `profiles` via Supabase; não há deduplicação automática visível para nome/telefone/email (conferência manual necessária).
+- **Regras de negócio**: status permitido limitado a `visitante`/`frequentador`/`membro`; filtros locais por nome/telefone/email/status na listagem; criação/edição persiste em `profiles` via Supabase; verificação de duplicata por telefone/email antes de salvar (manual necessária).
 - **Links**: [Manual do Usuário — Pessoas](manual-usuario.md#3-gestão-de-pessoas) · [Fluxo Pessoas (Mermaid)](diagramas/fluxo-pessoas.md) · [Sequência Pessoas (Mermaid)](diagramas/sequencia-pessoas.md) · [Permissões Pessoas](diagramas/permissoes-pessoas.md)
 - **Referências complementares**: [BIDIRECTIONAL_RELATIONSHIPS.md](BIDIRECTIONAL_RELATIONSHIPS.md) (exibição bidirecional de familiares), [AUTHORIZED_GUARDIANS.md](AUTHORIZED_GUARDIANS.md) (responsáveis autorizados para crianças/Kids) e [KIDS_INCLUSION.md](KIDS_INCLUSION.md) (campo de necessidades especiais na jornada Kids ligado aos perfis).
 
+#### PessoaWizard — Cadastro Interno (/pessoas/cadastrar)
+
+Substituiu o modal monolítico `CadastrarPessoaDialog` por uma **página wizard multi-etapas** (`/pessoas/cadastrar`), protegida por `AuthGate`.
+
+- **Rota**: `/pessoas/cadastrar` (requer autenticação)
+- **Componente principal**: `src/components/pessoas/PessoaWizard.tsx`
+- **Fluxo por tipo**:
+  - **Visitante / Frequentador**: 4 etapas — Selecionar tipo → Dados básicos → Complementar → Checkboxes
+  - **Membro**: 5 etapas — Selecionar tipo → Dados básicos → Dados do membro → Complementar → Checkboxes
+- **Etapas detalhadas**:
+  - `StepTipo`: seleção do tipo (Visitante / Frequentador / Membro) via cards
+  - `StepDadosBasicos`: nome (obrigatório), telefone (máscara), email, sexo
+  - `StepDadosMembro` (apenas Membro): CPF (máscara), RG, estado civil, profissão, endereço completo com autocomplete por CEP
+  - `StepComplementar`: data de aniversário (dia/mês/ano), como conheceu, observações
+  - `StepCheckboxes`: aceitou Jesus, batizado, deseja contato, recebeu brinde (visitante)
+- **Ações ao concluir**: verifica duplicata telefone/email, faz `INSERT profiles`, cria `visitante_contato` agendado para +3 dias se `deseja_contato=true`, redireciona para `/pessoas`
+- **Barra de progresso**: componente `Progress` do Shadcn atualizado por etapa
+
 #### Módulo Pessoas / Membros — visão funcional
 
-- **Funcionalidades disponíveis**: dashboard com estatísticas por status; busca rápida por nome/email/telefone; listagem com ordenação por nome e avatars (quando cadastrados); criação/edição de perfis completos; evolução de status visitante → frequentador → membro; visualização de vínculos familiares bidirecionais; atribuição de funções ministeriais; exportação da listagem; cards de acesso rápido (visitantes, membros, frequentadores, contatos agendados); painel de alterações pendentes; lista das últimas conversões (aceitaram Jesus).
+- **Funcionalidades disponíveis**: dashboard com estatísticas por status; busca rápida por nome/email/telefone; listagem com ordenação por nome e avatars (quando cadastrados); criação via wizard (rota dedicada); edição de perfis completos; evolução de status visitante → frequentador → membro; visualização de vínculos familiares bidirecionais; atribuição de funções ministeriais; exportação da listagem; cards de acesso rápido (visitantes, membros, frequentadores, contatos agendados); painel de alterações pendentes; lista das últimas conversões (aceitaram Jesus).
 - **Ações permitidas**: criar pessoa (nome obrigatório, contato recomendado), editar dados pessoais/contatos/status/funções, navegar para detalhes, aplicar busca/filtros, carregar mais itens via scroll, acionar atalhos rápidos para segmentos e contatos agendados, revisar alterações pendentes e acessar lista de conversões recentes.
-- **Regras funcionais**: status restrito a `visitante`/`frequentador`/`membro`; sem deduplicação automática (verificar duplicidade de nome/telefone/email antes de salvar); campos mínimos para cadastro exigem nome; contatos incompletos reduzem eficácia da busca e follow-up; vínculos familiares exibem ambos os lados com inversão de papel; avatars não são obrigatórios e podem exibir fallback.
+- **Regras funcionais**: status restrito a `visitante`/`frequentador`/`membro`; verificação manual de duplicidade (nome/telefone/email) antes de salvar; campos mínimos exigem nome; contatos incompletos reduzem eficácia de busca e follow-up; vínculos familiares exibem ambos os lados com inversão de papel; avatars não são obrigatórios e podem exibir fallback.
 - **Links relacionados**: [Manual do Usuário — Pessoas](manual-usuario.md#3-gestão-de-pessoas) · [Produto — Pessoas/Membros](produto/README_PRODUTO.MD#pessoas--membros-visão-de-produto)
+
+#### Check-in com OTP via WhatsApp
+
+O check-in de eventos usa verificação de identidade por código OTP enviado via WhatsApp (integração Make.com).
+
+- **Rota**: `/checkin/:tipo/:id` (público, sem autenticação)
+- **Componente**: `src/pages/Checkin.tsx`
+- **Fluxo**:
+  1. Participante escaneia QR Code do evento e digita seu telefone
+  2. Edge function `send-otp` envia código de 6 dígitos via WhatsApp (hash SHA-256 armazenado, rate-limited)
+  3. Participante digita o código recebido; edge function `verify-otp` valida (máx. 5 tentativas)
+  4. Edge function `checkin-evento` registra a presença vinculando o `profile_id`
+  5. Tela de sucesso exibe nome mascarado (ex: "Adriano O.") para privacidade
+  6. Se telefone não encontrado: redireciona para `/cadastro/visitante?telefone=...`
+- **Reenvio**: botão disponível após contador regressivo de 60 segundos
+- **Segurança**: nome completo nunca exibido na tela de check-in público
+
+#### Cadastro Público de Visitante (/cadastro/visitante)
+
+Formulário público (sem autenticação) convertido para wizard de 3 etapas, acessível via QR Code ou link direto.
+
+- **Rota**: `/cadastro/visitante` (público)
+- **Etapa 1**: Nome completo (obrigatório), sexo, aniversário (dia/mês)
+- **Etapa 2**: Telefone WhatsApp (máscara, pré-preenchido se veio do check-in), email
+- **Etapa 3**: Como conheceu a igreja, necessidades especiais, observações, checkboxes (aceitou Jesus, deseja contato)
+- **Submissão**: chama edge function `cadastro-publico` com `action: "cadastrar_visitante"`
+- **Parâmetros de URL**: `igreja_id`, `filial_id`, `todas_filiais`, `telefone` (pré-preenchimento), `aceitou=true` (muda título e ícone da etapa 1)
 
 ---
 
