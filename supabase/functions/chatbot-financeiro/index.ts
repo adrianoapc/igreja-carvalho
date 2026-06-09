@@ -17,6 +17,7 @@ const corsHeaders = {
 type EstadoSessao =
   | "AGUARDANDO_FORMA_INICIAL" // Pergunta forma antes dos comprovantes (fluxo DESPESAS)
   | "AGUARDANDO_COMPROVANTES"
+  | "CONFIRMANDO_ITEM"         // Revisão dos dados extraídos do comprovante antes de aceitar
   | "AGUARDANDO_OBSERVACAO"    // Pergunta observação/contexto após comprovantes
   | "AGUARDANDO_DATA"
   | "AGUARDANDO_FORMA_PGTO"
@@ -65,6 +66,9 @@ interface MetaDados {
   nome_perfil?: string;
   estado_atual: EstadoSessao;
   itens: ItemProcessado[];
+  item_pendente?: ItemProcessado | null; // Comprovante aguardando confirmação do usuário
+  fila_pendente?: ItemProcessado[];      // Comprovantes recebidos enquanto havia revisão pendente
+  fechar_solicitado?: boolean;           // Usuário pediu Fechar; concluir assim que a fila esvaziar
   valor_total_acumulado: number;
   data_vencimento?: string;
   forma_pagamento?: "pix" | "dinheiro" | "cartao" | "boleto" | "a_definir";
@@ -316,23 +320,15 @@ async function deletarAnexosSessao(
   let removidos = 0;
 
   for (const item of itens) {
-    if (item.anexo_storage) {
+    if (item.anexo_storage_path) {
       try {
-        // Extrair path do URL
-        const url = new URL(item.anexo_storage);
-        const pathMatch = url.pathname.match(
-          /\/storage\/v1\/object\/public\/transaction-attachments\/(.+)/
-        );
-        if (pathMatch) {
-          const filePath = pathMatch[1];
-          const { error } = await supabase.storage
-            .from("transaction-attachments")
-            .remove([filePath]);
+        const { error } = await supabase.storage
+          .from("transaction-attachments")
+          .remove([item.anexo_storage_path]);
 
-          if (!error) {
-            removidos++;
-            console.log(`[Storage] Removido: ${filePath}`);
-          }
+        if (!error) {
+          removidos++;
+          console.log(`[Storage] Removido: ${item.anexo_storage_path}`);
         }
       } catch (e) {
         console.error(`[Storage] Erro ao remover:`, e);
@@ -346,6 +342,155 @@ async function deletarAnexosSessao(
 // Formatar valor em reais
 function formatarValor(valor: number): string {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+// Baixa, persiste no Storage e roda o OCR de um comprovante recebido,
+// retornando o item já pronto para revisão (ou fila) — usado tanto para o
+// primeiro comprovante quanto para os que chegam enquanto há revisão pendente.
+async function processarComprovanteRecebido(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  supabaseUrl: string,
+  supabaseKey: string,
+  urlAnexo: string,
+  sessaoId: string,
+  whatsappToken: string | undefined,
+  igrejaId: string
+): Promise<ItemProcessado | null> {
+  const anexoResult = await persistirAnexo(supabase, urlAnexo, sessaoId, whatsappToken);
+  if (!anexoResult) return null;
+
+  let dadosNota: Awaited<ReturnType<typeof processarNotaFiscal>> = null;
+  try {
+    console.log(`[OCR] Baixando arquivo do storage para processamento...`);
+    const fileResponse = await fetch(anexoResult.signedUrl);
+    if (!fileResponse.ok) {
+      throw new Error(`Erro ao baixar do storage: ${fileResponse.status}`);
+    }
+
+    const fileBuffer = await fileResponse.arrayBuffer();
+    const uint8Arr = new Uint8Array(fileBuffer);
+
+    let base64 = "";
+    const chunkSize = 0x8000; // 32KB chunks
+    for (let i = 0; i < uint8Arr.length; i += chunkSize) {
+      const chunk = uint8Arr.subarray(i, Math.min(i + chunkSize, uint8Arr.length));
+      base64 += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    base64 = btoa(base64);
+
+    const mimeType = anexoResult.isPdf ? "application/pdf" : anexoResult.contentType;
+    console.log(`[OCR] Enviando para processamento: ${mimeType}, ${Math.round(uint8Arr.length / 1024)}KB`);
+
+    dadosNota = await processarNotaFiscal(supabaseUrl, supabaseKey, base64, mimeType, igrejaId);
+    console.log(`[OCR] Resultado: valor=${dadosNota?.valor}, fornecedor=${dadosNota?.fornecedor}`);
+  } catch (e) {
+    console.error("[OCR] Erro ao processar para OCR:", e);
+  }
+
+  return {
+    anexo_original: urlAnexo,
+    anexo_storage: anexoResult.signedUrl,
+    anexo_storage_path: anexoResult.storagePath,
+    anexo_content_type: anexoResult.contentType,
+    anexo_is_pdf: anexoResult.isPdf,
+    valor: dadosNota?.valor || 0,
+    fornecedor: dadosNota?.fornecedor || null,
+    fornecedor_id: dadosNota?.fornecedor_id || null,
+    data_emissao: dadosNota?.data_emissao || null,
+    descricao: dadosNota?.descricao || null,
+    categoria_sugerida_id: dadosNota?.categoria_sugerida_id || null,
+    subcategoria_sugerida_id: dadosNota?.subcategoria_sugerida_id || null,
+    centro_custo_sugerido_id: dadosNota?.centro_custo_sugerido_id || null,
+    base_ministerial_sugerido_id: dadosNota?.base_ministerial_sugerido_id || null,
+    processado_em: new Date().toISOString(),
+  };
+}
+
+// Monta a mensagem de revisão de um item, destacando quando algo não foi
+// identificado pelo OCR (em vez de deixar o usuário descobrir só depois).
+function montarMensagemRevisaoItem(item: ItemProcessado, numero: number): string {
+  const linhas: string[] = [];
+  if (item.valor > 0) {
+    linhas.push(`💰 Valor: ${formatarValor(item.valor)}`);
+  } else {
+    linhas.push(`⚠️ Valor: não consegui identificar`);
+  }
+  if (item.fornecedor) {
+    linhas.push(`🏪 Fornecedor: ${item.fornecedor}`);
+  } else {
+    linhas.push(`⚠️ Fornecedor: não identificado`);
+  }
+  if (item.data_emissao) {
+    linhas.push(`📅 Data: ${item.data_emissao}`);
+  }
+
+  return (
+    `📥 Comprovante ${numero} recebido! Aqui está o que identifiquei:\n\n` +
+    linhas.join("\n") +
+    `\n\n✅ Está correto? Digite *Sim* para confirmar.\n` +
+    `✏️ Ou me diga o que corrigir, ex: "valor 89,90" ou "fornecedor Mercado Bom Preço"\n` +
+    `🗑️ Digite *Remover* para descartar este comprovante.`
+  );
+}
+
+// Encerra o recebimento de comprovantes e avança para a etapa de observação.
+// Usada tanto pelo comando "Fechar" direto quanto pelo fechamento adiado
+// (usuário pediu Fechar mas ainda havia itens pendentes/na fila).
+async function finalizarRecebimentoComprovantes(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  sessaoId: string,
+  igrejaId: string,
+  metaDados: MetaDados,
+  itensFinal: ItemProcessado[],
+  valorTotalFinal: number
+): Promise<Response> {
+  if (itensFinal.length === 0) {
+    await supabase
+      .from("atendimentos_bot")
+      .update({
+        meta_dados: {
+          ...metaDados,
+          item_pendente: null,
+          fila_pendente: [],
+          fechar_solicitado: false,
+          estado_atual: "AGUARDANDO_COMPROVANTES",
+        },
+      })
+      .eq("id", sessaoId)
+      .eq("igreja_id", igrejaId);
+
+    return new Response(
+      JSON.stringify({
+        text: "⚠️ Nenhum comprovante foi confirmado ainda.\n\nEnvie a foto antes de fechar ou digite *Cancelar* para desistir.",
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  await supabase
+    .from("atendimentos_bot")
+    .update({
+      meta_dados: {
+        ...metaDados,
+        itens: itensFinal,
+        item_pendente: null,
+        fila_pendente: [],
+        fechar_solicitado: false,
+        valor_total_acumulado: valorTotalFinal,
+        estado_atual: "AGUARDANDO_OBSERVACAO",
+      },
+    })
+    .eq("id", sessaoId)
+    .eq("igreja_id", igrejaId);
+
+  return new Response(
+    JSON.stringify({
+      text: `📋 *Resumo: ${itensFinal.length} comprovante(s)*\n💰 Total: ${formatarValor(valorTotalFinal)}\n\n✏️ *Deseja adicionar uma observação?*\nEx: "Lanche do infantil" ou "Material reforma cozinha"\n\nDigite a observação ou *Pular* para continuar.`,
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
 }
 
 serve(async (req) => {
@@ -896,15 +1041,17 @@ serve(async (req) => {
           );
         }
 
-        // Baixar e salvar no Storage permanentemente
-        const anexoResult = await persistirAnexo(
+        const novoItem = await processarComprovanteRecebido(
           supabase,
+          supabaseUrl,
+          supabaseKey,
           url_anexo,
           sessao.id,
-          whatsappToken
+          whatsappToken,
+          igrejaId
         );
 
-        if (!anexoResult) {
+        if (!novoItem) {
           return new Response(
             JSON.stringify({
               text: "⚠️ Erro ao salvar o comprovante. Por favor, tente enviar novamente.",
@@ -913,104 +1060,27 @@ serve(async (req) => {
           );
         }
 
-        // Processar via OCR para extrair dados (imagens E PDFs)
-        let dadosNota: Awaited<ReturnType<typeof processarNotaFiscal>> = null;
-
-        try {
-          // Usar a URL do storage (já resolvida e salva) para o OCR
-          // Não usar url_anexo diretamente pois pode ser um media_id
-          const urlParaOcr = anexoResult.signedUrl;
-          console.log(`[OCR] Baixando arquivo do storage para processamento...`);
-          
-          const fileResponse = await fetch(urlParaOcr);
-          if (!fileResponse.ok) {
-            throw new Error(`Erro ao baixar do storage: ${fileResponse.status}`);
-          }
-          
-          const fileBuffer = await fileResponse.arrayBuffer();
-          const uint8Arr = new Uint8Array(fileBuffer);
-          
-          // Converter para base64 de forma mais robusta
-          let base64 = '';
-          const chunkSize = 0x8000; // 32KB chunks
-          for (let i = 0; i < uint8Arr.length; i += chunkSize) {
-            const chunk = uint8Arr.subarray(i, Math.min(i + chunkSize, uint8Arr.length));
-            base64 += String.fromCharCode.apply(null, Array.from(chunk));
-          }
-          base64 = btoa(base64);
-
-          // Determinar mimeType
-          const mimeType = anexoResult.isPdf
-            ? "application/pdf"
-            : anexoResult.contentType;
-
-          console.log(`[OCR] Enviando para processamento: ${mimeType}, ${Math.round(uint8Arr.length/1024)}KB`);
-
-          dadosNota = await processarNotaFiscal(
-            supabaseUrl,
-            supabaseKey,
-            base64,
-            mimeType,
-            igrejaId
-          );
-          
-          console.log(`[OCR] Resultado: valor=${dadosNota?.valor}, fornecedor=${dadosNota?.fornecedor}`);
-        } catch (e) {
-          console.error("[OCR] Erro ao processar para OCR:", e);
-        }
-
-        // Criar item processado
-        const novoItem: ItemProcessado = {
-          anexo_original: url_anexo,
-          anexo_storage: anexoResult.signedUrl,
-          anexo_storage_path: anexoResult.storagePath,
-          anexo_content_type: anexoResult.contentType,
-          anexo_is_pdf: anexoResult.isPdf,
-          valor: dadosNota?.valor || 0,
-          fornecedor: dadosNota?.fornecedor || null,
-          fornecedor_id: dadosNota?.fornecedor_id || null,
-          data_emissao: dadosNota?.data_emissao || null,
-          descricao: dadosNota?.descricao || null,
-          categoria_sugerida_id: dadosNota?.categoria_sugerida_id || null,
-          subcategoria_sugerida_id: dadosNota?.subcategoria_sugerida_id || null,
-          centro_custo_sugerido_id: dadosNota?.centro_custo_sugerido_id || null,
-          base_ministerial_sugerido_id: dadosNota?.base_ministerial_sugerido_id || null,
-          processado_em: new Date().toISOString(),
-        };
-
-        // Atualizar metadados
-        const itensAtualizados = [...metaDados.itens, novoItem];
-        const valorTotal = itensAtualizados.reduce(
-          (acc, item) => acc + item.valor,
-          0
-        );
+        // Não gravar direto em "itens": guardar como pendente e pedir confirmação
+        // do usuário antes de aceitar os dados extraídos pelo OCR (evita lançar
+        // valores/fornecedores errados ou zerados sem o usuário perceber).
+        const numeroComprovante = metaDados.itens.length + 1;
 
         await supabase
           .from("atendimentos_bot")
           .update({
             meta_dados: {
               ...metaDados,
-              itens: itensAtualizados,
-              valor_total_acumulado: valorTotal,
+              item_pendente: novoItem,
+              estado_atual: "CONFIRMANDO_ITEM",
             },
           })
           .eq("id", sessao.id)
           .eq("igreja_id", igrejaId);
 
-        // Resposta com resumo do item
-        let resposta = `📥 Comprovante ${itensAtualizados.length} recebido!\n`;
-        if (dadosNota?.valor) {
-          resposta += `💰 Valor: ${formatarValor(dadosNota.valor)}\n`;
-        }
-        if (dadosNota?.fornecedor) {
-          resposta += `🏪 ${dadosNota.fornecedor}\n`;
-        }
-        resposta += `\n📊 Total acumulado: ${formatarValor(valorTotal)} (${itensAtualizados.length} ${itensAtualizados.length === 1 ? "item" : "itens"})\n`;
-        resposta += `\nEnvie mais ou digite *Fechar* para concluir.`;
-
-        return new Response(JSON.stringify({ text: resposta }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ text: montarMensagemRevisaoItem(novoItem, numeroComprovante) }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       // B2. Cancelamento
@@ -1051,34 +1121,13 @@ serve(async (req) => {
         mensagem &&
         mensagem.toLowerCase().match(/fechar|fim|pronto|encerrar/)
       ) {
-        const qtdItens = metaDados.itens.length;
-
-        if (qtdItens === 0) {
-          return new Response(
-            JSON.stringify({
-              text: "⚠️ Nenhum comprovante foi enviado ainda.\n\nEnvie a foto antes de fechar ou digite *Cancelar* para desistir.",
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // NOVO: Transição para AGUARDANDO_OBSERVACAO (pedir comentário do usuário)
-        await supabase
-          .from("atendimentos_bot")
-          .update({
-            meta_dados: {
-              ...metaDados,
-              estado_atual: "AGUARDANDO_OBSERVACAO",
-            },
-          })
-          .eq("id", sessao.id)
-          .eq("igreja_id", igrejaId);
-
-        return new Response(
-          JSON.stringify({
-            text: `📋 *Resumo: ${qtdItens} comprovante(s)*\n💰 Total: ${formatarValor(metaDados.valor_total_acumulado)}\n\n✏️ *Deseja adicionar uma observação?*\nEx: "Lanche do infantil" ou "Material reforma cozinha"\n\nDigite a observação ou *Pular* para continuar.`,
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        return await finalizarRecebimentoComprovantes(
+          supabase,
+          sessao.id,
+          igrejaId,
+          metaDados,
+          metaDados.itens,
+          metaDados.valor_total_acumulado
         );
       }
 
@@ -1086,6 +1135,337 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           text: "📸 Aguardando comprovantes.\n\nEnvie a foto, digite *Fechar* para concluir ou *Cancelar* para desistir.",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ========== ESTADO: CONFIRMANDO_ITEM ==========
+    // Revisão dos dados extraídos via OCR antes de aceitar o comprovante.
+    // Evita lançar valor/fornecedor errados (ex: confundir "bônus na compra"
+    // com o valor total) ou zerados sem o usuário perceber.
+    if (estadoAtual === "CONFIRMANDO_ITEM") {
+      const itemPendente = metaDados.item_pendente;
+
+      if (!itemPendente) {
+        await supabase
+          .from("atendimentos_bot")
+          .update({
+            meta_dados: { ...metaDados, estado_atual: "AGUARDANDO_COMPROVANTES" },
+          })
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
+
+        return new Response(
+          JSON.stringify({
+            text: "📸 Aguardando comprovantes.\n\nEnvie a foto, digite *Fechar* para concluir ou *Cancelar* para desistir.",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const fila = metaDados.fila_pendente || [];
+      const texto = (mensagem || "").trim();
+      const textoLower = texto.toLowerCase();
+
+      // Cancelamento total da solicitação (inclui pendente + fila)
+      if (/^(cancelar|desistir|sair)$/i.test(textoLower)) {
+        const todosAnexos = [...metaDados.itens, itemPendente, ...fila];
+        const itensRemovidos = await deletarAnexosSessao(supabase, todosAnexos);
+
+        await supabase
+          .from("atendimentos_bot")
+          .update({
+            status: "CONCLUIDO",
+            meta_dados: {
+              ...metaDados,
+              estado_atual: "FINALIZADO",
+              resultado: "CANCELADO_PELO_USUARIO",
+              item_pendente: null,
+              fila_pendente: [],
+              itens_removidos: itensRemovidos,
+            },
+          })
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
+
+        return new Response(
+          JSON.stringify({
+            text: `❌ Solicitação cancelada.\n${itensRemovidos > 0 ? `${itensRemovidos} comprovante(s) descartado(s).` : ""}\n\nDigite *Reembolso* ou *Nova Conta* para iniciar novamente.`,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Usuário pediu para fechar, mas ainda há revisão pendente: registra o
+      // pedido (finaliza sozinho assim que a fila esvaziar) e lembra o que falta
+      if (mensagem && mensagem.toLowerCase().match(/fechar|fim|pronto|encerrar/)) {
+        await supabase
+          .from("atendimentos_bot")
+          .update({ meta_dados: { ...metaDados, fechar_solicitado: true } })
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
+
+        const totalPendentes = 1 + fila.length;
+        const resposta =
+          `📋 Combinado! Vou concluir assim que você revisar ${totalPendentes > 1 ? `os ${totalPendentes} comprovantes pendentes` : "o comprovante pendente"}.\n\n` +
+          montarMensagemRevisaoItem(itemPendente, metaDados.itens.length + 1);
+
+        return new Response(JSON.stringify({ text: resposta }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Novo arquivo enquanto há revisão pendente: processa e entra na fila,
+      // em vez de descartar — assim nada se perde quando o usuário manda
+      // vários comprovantes em sequência rápida.
+      if (tipo === "image" || tipo === "document") {
+        if (!url_anexo) {
+          return new Response(
+            JSON.stringify({ text: "Erro: Anexo sem URL." }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const itemEnfileirado = await processarComprovanteRecebido(
+          supabase,
+          supabaseUrl,
+          supabaseKey,
+          url_anexo,
+          sessao.id,
+          whatsappToken,
+          igrejaId
+        );
+
+        if (!itemEnfileirado) {
+          return new Response(
+            JSON.stringify({
+              text: "⚠️ Erro ao salvar este comprovante. Conclua a revisão atual e reenvie-o em seguida.",
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const filaAtualizada = [...fila, itemEnfileirado];
+
+        await supabase
+          .from("atendimentos_bot")
+          .update({ meta_dados: { ...metaDados, fila_pendente: filaAtualizada } })
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
+
+        const resposta =
+          `📥 Recebido! Vou revisar este assim que você concluir o comprovante atual.\n\n` +
+          `📋 ${filaAtualizada.length} ${filaAtualizada.length === 1 ? "comprovante" : "comprovantes"} aguardando na fila.\n\n` +
+          `👆 Pode responder agora sobre o comprovante mostrado: *Sim*, *Remover* ou uma correção (ex: "valor 89,90").`;
+
+        return new Response(JSON.stringify({ text: resposta }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Confirmação positiva: aceita o item pendente, grava e avança para o
+      // próximo da fila (se houver) ou finaliza (se "Fechar" já foi pedido)
+      if (/^(sim|s|ok|certo|correto|confirma|confirmado|confirmar|isso|exato|perfeito)$/i.test(textoLower)) {
+        const itensAtualizados = [...metaDados.itens, itemPendente];
+        const valorTotal = itensAtualizados.reduce((acc, item) => acc + item.valor, 0);
+        const filaRestante = [...fila];
+        const proximoItem = filaRestante.shift() || null;
+
+        if (proximoItem) {
+          await supabase
+            .from("atendimentos_bot")
+            .update({
+              meta_dados: {
+                ...metaDados,
+                itens: itensAtualizados,
+                item_pendente: proximoItem,
+                fila_pendente: filaRestante,
+                valor_total_acumulado: valorTotal,
+                estado_atual: "CONFIRMANDO_ITEM",
+              },
+            })
+            .eq("id", sessao.id)
+            .eq("igreja_id", igrejaId);
+
+          const resposta =
+            `✅ Comprovante ${itensAtualizados.length} confirmado!\n\n` +
+            montarMensagemRevisaoItem(proximoItem, itensAtualizados.length + 1);
+
+          return new Response(JSON.stringify({ text: resposta }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if (metaDados.fechar_solicitado) {
+          return await finalizarRecebimentoComprovantes(
+            supabase,
+            sessao.id,
+            igrejaId,
+            metaDados,
+            itensAtualizados,
+            valorTotal
+          );
+        }
+
+        await supabase
+          .from("atendimentos_bot")
+          .update({
+            meta_dados: {
+              ...metaDados,
+              itens: itensAtualizados,
+              item_pendente: null,
+              valor_total_acumulado: valorTotal,
+              estado_atual: "AGUARDANDO_COMPROVANTES",
+            },
+          })
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
+
+        const resposta =
+          `✅ Comprovante ${itensAtualizados.length} confirmado!\n\n` +
+          `📊 Total acumulado: ${formatarValor(valorTotal)} (${itensAtualizados.length} ${itensAtualizados.length === 1 ? "item" : "itens"})\n\n` +
+          `Envie mais ou digite *Fechar* para concluir.`;
+
+        return new Response(JSON.stringify({ text: resposta }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Descartar o comprovante pendente e avançar para o próximo da fila
+      // (se houver) ou finalizar (se "Fechar" já foi pedido)
+      if (/^(remover|descartar|excluir|apagar|deletar)$/i.test(textoLower)) {
+        await deletarAnexosSessao(supabase, [itemPendente]);
+
+        const filaRestante = [...fila];
+        const proximoItem = filaRestante.shift() || null;
+
+        if (proximoItem) {
+          await supabase
+            .from("atendimentos_bot")
+            .update({
+              meta_dados: {
+                ...metaDados,
+                item_pendente: proximoItem,
+                fila_pendente: filaRestante,
+                estado_atual: "CONFIRMANDO_ITEM",
+              },
+            })
+            .eq("id", sessao.id)
+            .eq("igreja_id", igrejaId);
+
+          const resposta =
+            `🗑️ Comprovante descartado.\n\n` +
+            montarMensagemRevisaoItem(proximoItem, metaDados.itens.length + 1);
+
+          return new Response(JSON.stringify({ text: resposta }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if (metaDados.fechar_solicitado) {
+          return await finalizarRecebimentoComprovantes(
+            supabase,
+            sessao.id,
+            igrejaId,
+            metaDados,
+            metaDados.itens,
+            metaDados.valor_total_acumulado
+          );
+        }
+
+        await supabase
+          .from("atendimentos_bot")
+          .update({
+            meta_dados: {
+              ...metaDados,
+              item_pendente: null,
+              estado_atual: "AGUARDANDO_COMPROVANTES",
+            },
+          })
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
+
+        const qtdItens = metaDados.itens.length;
+        const resposta =
+          `🗑️ Comprovante descartado.\n\n` +
+          `📊 Total acumulado: ${formatarValor(metaDados.valor_total_acumulado)} (${qtdItens} ${qtdItens === 1 ? "item" : "itens"})\n\n` +
+          `Envie outro comprovante ou digite *Fechar* para concluir.`;
+
+        return new Response(JSON.stringify({ text: resposta }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Correções pontuais: valor, fornecedor ou data
+      const matchValor = texto.match(/valor\s*[:\-]?\s*(?:r\$\s*)?([\d.,]+)/i);
+      if (matchValor) {
+        const valorNormalizado = matchValor[1].replace(/\./g, "").replace(",", ".");
+        const novoValor = parseFloat(valorNormalizado);
+        if (!isNaN(novoValor) && novoValor > 0) {
+          itemPendente.valor = novoValor;
+
+          await supabase
+            .from("atendimentos_bot")
+            .update({ meta_dados: { ...metaDados, item_pendente: itemPendente } })
+            .eq("id", sessao.id)
+            .eq("igreja_id", igrejaId);
+
+          return new Response(
+            JSON.stringify({
+              text: `✏️ Valor atualizado para ${formatarValor(novoValor)}.\n\n✅ Está correto agora? Digite *Sim* para confirmar ou continue corrigindo.`,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
+      const matchFornecedor = texto.match(/(?:fornecedor|empresa|loja|prestador)\s*[:\-]?\s*(.+)/i);
+      if (matchFornecedor) {
+        const novoFornecedor = matchFornecedor[1].trim();
+        if (novoFornecedor) {
+          itemPendente.fornecedor = novoFornecedor;
+          // Limpa o vínculo automático: o fornecedor digitado manualmente
+          // pode não corresponder ao registro localizado/criado pelo OCR
+          itemPendente.fornecedor_id = null;
+
+          await supabase
+            .from("atendimentos_bot")
+            .update({ meta_dados: { ...metaDados, item_pendente: itemPendente } })
+            .eq("id", sessao.id)
+            .eq("igreja_id", igrejaId);
+
+          return new Response(
+            JSON.stringify({
+              text: `✏️ Fornecedor atualizado para *${novoFornecedor}*.\n\n✅ Está correto agora? Digite *Sim* para confirmar ou continue corrigindo.`,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
+      const matchData = texto.match(/data\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})/i);
+      if (matchData) {
+        itemPendente.data_emissao = matchData[1];
+
+        await supabase
+          .from("atendimentos_bot")
+          .update({ meta_dados: { ...metaDados, item_pendente: itemPendente } })
+          .eq("id", sessao.id)
+          .eq("igreja_id", igrejaId);
+
+        return new Response(
+          JSON.stringify({
+            text: `✏️ Data atualizada para *${matchData[1]}*.\n\n✅ Está correto agora? Digite *Sim* para confirmar ou continue corrigindo.`,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Mensagem não reconhecida
+      return new Response(
+        JSON.stringify({
+          text: `🤔 Não entendi. Você pode:\n\n✅ Digitar *Sim* para confirmar os dados mostrados\n✏️ Corrigir, ex: "valor 89,90", "fornecedor Mercado Bom Preço" ou "data 15/01/2026"\n🗑️ Digitar *Remover* para descartar este comprovante`,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );

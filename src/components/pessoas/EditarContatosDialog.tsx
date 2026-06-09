@@ -412,7 +412,7 @@ export function EditarContatosDialog({
                   + Adicionar Contato
                 </Button>
               </div>
-              <div className="space-y-6 max-h-[340px] md:max-h-[420px] overflow-y-auto pr-1">
+              <div className="space-y-6 pr-1">
                 {contatos.map((contato, idx) => (
                   <div
                     key={idx}

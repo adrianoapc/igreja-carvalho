@@ -58,6 +58,17 @@ interface Membro {
     cor: string | null;
     posicao: string | null;
   }>;
+  contato_whatsapp?: boolean;
+  contato_login?: boolean;
+}
+
+interface ProfileContato {
+  profile_id: string;
+  tipo: string;
+  valor: string;
+  is_primary: boolean;
+  is_whatsapp: boolean;
+  is_login: boolean;
 }
 const ITEMS_PER_PAGE = 10;
 export default function Membros() {
@@ -99,9 +110,41 @@ export default function Membros() {
       const { data: membrosData, error: membrosError } = await query;
       if (membrosError) throw membrosError;
 
+      const membrosBase = membrosData || [];
+      const profileIds = membrosBase.map((m) => m.id);
+      const contatosPorPerfil = new Map<string, ProfileContato[]>();
+
+      if (profileIds.length > 0) {
+        const { data: contatosData } = await supabase
+          .from("profile_contatos")
+          .select("profile_id, tipo, valor, is_primary, is_whatsapp, is_login")
+          .in("profile_id", profileIds);
+
+        (contatosData || []).forEach((contato) => {
+          const key = contato.profile_id;
+          const lista = contatosPorPerfil.get(key) || [];
+          lista.push(contato as ProfileContato);
+          contatosPorPerfil.set(key, lista);
+        });
+      }
+
+      const pickContato = (
+        contatos: ProfileContato[],
+        tipos: string[],
+      ): ProfileContato | undefined => {
+        return (
+          contatos.find((c) => tipos.includes(c.tipo) && c.is_primary) ||
+          contatos.find((c) => tipos.includes(c.tipo))
+        );
+      };
+
       // Buscar funções e times de cada membro
       const membrosComFuncoes = await Promise.all(
-        (membrosData || []).map(async (membro) => {
+        membrosBase.map(async (membro) => {
+          const contatos = contatosPorPerfil.get(membro.id) || [];
+          const contatoTelefone = pickContato(contatos, ["celular", "fixo", "telefone"]);
+          const contatoEmail = pickContato(contatos, ["email"]);
+
           // Buscar funções
           const { data: funcoesData } = await supabase
             .from("membro_funcoes")
@@ -139,6 +182,10 @@ export default function Membros() {
 
           return {
             ...membro,
+            telefone: contatoTelefone?.valor || membro.telefone || null,
+            email: contatoEmail?.valor || membro.email || null,
+            contato_whatsapp: Boolean(contatoTelefone?.is_whatsapp),
+            contato_login: Boolean(contatoEmail?.is_login),
             funcoes:
               funcoesData?.map(
                 (f: { funcoes_igreja: { id: string; nome: string } }) => ({
@@ -329,6 +376,20 @@ export default function Membros() {
                             <span className="truncate">{membro.email}</span>
                           </span>
                         )}
+                        {(membro.contato_whatsapp || membro.contato_login) && (
+                          <div className="flex items-center gap-1 pt-1">
+                            {membro.contato_whatsapp && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-green-600 border-green-400">
+                                WhatsApp
+                              </Badge>
+                            )}
+                            {membro.contato_login && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-blue-600 border-blue-400">
+                                Login
+                              </Badge>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -398,6 +459,20 @@ export default function Membros() {
                         <div className="flex items-center gap-2">
                           <Mail className="w-4 h-4" />
                           <span className="truncate">{membro.email}</span>
+                        </div>
+                      )}
+                      {(membro.contato_whatsapp || membro.contato_login) && (
+                        <div className="flex items-center gap-1 pt-0.5">
+                          {membro.contato_whatsapp && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-green-600 border-green-400">
+                              WhatsApp
+                            </Badge>
+                          )}
+                          {membro.contato_login && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-blue-600 border-blue-400">
+                              Login
+                            </Badge>
+                          )}
                         </div>
                       )}
                     </div>

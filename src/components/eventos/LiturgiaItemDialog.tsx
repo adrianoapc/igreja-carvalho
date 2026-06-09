@@ -21,7 +21,6 @@ import {
   Timer,
   Image,
   Users,
-  HelpCircle,
   Presentation,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

@@ -78,7 +78,7 @@ export function CadastrarPessoaDialog({
     estado_civil: "",
     profissao: "",
     cep: "",
-    logradouro: "",
+    endereco: "",
     numero: "",
     complemento: "",
     bairro: "",
@@ -93,7 +93,7 @@ export function CadastrarPessoaDialog({
     if (dados) {
       setFormData((prev) => ({
         ...prev,
-        logradouro: dados.logradouro || prev.logradouro,
+        endereco: dados.logradouro || prev.endereco,
         bairro: dados.bairro || prev.bairro,
         cidade: dados.localidade || prev.cidade,
         estado: dados.uf || prev.estado,
@@ -177,7 +177,7 @@ export function CadastrarPessoaDialog({
       estado_civil: "",
       profissao: "",
       cep: "",
-      logradouro: "",
+      endereco: "",
       numero: "",
       complemento: "",
       bairro: "",
@@ -302,7 +302,7 @@ export function CadastrarPessoaDialog({
         dadosInserir.cep = formData.cep
           ? removerFormatacao(formData.cep)
           : null;
-        dadosInserir.logradouro = formData.logradouro || null;
+        dadosInserir.endereco = formData.endereco || null;
         dadosInserir.numero = formData.numero || null;
         dadosInserir.complemento = formData.complemento || null;
         dadosInserir.bairro = formData.bairro || null;
@@ -317,6 +317,45 @@ export function CadastrarPessoaDialog({
         .single();
 
       if (insertError) throw insertError;
+
+      // Inserir contatos em profile_contatos (fonte de verdade)
+      const contatosParaInserir: Array<{
+        profile_id: string;
+        tipo: string;
+        valor: string;
+        rotulo: string;
+        is_primary: boolean;
+        is_whatsapp: boolean;
+        is_login: boolean;
+      }> = [];
+      if (telefoneNormalizado) {
+        contatosParaInserir.push({
+          profile_id: newData.id,
+          tipo: "celular",
+          valor: telefoneNormalizado,
+          rotulo: "Pessoal",
+          is_primary: true,
+          is_whatsapp: false,
+          is_login: false,
+        });
+      }
+      if (formData.email.trim()) {
+        contatosParaInserir.push({
+          profile_id: newData.id,
+          tipo: "email",
+          valor: formData.email.trim(),
+          rotulo: "Pessoal",
+          is_primary: true,
+          is_whatsapp: false,
+          is_login: false,
+        });
+      }
+      if (contatosParaInserir.length > 0) {
+        const { error: contatosError } = await supabase
+          .from("profile_contatos")
+          .insert(contatosParaInserir);
+        if (contatosError) throw contatosError;
+      }
 
       // Se deseja contato e é visitante, criar agendamento
       if (
@@ -673,12 +712,12 @@ export function CadastrarPessoaDialog({
                   </div>
                 </div>
                 <div className="col-span-2 space-y-2">
-                  <Label htmlFor="logradouro">Logradouro</Label>
+                  <Label htmlFor="endereco">Endereço</Label>
                   <Input
-                    id="logradouro"
-                    value={formData.logradouro}
+                    id="endereco"
+                    value={formData.endereco}
                     onChange={(e) =>
-                      setFormData({ ...formData, logradouro: e.target.value })
+                      setFormData({ ...formData, endereco: e.target.value })
                     }
                     placeholder="Rua, Av..."
                     disabled={loading}

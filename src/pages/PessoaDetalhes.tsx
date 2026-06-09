@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -72,6 +72,16 @@ import { VidaIgrejaIntercessao } from "@/components/pessoas/VidaIgrejaIntercessa
 import { VidaIgrejaEnvolvimento } from "@/components/pessoas/VidaIgrejaEnvolvimento";
 import { AtividadeRecente } from "@/components/pessoas/AtividadeRecente";
 import { formatarCPF, formatarTelefone, formatarCEP } from "@/lib/validators";
+
+interface ProfileContato {
+  id: string;
+  tipo: string;
+  valor: string;
+  rotulo: string;
+  is_primary: boolean;
+  is_whatsapp: boolean;
+  is_login: boolean;
+}
 
 interface PessoaDetalhesData {
   id: string;
@@ -153,6 +163,7 @@ export default function PessoaDetalhes() {
   const [dadosContatosOpen, setDadosContatosOpen] = useState(true);
   const [dadosAdicionaisOpen, setDadosAdicionaisOpen] = useState(true);
   const [documentosOpen, setDocumentosOpen] = useState(true);
+  const [contatos, setContatos] = useState<ProfileContato[]>([]);
 
   const handleAvatarUpdate = (newUrl: string | null) => {
     if (pessoa) {
@@ -160,18 +171,50 @@ export default function PessoaDetalhes() {
     }
   };
 
-  const fetchPessoa = async () => {
+  const fetchPessoa = useCallback(async () => {
     if (!id) return;
 
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", id)
-        .single();
+      const [{ data, error }, { data: contatosData }] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", id).single(),
+        supabase
+          .from("profile_contatos")
+          .select("id, tipo, valor, rotulo, is_primary, is_whatsapp, is_login")
+          .eq("profile_id", id)
+          .order("is_primary", { ascending: false }),
+      ]);
 
       if (error) throw error;
       setPessoa(data);
+      const contatosLista = (contatosData as ProfileContato[]) ?? [];
+      if (contatosLista.length > 0) {
+        setContatos(contatosLista);
+      } else {
+        const fallbackContatos: ProfileContato[] = [];
+        if (data?.telefone) {
+          fallbackContatos.push({
+            id: `legacy-tel-${data.id}`,
+            tipo: "celular",
+            valor: data.telefone,
+            rotulo: "Pessoal",
+            is_primary: true,
+            is_whatsapp: false,
+            is_login: false,
+          });
+        }
+        if (data?.email) {
+          fallbackContatos.push({
+            id: `legacy-email-${data.id}`,
+            tipo: "email",
+            valor: data.email,
+            rotulo: "Pessoal",
+            is_primary: true,
+            is_whatsapp: false,
+            is_login: false,
+          });
+        }
+        setContatos(fallbackContatos);
+      }
 
       // Buscar funções da pessoa
       const { data: funcoesData } = await supabase
@@ -211,11 +254,11 @@ export default function PessoaDetalhes() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, toast]);
 
   useEffect(() => {
     fetchPessoa();
-  }, [id, toast]);
+  }, [fetchPessoa]);
 
   if (loading) {
     return (
@@ -691,39 +734,16 @@ export default function PessoaDetalhes() {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <CardContent className="space-y-3 pt-0">
+                    {/* Endereço */}
                     <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">
-                        Celular:
-                      </span>
-                      <span className="text-sm font-semibold text-right">
-                        {pessoa.telefone
-                          ? formatarTelefone(pessoa.telefone)
-                          : "—"}
-                      </span>
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">
-                        E-mail:
-                      </span>
-                      <span className="text-sm font-semibold text-right break-all">
-                        {pessoa.email || "—"}
-                      </span>
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">
-                        CEP:
-                      </span>
+                      <span className="text-sm text-muted-foreground">CEP:</span>
                       <span className="text-sm font-semibold text-right">
                         {pessoa.cep ? formatarCEP(pessoa.cep) : "—"}
                       </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">
-                        Cidade:
-                      </span>
+                      <span className="text-sm text-muted-foreground">Cidade:</span>
                       <span className="text-sm font-semibold text-right">
                         {pessoa.cidade && pessoa.estado
                           ? `${pessoa.cidade} - ${pessoa.estado}`
@@ -732,9 +752,7 @@ export default function PessoaDetalhes() {
                     </div>
                     <Separator />
                     <div className="flex justify-between items-start">
-                      <span className="text-sm text-muted-foreground">
-                        Bairro:
-                      </span>
+                      <span className="text-sm text-muted-foreground">Bairro:</span>
                       <span className="text-sm font-semibold text-right">
                         {pessoa.bairro || "—"}
                       </span>
@@ -743,13 +761,57 @@ export default function PessoaDetalhes() {
                       <>
                         <Separator />
                         <div className="flex justify-between items-start">
-                          <span className="text-sm text-muted-foreground">
-                            Endereço:
-                          </span>
+                          <span className="text-sm text-muted-foreground">Endereço:</span>
                           <span className="text-sm font-semibold text-right">
                             {pessoa.endereco}
                           </span>
                         </div>
+                      </>
+                    )}
+                    {/* Contatos de profile_contatos */}
+                    {contatos.length > 0 && (
+                      <>
+                        <Separator />
+                        <div className="space-y-3">
+                          {contatos.map((c) => (
+                            <div key={c.id} className="flex items-start justify-between gap-2">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                                  {c.tipo === "celular" ? "Celular" : c.tipo === "fixo" ? "Fixo" : c.tipo === "email" ? "E-mail" : c.tipo === "instagram" ? "Instagram" : c.tipo}
+                                  {c.rotulo ? ` · ${c.rotulo}` : ""}
+                                </span>
+                                <span className="text-sm font-semibold">
+                                  {(c.tipo === "celular" || c.tipo === "fixo")
+                                    ? formatarTelefone(c.valor)
+                                    : c.valor}
+                                </span>
+                              </div>
+                              <div className="flex gap-1 flex-wrap justify-end">
+                                {c.is_primary && (
+                                  <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                                    Principal
+                                  </Badge>
+                                )}
+                                {c.is_whatsapp && (
+                                  <Badge variant="outline" className="text-xs px-1.5 py-0 text-green-600 border-green-400">
+                                    WhatsApp
+                                  </Badge>
+                                )}
+                                {c.is_login && (
+                                  <Badge variant="outline" className="text-xs px-1.5 py-0 text-blue-600 border-blue-400">
+                                    Login
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {contatos.length === 0 && (
+                      <>
+                        <Separator />
+                        <p className="text-sm text-muted-foreground text-center py-1">Nenhum contato cadastrado.</p>
                       </>
                     )}
                   </CardContent>

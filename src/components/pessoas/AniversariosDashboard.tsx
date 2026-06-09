@@ -28,6 +28,7 @@ import { ptBR } from "date-fns/locale";
 import {
   Calendar as CalendarIcon,
   Cake,
+  Balloon,
   Heart,
   Droplets,
   Phone,
@@ -83,7 +84,7 @@ export function AniversariosDashboard() {
       let query = supabase
         .from("profiles")
         .select(
-          "id, nome, telefone, email, data_nascimento, data_casamento, data_batismo, status"
+          "id, nome, telefone, email, data_nascimento, data_casamento, data_batismo, status",
         )
         .order("nome")
         .eq("igreja_id", igrejaId);
@@ -156,7 +157,7 @@ export function AniversariosDashboard() {
         const aniverDate = new Date(
           selectedDate.getFullYear(),
           a.data.getMonth(),
-          a.data.getDate()
+          a.data.getDate(),
         );
         return isSameDay(aniverDate, selectedDate);
       });
@@ -177,7 +178,7 @@ export function AniversariosDashboard() {
       const aniverDate = new Date(
         now.getFullYear(),
         aniv.data.getMonth(),
-        aniv.data.getDate()
+        aniv.data.getDate(),
       );
 
       if (isToday(aniverDate)) {
@@ -199,7 +200,7 @@ export function AniversariosDashboard() {
   const getIcon = (tipo: string) => {
     switch (tipo) {
       case "nascimento":
-        return <Cake className="w-4 h-4" />;
+        return <Balloon className="w-4 h-4" />;
       case "casamento":
         return <Heart className="w-4 h-4" />;
       case "batismo":
@@ -227,14 +228,14 @@ export function AniversariosDashboard() {
     const aniverDate = new Date(
       now.getFullYear(),
       aniv.data.getMonth(),
-      aniv.data.getDate()
+      aniv.data.getDate(),
     );
     const idade = now.getFullYear() - aniv.data.getFullYear();
 
     const getTipoBgColor = (tipo: string) => {
       switch (tipo) {
         case "nascimento":
-          return "bg-pink-50 border-pink-200";
+          return "bg-green-50 border-green-200";
         case "casamento":
           return "bg-red-50 border-red-200";
         case "batismo":
@@ -247,7 +248,7 @@ export function AniversariosDashboard() {
     const getTipoTextColor = (tipo: string) => {
       switch (tipo) {
         case "nascimento":
-          return "text-pink-700";
+          return "text-green-700";
         case "casamento":
           return "text-red-700";
         case "batismo":
@@ -262,25 +263,30 @@ export function AniversariosDashboard() {
         key={`${aniv.id}-${aniv.tipo}`}
         className={cn(
           "flex flex-col gap-2 p-3 rounded-lg border-2 transition-all hover:shadow-md cursor-pointer",
-          getTipoBgColor(aniv.tipo)
+          getTipoBgColor(aniv.tipo),
         )}
         onClick={() => navigate(`/pessoas/${aniv.id}`)}
       >
         <div className="flex items-start gap-2">
-          <div className={cn("flex-shrink-0 mt-0.5", getTipoTextColor(aniv.tipo))}>
+          <div
+            className={cn("flex-shrink-0 mt-0.5", getTipoTextColor(aniv.tipo))}
+          >
             {getIcon(aniv.tipo)}
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-medium text-sm truncate">{aniv.nome}</p>
-            <p className={cn("text-xs font-semibold mt-0.5", getTipoTextColor(aniv.tipo))}>
+            <p
+              className={cn(
+                "text-xs font-semibold mt-0.5",
+                getTipoTextColor(aniv.tipo),
+              )}
+            >
               {format(aniverDate, "dd 'de' MMM", { locale: ptBR })}
             </p>
           </div>
         </div>
         {aniv.tipo === "nascimento" && (
-          <p className="text-xs text-muted-foreground">
-            {idade} anos
-          </p>
+          <p className="text-xs text-muted-foreground">{idade} anos</p>
         )}
         {(aniv.telefone || aniv.email) && (
           <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
@@ -314,17 +320,39 @@ export function AniversariosDashboard() {
             {/* Filtro Visual de Tipos */}
             <div className="flex flex-wrap gap-2">
               {[
-                { value: "todos", label: "Todos", icon: Cake, color: "bg-gray-100 text-gray-800 hover:bg-gray-200" },
-                { value: "nascimento", label: "Aniversário", icon: Cake, color: "bg-pink-100 text-pink-800 hover:bg-pink-200" },
-                { value: "casamento", label: "Casamento", icon: Heart, color: "bg-red-100 text-red-800 hover:bg-red-200" },
-                { value: "batismo", label: "Batismo", icon: Droplets, color: "bg-blue-100 text-blue-800 hover:bg-blue-200" },
+                {
+                  value: "todos",
+                  label: "Todos",
+                  icon: Cake,
+                  color: "bg-gray-100 text-gray-800 hover:bg-gray-200",
+                },
+                {
+                  value: "nascimento",
+                  label: "Aniversário",
+                  icon: Cake,
+                  color: "bg-pink-100 text-pink-800 hover:bg-pink-200",
+                },
+                {
+                  value: "casamento",
+                  label: "Casamento",
+                  icon: Heart,
+                  color: "bg-red-100 text-red-800 hover:bg-red-200",
+                },
+                {
+                  value: "batismo",
+                  label: "Batismo",
+                  icon: Droplets,
+                  color: "bg-blue-100 text-blue-800 hover:bg-blue-200",
+                },
               ].map(({ value, label, icon: Icon, color }) => (
                 <button
                   key={value}
                   onClick={() => setTipoFilter(value as typeof tipoFilter)}
                   className={cn(
                     "flex items-center gap-2 px-3 py-2 rounded-full transition-colors font-medium text-sm",
-                    tipoFilter === value ? color : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                    tipoFilter === value
+                      ? color
+                      : "bg-gray-50 text-gray-600 hover:bg-gray-100",
                   )}
                 >
                   <Icon className="w-4 h-4" />
@@ -336,7 +364,11 @@ export function AniversariosDashboard() {
             {/* Filtro de Data */}
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full sm:w-auto"
+                >
                   <CalendarIcon className="w-4 h-4 mr-2" />
                   {selectedDate
                     ? format(selectedDate, "dd/MM/yyyy")
@@ -378,7 +410,7 @@ export function AniversariosDashboard() {
               {filteredAniversarios.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {filteredAniversarios.map((aniv) =>
-                    renderAniversarioCard(aniv)
+                    renderAniversarioCard(aniv),
                   )}
                 </div>
               ) : (

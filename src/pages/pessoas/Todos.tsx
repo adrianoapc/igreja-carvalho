@@ -51,20 +51,32 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { formatarTelefone } from "@/lib/validators";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { usePermissions } from "@/hooks/usePermissions";
+
 interface Pessoa {
   id: string;
   nome: string;
   telefone: string | null;
   email: string | null;
+  contato_whatsapp?: boolean;
+  contato_login?: boolean;
   avatar_url?: string | null;
   status: "visitante" | "frequentador" | "membro";
   data_primeira_visita: string | null;
   numero_visitas: number;
   user_id: string | null;
+}
+
+interface ProfileContato {
+  profile_id: string;
+  tipo: string;
+  valor: string;
+  is_primary: boolean;
+  is_whatsapp: boolean;
+  is_login: boolean;
 }
 const ITEMS_PER_PAGE = 10;
 export default function TodosPessoas() {
@@ -84,6 +96,7 @@ export default function TodosPessoas() {
   );
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     igrejaId,
     filialId,
@@ -91,6 +104,52 @@ export default function TodosPessoas() {
     loading: authLoading,
   } = useAuthContext();
   const { isAdmin } = usePermissions();
+
+  const atualizarQueryParams = (
+    updates: {
+      buscar?: string;
+      status?: "todos" | "visitante" | "frequentador" | "membro";
+      hasPhone?: boolean;
+      hasEmail?: boolean;
+    },
+  ) => {
+    const nextParams = new URLSearchParams(searchParams);
+
+    if (updates.buscar !== undefined) {
+      if (updates.buscar.trim()) {
+        nextParams.set("buscar", updates.buscar);
+      } else {
+        nextParams.delete("buscar");
+      }
+    }
+
+    if (updates.status !== undefined) {
+      if (updates.status !== "todos") {
+        nextParams.set("status", updates.status);
+      } else {
+        nextParams.delete("status");
+      }
+    }
+
+    if (updates.hasPhone !== undefined) {
+      if (updates.hasPhone) {
+        nextParams.set("hasPhone", "1");
+      } else {
+        nextParams.delete("hasPhone");
+      }
+    }
+
+    if (updates.hasEmail !== undefined) {
+      if (updates.hasEmail) {
+        nextParams.set("hasEmail", "1");
+      } else {
+        nextParams.delete("hasEmail");
+      }
+    }
+
+    setSearchParams(nextParams, { replace: true });
+    setCurrentPage(1);
+  };
 
   const fetchPessoas = async () => {
     try {
@@ -111,7 +170,50 @@ export default function TodosPessoas() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setAllPessoas(data || []);
+
+      const pessoasBase = data || [];
+      const profileIds = pessoasBase.map((p) => p.id);
+
+      const contatosPorPerfil = new Map<string, ProfileContato[]>();
+      if (profileIds.length > 0) {
+        const { data: contatosData } = await supabase
+          .from("profile_contatos")
+          .select("profile_id, tipo, valor, is_primary, is_whatsapp, is_login")
+          .in("profile_id", profileIds);
+
+        (contatosData || []).forEach((contato) => {
+          const key = contato.profile_id;
+          const lista = contatosPorPerfil.get(key) || [];
+          lista.push(contato as ProfileContato);
+          contatosPorPerfil.set(key, lista);
+        });
+      }
+
+      const pickContato = (
+        contatos: ProfileContato[],
+        tipos: string[],
+      ): ProfileContato | undefined => {
+        return (
+          contatos.find((c) => tipos.includes(c.tipo) && c.is_primary) ||
+          contatos.find((c) => tipos.includes(c.tipo))
+        );
+      };
+
+      const pessoasComContato: Pessoa[] = pessoasBase.map((pessoa) => {
+        const contatos = contatosPorPerfil.get(pessoa.id) || [];
+        const contatoTelefone = pickContato(contatos, ["celular", "fixo", "telefone"]);
+        const contatoEmail = pickContato(contatos, ["email"]);
+
+        return {
+          ...pessoa,
+          telefone: contatoTelefone?.valor || pessoa.telefone || null,
+          email: contatoEmail?.valor || pessoa.email || null,
+          contato_whatsapp: Boolean(contatoTelefone?.is_whatsapp),
+          contato_login: Boolean(contatoEmail?.is_login),
+        };
+      });
+
+      setAllPessoas(pessoasComContato);
       setCurrentPage(1);
     } catch (error) {
       console.error("Erro ao buscar pessoas:", error);
@@ -128,6 +230,29 @@ export default function TodosPessoas() {
       fetchPessoas();
     }
   }, [igrejaId, filialId, isAllFiliais, authLoading]);
+
+  useEffect(() => {
+    const termoBusca = (searchParams.get("buscar") || "").trim();
+    const statusParam = searchParams.get("status");
+    const hasPhoneParam = searchParams.get("hasPhone");
+    const hasEmailParam = searchParams.get("hasEmail");
+
+    const statusValido =
+      statusParam === "visitante" ||
+      statusParam === "frequentador" ||
+      statusParam === "membro" ||
+      statusParam === "todos";
+
+    setSearchTerm(termoBusca);
+    setStatusFilter(
+      statusValido
+        ? (statusParam as "todos" | "visitante" | "frequentador" | "membro")
+        : "todos",
+    );
+    setFilterHasPhone(hasPhoneParam === "1" || hasPhoneParam === "true");
+    setFilterHasEmail(hasEmailParam === "1" || hasEmailParam === "true");
+    setCurrentPage(1);
+  }, [searchParams]);
 
   // Apply filters to all pessoas for pagination
   const filteredPessoas = allPessoas
@@ -285,14 +410,20 @@ export default function TodosPessoas() {
                 placeholder="Buscar por nome, telefone ou email..."
                 className="pl-10 text-base md:text-lg"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  const termo = e.target.value;
+                  setSearchTerm(termo);
+                  atualizarQueryParams({ buscar: termo });
+                }}
               />
             </div>
             <Select
               value={statusFilter}
-              onValueChange={(value) =>
-                setStatusFilter(value as typeof statusFilter)
-              }
+              onValueChange={(value) => {
+                const nextStatus = value as typeof statusFilter;
+                setStatusFilter(nextStatus);
+                atualizarQueryParams({ status: nextStatus });
+              }}
             >
               <SelectTrigger className="w-full md:w-[200px]">
                 <SelectValue placeholder="Status" />
@@ -374,6 +505,20 @@ export default function TodosPessoas() {
                             <Mail className="w-4 h-4" />
                             <span className="truncate">{pessoa.email}</span>
                           </span>
+                        )}
+                        {(pessoa.contato_whatsapp || pessoa.contato_login) && (
+                          <div className="flex items-center gap-1 pt-1">
+                            {pessoa.contato_whatsapp && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-green-600 border-green-400">
+                                WhatsApp
+                              </Badge>
+                            )}
+                            {pessoa.contato_login && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-blue-600 border-blue-400">
+                                Login
+                              </Badge>
+                            )}
+                          </div>
                         )}
                         {pessoa.data_primeira_visita && (
                           <span className="flex items-center gap-2">
@@ -494,6 +639,20 @@ export default function TodosPessoas() {
                           <Mail className="w-4 h-4" />
                           <span className="truncate">{pessoa.email}</span>
                         </span>
+                      )}
+                      {(pessoa.contato_whatsapp || pessoa.contato_login) && (
+                        <div className="flex items-center gap-1 pt-0.5">
+                          {pessoa.contato_whatsapp && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-green-600 border-green-400">
+                              WhatsApp
+                            </Badge>
+                          )}
+                          {pessoa.contato_login && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-blue-600 border-blue-400">
+                              Login
+                            </Badge>
+                          )}
+                        </div>
                       )}
                       {pessoa.data_primeira_visita && (
                         <span className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -634,7 +793,10 @@ export default function TodosPessoas() {
               </div>
               <Switch
                 checked={filterHasPhone}
-                onCheckedChange={setFilterHasPhone}
+                onCheckedChange={(checked) => {
+                  setFilterHasPhone(checked);
+                  atualizarQueryParams({ hasPhone: checked });
+                }}
               />
             </div>
             <div className="flex items-center justify-between gap-3">
@@ -646,7 +808,10 @@ export default function TodosPessoas() {
               </div>
               <Switch
                 checked={filterHasEmail}
-                onCheckedChange={setFilterHasEmail}
+                onCheckedChange={(checked) => {
+                  setFilterHasEmail(checked);
+                  atualizarQueryParams({ hasEmail: checked });
+                }}
               />
             </div>
           </div>
@@ -656,6 +821,7 @@ export default function TodosPessoas() {
               onClick={() => {
                 setFilterHasPhone(false);
                 setFilterHasEmail(false);
+                atualizarQueryParams({ hasPhone: false, hasEmail: false });
               }}
             >
               Limpar

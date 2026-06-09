@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { GripVertical, Clock, User, Film, Plus, Layers, Save, Video, BookOpen, Timer, Image, Users, HelpCircle, Presentation } from "lucide-react";
+import { GripVertical, Clock, User, Film, Plus, Layers, Save, Video, BookOpen, Timer, Image, Users, CircleHelp, Presentation } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -48,7 +48,7 @@ const TIPO_CONTEUDO_ICONS: Record<TipoConteudo, { icon: typeof Video; label: str
   'VERSICULO': { icon: BookOpen, label: 'Versículo', color: 'text-amber-500' },
   'PEDIDOS': { icon: Users, label: 'Pedidos', color: 'text-purple-500' },
   'TIMER': { icon: Timer, label: 'Timer', color: 'text-green-500' },
-  'QUIZ': { icon: HelpCircle, label: 'Quiz', color: 'text-pink-500' },
+  'QUIZ': { icon: CircleHelp, label: 'Quiz', color: 'text-pink-500' },
   'AUDIO': { icon: Film, label: 'Áudio', color: 'text-cyan-500' },
   'TEXTO': { icon: BookOpen, label: 'Texto', color: 'text-orange-500' },
 };
