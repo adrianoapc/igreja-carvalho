@@ -105,9 +105,10 @@ export function PessoaWizard() {
       if (telefoneNormalizado) {
         checks.push(supabase.from("profiles").select("id, nome, status").eq("telefone", telefoneNormalizado));
       }
-      for (const check of checks) {
-        const { data } = await check;
-        if (data && data.length > 0) {
+for (const check of checks) {
+  const { data, error } = await check;
+  if (error) throw error;
+  if (data && data.length > 0) {
           const existente = data[0];
           toast({
             title: "Pessoa já cadastrada",
