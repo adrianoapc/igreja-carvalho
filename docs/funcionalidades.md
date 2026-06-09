@@ -159,7 +159,7 @@ Substituiu o modal monolítico `CadastrarPessoaDialog` por uma **página wizard 
   - `StepDadosMembro` (apenas Membro): CPF (máscara), RG, estado civil, profissão, endereço completo com autocomplete por CEP
   - `StepComplementar`: data de aniversário (dia/mês/ano), como conheceu, observações
   - `StepCheckboxes`: aceitou Jesus, batizado, deseja contato, recebeu brinde (visitante)
-- **Ações ao concluir**: verifica duplicata telefone/email, faz `INSERT profiles`, cria `visitante_contato` agendado para +3 dias se `deseja_contato=true`, redireciona para `/pessoas`
+- **Ações ao concluir**: verifica duplicata telefone/email, faz `INSERT profiles`, cria `visitante_contatos` agendado para +3 dias se `deseja_contato=true`, redireciona para `/pessoas`
 - **Barra de progresso**: componente `Progress` do Shadcn atualizado por etapa
 
 #### Módulo Pessoas / Membros — visão funcional
