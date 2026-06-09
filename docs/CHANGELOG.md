@@ -23,9 +23,9 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 **Arquivos modificados/criados:**
 
 - `supabase/migrations/20260608190000_sanitize_backfill_profile_contatos.sql`
-- `src/pages/pessoas/todos.tsx`
-- `src/pages/pessoas/membros.tsx`
-- `src/pages/pessoas/visitantes.tsx`
+- `src/pages/pessoas/Todos.tsx`
+- `src/pages/pessoas/Membros.tsx`
+- `src/pages/pessoas/Visitantes.tsx`
 - `src/pages/PessoaDetalhes.tsx`
 - `src/pages/pessoas/EditarPessoa.tsx`
 - `src/components/pessoas/CadastrarPessoaDialog.tsx`

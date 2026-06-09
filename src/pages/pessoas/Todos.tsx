@@ -176,10 +176,12 @@ export default function TodosPessoas() {
 
       const contatosPorPerfil = new Map<string, ProfileContato[]>();
       if (profileIds.length > 0) {
-        const { data: contatosData } = await supabase
+        const { data: contatosData, error: contatosError } = await supabase
           .from("profile_contatos")
           .select("profile_id, tipo, valor, is_primary, is_whatsapp, is_login")
           .in("profile_id", profileIds);
+
+        if (contatosError) throw contatosError;
 
         (contatosData || []).forEach((contato) => {
           const key = contato.profile_id;

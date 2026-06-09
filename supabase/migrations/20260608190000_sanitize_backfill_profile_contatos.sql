@@ -11,7 +11,7 @@ where tipo = 'telefone';
 
 -- 2) Sanitizar valores
 update public.profile_contatos
-set valor = regexp_replace(valor, '\\D', '', 'g')
+set valor = regexp_replace(valor, '\D', '', 'g')
 where tipo in ('celular', 'fixo')
   and valor is not null;
 
@@ -35,10 +35,10 @@ insert into public.profile_contatos (
 select
   p.id as profile_id,
   case
-    when length(regexp_replace(p.telefone, '\\D', '', 'g')) >= 11 then 'celular'
+    when length(regexp_replace(p.telefone, '\D', '', 'g')) >= 11 then 'celular'
     else 'fixo'
   end as tipo,
-  regexp_replace(p.telefone, '\\D', '', 'g') as valor,
+  regexp_replace(p.telefone, '\D', '', 'g') as valor,
   'Pessoal' as rotulo,
   true as is_primary,
   false as is_whatsapp,
@@ -53,7 +53,7 @@ where p.telefone is not null
     from public.profile_contatos pc
     where pc.profile_id = p.id
       and pc.tipo in ('celular', 'fixo', 'telefone')
-      and regexp_replace(pc.valor, '\\D', '', 'g') = regexp_replace(p.telefone, '\\D', '', 'g')
+      and regexp_replace(pc.valor, '\D', '', 'g') = regexp_replace(p.telefone, '\D', '', 'g')
   );
 
 -- 4) Backfill de email legado (somente se não existir equivalente)

@@ -14,7 +14,6 @@ import {
   Heart,
   Search,
   Plus,
-  UserPen,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -119,8 +118,9 @@ export default function Pessoas() {
         setStats((prev) => [
           { ...prev[0], value: total.toString() },
           { ...prev[1], value: visitantes.toString() },
-          { ...prev[2], value: frequentadores.toString() },
-          { ...prev[3], value: membros.toString() },
+          prev[2],
+          { ...prev[3], value: frequentadores.toString() },
+          { ...prev[4], value: membros.toString() },
         ]);
 
         // Buscar contatos agendados (filtrados por igreja/filial)
@@ -139,6 +139,13 @@ export default function Pessoas() {
         const { count } = await contatosQuery;
 
         setContatosCount(count || 0);
+        setStats((prev) => [
+          prev[0],
+          prev[1],
+          { ...prev[2], value: (count || 0).toString() },
+          prev[3],
+          prev[4],
+        ]);
 
         // Buscar alterações pendentes (filtradas)
         console.log("[Dashboard Pessoas] Buscando pendentes:", {
@@ -202,7 +209,7 @@ export default function Pessoas() {
       description: "Visualizar e editar perfis de membros",
       icon: Users,
       path: "/pessoas/membros",
-      count: stats[3].value,
+      count: stats[4].value,
       label: "ativos",
     },
     {
@@ -218,7 +225,7 @@ export default function Pessoas() {
       description: "Pessoas com múltiplas visitas",
       icon: UserCheck,
       path: "/pessoas/frequentadores",
-      count: stats[2].value,
+      count: stats[3].value,
       label: "ativos",
     },
   ];
