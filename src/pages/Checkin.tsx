@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -10,141 +10,219 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { 
-  CheckCircle2, 
-  Calendar, 
-  Clock, 
-  Search,
+import {
+  CheckCircle2,
+  Calendar,
+  Clock,
+  ArrowRight,
   UserPlus,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  MessageCircle,
+  RefreshCw,
 } from "lucide-react";
+import { removerFormatacao } from "@/lib/validators";
 
 interface EventoInfo {
   id: string;
   titulo: string;
   data: string;
   tipo: string;
+  igreja_id?: string;
+}
+
+type Step = "telefone" | "otp" | "success" | "not-found";
+
+function mascararNome(nome: string): string {
+  const partes = nome.trim().split(" ");
+  if (partes.length === 1) return partes[0];
+  return `${partes[0]} ${partes[partes.length - 1].charAt(0)}.`;
 }
 
 export default function Checkin() {
   const { tipo, id } = useParams<{ tipo: string; id: string }>();
   const navigate = useNavigate();
-  
+
   const [evento, setEvento] = useState<EventoInfo | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [searching, setSearching] = useState(false);
-  const [contato, setContato] = useState("");
-  const [step, setStep] = useState<"input" | "success" | "not-found">("input");
+  const [loadingEvento, setLoadingEvento] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [step, setStep] = useState<Step>("telefone");
+  const [telefone, setTelefone] = useState("");
+  const [codigo, setCodigo] = useState("");
   const [pessoaNome, setPessoaNome] = useState("");
+  const [tentativasRestantes, setTentativasRestantes] = useState<number | null>(null);
+
+  // Reenvio: contador regressivo de 60s
+  const [reenvioSegundos, setReenvioSegundos] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     loadEvento();
   }, [tipo, id]);
 
+  useEffect(() => {
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, []);
+
+const iniciarContadorReenvio = () => {
+  if (timerRef.current) {
+    clearInterval(timerRef.current);
+    timerRef.current = null;
+  }
+
+  setReenvioSegundos(60);
+  timerRef.current = setInterval(() => {
+    setReenvioSegundos((s) => {
+      if (s <= 1) {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        return 0;
+      }
+      return s - 1;
+    });
+  }, 1000);
+};
+
   const loadEvento = async () => {
     if (!tipo || !id) return;
-    
     try {
       if (tipo === "culto") {
         const { data, error } = await supabase
           .from("eventos")
-          .select("id, titulo, data_evento, tipo")
+          .select("id, titulo, data_evento, tipo, igreja_id")
           .eq("id", id)
           .maybeSingle();
-        
         if (error) throw error;
-        if (data) {
-          setEvento({
-            id: data.id,
-            titulo: data.titulo,
-            data: data.data_evento,
-            tipo: data.tipo,
-          });
-        }
+        if (data) setEvento({ id: data.id, titulo: data.titulo, data: data.data_evento, tipo: data.tipo, igreja_id: data.igreja_id });
       } else if (tipo === "aula") {
         const { data, error } = await supabase
           .from("aulas")
-          .select("id, tema, data_inicio, modalidade")
+          .select("id, tema, data_inicio, modalidade, igreja_id")
           .eq("id", id)
           .maybeSingle();
-        
         if (error) throw error;
-        if (data) {
-          setEvento({
-            id: data.id,
-            titulo: data.tema || "Aula",
-            data: data.data_inicio,
-            tipo: data.modalidade || "presencial",
-          });
-        }
+        if (data) setEvento({ id: data.id, titulo: data.tema || "Aula", data: data.data_inicio, tipo: data.modalidade || "presencial", igreja_id: data.igreja_id });
       }
-    } catch (error: unknown) {
-      console.error("Erro ao carregar evento:", error);
+    } catch {
       toast.error("Evento não encontrado");
     } finally {
-      setLoading(false);
+      setLoadingEvento(false);
     }
   };
 
-  const handleSearch = async () => {
-    if (!contato.trim()) {
-      toast.error("Digite seu email ou telefone");
+  const handleEnviarOTP = async () => {
+    const tel = removerFormatacao(telefone.trim());
+    if (tel.length < 10) {
+      toast.error("Informe um telefone válido");
+      return;
+    }
+    if (!evento?.igreja_id) {
+      toast.error("Configuração do evento inválida");
       return;
     }
 
-    setSearching(true);
-    
+    setSubmitting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("checkin-evento", {
-        body: {
-          tipo,
-          evento_id: id,
-          contato: contato.trim(),
-        },
+      const { data, error } = await supabase.functions.invoke("send-otp", {
+        body: { telefone: tel, igreja_id: evento.igreja_id },
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      if (data.success) {
-        setPessoaNome(data.nome);
+      toast.success("Código enviado via WhatsApp!");
+      setCodigo("");
+      setTentativasRestantes(null);
+      setStep("otp");
+      iniciarContadorReenvio();
+    } catch (err) {
+      toast.error("Não foi possível enviar o código", {
+        description: err instanceof Error ? err.message : "Tente novamente",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleVerificarOTP = async () => {
+    const tel = removerFormatacao(telefone.trim());
+    if (!codigo.trim() || codigo.trim().length !== 6) {
+      toast.error("Digite o código de 6 dígitos");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { data: verifyData, error: verifyError } = await supabase.functions.invoke("verify-otp", {
+        body: { telefone: tel, codigo: codigo.trim() },
+      });
+
+      if (verifyError) throw verifyError;
+
+      if (!verifyData?.success) {
+        const msg = verifyData?.error || "Código incorreto";
+        if (verifyData?.tentativas_restantes !== undefined) {
+          setTentativasRestantes(verifyData.tentativas_restantes);
+        }
+        toast.error(msg);
+        return;
+      }
+
+      // OTP válido — fazer check-in
+      const profileId = verifyData.profile_id;
+
+      const { data: checkinData, error: checkinError } = await supabase.functions.invoke("checkin-evento", {
+        body: {
+          tipo,
+          evento_id: id,
+          contato: telefone.trim(),
+          profile_id: profileId ?? undefined,
+        },
+      });
+
+      if (checkinError) throw checkinError;
+
+      if (checkinData?.success) {
+        setPessoaNome(checkinData.nome || "");
         setStep("success");
-        toast.success("Presença registrada!");
-      } else if (data.not_found) {
+      } else if (checkinData?.not_found) {
         setStep("not-found");
       } else {
-        toast.error(data.message || "Erro ao registrar presença");
+        toast.error(checkinData?.message || "Erro ao registrar presença");
       }
-    } catch (error: unknown) {
-      console.error("Erro no check-in:", error);
-      toast.error("Erro ao processar check-in", { description: error instanceof Error ? error.message : String(error) });
+    } catch (err) {
+      toast.error("Erro ao verificar código", {
+        description: err instanceof Error ? err.message : String(err),
+      });
     } finally {
-      setSearching(false);
+      setSubmitting(false);
     }
   };
 
   const handleCadastro = () => {
-    // Redireciona para cadastro de visitante passando o contato como parâmetro
     const params = new URLSearchParams();
-    if (contato.includes("@")) {
-      params.set("email", contato);
-    } else {
-      params.set("telefone", contato);
-    }
+    params.set("telefone", telefone.trim());
     if (tipo && id) {
       params.set("retorno_tipo", tipo);
       params.set("retorno_id", id);
     }
-    navigate(`/cadastro/Visitante?${params.toString()}`);
+    navigate(`/cadastro/visitante?${params.toString()}`);
   };
 
-  const handleNovoCheckin = () => {
-    setStep("input");
-    setContato("");
+  const resetar = () => {
+    setStep("telefone");
+    setTelefone("");
+    setCodigo("");
     setPessoaNome("");
+    setTentativasRestantes(null);
+    if (timerRef.current) clearInterval(timerRef.current);
+    setReenvioSegundos(0);
   };
 
-  if (loading) {
+  if (loadingEvento) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/5 to-background">
         <Card className="w-full max-w-md">
@@ -198,108 +276,145 @@ export default function Checkin() {
         </CardHeader>
 
         <CardContent className="p-6">
-          {step === "input" && (
+          {/* Step 1: telefone */}
+          {step === "telefone" && (
             <div className="space-y-6">
               <div className="text-center">
                 <h3 className="text-lg font-semibold mb-2">Confirmar Presença</h3>
                 <p className="text-sm text-muted-foreground">
-                  Digite seu email ou telefone cadastrado
+                  Digite seu telefone para receber o código de confirmação via WhatsApp
                 </p>
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="contato">Email ou Telefone</Label>
+                <Label htmlFor="telefone">Telefone (WhatsApp)</Label>
                 <Input
-                  id="contato"
-                  type="text"
-                  placeholder="seu@email.com ou (11) 99999-9999"
-                  value={contato}
-                  onChange={(e) => setContato(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  id="telefone"
+                  type="tel"
+                  placeholder="(11) 99999-9999"
+                  value={telefone}
+                  onChange={(e) => setTelefone(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleEnviarOTP()}
                   autoFocus
                   className="text-lg h-12"
                 />
               </div>
-
-              <Button 
-                className="w-full h-12 text-lg" 
-                onClick={handleSearch}
-                disabled={searching || !contato.trim()}
+              <Button
+                className="w-full h-12 text-base"
+                onClick={handleEnviarOTP}
+                disabled={submitting || !telefone.trim()}
               >
-                {searching ? (
-                  <>
-                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                    Buscando...
-                  </>
+                {submitting ? (
+                  <><Loader2 className="h-5 w-5 mr-2 animate-spin" />Enviando...</>
                 ) : (
-                  <>
-                    <Search className="h-5 w-5 mr-2" />
-                    Confirmar Presença
-                  </>
+                  <><MessageCircle className="h-5 w-5 mr-2" />Receber código no WhatsApp</>
                 )}
               </Button>
             </div>
           )}
 
+          {/* Step 2: OTP */}
+          {step === "otp" && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <h3 className="text-lg font-semibold mb-2">Digite o código</h3>
+                <p className="text-sm text-muted-foreground">
+                  Enviamos um código de 6 dígitos para{" "}
+                  <span className="font-medium">{telefone}</span>
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="codigo">Código de verificação</Label>
+                <Input
+                  id="codigo"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="000000"
+                  value={codigo}
+                  onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))}
+                  onKeyDown={(e) => e.key === "Enter" && handleVerificarOTP()}
+                  autoFocus
+                  className="text-2xl h-14 tracking-widest text-center"
+                />
+                {tentativasRestantes !== null && (
+                  <p className="text-xs text-destructive text-center">
+                    {tentativasRestantes} tentativa{tentativasRestantes !== 1 ? "s" : ""} restante{tentativasRestantes !== 1 ? "s" : ""}
+                  </p>
+                )}
+              </div>
+              <Button
+                className="w-full h-12 text-base"
+                onClick={handleVerificarOTP}
+                disabled={submitting || codigo.length !== 6}
+              >
+                {submitting ? (
+                  <><Loader2 className="h-5 w-5 mr-2 animate-spin" />Verificando...</>
+                ) : (
+                  <><ArrowRight className="h-5 w-5 mr-2" />Confirmar presença</>
+                )}
+              </Button>
+              <div className="text-center space-y-2">
+                {reenvioSegundos > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Reenviar código em {reenvioSegundos}s
+                  </p>
+                ) : (
+                  <Button variant="ghost" size="sm" onClick={handleEnviarOTP} disabled={submitting}>
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Reenviar código
+                  </Button>
+                )}
+                <div>
+                  <Button variant="ghost" size="sm" onClick={resetar} className="text-muted-foreground text-xs">
+                    Usar outro número
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: sucesso */}
           {step === "success" && (
             <div className="text-center space-y-6">
               <div className="h-20 w-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto">
                 <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
               </div>
-              
               <div>
                 <h3 className="text-2xl font-bold text-green-600 dark:text-green-400">
                   Presença Confirmada!
                 </h3>
                 <p className="text-lg mt-2">
-                  Olá, <span className="font-semibold">{pessoaNome}</span>!
+                  Olá, <span className="font-semibold">{mascararNome(pessoaNome)}</span>!
                 </p>
                 <p className="text-muted-foreground mt-1">
                   Sua presença foi registrada com sucesso.
                 </p>
               </div>
-
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={handleNovoCheckin}
-              >
+              <Button variant="outline" className="w-full" onClick={resetar}>
                 Novo Check-in
               </Button>
             </div>
           )}
 
+          {/* Step 4: não encontrado */}
           {step === "not-found" && (
             <div className="text-center space-y-6">
               <div className="h-20 w-20 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto">
                 <UserPlus className="h-10 w-10 text-amber-600 dark:text-amber-400" />
               </div>
-              
               <div>
-                <h3 className="text-xl font-bold">
-                  Cadastro não encontrado
-                </h3>
+                <h3 className="text-xl font-bold">Cadastro não encontrado</h3>
                 <p className="text-muted-foreground mt-2">
-                  Não encontramos seu cadastro com "{contato}". 
-                  Gostaria de se cadastrar como visitante?
+                  Não encontramos ninguém com esse número. Deseja se cadastrar como visitante?
                 </p>
               </div>
-
               <div className="space-y-3">
-                <Button 
-                  className="w-full h-12"
-                  onClick={handleCadastro}
-                >
+                <Button className="w-full h-12" onClick={handleCadastro}>
                   <UserPlus className="h-5 w-5 mr-2" />
                   Fazer Cadastro
                 </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={handleNovoCheckin}
-                >
-                  Tentar outro contato
+                <Button variant="outline" className="w-full" onClick={resetar}>
+                  Usar outro número
                 </Button>
               </div>
             </div>

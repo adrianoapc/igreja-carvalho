@@ -13,6 +13,7 @@ import { ptBR } from "date-fns/locale";
 import { ArrowLeft, Calendar, CheckCircle2, Users, AlertCircle, Check, Loader } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { useIgrejaId } from "@/hooks/useIgrejaId";
 import {
   Accordion,
   AccordionContent,
@@ -38,22 +39,22 @@ interface Evento {
 export default function Chamada() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  
-  // Estado local para presenças (true = presente, false = ausente)
-  // Por padrão, todos começam como "presente"
+  const { igrejaId } = useIgrejaId();
+
   const [presencas, setPresencas] = useState<Record<string, boolean>>({});
   const [isSaving, setIsSaving] = useState(false);
 
-  // Buscar culto mais próximo (hoje ou mais recente)
+  // Buscar culto mais próximo (hoje ou mais recente) filtrado por igreja
   const { data: culto, isLoading: loadingCulto } = useQuery({
-    queryKey: ["culto-hoje"],
+    queryKey: ["culto-hoje", igrejaId],
     queryFn: async () => {
+      if (!igrejaId) return null;
       const hoje = new Date().toISOString().split("T")[0];
-      
-      // Primeiro tenta buscar culto de hoje
+
       const { data: cultoHoje, error: errorHoje } = await supabase
         .from("eventos")
         .select("id, titulo, data_evento")
+        .eq("igreja_id", igrejaId)
         .gte("data_evento", `${hoje}T00:00:00`)
         .lte("data_evento", `${hoje}T23:59:59`)
         .order("data_evento", { ascending: true })
@@ -63,10 +64,10 @@ export default function Chamada() {
       if (errorHoje) throw errorHoje;
       if (cultoHoje) return cultoHoje as Evento;
 
-      // Se não houver culto hoje, busca o mais recente
       const { data: cultoRecente, error: errorRecente } = await supabase
         .from("eventos")
         .select("id, titulo, data_evento")
+        .eq("igreja_id", igrejaId)
         .lt("data_evento", `${hoje}T00:00:00`)
         .order("data_evento", { ascending: false })
         .limit(1)
@@ -75,109 +76,89 @@ export default function Chamada() {
       if (errorRecente) throw errorRecente;
       return cultoRecente as Evento | null;
     },
+    enabled: !!igrejaId,
   });
 
-  // Buscar lista de membros/inscritos (híbrido baseado em requer_inscricao)
+  // Buscar lista de membros/inscritos com agrupamento real por time
   const { data: membros, isLoading: loadingMembros } = useQuery({
-    queryKey: ["lista-chamada", culto?.id],
+    queryKey: ["lista-chamada", culto?.id, igrejaId],
     queryFn: async () => {
-      if (!culto?.id) return [];
-      
-      try {
-        // Buscar dados do evento para saber se requer inscrição
-        const { data: evento, error: eventoError } = await supabase
-          .from("eventos")
-          .select("requer_inscricao, tipo")
-          .eq("id", culto.id)
-          .single();
+      if (!culto?.id || !igrejaId) return [];
 
-        if (eventoError) {
-          console.error("Erro ao buscar evento:", eventoError);
-          throw eventoError;
-        }
+      const { data: evento, error: eventoError } = await supabase
+        .from("eventos")
+        .select("requer_inscricao, tipo")
+        .eq("id", culto.id)
+        .single();
 
-        console.log("Evento carregado:", evento);
+      if (eventoError) throw eventoError;
 
-        let pessoas: Array<{ id: string; nome: string; avatar_url: string | null }> = [];
+      let pessoaIds: string[] = [];
 
-        // Se requer inscrição, buscar inscritos
-        if (evento?.requer_inscricao) {
-          console.log("Buscando inscritos (requer_inscricao=true)");
-          const { data: inscritos, error: inscritos_error } = await supabase
-            .from("inscricoes_eventos")
-            .select("pessoa_id")
-            .eq("evento_id", culto.id)
-            .is("cancelado_em", null);
-
-          if (inscritos_error) {
-            console.error("Erro ao buscar inscritos:", inscritos_error);
-            throw inscritos_error;
-          }
-
-          // Buscar dados dos profiles dos inscritos
-          const pessoaIds = (inscritos || []).map(i => i.pessoa_id);
-          console.log("Pessoa IDs inscritos:", pessoaIds);
-          
-          if (pessoaIds.length > 0) {
-            const { data: profiles, error: profilesError } = await supabase
-              .from("profiles")
-              .select("id, nome, avatar_url")
-              .in("id", pessoaIds)
-              .order("nome");
-
-            if (profilesError) {
-              console.error("Erro ao buscar profiles dos inscritos:", profilesError);
-              throw profilesError;
-            }
-            pessoas = profiles || [];
-            console.log("Profiles dos inscritos carregados:", pessoas.length);
-          }
-        } else {
-          // Se não requer inscrição (culto), buscar membros
-          console.log("Buscando membros (requer_inscricao=false)");
-          const { data: profiles, error: profilesError } = await supabase
-            .from("profiles")
-            .select("id, nome, avatar_url")
-            .eq("status", "membro")
-            .order("nome");
-
-          if (profilesError) {
-            console.error("Erro ao buscar membros:", profilesError);
-            throw profilesError;
-          }
-          pessoas = profiles || [];
-          console.log("Membros carregados:", pessoas.length);
-        }
-
-        // Buscar as presenças JÁ REGISTRADAS deste evento
-        const { data: checkins, error: checkinsError } = await supabase
-          .from("checkins")
+      if (evento?.requer_inscricao) {
+        const { data: inscritos, error } = await supabase
+          .from("inscricoes_eventos")
           .select("pessoa_id")
-          .eq("evento_id", culto.id);
-
-        if (checkinsError) {
-          console.error("Erro ao buscar checkins:", checkinsError);
-          throw checkinsError;
-        }
-
-        const checkinIds = new Set(checkins?.map(c => c.pessoa_id) || []);
-        console.log("Checkins carregados:", checkinIds.size);
-
-        // Montar lista de membros/inscritos
-        return pessoas.map(p => ({
-          pessoa_id: p.id,
-          nome: p.nome,
-          avatar_url: p.avatar_url,
-          nome_grupo: "Participante",
-          tipo_grupo: "geral",
-          ja_marcado: checkinIds.has(p.id),
-        } as MembroChamada));
-      } catch (error) {
-        console.error("Erro ao buscar lista de chamada:", error);
-        return [];
+          .eq("evento_id", culto.id)
+          .is("cancelado_em", null);
+        if (error) throw error;
+        pessoaIds = (inscritos || []).map(i => i.pessoa_id);
+      } else {
+        // Membros da igreja filtrados por igreja_id
+        const { data: profiles, error } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("status", "membro")
+          .eq("igreja_id", igrejaId);
+        if (error) throw error;
+        pessoaIds = (profiles || []).map(p => p.id);
       }
+
+      if (pessoaIds.length === 0) return [];
+
+      // Buscar profiles completos
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, nome, avatar_url")
+        .in("id", pessoaIds)
+        .order("nome");
+      if (profilesError) throw profilesError;
+
+      // Buscar vínculos de times para agrupamento
+      const { data: vinculos } = await supabase
+        .from("membros_time")
+        .select("pessoa_id, times(nome)")
+        .in("pessoa_id", pessoaIds)
+        .eq("ativo", true)
+        .eq("igreja_id", igrejaId);
+
+      // Mapear pessoa_id → nome do time (pega o primeiro ativo)
+      const grupoMap: Record<string, string> = {};
+      (vinculos || []).forEach((v: any) => {
+        if (!grupoMap[v.pessoa_id] && v.times?.nome) {
+          grupoMap[v.pessoa_id] = v.times.nome;
+        }
+      });
+
+      // Checkins já registrados para este evento
+      const { data: checkins, error: checkinsError } = await supabase
+        .from("checkins")
+        .select("pessoa_id")
+        .eq("evento_id", culto.id);
+      if (checkinsError) throw checkinsError;
+
+      const checkinIds = new Set(checkins?.map(c => c.pessoa_id) || []);
+
+      return (profiles || []).map(p => ({
+        pessoa_id: p.id,
+        nome: p.nome,
+        avatar_url: p.avatar_url,
+        nome_grupo: grupoMap[p.id] || "Sem equipe",
+        tipo_grupo: grupoMap[p.id] ? "time" : "geral",
+        ja_marcado: checkinIds.has(p.id),
+      } as MembroChamada));
     },
-    enabled: !!culto?.id,
+    enabled: !!culto?.id && !!igrejaId,
   });
 
   // Inicializar presenças quando membros carregarem
@@ -255,7 +236,7 @@ export default function Chamada() {
 
       const totalAlteracoes = paraMarcados.length + paraDesmarcados.length;
       toast.success(`✅ ${totalAlteracoes} mudança(s) salva(s)!`);
-      queryClient.invalidateQueries({ queryKey: ["lista-chamada", culto?.id] });
+      queryClient.invalidateQueries({ queryKey: ["lista-chamada", culto?.id, igrejaId] });
       queryClient.invalidateQueries({ queryKey: ["chamada-stats", culto?.id] });
     } catch (error) {
       console.error("Erro ao salvar presenças:", error);

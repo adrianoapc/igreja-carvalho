@@ -27,3 +27,50 @@ sequenceDiagram
     Supabase-->>Frontend: Lista atualizada
     Frontend-->>Usuario: Exibe lista atualizada
 ```
+
+## Sequência: Wizard Interno de Cadastro (/pessoas/cadastrar)
+
+```mermaid
+sequenceDiagram
+    participant U as Usuário (staff)
+    participant FE as PessoaWizard
+    participant SB as Supabase
+
+    U->>FE: Clica "Cadastrar Pessoa"
+    FE-->>U: Step 0 — Selecionar tipo
+    U->>FE: Escolhe Visitante / Frequentador / Membro
+    FE-->>U: Steps de dados (2-4 passos)
+    U->>FE: Preenche e avança steps
+    FE->>SB: Verificar duplicata (telefone/email)
+    SB-->>FE: Resultado
+    FE->>SB: INSERT profiles
+    SB-->>FE: OK + id
+    alt Visitante com deseja_contato
+        FE->>SB: INSERT visitante_contatos (agendado +3 dias)
+    end
+    FE-->>U: Redireciona para /pessoas
+```
+
+## Sequência: Check-in com OTP WhatsApp
+
+```mermaid
+sequenceDiagram
+    participant U as Participante
+    participant FE as Checkin.tsx
+    participant SO as Edge: send-otp
+    participant VO as Edge: verify-otp
+    participant CE as Edge: checkin-evento
+    participant WA as WhatsApp (Meta API)
+
+    U->>FE: Escaneia QR Code do evento
+    U->>FE: Digita telefone
+    FE->>SO: { telefone, igreja_id }
+    SO->>WA: Envia código OTP (hash SHA-256 no banco)
+    WA-->>U: Mensagem WhatsApp com código
+    U->>FE: Digita código de 6 dígitos
+    FE->>VO: { telefone, codigo }
+    VO-->>FE: { success, profile_id }
+    FE->>CE: { tipo, evento_id, profile_id }
+    CE-->>FE: { success, nome }
+    FE-->>U: "Presença Confirmada!" (nome mascarado)
+```

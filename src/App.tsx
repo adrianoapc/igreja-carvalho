@@ -67,8 +67,14 @@ const CadastroCafeVP = lazy(() => import("./pages/cadastro/CafeVP"));
 // Inscrição Pública (QR Code)
 const InscricaoPublica = lazy(() => import("./pages/InscricaoPublica"));
 
+// Recepção
+const HubRecepcao = lazy(() => import("./pages/recepcao/index"));
+const RecepcaoVisitante = lazy(() => import("./pages/recepcao/Visitante"));
+const RecepcaoFrequentador = lazy(() => import("./pages/recepcao/Frequentador"));
+
 // Pessoas
 const PessoasIndex = lazy(() => import("./pages/pessoas/index"));
+const CadastrarPessoa = lazy(() => import("./pages/pessoas/CadastrarPessoa"));
 const PessoasTodos = lazy(() => import("./pages/pessoas/Todos"));
 const PessoasMembros = lazy(() => import("./pages/pessoas/Membros"));
 const PessoasVisitantes = lazy(() => import("./pages/pessoas/Visitantes"));
@@ -372,6 +378,30 @@ const App = () => (
                       }
                     />
                     <Route
+                      path="/recepcao"
+                      element={
+                        <AuthGate>
+                          <HubRecepcao />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/recepcao/visitante"
+                      element={
+                        <AuthGate>
+                          <RecepcaoVisitante />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/recepcao/frequentador"
+                      element={
+                        <AuthGate>
+                          <RecepcaoFrequentador />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
                       path="/voluntariado"
                       element={
                         <AuthGate>
@@ -468,6 +498,14 @@ const App = () => (
                       element={
                         <AuthGate>
                           <PessoasIndex />
+                        </AuthGate>
+                      }
+                    />
+                    <Route
+                      path="/pessoas/cadastrar"
+                      element={
+                        <AuthGate>
+                          <CadastrarPessoa />
                         </AuthGate>
                       }
                     />

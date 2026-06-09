@@ -46,7 +46,7 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-  Frontend[Frontend (React/Vite)]
+  Frontend["Frontend (React/Vite)"]
 
   subgraph Modulos[Frontend · Módulos Principais]
     Pessoas[Pessoas]
@@ -61,7 +61,7 @@ flowchart LR
     Admin[Admin]
   end
 
-  Supabase[Supabase (Auth + Database + Edge Functions)]
+  Supabase["Supabase (Auth + Database + Edge Functions)"]
 
   Frontend --> Modulos
   Modulos --> Supabase
