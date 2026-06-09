@@ -87,11 +87,24 @@ jobs:
           JSON
 
           shopt -s nullglob
+          success_count=0
+          failed_count=0
           for mmd in "$OUT_DIR"/*.mmd; do
             png="${mmd%.mmd}.png"
-            mmdc -i "$mmd" -o "$png" -b transparent --scale 2 -p "$PUPPETEER_CONFIG"
-            echo "Gerado: $png"
+            if mmdc -i "$mmd" -o "$png" -b transparent --scale 2 -p "$PUPPETEER_CONFIG"; then
+              echo "Gerado: $png"
+              success_count=$((success_count + 1))
+            else
+              echo "::warning file=$mmd::Falha ao renderizar este bloco Mermaid. Seguindo para o próximo."
+              failed_count=$((failed_count + 1))
+            fi
           done
+
+          echo "Renderizados com sucesso: $success_count | Falhas: $failed_count"
+          if [[ "$success_count" -eq 0 && "$failed_count" -gt 0 ]]; then
+            echo "::error::Nenhum diagrama Mermaid pôde ser renderizado."
+            exit 1
+          fi
 
       - name: Commit exported diagrams
         if: github.event_name == 'push'
