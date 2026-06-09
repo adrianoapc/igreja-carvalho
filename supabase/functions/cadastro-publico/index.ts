@@ -109,6 +109,64 @@ function applyTenantFilters(
   return nextQuery;
 }
 
+// Sincroniza telefone e email em profile_contatos após criar/atualizar um
+// perfil via cadastro público. Não lança — erros são apenas logados para
+// não bloquear o retorno de sucesso ao usuário.
+// deno-lint-ignore no-explicit-any
+async function sincronizarContatosPerfil(
+  supabase: any,
+  profileId: string,
+  telefone: string | null,
+  email: string | null,
+) {
+  const upsertContato = async (
+    tipo: string,
+    valor: string,
+    isWhatsapp: boolean,
+    isLogin: boolean,
+  ) => {
+    const { data: existing } = await supabase
+      .from("profile_contatos")
+      .select("id")
+      .eq("profile_id", profileId)
+      .eq("tipo", tipo)
+      .eq("is_primary", true)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase
+        .from("profile_contatos")
+        .update({ valor, is_whatsapp: isWhatsapp, is_login: isLogin })
+        .eq("id", existing.id);
+    } else {
+      await supabase.from("profile_contatos").insert({
+        profile_id: profileId,
+        tipo,
+        valor,
+        rotulo: "Pessoal",
+        is_primary: true,
+        is_whatsapp: isWhatsapp,
+        is_login: isLogin,
+      });
+    }
+  };
+
+  try {
+    if (telefone) {
+      const tipoTel = telefone.length >= 11 ? "celular" : "fixo";
+      await upsertContato(tipoTel, telefone, true, false);
+    }
+    if (email) {
+      await upsertContato("email", email, false, false);
+    }
+  } catch (err) {
+    console.warn(
+      "[cadastro-publico] Aviso: erro ao sincronizar profile_contatos:",
+      err,
+    );
+  }
+}
+
 // Helper to log audit events
 // deno-lint-ignore no-explicit-any
 async function logAudit(
@@ -230,15 +288,19 @@ Deno.serve(async (req) => {
       // Normalizar telefone usando utilitário compartilhado
       const telefoneNormalizado = normalizarTelefone(visitanteData.telefone);
 
-      // Verificar se já existe uma pessoa com o mesmo email ou telefone
+      // Verificar se já existe uma pessoa com o mesmo email ou telefone.
+      // Busca em profiles (campo legado) E em profile_contatos para cobrir
+      // perfis criados ou migrados após a padronização de contatos.
       let visitanteExistente = null;
 
       if (visitanteData.email?.trim()) {
+        const emailBusca = visitanteData.email.trim().toLowerCase();
+
         let byEmailQuery = supabase
           .from("profiles")
           .select("*")
           .in("status", ["visitante", "frequentador"])
-          .eq("email", visitanteData.email.trim().toLowerCase())
+          .eq("email", emailBusca)
           .limit(1);
 
         byEmailQuery = applyTenantFilters(byEmailQuery, visitanteData);
@@ -246,6 +308,23 @@ Deno.serve(async (req) => {
 
         if (byEmail && byEmail.length > 0) {
           visitanteExistente = byEmail[0];
+        }
+
+        // Fallback: buscar em profile_contatos
+        if (!visitanteExistente) {
+          const { data: byEmailContato } = await supabase
+            .from("profile_contatos")
+            .select("profile_id, profiles!inner(*)")
+            .eq("tipo", "email")
+            .eq("valor", emailBusca)
+            .eq("profiles.igreja_id", visitanteData.igreja_id)
+            .in("profiles.status", ["visitante", "frequentador"])
+            .limit(1)
+            .maybeSingle();
+
+          if (byEmailContato?.profiles) {
+            visitanteExistente = byEmailContato.profiles;
+          }
         }
       }
 
@@ -262,6 +341,23 @@ Deno.serve(async (req) => {
 
         if (byTelefone && byTelefone.length > 0) {
           visitanteExistente = byTelefone[0];
+        }
+
+        // Fallback: buscar em profile_contatos
+        if (!visitanteExistente) {
+          const { data: byTelContato } = await supabase
+            .from("profile_contatos")
+            .select("profile_id, profiles!inner(*)")
+            .in("tipo", ["celular", "fixo"])
+            .eq("valor", telefoneNormalizado)
+            .eq("profiles.igreja_id", visitanteData.igreja_id)
+            .in("profiles.status", ["visitante", "frequentador"])
+            .limit(1)
+            .maybeSingle();
+
+          if (byTelContato?.profiles) {
+            visitanteExistente = byTelContato.profiles;
+          }
         }
       }
 
@@ -305,6 +401,13 @@ Deno.serve(async (req) => {
         if (updateError) throw updateError;
         resultData = updated;
 
+        await sincronizarContatosPerfil(
+          supabase,
+          visitanteExistente.id,
+          telefoneNormalizado,
+          visitanteData.email?.trim().toLowerCase() || null,
+        );
+
         console.log(
           `[cadastro-publico] Visitante atualizado: ${resultData.nome}, visitas: ${resultData.numero_visitas}`,
         );
@@ -336,6 +439,13 @@ Deno.serve(async (req) => {
 
         if (insertError) throw insertError;
         resultData = newData;
+
+        await sincronizarContatosPerfil(
+          supabase,
+          newData.id,
+          telefoneNormalizado,
+          visitanteData.email?.trim().toLowerCase() || null,
+        );
 
         console.log(
           `[cadastro-publico] Novo visitante cadastrado: ${resultData.nome}`,
