@@ -1,0 +1,17 @@
+flowchart TD
+    Start([Membro]) -->|Acessa Testemunho| A[Intercessão - Testemunhos]
+    A -->|Clica 'Novo Testemunho'| B[Dialog: Novo Testemunho]
+    B -->|Preenche Título, Categoria, Mensagem| C["Testemunho criado: status=aberto"]
+    
+    C -->|Admin recebe notificação| D[Admin - Aprovação]
+    D -->|Revisa conteúdo| E["Opções: Aprovar ou Arquivar"]
+    
+    E -->|Aprova| F["Testemunho: status=publico<br/>data_publicacao=now()"]
+    F -->|Aparece em Dashboard| G[Carrossel de Testemunhos<br/>para todos membros]
+    
+    E -->|Arquiva| H["Testemunho: status=arquivado"]
+    
+    style C fill:#fff3cd
+    style F fill:#d4edda
+    style G fill:#e2e3e5
+    style H fill:#f8d7da

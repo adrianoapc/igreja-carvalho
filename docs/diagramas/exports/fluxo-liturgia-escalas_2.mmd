@@ -1,0 +1,26 @@
+flowchart TD
+    Start([Admin Remove<br/>Item da Liturgia]) --> Trigger[Trigger<br/>cleanup_liturgia_escala]
+    
+    Trigger --> CheckOldResponsavel{OLD.responsavel_id<br/>Preenchido?}
+    
+    CheckOldResponsavel -->|Não| End1([Ignora])
+    CheckOldResponsavel -->|Sim| FindTime[Busca Time<br/>nome = 'Liturgia']
+    
+    FindTime --> TimeExists{Time<br/>Existe?}
+    
+    TimeExists -->|Não| End2([Ignora])
+    TimeExists -->|Sim| CountOthers[Conta outros itens<br/>do mesmo responsável<br/>no mesmo culto]
+    
+    CountOthers --> HasOthers{Tem outros<br/>itens?}
+    
+    HasOthers -->|Sim| End3([Mantém Escala:<br/>Ainda tem liturgia])
+    HasOthers -->|Não| DeleteEscala[DELETE escalas_culto<br/>pessoa + culto + time Liturgia]
+    
+    DeleteEscala --> End4([Fim: Escala Removida])
+    
+    style Start fill:#e1f5ff
+    style End1 fill:#fff4e1
+    style End2 fill:#fff4e1
+    style End3 fill:#fff4e1
+    style End4 fill:#e1ffe1
+    style Trigger fill:#f5e1ff

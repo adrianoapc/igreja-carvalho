@@ -1,0 +1,52 @@
+flowchart TD
+    Start([Membro Registra<br/>Sentimento]) --> SaveDB[Salva em<br/>sentimentos_membros]
+    
+    SaveDB --> HasMessage{Tem<br/>Mensagem?}
+    
+    HasMessage -->|Não| End1([Apenas Registro<br/>Sem Análise])
+    HasMessage -->|Sim| CallEdge[Chama Edge Function<br/>analise-sentimento-ia]
+    
+    CallEdge --> FetchSentiment[Busca Sentimento<br/>+ Profile do Membro]
+    
+    FetchSentiment --> CallAI[Chama Lovable AI<br/>Gemini 2.5 Flash]
+    
+    CallAI --> AIProcess{AI Processa}
+    
+    AIProcess -->|Sucesso| ParseResult[Parseia JSON:<br/>titulo, motivo,<br/>gravidade, resposta]
+    AIProcess -->|Erro| FallbackAnalysis[Análise Fallback<br/>Baseada no Sentimento]
+    
+    ParseResult --> UpdateDB[UPDATE sentimentos_membros<br/>analise_ia_*]
+    FallbackAnalysis --> UpdateDB
+    
+    UpdateDB --> CheckCritical{Gravidade<br/>Crítica ou<br/>Média+?}
+    
+    CheckCritical -->|Gravidade < MEDIA| End2([Fim:<br/>Análise Salva<br/>em Sentimentos])
+    
+    CheckCritical -->|Gravidade >= MEDIA| CreateGabinete["Cria em<br/>atendimentos_pastorais<br/>origem='SENTIMENTOS'"]
+    
+    CreateGabinete --> FindLeader[Detecta Líder<br/>do Membro]
+    
+    FindLeader --> HasLeader{Líder<br/>Encontrado?}
+    
+    HasLeader -->|Sim| AssignLeader["Atribui a Líder<br/>do Membro"]
+    HasLeader -->|Não| AssignPlantao["Atribui a Pastor<br/>de Plantão"]
+    
+    AssignLeader --> Notify["Notifica Pastor<br/>Responsável"]
+    AssignPlantao --> Notify
+    
+    Notify --> CheckNotif{Gravidade<br/>CRÍTICA?}
+    
+    CheckNotif -->|Sim| NotifyImm["Notificação Imediata:<br/>WhatsApp + In-App"]
+    CheckNotif -->|Não| NotifyPassive["Notificação Passiva:<br/>In-App no Gabinete"]
+    
+    NotifyImm --> End3([Fim: Atendimento<br/>no Gabinete])
+    NotifyPassive --> End3
+    
+    style Start fill:#e1f5ff
+    style End2 fill:#fff4e1
+    style End3 fill:#e1ffe1
+    style CreateGabinete fill:#fff3cd
+    style CallAI fill:#f5e1ff
+    style AssignLeader fill:#e6ffe6
+    style AssignPlantao fill:#e6ffe6
+    style NotifyImm fill:#ffe6e6

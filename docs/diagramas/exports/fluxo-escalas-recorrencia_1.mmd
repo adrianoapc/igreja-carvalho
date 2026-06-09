@@ -1,0 +1,38 @@
+graph TD
+    A["👤 Usuário clica em slot vazio<br/>(Timeline ou Dialog)"]
+    B["📋 Sheet 'Adicionar Voluntário' abre"]
+    C["🔍 Busca voluntário por nome<br/>(Combobox autocomplete)"]
+    D["⏰ Define horário<br/>(início/fim)"]
+    E["🔄 Seleciona recorrência:<br/>None|Daily|Weekly|Custom"]
+
+    E -->|None| F["📅 1 slot apenas"]
+    E -->|Daily| G["📅 Todos os dias<br/>até fim do evento"]
+    E -->|Weekly| H["📅 Mesmo dia da semana<br/>a cada 7 dias"]
+    E -->|Custom| I["📅 Checkboxes por dia<br/>Seg/Ter/Qua/etc"]
+
+    F --> J["🧮 Calcula array de datas"]
+    G --> J
+    H --> J
+    I --> J
+
+    J --> K["⚠️ Detecta conflitos?<br/>(voluntário já escalado)"]
+
+    K -->|Sim| L["⚠️ Exibe aviso<br/>com conflitos"]
+    K -->|Não| M["✅ Sem conflitos"]
+
+    L --> N["👤 Usuário escolhe:<br/>Cancelar | Continuar"]
+    N -->|Cancelar| O["❌ Aborta operação"]
+    N -->|Continuar| P["💾 Insere datas sem conflito"]
+
+    M --> Q["✅ Preview exibe:<br/>X turnos em [datas]"]
+    Q --> R["📲 Usuário clica 'Adicionar'"]
+    R --> S["💾 Batch insert no banco<br/>(array de escalas)"]
+
+    P --> T["✅ Toast: 'N turnos criados'"]
+    S --> T
+    T --> U["🎉 Timeline atualiza<br/>com novos slots"]
+
+    style A fill:#e1f5ff
+    style U fill:#c8e6c9
+    style O fill:#ffcdd2
+    style T fill:#c8e6c9

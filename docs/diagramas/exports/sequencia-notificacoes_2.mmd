@@ -1,0 +1,63 @@
+sequenceDiagram
+    participant Admin as Admin User
+    participant Page as Notificacoes.tsx
+    participant Supabase as Supabase Client
+    participant DB as Supabase DB
+    
+    Admin->>+Page: Acessa /admin/notificacoes
+    
+    Page->>+Supabase: SELECT * FROM notificacao_eventos
+    Supabase->>+DB: Query eventos
+    DB-->>-Supabase: Lista de eventos
+    Supabase-->>-Page: Dados eventos
+    
+    Page->>+Supabase: SELECT * FROM notificacao_regras
+    Supabase->>+DB: Query regras
+    DB-->>-Supabase: Lista de regras
+    Supabase-->>-Page: Dados regras
+    
+    Page->>Page: Renderiza cards agrupados<br/>por evento/categoria
+    
+    Note over Admin: Admin clica "+ Add" em um evento
+    
+    Admin->>+Page: Abrir dialog de criação
+    Page->>Admin: Exibe dropdown de roles
+    
+    Admin->>Page: Seleciona role "tesoureiro"
+    Admin->>Page: Clica "Criar"
+    
+    Page->>+Supabase: INSERT INTO notificacao_regras<br/>{evento_slug, role_alvo, canais, ativo}
+    Supabase->>+DB: INSERT regra
+    DB-->>-Supabase: Regra criada {id: uuid}
+    Supabase-->>-Page: Sucesso
+    
+    Page->>Page: Atualiza estado local<br/>fecha dialog
+    Page->>Admin: Toast: "Regra criada"
+    
+    Note over Admin: Admin alterna switch de canal (ex: Push)
+    
+    Admin->>+Page: Toggle canal "push"
+    
+    Page->>Page: Optimistic update<br/>inverte valor local
+    
+    Page->>+Supabase: UPDATE notificacao_regras<br/>SET canais = {..., push: true}<br/>WHERE id = regra_id
+    Supabase->>+DB: UPDATE regra
+    DB-->>-Supabase: Regra atualizada
+    Supabase-->>-Page: Sucesso
+    
+    Page->>Admin: Toast: "Canal atualizado"
+    
+    Note over Admin: Admin clica na lixeira de uma regra
+    
+    Admin->>+Page: Confirmar exclusão
+    Page->>Admin: Exibe toast de confirmação (a confirmar)
+    
+    Admin->>Page: Confirma
+    
+    Page->>+Supabase: DELETE FROM notificacao_regras<br/>WHERE id = regra_id
+    Supabase->>+DB: DELETE regra
+    DB-->>-Supabase: Regra removida
+    Supabase-->>-Page: Sucesso
+    
+    Page->>Page: Remove do estado local
+    Page->>Admin: Toast: "Regra excluída"

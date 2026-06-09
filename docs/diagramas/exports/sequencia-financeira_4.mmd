@@ -1,0 +1,20 @@
+sequenceDiagram
+    autonumber
+    participant Tesoureiro
+    participant Sistema
+    participant Banco
+
+    Tesoureiro->>Sistema: Aprova pagamento parcelado 3x
+    Sistema->>Sistema: Cria 3 transações de caixa agendadas
+    Sistema->>Banco: Executa parcela 1
+    Banco-->>Sistema: Confirma pagamento
+    Sistema->>Sistema: Aguarda próximo mês
+    Sistema->>Banco: Executa parcela 2
+    Banco-->>Sistema: Confirma pagamento
+    Sistema->>Sistema: Aguarda próximo mês
+    Sistema->>Banco: Executa parcela 3
+    Banco-->>Sistema: Confirma pagamento
+    Sistema-->>Tesoureiro: Pagamento completo
+
+    Note over Sistema: DRE registra valor total no mês 1
+    Note over Sistema: Caixa registra -R$ parcial por mês

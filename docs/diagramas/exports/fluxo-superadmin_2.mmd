@@ -1,0 +1,29 @@
+flowchart TD
+    Start([Usuário Faz Login]) --> CheckRole{É Super Admin?}
+    
+    CheckRole -->|Não| GoToApp([Redireciona para /])
+    CheckRole -->|Sim| CheckPreference{Tem Preferência<br/>Salva em localStorage?}
+    
+    CheckPreference -->|Sim| GetPreference[Lê preferred_context]
+    CheckPreference -->|Não| ShowSelect[Exibe /context-select]
+    
+    GetPreference --> |superadmin| GoToSuperAdmin([Redireciona para /superadmin])
+    GetPreference --> |app| GoToApp
+    
+    ShowSelect --> UserChoice{Usuário Escolhe}
+    
+    UserChoice --> |Painel SaaS| CheckRemember1{Lembrar Escolha?}
+    UserChoice --> |Aplicativo Igreja| CheckRemember2{Lembrar Escolha?}
+    
+    CheckRemember1 -->|Sim| SavePref1[Salva 'superadmin'<br/>em localStorage]
+    CheckRemember1 -->|Não| GoToSuperAdmin
+    SavePref1 --> GoToSuperAdmin
+    
+    CheckRemember2 -->|Sim| SavePref2[Salva 'app'<br/>em localStorage]
+    CheckRemember2 -->|Não| GoToApp
+    SavePref2 --> GoToApp
+    
+    style Start fill:#e1f5ff
+    style ShowSelect fill:#fff4e1
+    style GoToSuperAdmin fill:#f5e1ff
+    style GoToApp fill:#e1ffe1

@@ -1,0 +1,42 @@
+flowchart TD
+    Start([Cron Job<br/>09:00 diário]) --> CallEdge[Chama Edge Function<br/>verificar-escalas-pendentes]
+    
+    CallEdge --> CheckWhatsApp{WhatsApp<br/>Habilitado?}
+    
+    CheckWhatsApp -->|Não| End1([Fim: WhatsApp Desativado])
+    CheckWhatsApp -->|Sim| CalcWindow[Calcular Janela:<br/>24h a 48h no futuro]
+    
+    CalcWindow --> QueryPending[Query escalas_culto<br/>WHERE status = 'pendente'<br/>AND culto 24-48h]
+    
+    QueryPending --> HasPending{Escalas<br/>Pendentes?}
+    
+    HasPending -->|Não| End2([Fim: Nada a Enviar])
+    HasPending -->|Sim| FilterAntiSpam[Filtrar Anti-Spam:<br/>ultimo_aviso_em > 24h<br/>OU NULL]
+    
+    FilterAntiSpam --> HasEligible{Escalas<br/>Elegíveis?}
+    
+    HasEligible -->|Não| End3([Fim: Já Avisados])
+    HasEligible -->|Sim| LoopStart{Para cada<br/>Escala Elegível}
+    
+    LoopStart --> BuildMessage[Montar Mensagem:<br/>Nome, Culto, Data,<br/>Time, Posição]
+    
+    BuildMessage --> CallDispararAlerta[Invoke<br/>disparar-alerta]
+    
+    CallDispararAlerta --> SendResult{Envio<br/>OK?}
+    
+    SendResult -->|Sim| UpdateTimestamp[UPDATE escalas_culto<br/>ultimo_aviso_em = NOW]
+    SendResult -->|Erro| LogError[Log Erro]
+    
+    UpdateTimestamp --> NextLoop{Mais<br/>Escalas?}
+    LogError --> NextLoop
+    
+    NextLoop -->|Sim| LoopStart
+    NextLoop -->|Não| End4([Fim: Lembretes Enviados])
+    
+    style Start fill:#e1f5ff
+    style End1 fill:#ffe1e1
+    style End2 fill:#fff4e1
+    style End3 fill:#fff4e1
+    style End4 fill:#e1ffe1
+    style FilterAntiSpam fill:#f5e1ff
+    style CallDispararAlerta fill:#fff9e1

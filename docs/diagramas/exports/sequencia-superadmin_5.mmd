@@ -1,0 +1,25 @@
+sequenceDiagram
+    actor Admin as Super Admin
+    participant Page as Metricas.tsx
+    participant Supabase as Supabase
+    participant RPC as RPC Function
+
+    Admin->>Page: Acessa /superadmin/metricas
+    Page->>Supabase: SELECT * FROM igrejas
+    Supabase-->>Page: Lista para dropdown
+    
+    Admin->>Page: Seleciona igreja
+    Page->>Supabase: SELECT FROM metricas_igreja<br/>WHERE igreja_id = ?
+    Supabase-->>Page: Dados de métricas
+    Page-->>Admin: Exibe KPIs em cards
+    
+    opt Recalcular Métricas
+        Admin->>Page: Click "Recalcular"
+        Page->>RPC: rpc('recalcular_metricas_igreja', { igreja_id })
+        RPC->>Supabase: Executa contagens e agregações
+        Supabase-->>RPC: Métricas atualizadas
+        RPC-->>Page: Sucesso
+        Page->>Supabase: SELECT FROM metricas_igreja
+        Supabase-->>Page: Dados atualizados
+        Page-->>Admin: Refresh dos KPIs
+    end

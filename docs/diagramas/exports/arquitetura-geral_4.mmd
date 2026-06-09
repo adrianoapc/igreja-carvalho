@@ -1,0 +1,23 @@
+stateDiagram-v2
+  [*] --> Dashboard: /
+
+  Dashboard --> Pessoas: /pessoas
+  Dashboard --> Intercessao: /intercessao
+  Dashboard --> Eventos: /eventos
+  Dashboard --> Ensino: /ensino
+  Dashboard --> Financas: /financas
+  Dashboard --> Kids: /kids
+  Dashboard --> Voluntariado: /voluntariado
+  Dashboard --> Comunicacao: /comunicados
+  Dashboard --> Gabinete: /gabinete
+
+  Pessoas --> PessoasTodos: /pessoas/todos
+  Pessoas --> PessoasVisitantes: /pessoas/visitantes
+  Pessoas --> PessoasFrequentadores: /pessoas/frequentadores
+  Pessoas --> PessoasMembros: /pessoas/membros
+  Pessoas --> PessoasContatos: /pessoas/contatos
+
+  Intercessao --> Diario: /intercessao/diario
+  Intercessao --> SalaGuerra: /intercessao/sala-de-guerra
+  Intercessao --> Equipes: /intercessao/equipes
+  Intercessao --> Sentimentos: /intercessao/sentimentos

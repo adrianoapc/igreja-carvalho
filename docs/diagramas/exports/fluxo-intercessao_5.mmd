@@ -1,0 +1,24 @@
+graph LR
+    Membro[Membro] -->|Criar| Pedido["Pedido de Oração"]
+    Membro -->|Enviar| Testemunho["Testemunho"]
+    Membro -->|Registrar| Sentimento["Sentimento Diário"]
+    
+    Visitante[Visitante/Anônimo] -->|Criar| Pedido
+    
+    Intercessor[Intercessor] -->|Acompanha| Pedido
+    Intercessor -->|Registra| Observacoes["Observações"]
+    Observacoes -->|Marca como| Respondido["Respondido"]
+    
+    Admin[Admin/Pastor] -->|Gerencia| Equipe["Intercessores"]
+    Admin -->|Aloca| Pedido
+    Admin -->|Aprova| Testemunho
+    Admin -->|Monitora| AlertasCriticos["Alertas Críticos<br/>3+ dias negativos"]
+    
+    Pedido -->|Ciclo| Pendente["Pendente → Alocado →<br/>Em Oração → Respondido"]
+    Testemunho -->|Ciclo| Aberto["Aberto → Público<br/>ou Arquivado"]
+    
+    style Pedido fill:#d1ecf1
+    style Testemunho fill:#fff3cd
+    style Sentimento fill:#d4edda
+    style AlertasCriticos fill:#f8d7da
+    style Equipe fill:#e2e3e5

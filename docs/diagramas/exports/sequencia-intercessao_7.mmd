@@ -1,0 +1,21 @@
+sequenceDiagram
+    actor User1 as Intercessor 1 (Frontend)
+    actor User2 as Admin (Frontend)
+    participant Sub as Supabase Realtime
+    participant DB as Postgres
+    
+    Note over User1,DB: Se Realtime implementado em pedidos_oracao
+    
+    User1->>Sub: SUBSCRIBE pedidos_oracao (channel)
+    User2->>Sub: SUBSCRIBE pedidos_oracao (channel)
+    
+    User2->>DB: UPDATE pedidos_oracao: status='respondido' (pedido de User1)
+    DB-->>Sub: BROADCAST change event
+    
+    Sub-->>User1: Realtime update: Pedido status mudou
+    Sub-->>User2: Realtime update: Pedido status mudou
+    
+    User1->>User1: Atualiza lista sem refetch manual
+    User2->>User2: Atualiza lista sem refetch manual
+    
+    Note over User1,DB: Se não implementado: Polling via TanStack Query cada X segundos

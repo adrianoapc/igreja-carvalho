@@ -1,0 +1,16 @@
+sequenceDiagram
+    autonumber
+    participant Banco
+    participant Sistema
+    participant Tesoureiro
+
+    Banco->>Sistema: Retorna extrato
+    Sistema->>Sistema: Compara previsto vs extrato
+    Sistema->>Sistema: Identifica divergência (taxa bancária)
+    Sistema-->>Tesoureiro: Alerta de divergência
+    Tesoureiro->>Sistema: Ajusta lançamento (inclui taxa)
+    Sistema->>Sistema: Marca como conciliado
+    Sistema-->>Tesoureiro: Conciliação completa
+
+    Note over Sistema: Taxa bancária é ajuste de caixa
+    Note over Sistema: Não altera o DRE original

@@ -1,0 +1,25 @@
+flowchart TD
+    AdminStart([Admin Clica<br/>'Notificar Escala']) --> CallDispararEscala[Chama Edge Function<br/>disparar-escala]
+    
+    CallDispararEscala --> FetchCulto[Buscar Dados do Culto<br/>+ Escalas Vinculadas]
+    
+    FetchCulto --> FormatData[Formatar:<br/>Data, Horário, Local]
+    
+    FormatData --> LoopVoluntarios{Para cada<br/>Voluntário Escalado}
+    
+    LoopVoluntarios --> FormatPhone[Limpar Telefone<br/>Remover formatação]
+    
+    FormatPhone --> BuildPayload[Montar Payload:<br/>nome, telefone,<br/>time, posição, data]
+    
+    BuildPayload --> SendWebhook[POST para<br/>MAKE_WEBHOOK_ESCALAS]
+    
+    SendWebhook --> UpdateAviso[UPDATE escalas_culto<br/>ultimo_aviso_em = NOW]
+    
+    UpdateAviso --> NextVol{Mais<br/>Voluntários?}
+    
+    NextVol -->|Sim| LoopVoluntarios
+    NextVol -->|Não| End([Fim: Escala Notificada])
+    
+    style AdminStart fill:#e1f5ff
+    style End fill:#e1ffe1
+    style SendWebhook fill:#fff9e1

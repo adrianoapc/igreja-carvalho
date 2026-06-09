@@ -1,0 +1,18 @@
+flowchart LR
+    Pend["<b>PENDENTE</b><br/>Novo atendimento,<br/>aguardando ação<br/>do pastor"]
+    
+    Acomp["<b>EM ACOMPANHAMENTO</b><br/>Pastor iniciou<br/>contato/conversa<br/>com membro"]
+    
+    Agend["<b>AGENDADO</b><br/>Encontro pastoral<br/>marcado para<br/>data/hora específica"]
+    
+    Concl["<b>CONCLUÍDO</b><br/>Caso encerrado,<br/>membro acompanhado<br/>ou referenciado"]
+    
+    Pend -->|Pastor clica<br/>'Iniciar'| Acomp
+    Acomp -->|Pastor clica<br/>'Agendar'| Agend
+    Agend -->|Após encontro| Acomp
+    Acomp -->|Pastor clica<br/>'Encerrar'| Concl
+    
+    style Pend fill:#fff3cd
+    style Acomp fill:#d1ecf1
+    style Agend fill:#ffe6e6
+    style Concl fill:#d4edda

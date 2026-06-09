@@ -1,0 +1,15 @@
+sequenceDiagram
+    autonumber
+    participant Tesoureiro
+    participant Sistema
+    participant Banco
+
+    Tesoureiro->>Sistema: Solicita estorno de pagamento
+    Sistema->>Tesoureiro: Pede justificativa
+    Tesoureiro->>Sistema: Informa motivo
+    Sistema->>Banco: Reverte transação (se possível)
+    Sistema->>Sistema: Atualiza saldo da conta
+    Sistema-->>Tesoureiro: Confirma estorno
+
+    Note over Sistema: DRE permanece inalterado
+    Note over Sistema: Fato gerador continua válido

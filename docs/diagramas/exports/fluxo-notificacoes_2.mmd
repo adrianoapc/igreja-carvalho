@@ -1,0 +1,32 @@
+flowchart TD
+    AdminStart([Admin Acessa<br/>/admin/notificacoes]) --> GetIgrejaContext[Obter igreja_id<br/>do usuário logado]
+
+    GetIgrejaContext --> LoadData[Carregar:<br/>- notificacao_eventos<br/>- notificacao_regras<br/>WHERE igreja_id = ?]
+
+    LoadData --> DisplayCards[Exibir Cards<br/>por Evento<br/>da igreja]
+
+    DisplayCards --> AdminAction{Ação do Admin}
+
+    AdminAction -->|Adicionar Destinatário| OpenDialog[Abrir Dialog<br/>Selecionar Role<br/>da igreja]
+    OpenDialog --> SelectRole[Admin Escolhe<br/>Role/Cargo<br/>da igreja]
+    SelectRole --> CreateRule[INSERT em<br/>notificacao_regras<br/>igreja_id + canais padrão]
+    CreateRule --> ReloadData
+
+    AdminAction -->|Toggle Canal| UpdateChannel[UPDATE canais<br/>na regra específica<br/>scoped por igreja]
+    UpdateChannel --> ReloadData
+
+    AdminAction -->|Remover Destinatário| ConfirmDelete{Confirmar<br/>Exclusão?}
+    ConfirmDelete -->|Sim| DeleteRule[DELETE regra<br/>scoped por igreja]
+    DeleteRule --> ReloadData
+    ConfirmDelete -->|Não| DisplayCards
+
+    ReloadData[Recarregar Dados<br/>scoped por igreja] --> DisplayCards
+
+    style AdminStart fill:#e1f5ff
+    style LoadData fill:#fff4e1
+    style DisplayCards fill:#e1ffe1
+    style AdminAction fill:#fff9e1
+    style CreateRule fill:#ffe1f5
+    style UpdateChannel fill:#ffe1f5
+    style DeleteRule fill:#ffe1e1
+    style GetIgrejaContext fill:#e1f5ff

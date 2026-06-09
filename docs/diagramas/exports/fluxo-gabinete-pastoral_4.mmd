@@ -1,0 +1,30 @@
+graph TB
+    subgraph "Origem: Sentimentos"
+        SentInsert["INSERT em<br/>sentimentos_membros"]
+        SentTrigger["Trigger:<br/>analise-sentimento-ia"]
+        SentInsert --> SentTrigger
+    end
+    
+    subgraph "Origem: Pedidos de Oração"
+        PedInsert["INSERT em<br/>pedidos_oracao"]
+        PedTrigger["Trigger:<br/>analise-pedido-ia"]
+        PedInsert --> PedTrigger
+    end
+    
+    subgraph "Gabinete Digital"
+        Attend["atendimentos_pastorais<br/>criado com status=PENDENTE<br/>gravidade, origem, etc"]
+    end
+    
+    subgraph "Notificações"
+        NotifTrigger["Trigger:<br/>INSERT em atendimentos_pastorais<br/>se gravidade >= ALTA"]
+        DispatchAlert["disparar-alerta<br/>resolve destinatário<br/>envia WhatsApp/In-App"]
+    end
+    
+    SentTrigger -->|Se gravidade >= MEDIA| Attend
+    PedTrigger -->|Se gravidade >= MEDIA| Attend
+    
+    Attend --> NotifTrigger
+    NotifTrigger --> DispatchAlert
+    
+    style Attend fill:#fff3cd
+    style DispatchAlert fill:#ffe6e6

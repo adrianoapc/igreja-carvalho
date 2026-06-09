@@ -1,0 +1,21 @@
+sequenceDiagram
+    actor Admin as Super Admin
+    participant Page as Igrejas.tsx
+    participant Supabase as Supabase
+    participant RLS as RLS Policies
+
+    Admin->>Page: Acessa /superadmin/igrejas
+    Page->>Supabase: SELECT * FROM igrejas
+    Supabase->>RLS: Verifica super_admin role
+    RLS-->>Supabase: Acesso permitido (global)
+    Supabase-->>Page: Lista de igrejas
+    Page-->>Admin: Exibe tabela
+
+    Admin->>Page: Busca por nome
+    Page->>Supabase: SELECT WHERE nome ILIKE '%termo%'
+    Supabase-->>Page: Resultados filtrados
+    
+    Admin->>Page: Altera status da igreja
+    Page->>Supabase: UPDATE igrejas SET status = 'ativo'
+    Supabase-->>Page: Confirmação
+    Page-->>Admin: Toast de sucesso

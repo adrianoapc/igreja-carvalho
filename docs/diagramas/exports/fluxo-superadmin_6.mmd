@@ -1,0 +1,19 @@
+flowchart TD
+    Request([Request para /superadmin/*]) --> CheckAuth{Usuário<br/>Autenticado?}
+    
+    CheckAuth -->|Não| RedirectLogin([Redireciona /auth])
+    CheckAuth -->|Sim| CheckRole{Tem Role<br/>super_admin?}
+    
+    CheckRole -->|Não| RedirectHome([Redireciona /])
+    CheckRole -->|Sim| RenderPage[Renderiza Página<br/>Super Admin]
+    
+    subgraph "Validação de Role"
+        Query[SELECT * FROM user_roles<br/>WHERE user_id = ?<br/>AND role = 'super_admin']
+    end
+    
+    CheckRole --> Query
+    
+    style Request fill:#e1f5ff
+    style RedirectLogin fill:#ffe1e1
+    style RedirectHome fill:#ffe1e1
+    style RenderPage fill:#e1ffe1

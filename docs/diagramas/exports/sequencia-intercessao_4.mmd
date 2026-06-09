@@ -1,0 +1,33 @@
+sequenceDiagram
+    actor Membro as Membro (Frontend)
+    participant Notif as Notificação Push (9h)
+    participant Dialog as Dialog: RegistrarSentimentoDialog
+    participant TQ as TanStack Query
+    participant Supa as Supabase Client
+    participant DB as Postgres
+    
+    Notif-->>Membro: Notificação às 9h: "Como você está?"
+    Membro->>Notif: Clica na notificação
+    Notif->>Dialog: Abre dialog de registro
+    
+    Dialog->>Dialog: Exibe opções (radio buttons/emojis)
+    Membro->>Dialog: Seleciona "Feliz" + clica "Registrar"
+    
+    Dialog->>TQ: Mutation: INSERT into sentimentos_membros
+    TQ->>Supa: POST /rest/v1/sentimentos_membros { pessoa_id, sentimento='feliz', ... }
+    Supa->>DB: INSERT sentimento
+    DB-->>Supa: Retorna sentimento com id, data_registro
+    Supa-->>TQ: { id, pessoa_id, sentimento, ... }
+    TQ-->>Dialog: Sucesso ✓
+    
+    Dialog->>Dialog: Analisa sentimento (if positivo)
+    Dialog->>Dialog: Exibe sugestão: "Compartilhar Testemunho?"
+    Dialog->>Dialog: Renderiza botão com link para `/intercessao/testemunhos?novo=true`
+    
+    Membro->>Dialog: Clica em "Sim, compartilhar"
+    Dialog->>Dialog: Navega para novo testemunho
+    Dialog-->>Membro: Novo diálogo: NovoTestemunhoDialog (pré-populado se possível)
+    
+    Note over Membro,DB: RLS valida: pessoa_id = auth.uid() para INSERT
+    Note over Membro,DB: Redirecionamento inteligente: lógica frontend
+    Note over Membro,DB: Sistema NÃO bloqueia, apenas sugere ação

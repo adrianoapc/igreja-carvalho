@@ -1,0 +1,22 @@
+sequenceDiagram
+    actor Membro as Membro (Frontend)
+    participant Dialog as Dialog: NovoPedidoDialog
+    participant TQ as TanStack Query
+    participant Supa as Supabase Client
+    participant DB as Postgres: pedidos_oracao
+    
+    Membro->>Dialog: Preenche formulário (pedido, tipo, anônimo)
+    Membro->>Dialog: Clica "Enviar"
+    
+    Dialog->>TQ: Mutation: INSERT into pedidos_oracao
+    TQ->>Supa: POST /rest/v1/pedidos_oracao (POST)
+    Supa->>DB: INSERT pedido com status='pendente'
+    
+    DB-->>Supa: Retorna pedido com id, data_criacao
+    Supa-->>TQ: { id, pedido, tipo, status, pessoa_id, ... }
+    TQ-->>Dialog: Sucesso ✓
+    
+    Dialog->>Dialog: Exibe feedback: "Pedido enviado com sucesso"
+    Dialog-->>Membro: Fecha dialog + refetch listagem
+    
+    Note over Membro,DB: RLS valida: membro_id = auth.uid() ou pessoa_id = auth.uid()

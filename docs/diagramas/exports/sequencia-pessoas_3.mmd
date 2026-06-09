@@ -1,0 +1,19 @@
+sequenceDiagram
+    participant U as Participante
+    participant FE as Checkin.tsx
+    participant SO as Edge: send-otp
+    participant VO as Edge: verify-otp
+    participant CE as Edge: checkin-evento
+    participant WA as WhatsApp (Meta API)
+
+    U->>FE: Escaneia QR Code do evento
+    U->>FE: Digita telefone
+    FE->>SO: { telefone, igreja_id }
+    SO->>WA: Envia código OTP (hash SHA-256 no banco)
+    WA-->>U: Mensagem WhatsApp com código
+    U->>FE: Digita código de 6 dígitos
+    FE->>VO: { telefone, codigo }
+    VO-->>FE: { success, profile_id }
+    FE->>CE: { tipo, evento_id, profile_id }
+    CE-->>FE: { success, nome }
+    FE-->>U: "Presença Confirmada!" (nome mascarado)

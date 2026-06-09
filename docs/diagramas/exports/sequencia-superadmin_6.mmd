@@ -1,0 +1,22 @@
+sequenceDiagram
+    actor Admin as Super Admin
+    participant SALayout as SuperAdminLayout
+    participant MainLayout as MainLayout
+    participant Indicator as SuperAdminIndicator
+    participant Router as React Router
+
+    Note over Admin,Router: Do Portal SaaS para o App
+    
+    Admin->>SALayout: Visualiza header
+    SALayout-->>Admin: Mostra botão "Ir para App Igreja"
+    Admin->>SALayout: Click no botão
+    SALayout->>Router: navigate('/')
+    Router-->>MainLayout: Renderiza App normal
+    
+    Note over Admin,Router: Do App para o Portal SaaS
+    
+    MainLayout->>Indicator: Renderiza (se super_admin)
+    Indicator-->>Admin: Mostra Shield icon
+    Admin->>Indicator: Click no ícone
+    Indicator->>Router: navigate('/superadmin')
+    Router-->>SALayout: Renderiza Portal SaaS

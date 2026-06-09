@@ -1,0 +1,20 @@
+flowchart LR
+    subgraph "Super Admin Layout"
+        Header1[Header com Shield Icon]
+        Nav1[Dashboard | Igrejas | Métricas | Billing | Config]
+        BtnApp[Botão: Ir para App Igreja]
+    end
+    
+    subgraph "Main Layout (App)"
+        Header2[Header Normal]
+        Nav2[Dashboard | Módulos...]
+        IndicatorSA[Shield Icon<br/>para Super Admins]
+    end
+    
+    BtnApp --> |Click| Header2
+    IndicatorSA --> |Click| Header1
+    
+    style Header1 fill:#f5e1ff
+    style Header2 fill:#e1ffe1
+    style BtnApp fill:#fff4e1
+    style IndicatorSA fill:#fff4e1

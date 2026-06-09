@@ -1,0 +1,61 @@
+flowchart TD
+    Start([Evento Ocorre no Sistema]) --> GetContext[Obter Contexto<br/>igreja_id do evento]
+
+    GetContext --> CheckEvent{Evento<br/>Cadastrado<br/>para esta igreja?}
+
+    CheckEvent -->|Não| End1([Ignora])
+    CheckEvent -->|Sim| GetRules[Buscar Regras Ativas<br/>notificacao_regras<br/>WHERE igreja_id = ?]
+
+    GetRules --> HasRules{Regras<br/>Encontradas?}
+
+    HasRules -->|Não| End2([Nenhuma Notificação])
+    HasRules -->|Sim| ResolveRecipients[Resolver Destinatários<br/>por Role ou User ID<br/>na mesma igreja]
+
+    ResolveRecipients --> FormatTemplate[Formatar Mensagem<br/>Substituir Variáveis]
+
+    FormatTemplate --> DeliveryLoop{Para cada<br/>Destinatário}
+
+    DeliveryLoop --> CheckChannels{Canais<br/>Ativos?}
+
+    CheckChannels --> InApp{In-App<br/>Ativo?}
+    InApp -->|Sim| InsertNotification[INSERT em<br/>notifications<br/>tabela<br/>igreja_id scoped]
+    InsertNotification --> RealtimeSync[Realtime Sync<br/>Supabase]
+    RealtimeSync --> UpdateBell[Atualizar Sininho<br/>no Frontend]
+
+    CheckChannels --> Push{Push<br/>Ativo?}
+    Push -->|Sim| SendPush[Enviar Push<br/>via Browser API]
+    SendPush --> ShowBrowserNotif[Exibir Notificação<br/>no Navegador/Celular]
+
+    CheckChannels --> WhatsApp{WhatsApp<br/>Ativo?}
+    WhatsApp -->|Sim| CheckProvider{Provider?}
+    CheckProvider -->|meta_direto| MetaAPI[Enviar via<br/>Meta API]
+    CheckProvider -->|make| MakeWebhook[Enviar via<br/>Make Webhook<br/>scoped por igreja]
+
+    InApp -->|Não| SkipInApp[Pular In-App]
+    Push -->|Não| SkipPush[Pular Push]
+    WhatsApp -->|Não| SkipWhatsApp[Pular WhatsApp]
+
+    UpdateBell --> NextRecipient
+    ShowBrowserNotif --> NextRecipient
+    MetaAPI --> NextRecipient
+    MakeWebhook --> NextRecipient
+    SkipInApp --> NextRecipient
+    SkipPush --> NextRecipient
+    SkipWhatsApp --> NextRecipient
+
+    NextRecipient{Mais<br/>Destinatários?}
+    NextRecipient -->|Sim| DeliveryLoop
+    NextRecipient -->|Não| End3([Fim: Notificações Disparadas])
+
+    style Start fill:#e1f5ff
+    style End1 fill:#ffe1e1
+    style End2 fill:#fff4e1
+    style End3 fill:#e1ffe1
+    style CheckEvent fill:#fff9e1
+    style HasRules fill:#fff9e1
+    style CheckChannels fill:#f0e1ff
+    style InApp fill:#f0e1ff
+    style Push fill:#f0e1ff
+    style WhatsApp fill:#f0e1ff
+    style CheckProvider fill:#f0e1ff
+    style GetContext fill:#e1f5ff

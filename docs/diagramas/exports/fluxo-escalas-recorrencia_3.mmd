@@ -1,0 +1,41 @@
+stateDiagram-v2
+    [*] --> SheetAberto: Clique em slot vazio
+
+    SheetAberto --> Preenchendo: Sheet renderiza
+
+    Preenchendo --> ValidandoVoluntario: Usuário seleciona voluntário
+    ValidandoVoluntario --> ValidandoHorario: Nome confirmado
+
+    ValidandoHorario --> SelecionandoRecorrencia: Horário definido
+
+    SelecionandoRecorrencia --> CalculandoDatas: Recorrência escolhida
+
+    CalculandoDatas --> VerificandoConflitos: Array de datas gerado
+
+    VerificandoConflitos --> SemConflito: Sem conflitos
+    VerificandoConflitos --> ComConflito: Conflitos encontrados
+
+    SemConflito --> ExibindoPreview: Preview sem aviso
+    ComConflito --> ExibindoAviso: Exibe conflitos
+
+    ExibindoAviso --> AguardandoAcao: Usuário decide
+    AguardandoAcao --> Cancelando: Clique "Cancelar"
+    AguardandoAcao --> FiltrandomDatas: Clique "Continuar"
+
+    ExibindoPreview --> Inserindo: Clique "Adicionar"
+    FiltrandomDatas --> Inserindo: Datas filtradas
+
+    Inserindo --> InseridoSucesso: INSERT sucesso
+    Inserindo --> ErroInsert: INSERT falhou
+
+    InseridoSucesso --> AtualizandoTimeline: Toast exibida
+    AtualizandoTimeline --> [*]
+
+    Cancelando --> [*]
+    ErroInsert --> [*]
+
+    style SemConflito fill:#c8e6c9
+    style InseridoSucesso fill:#c8e6c9
+    style Cancelando fill:#ffcdd2
+    style ComConflito fill:#fff3e0
+    style ExibindoAviso fill:#fff3e0

@@ -1,0 +1,25 @@
+flowchart TD
+    Start([Líder de Intercessão]) -->|Acessa Módulo de Equipes| A[Times - Lista de Ministérios]
+    A -->|Seleciona 'Intercessão'| B[Gerenciar Time - Dialog]
+    B -->|Aba 'Membros'| C[Adicionar Membro ao Time]
+    
+    C -->|Busca pessoa na lista| D["Pessoa adicionada em membros_time"]
+    
+    D -->|Trigger detecta Time 'Intercessão'| E["Trigger: sync_membro_intercessor()"]
+    E -->|Busca dados do perfil| F["Se user_id existe"]
+    F -->|Sim| G["Insere/Reativa em intercessores<br/>ativo=true, max_pedidos=10"]
+    F -->|Não| H["Não sincroniza<br/>(apenas membros com login)"]
+    
+    G -->|Sistema inicia Alocação Automática| I[Balancear Pedidos]
+    I -->|Distribui pendentes respeitando max_pedidos| J["Pedidos alocados aos intercessores"]
+    
+    J -->|Admin pode ajustar na tela de Intercessão| K[Editar/Inativar Intercessor]
+    K -->|Inativa| L["Intercessor: ativo=false<br/>não recebe novos pedidos"]
+    
+    K -->|Ativa| M["Intercessor: ativo=true<br/>volta a receber pedidos"]
+    
+    style D fill:#fff3cd
+    style G fill:#d4edda
+    style J fill:#d1ecf1
+    style L fill:#f8d7da
+    style M fill:#d4edda

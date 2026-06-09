@@ -1,0 +1,32 @@
+sequenceDiagram
+    participant Admin
+    participant UI as Frontend<br/>LiturgiaWorkspace
+    participant DB as Supabase<br/>PostgreSQL
+    participant Trigger as Triggers
+    
+    Admin->>UI: Atribui "Pastor João"<br/>para "Pregação"
+    UI->>DB: UPDATE liturgia_culto<br/>SET responsavel_id = 'uuid-joao'
+    
+    DB->>Trigger: AFTER UPDATE<br/>sync_liturgia_responsavel_to_escala()
+    
+    Trigger->>DB: SELECT id FROM times_culto<br/>WHERE nome = 'Liturgia'
+    DB-->>Trigger: time_id = 'uuid-liturgia'
+    
+    Trigger->>DB: SELECT id FROM escalas_culto<br/>WHERE pessoa_id = 'uuid-joao'<br/>AND culto_id = 'uuid-culto'
+    DB-->>Trigger: (não encontrado)
+    
+    Trigger->>DB: INSERT escalas_culto<br/>(culto_id, pessoa_id, time_id,<br/>observacoes='Liturgia: Pregação',<br/>status_confirmacao='confirmado')
+    
+    Note over DB: Pastor João agora<br/>aparece na aba Escalas
+    
+    Admin->>UI: Atribui "Pastor João"<br/>para "Avisos"
+    UI->>DB: UPDATE liturgia_culto<br/>SET responsavel_id = 'uuid-joao'
+    
+    DB->>Trigger: AFTER UPDATE<br/>sync_liturgia_responsavel_to_escala()
+    
+    Trigger->>DB: SELECT id FROM escalas_culto<br/>WHERE pessoa_id = 'uuid-joao'
+    DB-->>Trigger: escala_id = 'uuid-escala'
+    
+    Trigger->>DB: UPDATE escalas_culto<br/>SET observacoes = obs + ' | Liturgia: Avisos'<br/>WHERE NOT EXISTS tag
+    
+    Note over DB: Observações agora:<br/>'Liturgia: Pregação | Liturgia: Avisos'

@@ -1,0 +1,26 @@
+flowchart LR
+    Input["Contexto<br/>(sentimento, pedido,<br/>ou texto)"]
+    
+    Input --> AI["IA Lovable Gemini<br/>Analisa"]
+    
+    AI --> Baixa["<b>BAIXA</b><br/>Dúvida simples,<br/>curiosidade,<br/>gratidão"]
+    
+    AI --> Media["<b>MÉDIA</b><br/>Necessidade de<br/>orientação,<br/>dificuldade<br/>pontual"]
+    
+    AI --> Alta["<b>ALTA</b><br/>Crise emocional,<br/>luto, separação,<br/>decisão importante"]
+    
+    AI --> Critica["<b>CRÍTICA</b><br/>Risco de vida,<br/>suicídio, abuso,<br/>situação urgente"]
+    
+    Baixa --> NoGab["Sem atendimento<br/>pastoral<br/>(fica em sentimentos<br/>ou pedidos)"]
+    
+    Media --> CreateGab["Cria em<br/>atendimentos_pastorais<br/>com gravidade=MEDIA"]
+    
+    Alta --> CreateGab
+    Critica --> CreateGab
+    
+    CreateGab --> Notify["Notificação<br/>imediata"]
+    
+    style Critica fill:#ffe6e6
+    style Alta fill:#fff3cd
+    style Media fill:#d1ecf1
+    style Baixa fill:#d4edda

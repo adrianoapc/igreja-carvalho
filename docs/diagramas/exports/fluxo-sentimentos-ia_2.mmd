@@ -1,0 +1,15 @@
+flowchart LR
+    Input[Sentimento +<br/>Mensagem] --> AI{Lovable AI<br/>Gemini 2.5 Flash}
+    
+    AI --> Titulo[Título<br/>3-5 palavras]
+    AI --> Motivo[Motivo Raiz:<br/>Saúde, Família,<br/>Financeiro, Luto,<br/>Relacionamento, etc.]
+    AI --> Gravidade[Gravidade:<br/>baixa, media, critica]
+    AI --> Resposta[Mensagem<br/>Pastoral 3 frases]
+    
+    Titulo --> DB[(sentimentos_membros)]
+    Motivo --> DB
+    Gravidade --> DB
+    Resposta --> DB
+    
+    style AI fill:#f5e1ff
+    style DB fill:#e1f5ff

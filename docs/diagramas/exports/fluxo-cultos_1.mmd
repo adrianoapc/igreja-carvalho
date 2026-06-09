@@ -1,0 +1,36 @@
+flowchart TD
+    subgraph Admin
+        GC[Agenda/Geral]
+        NC[Novo Culto/Evento]
+        MC[Mesa de Controle]
+        AL[Liturgia: Adicionar Itens]
+        AR[Recursos: Vincular Mídias]
+        AT[Templates: Aplicar/Salvar]
+        GT[Times/Posições]
+        GE[Escalas: Alocar Voluntários]
+        GM[Gerenciar Mídias]
+    end
+
+    subgraph Projeção
+        TL[TELÃO Comunicados /telao]
+        TLL[TELÃO Liturgia /telao-liturgia/:id]
+    end
+
+    GC --> NC --> MC
+    MC --> AL --> AR
+    MC --> AT
+    GC --> GT --> GE
+    GC --> GM
+
+    AR -->|Recursos prontos| TLL
+    GM -->|Comunicados ativos| TL
+
+    %% Telão Comunicados
+    TL -->|Fonte: comunicados.ativo & exibir_telao\nordem_telao, janelas inicio/fim| TL
+
+    %% Telão Liturgia
+    TLL -->|Fonte: cultos → liturgia_culto → liturgia_recursos → midias| TLL
+    TLL -->|Realtime: atualiza playlist ao editar liturgia/recursos| TLL
+
+    classDef proj fill:#0f172a,stroke:#334155,stroke-width:1px,color:#f8fafc;
+    class TL,TLL proj;

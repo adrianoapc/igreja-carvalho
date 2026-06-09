@@ -1,0 +1,34 @@
+sequenceDiagram
+    actor Admin as Admin (Frontend)
+    participant Dialog as Dialog: PedidoDetailsDialog
+    participant TQ as TanStack Query
+    participant Supa as Supabase Client
+    participant DB as Postgres
+    
+    Admin->>Dialog: Abre detalhes de pedido pendente
+    
+    Dialog->>TQ: Query: SELECT * FROM pedidos_oracao WHERE id = ?
+    TQ->>Supa: GET /rest/v1/pedidos_oracao?id=eq.{id}
+    Supa->>DB: SELECT com RLS (admin vê todos)
+    DB-->>Supa: Retorna pedido completo
+    Supa-->>TQ: Dados do pedido
+    TQ-->>Dialog: Renderiza detalhes + dropdown de intercessores
+    
+    Dialog->>TQ: Query: SELECT * FROM intercessores WHERE ativo=true
+    TQ->>Supa: GET /rest/v1/intercessores?ativo=eq.true
+    Supa-->>TQ: Lista de intercessores com carga atual
+    TQ-->>Dialog: Popula dropdown ordenado por carga
+    
+    Admin->>Dialog: Seleciona intercessor + clica "Alocar"
+    
+    Dialog->>TQ: Mutation: UPDATE pedidos_oracao SET intercessor_id=?, status='alocado', data_alocacao=now()
+    TQ->>Supa: PATCH /rest/v1/pedidos_oracao
+    Supa->>DB: UPDATE status, intercessor_id, data_alocacao
+    DB-->>Supa: Retorna pedido atualizado
+    Supa-->>TQ: { status: 'alocado', intercessor_id, data_alocacao, ... }
+    TQ-->>Dialog: Sucesso ✓
+    
+    Dialog->>Dialog: Feedback: "Pedido alocado"
+    Dialog-->>Admin: Fecha + refetch listagem
+    
+    Note over Admin,DB: RLS valida: admin vê/edita tudo

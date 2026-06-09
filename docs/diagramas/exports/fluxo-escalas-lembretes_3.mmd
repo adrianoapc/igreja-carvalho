@@ -1,0 +1,9 @@
+flowchart LR
+    Input[Escala Pendente] --> Check{ultimo_aviso_em?}
+    
+    Check -->|NULL| Eligible[✅ Elegível<br/>Nunca avisado]
+    Check -->|< 24h atrás| Skip[❌ Skip<br/>Já avisado recentemente]
+    Check -->|> 24h atrás| Eligible
+    
+    style Eligible fill:#e1ffe1
+    style Skip fill:#ffe1e1

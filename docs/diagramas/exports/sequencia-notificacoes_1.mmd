@@ -1,0 +1,64 @@
+sequenceDiagram
+    participant Origem as Sistema Origem<br/>(Frontend/Backend)
+    participant EdgeFunc as Edge Function<br/>disparar-alerta
+    participant DB as Supabase DB
+    participant Realtime as Supabase Realtime
+    participant Frontend as Frontend<br/>useNotifications
+    participant Bell as NotificationBell<br/>Component
+    participant Browser as Browser<br/>Notification API
+    participant WhatsApp as WhatsApp<br/>(Meta/Make)
+    
+    Note over Origem: Evento ocorre (ex: kids_checkin)
+    
+    Origem->>+EdgeFunc: POST /disparar-alerta<br/>{evento: "kids_checkin", dados: {...}}
+    
+    EdgeFunc->>+DB: SELECT * FROM notificacao_eventos<br/>WHERE slug = 'kids_checkin'
+    DB-->>-EdgeFunc: Retorna evento config
+    
+    EdgeFunc->>+DB: SELECT * FROM notificacao_regras<br/>WHERE evento_slug = 'kids_checkin'<br/>AND ativo = true
+    DB-->>-EdgeFunc: Retorna regras ativas
+    
+    Note over EdgeFunc: Resolver destinatários<br/>por role (ex: admin)
+    
+    EdgeFunc->>+DB: SELECT * FROM user_roles<br/>WHERE role = 'admin'
+    DB-->>-EdgeFunc: Lista de user_ids
+    
+    EdgeFunc->>+DB: SELECT * FROM profiles<br/>WHERE id IN (...)
+    DB-->>-EdgeFunc: Dados dos destinatários<br/>(nome, email, telefone)
+    
+    Note over EdgeFunc: Formatar template<br/>substituir {{variáveis}}
+    
+    loop Para cada destinatário
+        
+        alt Canal In-App Ativo
+            EdgeFunc->>+DB: INSERT INTO notifications<br/>(user_id, title, message, type, read)
+            DB-->>-EdgeFunc: Notificação criada
+            
+            DB->>+Realtime: Novo registro em notifications
+            Realtime->>+Frontend: Realtime event (INSERT)
+            Frontend->>Frontend: Adiciona ao estado local
+            Frontend->>Bell: Atualiza unreadCount
+            Bell->>Bell: Exibe badge vermelho
+        end
+        
+        alt Canal Push Ativo
+            EdgeFunc->>Frontend: (Via Realtime metadata)
+            Frontend->>+Browser: new Notification(title, body)
+            Browser-->>-Frontend: Notificação exibida
+        end
+        
+        alt Canal WhatsApp Ativo
+            alt Provider: meta_direto
+                EdgeFunc->>+WhatsApp: POST Meta API<br/>{to: phone, message: text}
+                WhatsApp-->>-EdgeFunc: Success/Error
+            else Provider: make
+                EdgeFunc->>+WhatsApp: POST Make Webhook<br/>{phone, message}
+                WhatsApp-->>-EdgeFunc: Success/Error
+            end
+        end
+        
+    end
+    
+    EdgeFunc-->>-Origem: Response {success: true, enviadas: N}
+    
+    Note over Bell: Notificação visível no sininho

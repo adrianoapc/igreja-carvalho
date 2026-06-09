@@ -1,0 +1,77 @@
+flowchart TD
+    subgraph Admin
+        AJ[Abrir Jornadas]
+        CJ[Criar/Editar Jornada]
+        TJ{Tipo Jornada?}
+        AE[Criar/Editar Etapas]
+        CE{Tipo Etapa?}
+        EC[Editor de Conteúdo]
+        CQ[Configurar Quiz]
+        CV[Adicionar Vídeo/URL]
+        CT[Adicionar Texto]
+        MI[Matricular aluno]
+        AA[Agendar Aula]
+        RS[Registrar presença manual]
+    end
+
+    subgraph Aluno
+        VA[Ver cursos disponíveis]
+        IN[Inscrever-se]
+        PL[Acessar Player]
+        ET{Tipo Etapa?}
+        VV[Assistir Vídeo]
+        LT[Ler Texto]
+        RQ[Responder Quiz]
+        RT[Realizar Tarefa]
+        PR[Participar Reunião]
+        CA{Check Automático?}
+        MA[Marcar etapa concluída]
+        AV[Avança automaticamente]
+    end
+
+    AJ --> CJ --> TJ
+    TJ -->|auto_instrucional| AE
+    TJ -->|processo_acompanhado| MI
+    TJ -->|hibrido| AE
+    
+    AE --> CE
+    CE -->|quiz| EC --> CQ --> MI
+    CE -->|video| EC --> CV --> MI
+    CE -->|texto| EC --> CT --> MI
+    CE -->|tarefa/reuniao| EC --> MI
+    
+    MI --> VA
+    VA --> IN
+
+    IN -->|Curso pago| TF[Cria transação financeira pendente]
+    IN -->|Curso grátis| INS[Inscrição ativa]
+
+    TF --> INS
+
+    AA --> RS
+    RS --> PL
+
+    INS -->|status_pagamento = pago ou isento| PL
+    INS -->|status_pagamento = pendente| BLK[Player bloqueado]
+    BLK -->|pagamento confirmado| PL
+
+    PL --> ET
+    ET -->|video| VV --> CA
+    ET -->|texto| LT --> CA
+    ET -->|quiz| RQ --> NM{Nota >= mínima?}
+    ET -->|tarefa| RT --> CA
+    ET -->|reuniao| PR --> CA
+    
+    NM -->|Sim| CA
+    NM -->|Não| RQ
+    
+    CA -->|Sim| AV --> FC{100% das etapas?}
+    FC -->|Sim| BC[Baixar certificado PDF]
+    FC -->|Não| PL
+    CA -->|Não| MA --> PL
+
+    %% Estilos
+    classDef blocked fill:#ffebee,stroke:#c62828,stroke-width:2px;
+    classDef quiz fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
+    class BLK blocked;
+    class RQ,CQ,NM quiz;

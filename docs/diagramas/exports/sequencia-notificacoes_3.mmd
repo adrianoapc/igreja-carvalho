@@ -1,0 +1,89 @@
+sequenceDiagram
+    participant User as Usuário Logado
+    participant Bell as NotificationBell
+    participant Hook as useNotifications
+    participant Supabase as Supabase Client
+    participant DB as Supabase DB
+    participant Realtime as Supabase Realtime
+    participant Router as React Router
+    
+    Note over User: Usuário está navegando no app
+    
+    User->>+Hook: Hook inicializa ao login
+    
+    Hook->>+Supabase: SELECT * FROM notifications<br/>WHERE user_id = auth.uid()<br/>ORDER BY created_at DESC<br/>LIMIT 50
+    Supabase->>+DB: Query notificações
+    DB-->>-Supabase: Lista de notificações
+    Supabase-->>-Hook: Dados iniciais
+    
+    Hook->>Hook: Atualiza estado:<br/>notifications array,<br/>unreadCount
+    
+    Hook->>+Realtime: Channel subscribe<br/>notifications:user_id=eq.{uid}
+    Realtime-->>-Hook: Subscrição ativa
+    
+    Hook->>Bell: Passa notifications + unreadCount
+    Bell->>Bell: Exibe badge se unreadCount > 0
+    
+    Note over DB: Nova notificação inserida<br/>por Edge Function
+    
+    DB->>+Realtime: INSERT event<br/>notifications table
+    Realtime->>+Hook: Evento realtime (INSERT)
+    Hook->>Hook: Adiciona ao estado local<br/>unreadCount++
+    Hook->>Bell: Atualiza props
+    Bell->>Bell: Badge vermelho pisca<br/>(animate-in zoom-in)
+    
+    Note over User: Usuário clica no sininho
+    
+    User->>+Bell: onClick sininho
+    Bell->>Bell: Abre Popover<br/>renderiza lista
+    
+    Bell->>User: Exibe notificações<br/>(não lidas no topo)
+    
+    Note over User: Usuário clica em uma notificação
+    
+    User->>+Bell: onClick notificação
+    
+    Bell->>+Hook: markAsRead(notification.id)
+    Hook->>+Supabase: UPDATE notifications<br/>SET read = true<br/>WHERE id = notification.id
+    Supabase->>+DB: UPDATE registro
+    DB-->>-Supabase: Registro atualizado
+    Supabase-->>-Hook: Sucesso
+    
+    Hook->>Hook: Atualiza estado local<br/>unreadCount--
+    Hook->>Bell: Atualiza props
+    Bell->>Bell: Remove bolinha azul<br/>acinzenta notificação
+    
+    Bell->>+Router: navigate(deepLink)<br/>ex: /kids/dashboard
+    Router-->>-Bell: Navegação realizada
+    
+    Bell->>User: Tela de destino exibida
+    
+    Note over User: Usuário clica "Limpar"
+    
+    User->>+Bell: onClick "Limpar"
+    Bell->>+Hook: markAllAsRead()
+    
+    Hook->>+Supabase: UPDATE notifications<br/>SET read = true<br/>WHERE user_id = auth.uid()<br/>AND read = false
+    Supabase->>+DB: UPDATE múltiplos registros
+    DB-->>-Supabase: Registros atualizados
+    Supabase-->>-Hook: Sucesso
+    
+    Hook->>Hook: Atualiza estado local<br/>unreadCount = 0
+    Hook->>Bell: Atualiza props
+    Bell->>Bell: Remove badge<br/>acinzenta todas
+    
+    Note over User: Usuário clica lixeira em notificação
+    
+    User->>+Bell: onClick lixeira
+    Bell->>+Hook: deleteNotification(id)
+    
+    Hook->>+Supabase: DELETE FROM notifications<br/>WHERE id = notification.id
+    Supabase->>+DB: DELETE registro
+    DB-->>-Supabase: Registro removido
+    Supabase-->>-Hook: Sucesso
+    
+    Hook->>Hook: Remove do estado local
+    Hook->>Bell: Atualiza props
+    Bell->>Bell: Remove da lista visual
+    
+    Bell-->>-User: Notificação desaparece

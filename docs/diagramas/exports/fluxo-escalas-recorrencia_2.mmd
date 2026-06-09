@@ -1,0 +1,41 @@
+sequenceDiagram
+    participant UI as UI (Sheet)
+    participant FE as Frontend<br/>(Cálculo)
+    participant SB as Supabase<br/>(Query)
+    participant DB as PostgreSQL
+
+    UI->>FE: Clique em "Adicionar"
+    FE->>FE: Calcula array de datas<br/>baseado em recorrência
+
+    Note over FE: Exemplo: Diária = 7 datas
+
+    FE->>SB: SELECT escalas WHERE<br/>pessoa_id = ? AND<br/>data IN (array)
+
+    SB->>DB: Executa query
+    DB-->>SB: Retorna conflitos
+    SB-->>FE: Lista de conflitos
+
+    FE->>FE: Filtra datas<br/>sem conflito
+
+    alt Sem Conflito
+        FE->>SB: INSERT escalas (array)
+        SB->>DB: Batch insert
+        DB-->>SB: ✅ N linhas inseridas
+        SB-->>FE: Success
+        FE->>UI: Toast: "N turnos criados"
+    else Com Conflito
+        FE->>UI: Exibe aviso
+        UI->>UI: Usuário escolhe
+        alt Usuário Cancela
+            Note over FE: Sem ação
+        else Usuário Continua
+            FE->>SB: INSERT escalas (datas filtradas)
+            SB->>DB: Batch insert
+            DB-->>SB: ✅ M linhas inseridas<br/>(M < N)
+            SB-->>FE: Success
+            FE->>UI: Toast: "M turnos criados<br/>(com filtro)"
+        end
+    end
+
+    FE->>UI: Recarrega Timeline
+    UI->>UI: Exibe novos slots

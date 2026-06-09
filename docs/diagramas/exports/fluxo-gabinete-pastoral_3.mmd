@@ -1,0 +1,30 @@
+flowchart TD
+    OpenCard["Pastor clica<br/>no card do<br/>atendimento"]
+    
+    OpenCard --> DrawerOpen["Drawer abre<br/>com abas"]
+    
+    DrawerOpen --> Aba1["<b>Aba: Geral</b><br/>Nome, status, gravidade<br/>data criação, líder direto"]
+    DrawerOpen --> Aba2["<b>Aba: Histórico</b><br/>Se origem=CHATBOT:<br/>Exibe conversa WhatsApp"]
+    DrawerOpen --> Aba3["<b>Aba: Notas</b><br/>Array de evolução<br/>timestamp, autor, msg"]
+    DrawerOpen --> Aba4["<b>Aba: Agendamento</b><br/>Data/hora + modalidade<br/>grava data_agendamento<br/>e local_atendimento"]
+    DrawerOpen --> Aba5["<b>Aba: Análise IA</b><br/>Resumo da IA:<br/>gravidade, motivo,<br/>resposta sugerida"]
+    
+    Aba1 --> Action1["Pastor pode editar<br/>status aqui"]
+    Aba3 --> Action2["Pastor adiciona nota<br/>de progresso"]
+    Aba4 --> Action3["Pastor marca<br/>data/hora do<br/>encontro"]
+    Aba5 --> Action4["Pastor copia<br/>resposta sugerida"]
+    
+    Action1 --> Save["Salva atendimento"]
+    Action2 --> Save
+    Action3 --> Save
+    Action4 --> Save
+    
+    Save --> Close["Drawer fecha"]
+    
+    style DrawerOpen fill:#e2e3e5
+    style Aba1 fill:#e1f5ff
+    style Aba2 fill:#e1f5ff
+    style Aba3 fill:#e1f5ff
+    style Aba4 fill:#fff9e1
+    style Aba5 fill:#f5e1ff
+    style Save fill:#d4edda

@@ -1,0 +1,37 @@
+flowchart TD
+    UserStart([Usuário Logado<br/>no Sistema]) --> SubscribeRealtime[useNotifications Hook<br/>Subscreve Realtime]
+
+    SubscribeRealtime --> WaitEvent{Nova Notificação<br/>Inserida?}
+
+    WaitEvent -->|Sim| ReceiveNotif[Recebe via<br/>Realtime Channel]
+    ReceiveNotif --> UpdateState[Atualiza Estado<br/>notifications array]
+    UpdateState --> UpdateBadge[Atualiza Badge<br/>unreadCount++]
+    UpdateBadge --> CheckPushPref{Push<br/>Habilitado?}
+
+    CheckPushPref -->|Sim| ShowPush[Exibir Push<br/>no Navegador]
+    CheckPushPref -->|Não| SkipPush[Apenas In-App]
+
+    ShowPush --> WaitEvent
+    SkipPush --> WaitEvent
+
+    WaitEvent -->|Usuário Clica Sininho| OpenPopover[Abrir Popover<br/>Lista de Notificações]
+
+    OpenPopover --> UserInteraction{Interação}
+
+    UserInteraction -->|Clica Notificação| MarkRead[UPDATE read = true]
+    MarkRead --> Redirect[Redirecionar<br/>Deep Link]
+    Redirect --> WaitEvent
+
+    UserInteraction -->|Clica 'Limpar'| MarkAllRead[UPDATE all<br/>read = true]
+    MarkAllRead --> ClearBadge[unreadCount = 0]
+    ClearBadge --> WaitEvent
+
+    UserInteraction -->|Clica Lixeira| DeleteNotif[DELETE notificação]
+    DeleteNotif --> WaitEvent
+
+    style UserStart fill:#e1f5ff
+    style SubscribeRealtime fill:#fff4e1
+    style WaitEvent fill:#fff9e1
+    style MarkRead fill:#e1ffe1
+    style MarkAllRead fill:#e1ffe1
+    style DeleteNotif fill:#ffe1e1

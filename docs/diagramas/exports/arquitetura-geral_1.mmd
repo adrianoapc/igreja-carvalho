@@ -1,0 +1,28 @@
+flowchart TD
+    subgraph "Sistema Multi-tenant"
+        subgraph "Igreja A (igreja_id: 1)"
+            FrontendA[Frontend React]
+            ModulosA[Módulos: Pessoas, Eventos, etc.]
+            SupabaseA[(Supabase - Dados Igreja A)]
+        end
+
+        subgraph "Igreja B (igreja_id: 2)"
+            FrontendB[Frontend React]
+            ModulosB[Módulos: Pessoas, Eventos, etc.]
+            SupabaseB[(Supabase - Dados Igreja B)]
+        end
+
+        subgraph "Super Admin (igreja_id: null)"
+            SuperAdmin[Super Admin Dashboard<br/>/superadmin]
+            SupabaseGlobal[(Supabase Global<br/>igrejas, onboarding)]
+        end
+    end
+
+    FrontendA --> ModulosA
+    ModulosA --> SupabaseA
+    FrontendB --> ModulosB
+    ModulosB --> SupabaseB
+    SuperAdmin --> SupabaseGlobal
+
+    SupabaseA -.->|RLS Policies| SupabaseA
+    SupabaseB -.->|RLS Policies| SupabaseB

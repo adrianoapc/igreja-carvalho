@@ -1,0 +1,39 @@
+sequenceDiagram
+    actor Admin as Admin (Frontend)
+    participant List as Listagem: /intercessao/testemunhos
+    participant Dialog as Dialog: TestemunhoDetailsDialog
+    participant TQ as TanStack Query
+    participant Supa as Supabase Client
+    participant DB as Postgres
+    
+    Admin->>List: Acessa /intercessao/testemunhos (aba "Aberto")
+    
+    List->>TQ: Query: SELECT * FROM testemunhos WHERE status='aberto'
+    TQ->>Supa: GET /rest/v1/testemunhos?status=eq.aberto
+    Supa->>DB: SELECT com RLS (Admin vê tudo)
+    DB-->>Supa: Retorna testemunhos em submissão
+    Supa-->>TQ: Lista
+    TQ-->>List: Renderiza cards de testemunhos
+    
+    Admin->>List: Clica em testemunho
+    List->>Dialog: Abre TestemunhoDetailsDialog
+    Dialog->>Dialog: Exibe: título, categoria, corpo, autor (ou "Anônimo")
+    
+    Admin->>Dialog: Lê conteúdo + clica "Aprovar para Publicação"
+    
+    Dialog->>TQ: Mutation: UPDATE testemunhos SET status='publico', publicar=true, data_publicacao=now()
+    TQ->>Supa: PATCH /rest/v1/testemunhos
+    Supa->>DB: UPDATE status, publicar, data_publicacao
+    DB-->>Supa: Retorna testemunho atualizado
+    Supa-->>TQ: Sucesso
+    TQ-->>Dialog: Refetch
+    
+    Dialog->>Dialog: Feedback: "Testemunho publicado com sucesso"
+    Dialog-->>Admin: Fecha dialog
+    
+    List->>TQ: Query refetch: SELECT * FROM testemunhos WHERE status='publico'
+    TQ->>Supa: GET /rest/v1/testemunhos?status=eq.publico
+    Supa-->>TQ: Retorna (para exibição em dashboard carrossel)
+    
+    Note over Admin,DB: RLS valida: admin vê/edita tudo
+    Note over Admin,DB: Testemunho com status='publico' aparece em Dashboard para TODOS membros

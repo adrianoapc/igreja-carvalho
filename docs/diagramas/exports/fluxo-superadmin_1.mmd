@@ -1,0 +1,30 @@
+flowchart TD
+    subgraph "Portal Super Admin"
+        SA[Super Admin User]
+        ContextSelect[Tela de Seleção<br/>/context-select]
+        
+        subgraph "Painel SaaS /superadmin"
+            Dashboard[Dashboard<br/>KPIs Globais]
+            Igrejas[Gerenciar Igrejas]
+            Metricas[Métricas por Tenant]
+            Billing[Faturamento]
+            Config[Configurações]
+        end
+        
+        subgraph "Aplicativo Igreja /"
+            AppIgreja[App Normal<br/>como Membro]
+        end
+    end
+    
+    SA --> |Login| ContextSelect
+    ContextSelect --> |Escolhe SaaS| Dashboard
+    ContextSelect --> |Escolhe App| AppIgreja
+    
+    Dashboard --> Igrejas
+    Dashboard --> Metricas
+    Dashboard --> Billing
+    Dashboard --> Config
+    
+    style ContextSelect fill:#e1f5ff
+    style Dashboard fill:#f5e1ff
+    style AppIgreja fill:#e1ffe1

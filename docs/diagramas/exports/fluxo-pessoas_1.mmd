@@ -1,0 +1,19 @@
+flowchart TD
+    A([Inicio]) --> B[Acessar tela Pessoas]
+    B --> C[Obter igreja_id do usuário<br/>useIgrejaId()]
+    C --> D[Listar pessoas<br/>WHERE igreja_id = ?]
+    D --> E{Buscar ou filtrar?}
+    E -->|Sim| F[Aplicar filtros adicionais<br/>+ igreja_id]
+    E -->|Nao| G[Escolher proxima acao]
+    F --> G
+    G --> H{Criar ou editar?}
+    H -->|Criar| I[Navegar para /pessoas/cadastrar<br/>PessoaWizard]
+    H -->|Editar| J[Editar pessoa<br/>validar igreja_id]
+    I --> I1{Selecionar tipo}
+    I1 -->|Visitante/Frequentador| I2[Step 1: Dados básicos<br/>Step 2: Complementar<br/>Step 3: Finalizar]
+    I1 -->|Membro| I3[Step 1: Dados básicos<br/>Step 2: Dados do membro<br/>Step 3: Complementar<br/>Step 4: Finalizar]
+    I2 --> K[Salvar cadastro<br/>INSERT profiles]
+    I3 --> K
+    J --> K
+    K --> L[Recarregar/atualizar listagem<br/>scoped por igreja]
+    L --> M([Fim])

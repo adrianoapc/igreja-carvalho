@@ -1,0 +1,88 @@
+graph TD
+  Sistema[Sistema Igreja Carvalho]
+
+  Sistema --> Pessoas
+  Pessoas --> PessoasDashboard[Dashboard (/pessoas)]
+  Pessoas --> PessoasTodos[Todos (/pessoas/todos)]
+  Pessoas --> PessoasMembros[Membros (/pessoas/membros)]
+  Pessoas --> PessoasVisitantes[Visitantes (/pessoas/visitantes)]
+  Pessoas --> PessoasFrequentadores[Frequentadores (/pessoas/frequentadores)]
+  Pessoas --> PessoasContatos[Contatos (/pessoas/contatos)]
+  Pessoas --> PessoasPendentes[Alterações Pendentes (/pessoas/pendentes)]
+  Pessoas --> PessoaDetalhes[Perfil (/pessoas/:id)]
+  Pessoas --> EditarPessoa[Editar (/pessoas/:id/editar)]
+
+  Sistema --> Intercessao
+  Intercessao --> IntercessaoHub[Hub (/intercessao)]
+  Intercessao --> Diario[Diário de Oração (/intercessao/diario)]
+  Intercessao --> SalaGuerra[Sala de Guerra (/intercessao/sala-de-guerra)]
+  Intercessao --> Equipes[Gestão de Equipes (/intercessao/equipes)]
+  Intercessao --> Sentimentos[Sentimentos (/intercessao/sentimentos)]
+
+  Sistema --> Eventos
+  Eventos --> EventosGeral[Dashboard (/eventos/geral)]
+  Eventos --> EventosLista[Lista (/eventos/lista)]
+  Eventos --> EventoDetalhes[Detalhes (/eventos/:id)]
+  Eventos --> EventosTimes[Times (/eventos/times)]
+  Eventos --> EventosCategorias[Categorias (/eventos/categorias)]
+  Eventos --> EventosPosicoes[Posições (/eventos/posicoes)]
+  Eventos --> EventosTemplates[Templates (/eventos/templates)]
+  Eventos --> EventosLiturgia[Liturgia (/eventos/liturgia)]
+  Eventos --> EventosMidias[Mídias (/eventos/midias)]
+
+  Sistema --> Ensino
+  Ensino --> EnsinoDashboard[Dashboard (/ensino/dashboard)]
+  Ensino --> EnsinoGestao[/ensino]
+  Ensino --> Jornadas[Jornadas (/jornadas)]
+  Ensino --> JornadaDetalhes[Detalhes (/jornadas/:id)]
+  Ensino --> JornadaBoard[Board (/jornadas/:id/board)]
+  Ensino --> MeusCursos[Meus Cursos (/cursos)]
+  Ensino --> CursoPlayer[Curso Player (/cursos/:id)]
+  Ensino --> Ensinamentos[Ensinamentos (/ensinamentos)]
+
+  Sistema --> Kids
+  Kids --> KidsHub[/kids]
+  Kids --> KidsDashboard[/kids/dashboard]
+  Kids --> KidsCriancas[/kids/criancas]
+  Kids --> KidsScanner[/kids/scanner]
+  Kids --> KidsTurmaAtiva[/kids/turma-ativa]
+  Kids --> KidsConfig[/kids/config]
+
+  Sistema --> Financas
+  Financas --> FinancasHub[/financas]
+  Financas --> FinancasDashboard[/financas/dashboard]
+  Financas --> FinancasDashboardOfertas[/financas/dashboard-ofertas]
+  Financas --> FinancasProjecao[/financas/projecao]
+  Financas --> FinancasInsights[/financas/insights]
+  Financas --> FinancasEntradas[/financas/entradas]
+  Financas --> FinancasSaidas[/financas/saidas]
+  Financas --> FinancasContas[/financas/contas]
+  Financas --> FinancasReembolsos[/financas/reembolsos]
+  Financas --> FinancasCategorias[/financas/categorias]
+  Financas --> FinancasCentrosCusto[/financas/centros-custo]
+  Financas --> FinancasFornecedores[/financas/fornecedores]
+  Financas --> FinancasBasesMinisteriais[/financas/bases-ministeriais]
+  Financas --> FinancasFormasPagamento[/financas/formas-pagamento]
+  Financas --> FinancasDRE[/financas/dre]
+  Financas --> FinancasRelatorioOferta[/financas/relatorios/ofertas]
+
+  Sistema --> Voluntariado
+  Voluntariado --> VoluntariadoHub[/voluntariado]
+  Voluntariado --> VoluntariadoCandidatos[/voluntariado/candidatos]
+  Voluntariado --> VoluntariadoHistorico[/voluntariado/historico]
+
+  Sistema --> Comunicacao
+  Comunicacao --> Comunicados[/comunicados]
+  Comunicacao --> Mural[/mural]
+  Comunicacao --> AdminMural[/admin/mural]
+
+  Sistema --> Gabinete
+  Gabinete --> GabineteHub[/gabinete]
+  Gabinete --> GabineteAtendimento[/gabinete/atendimento/:id]
+
+  Sistema --> Admin
+  Admin --> AdminHub[/admin]
+  Admin --> AdminPermissoes[/admin/permissoes]
+  Admin --> AdminWebhooks[/admin/webhooks]
+  Admin --> AdminNotificacoes[/admin/notificacoes]
+  Admin --> AdminChatbots[/admin/chatbots]

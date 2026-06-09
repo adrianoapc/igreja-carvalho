@@ -1,0 +1,30 @@
+flowchart TD
+    Start([Super Admin Acessa<br/>/superadmin/metricas]) --> SelectIgreja[Seleciona Igreja<br/>do Dropdown]
+    
+    SelectIgreja --> LoadMetrics[Carrega Métricas<br/>WHERE igreja_id = ?]
+    
+    LoadMetrics --> ShowCards[Exibe Cards de KPIs]
+    
+    subgraph "KPIs Exibidos"
+        TotalMembros[Total de Membros]
+        TotalEventos[Eventos Realizados]
+        TotalCheckins[Check-ins]
+        TotalFinanceiro[Movimentação Financeira]
+    end
+    
+    ShowCards --> TotalMembros
+    ShowCards --> TotalEventos
+    ShowCards --> TotalCheckins
+    ShowCards --> TotalFinanceiro
+    
+    ShowCards --> RecalcAction{Recalcular?}
+    
+    RecalcAction -->|Sim| CallRPC[Chama RPC<br/>recalcular_metricas_igreja]
+    RecalcAction -->|Não| End([Fim])
+    
+    CallRPC --> UpdateMetrics[Atualiza metricas_igreja<br/>com novos valores]
+    UpdateMetrics --> LoadMetrics
+    
+    style Start fill:#e1f5ff
+    style ShowCards fill:#e1ffe1
+    style CallRPC fill:#f5e1ff

@@ -1,0 +1,34 @@
+flowchart TD
+    Start([Admin Atribui<br/>Responsável na Liturgia]) --> Trigger[Trigger<br/>sync_liturgia_responsavel_to_escala]
+    
+    Trigger --> CheckResponsavel{responsavel_id<br/>Preenchido?}
+    
+    CheckResponsavel -->|Não| End1([Ignora:<br/>Convidado Externo])
+    CheckResponsavel -->|Sim| BuildTag[Monta Tag:<br/>'Liturgia: {titulo}']
+    
+    BuildTag --> FindTime[Busca Time<br/>nome = 'Liturgia']
+    
+    FindTime --> TimeExists{Time<br/>Existe?}
+    
+    TimeExists -->|Não| End2([Ignora:<br/>Time Não Cadastrado])
+    TimeExists -->|Sim| CheckExisting[Busca escala_culto<br/>pessoa + culto]
+    
+    CheckExisting --> EscalaExists{Escala<br/>Existe?}
+    
+    EscalaExists -->|Não| InsertEscala[INSERT escalas_culto<br/>time = Liturgia<br/>status = confirmado<br/>obs = tag]
+    
+    EscalaExists -->|Sim| CheckDuplicate{Tag já<br/>existe em obs?}
+    
+    CheckDuplicate -->|Sim| End3([Ignora:<br/>Já Cadastrado])
+    CheckDuplicate -->|Não| AppendTag[UPDATE escalas_culto<br/>obs = obs + ' | ' + tag]
+    
+    InsertEscala --> End4([Fim: Escala Criada])
+    AppendTag --> End5([Fim: Tag Adicionada])
+    
+    style Start fill:#e1f5ff
+    style End1 fill:#fff4e1
+    style End2 fill:#ffe1e1
+    style End3 fill:#fff4e1
+    style End4 fill:#e1ffe1
+    style End5 fill:#e1ffe1
+    style Trigger fill:#f5e1ff

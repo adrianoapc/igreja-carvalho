@@ -1,0 +1,31 @@
+flowchart TD
+    Start([Super Admin Acessa<br/>/superadmin/igrejas]) --> LoadIgrejas[Carrega Lista de Igrejas<br/>SELECT * FROM igrejas]
+    
+    LoadIgrejas --> FilterSearch{Buscar ou<br/>Filtrar?}
+    
+    FilterSearch -->|Sim| ApplyFilter[Aplica Filtros<br/>nome, status, etc.]
+    FilterSearch -->|Não| ShowList[Exibe Lista]
+    ApplyFilter --> ShowList
+    
+    ShowList --> Action{Ação?}
+    
+    Action -->|Ver Detalhes| ExpandRow[Expande Row<br/>Mostra Filiais]
+    Action -->|Alterar Status| UpdateStatus[UPDATE igrejas<br/>SET status = ?]
+    Action -->|Ver Métricas| GoToMetricas[Navega para<br/>/superadmin/metricas?igreja=id]
+    
+    ExpandRow --> ManageFiliais{Gerenciar Filiais?}
+    ManageFiliais -->|Adicionar| AddFilial[INSERT filiais<br/>igreja_id = ?]
+    ManageFiliais -->|Editar| EditFilial[UPDATE filiais<br/>SET nome = ?]
+    ManageFiliais -->|Excluir| CheckMatriz{É Matriz?}
+    
+    CheckMatriz -->|Sim| Error([Erro: Não pode<br/>excluir Matriz])
+    CheckMatriz -->|Não| DeleteFilial[DELETE filiais<br/>WHERE id = ?]
+    
+    UpdateStatus --> ShowList
+    AddFilial --> ShowList
+    EditFilial --> ShowList
+    DeleteFilial --> ShowList
+    
+    style Start fill:#e1f5ff
+    style Error fill:#ffe1e1
+    style ShowList fill:#e1ffe1

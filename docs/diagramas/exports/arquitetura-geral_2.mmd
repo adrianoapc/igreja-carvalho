@@ -1,0 +1,20 @@
+flowchart LR
+  Frontend["Frontend (React/Vite)"]
+
+  subgraph Modulos[Frontend · Módulos Principais]
+    Pessoas[Pessoas]
+    Intercessao[Intercessão]
+    Eventos[Eventos]
+    Ensino[Ensino]
+    Kids[Kids]
+    Financas[Finanças]
+    Voluntariado[Voluntariado]
+    Comunicacao[Comunicação]
+    Gabinete[Gabinete Pastoral]
+    Admin[Admin]
+  end
+
+  Supabase["Supabase (Auth + Database + Edge Functions)"]
+
+  Frontend --> Modulos
+  Modulos --> Supabase

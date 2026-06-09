@@ -1,0 +1,7 @@
+flowchart TD
+    A([Request autenticada]) --> B[Frontend envia consulta de Pessoas]
+    B --> C[Supabase recebe JWT e contexto de perfil]
+    C --> D[Identificar role/perfil do usuario]
+    D --> E[Aplicar politicas RLS/permissionamento em tabelas de pessoas]
+    E --> F[Resultado filtrado pelo RLS]
+    F --> G[Frontend exibe apenas dados permitidos]

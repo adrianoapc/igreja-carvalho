@@ -1,0 +1,32 @@
+sequenceDiagram
+    actor Admin as Super Admin
+    participant Page as Igrejas.tsx
+    participant Manager as FilialManager.tsx
+    participant Supabase as Supabase
+
+    Admin->>Page: Expande row da igreja
+    Page->>Manager: Renderiza com igreja_id
+    Manager->>Supabase: SELECT FROM filiais<br/>WHERE igreja_id = ?
+    Supabase-->>Manager: Lista de filiais
+    
+    alt Adicionar Filial
+        Admin->>Manager: Click "Adicionar"
+        Manager->>Manager: Abre Dialog
+        Admin->>Manager: Preenche nome
+        Manager->>Supabase: INSERT INTO filiais<br/>(nome, igreja_id)
+        Supabase-->>Manager: Nova filial
+        Manager-->>Admin: Toast sucesso + Refresh
+    end
+    
+    alt Excluir Filial
+        Admin->>Manager: Click "Excluir"
+        Manager->>Manager: Verifica se é "Matriz"
+        
+        alt É Matriz
+            Manager-->>Admin: Toast erro: "Não pode excluir Matriz"
+        else Não é Matriz
+            Manager->>Supabase: DELETE FROM filiais WHERE id = ?
+            Supabase-->>Manager: Confirmação
+            Manager-->>Admin: Toast sucesso + Refresh
+        end
+    end

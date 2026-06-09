@@ -1,0 +1,34 @@
+sequenceDiagram
+    actor Intercessor as Intercessor (Frontend)
+    participant List as Listagem: /intercessao/pedidos
+    participant Dialog as Dialog: PedidoDetailsDialog
+    participant TQ as TanStack Query
+    participant Supa as Supabase Client
+    participant DB as Postgres
+    
+    Intercessor->>List: Acessa /intercessao/pedidos
+    
+    List->>TQ: Query: SELECT * FROM pedidos_oracao WHERE intercessor_id = auth.uid()
+    TQ->>Supa: GET /rest/v1/pedidos_oracao?intercessor_id=eq.{auth.uid()}
+    Supa->>DB: SELECT com RLS (Intercessor vê alocados a si)
+    DB-->>Supa: Retorna pedidos alocados
+    Supa-->>TQ: Lista de pedidos
+    TQ-->>List: Renderiza tabela
+    
+    Intercessor->>List: Clica em pedido para detalhar
+    List->>Dialog: Abre PedidoDetailsDialog
+    
+    Dialog->>Dialog: Exibe dados + campo "Observações do Intercessor"
+    Intercessor->>Dialog: Escreve observação + clica "Marcar como Em Oração"
+    
+    Dialog->>TQ: Mutation: UPDATE pedidos_oracao SET status='em_oracao', observacoes_intercessor=?
+    TQ->>Supa: PATCH /rest/v1/pedidos_oracao
+    Supa->>DB: UPDATE status, observacoes_intercessor
+    DB-->>Supa: Retorna pedido com status='em_oracao'
+    Supa-->>TQ: Sucesso
+    TQ-->>Dialog: Refetch pedido
+    
+    Dialog->>Dialog: Atualiza exibição: "Status: Em Oração"
+    Dialog-->>Intercessor: Botão agora é "Marcar como Respondido"
+    
+    Note over Intercessor,DB: RLS valida: UPDATE permitido apenas se intercessor_id = auth.uid()

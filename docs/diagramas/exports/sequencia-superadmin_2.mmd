@@ -1,0 +1,25 @@
+sequenceDiagram
+    actor User as Super Admin
+    participant Page as ContextSelect.tsx
+    participant Storage as localStorage
+    participant Router as React Router
+
+    User->>Page: Visualiza opções
+    
+    alt Escolhe Painel SaaS
+        User->>Page: Click "Painel SaaS"
+        
+        alt Marca "Lembrar escolha"
+            Page->>Storage: setItem('preferred_context', 'superadmin')
+        end
+        
+        Page->>Router: navigate('/superadmin')
+    else Escolhe Aplicativo Igreja
+        User->>Page: Click "Aplicativo Igreja"
+        
+        alt Marca "Lembrar escolha"
+            Page->>Storage: setItem('preferred_context', 'app')
+        end
+        
+        Page->>Router: navigate('/')
+    end

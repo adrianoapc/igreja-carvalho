@@ -1,0 +1,15 @@
+sequenceDiagram
+    autonumber
+    participant Tesoureiro
+    participant Sistema
+    participant DB
+
+    Tesoureiro->>Sistema: Solicita estorno de fato gerador
+    Sistema->>Tesoureiro: Pede justificativa
+    Tesoureiro->>Sistema: Informa motivo
+    Sistema->>DB: Marca fato gerador como estornado
+    Sistema->>DB: Remove lançamento do DRE
+    Sistema-->>Tesoureiro: Confirma estorno
+
+    Note over Sistema: Caixa não é revertido automaticamente
+    Note over Sistema: Requer estorno de pagamento separado

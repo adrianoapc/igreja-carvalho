@@ -1,0 +1,13 @@
+flowchart TD
+    Check{Verifica<br/>Criticidade}
+    
+    Check --> Cond1{gravidade =<br/>'critica'?}
+    Check --> Cond2{sentimento IN<br/>triste, com_medo,<br/>angustiado, sozinho?}
+    
+    Cond1 -->|Sim| Critical[⚠️ CRÍTICO]
+    Cond2 -->|Sim| Critical
+    Cond1 -->|Não| Cond2
+    Cond2 -->|Não| Normal[Normal]
+    
+    style Critical fill:#ffe1e1
+    style Normal fill:#e1ffe1

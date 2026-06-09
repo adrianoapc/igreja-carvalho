@@ -1,0 +1,23 @@
+flowchart TD
+    User{Tipo de<br/>Usuário?}
+    
+    User -->|Pastor/Líder| PastorRLS["RLS: Vê apenas<br/>seus próprios<br/>atendimentos<br/>(pastor_responsavel_id<br/>=auth.uid())"]
+    
+    User -->|Secretaria| SecRLS["RLS via view<br/>view_agenda_secretaria<br/>Vê: id, nome, status<br/>data_agendado,<br/>gravidade<br/>NÃO vê:<br/>conteudo_original"]
+    
+    User -->|Admin| AdminRLS["Acesso CRUD<br/>completo em<br/>atendimentos_pastorais"]
+    
+    User -->|Membro| MemberRLS["Pode ver<br/>status de seu próprio<br/>atendimento<br/>(via view específica<br/>a confirmar)"]
+    
+    PastorRLS --> PastorUX["UI no /gabinete<br/>Kanban pessoal<br/>com seus<br/>atendimentos"]
+    
+    SecRLS --> SecUX["UI view_agenda_secretaria<br/>Agendar encontros<br/>sem ler dados sensíveis"]
+    
+    AdminRLS --> AdminUX["UI Dashboard<br/>KPI de saúde<br/>pastoral geral"]
+    
+    style PastorRLS fill:#e1f5ff
+    style SecRLS fill:#fff9e1
+    style AdminRLS fill:#e6ffe6
+    style PastorUX fill:#d1ecf1
+    style SecUX fill:#ffe6e6
+    style AdminUX fill:#d4edda
