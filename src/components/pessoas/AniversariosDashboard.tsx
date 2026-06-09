@@ -33,6 +33,7 @@ import {
   Droplets,
   Phone,
   Mail,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
@@ -66,6 +67,8 @@ export function AniversariosDashboard() {
   const [tipoFilter, setTipoFilter] = useState<
     "todos" | "nascimento" | "casamento" | "batismo"
   >("todos");
+  const [semanaColapsada, setSemanaColapsada] = useState(false);
+  const [mesColapsado, setMesColapsado] = useState(false);
   const navigate = useNavigate();
   const {
     igrejaId,
@@ -316,50 +319,45 @@ export function AniversariosDashboard() {
             <Cake className="w-5 h-5" />
             Aniversários
           </CardTitle>
-          <div className="flex flex-col gap-3">
-            {/* Filtro Visual de Tipos */}
-            <div className="flex flex-wrap gap-2">
-              {[
-                {
-                  value: "todos",
-                  label: "Todos",
-                  icon: Cake,
-                  color: "bg-gray-100 text-gray-800 hover:bg-gray-200",
-                },
-                {
-                  value: "nascimento",
-                  label: "Aniversário",
-                  icon: Cake,
-                  color: "bg-pink-100 text-pink-800 hover:bg-pink-200",
-                },
-                {
-                  value: "casamento",
-                  label: "Casamento",
-                  icon: Heart,
-                  color: "bg-red-100 text-red-800 hover:bg-red-200",
-                },
-                {
-                  value: "batismo",
-                  label: "Batismo",
-                  icon: Droplets,
-                  color: "bg-blue-100 text-blue-800 hover:bg-blue-200",
-                },
-              ].map(({ value, label, icon: Icon, color }) => (
-                <button
-                  key={value}
-                  onClick={() => setTipoFilter(value as typeof tipoFilter)}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2 rounded-full transition-colors font-medium text-sm",
-                    tipoFilter === value
-                      ? color
-                      : "bg-gray-50 text-gray-600 hover:bg-gray-100",
-                  )}
-                >
-                  <Icon className="w-4 h-4" />
-                  {label}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              {
+                value: "todos",
+                label: "Todos",
+                icon: Balloon,
+                color: "bg-gray-100 text-gray-800 hover:bg-gray-200",
+              },
+              {
+                value: "nascimento",
+                label: "Aniversário",
+                icon: Cake,
+                color: "bg-green-100 text-green-800 hover:bg-green-200",
+              },
+              {
+                value: "casamento",
+                label: "Casamento",
+                icon: Heart,
+                color: "bg-red-100 text-red-800 hover:bg-red-200",
+              },
+              {
+                value: "batismo",
+                label: "Batismo",
+                icon: Droplets,
+                color: "bg-blue-100 text-blue-800 hover:bg-blue-200",
+              },
+            ].map(({ value, label, icon: Icon, color }) => (
+              <button
+                key={value}
+                onClick={() => setTipoFilter(value as typeof tipoFilter)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-full transition-colors font-medium text-sm",
+                  tipoFilter === value ? color : color,
+                )}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </button>
+            ))}
 
             {/* Filtro de Data */}
             <Popover>
@@ -367,7 +365,10 @@ export function AniversariosDashboard() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full sm:w-auto"
+                  className={cn(
+                    "ml-auto rounded-full text-sm font-medium",
+                    selectedDate && "border-primary text-primary",
+                  )}
                 >
                   <CalendarIcon className="w-4 h-4 mr-2" />
                   {selectedDate
@@ -437,26 +438,62 @@ export function AniversariosDashboard() {
               {/* Esta Semana */}
               {estaSemana.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <button
+                    className="w-full flex items-center gap-2 font-semibold text-sm text-left hover:bg-muted/50 rounded-lg px-2 py-1 -mx-2 transition-colors"
+                    onClick={() => setSemanaColapsada((v) => !v)}
+                  >
                     📅 Esta Semana
                     <Badge variant="secondary">{estaSemana.length}</Badge>
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {estaSemana.map((aniv) => renderAniversarioCard(aniv))}
-                  </div>
+                    <span
+                      className={cn(
+                        "ml-auto flex items-center justify-center w-6 h-6 rounded-full border-2 border-secondary text-secondary-foreground transition-colors duration-200",
+                        semanaColapsada ? "bg-secondary" : "bg-muted/50",
+                      )}
+                    >
+                      <ChevronDown
+                        className={cn(
+                          "w-3.5 h-3.5 transition-transform duration-200",
+                          semanaColapsada && "rotate-180",
+                        )}
+                      />
+                    </span>
+                  </button>
+                  {!semanaColapsada && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {estaSemana.map((aniv) => renderAniversarioCard(aniv))}
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Este Mês */}
               {esteMes.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <button
+                    className="w-full flex items-center gap-2 font-semibold text-sm text-left hover:bg-muted/50 rounded-lg px-2 py-1 -mx-2 transition-colors"
+                    onClick={() => setMesColapsado((v) => !v)}
+                  >
                     📆 Este Mês
                     <Badge variant="outline">{esteMes.length}</Badge>
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {esteMes.map((aniv) => renderAniversarioCard(aniv))}
-                  </div>
+                    <span
+                      className={cn(
+                        "ml-auto flex items-center justify-center w-6 h-6 rounded-full border-2 border-border text-muted-foreground transition-colors duration-200",
+                        mesColapsado ? "bg-muted" : "bg-muted/50",
+                      )}
+                    >
+                      <ChevronDown
+                        className={cn(
+                          "w-3.5 h-3.5 transition-transform duration-200",
+                          mesColapsado && "rotate-180",
+                        )}
+                      />
+                    </span>
+                  </button>
+                  {!mesColapsado && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {esteMes.map((aniv) => renderAniversarioCard(aniv))}
+                    </div>
+                  )}
                 </div>
               )}
 

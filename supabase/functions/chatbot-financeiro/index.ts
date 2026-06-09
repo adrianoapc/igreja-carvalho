@@ -1246,17 +1246,19 @@ serve(async (req) => {
           );
         }
 
-        const filaAtualizada = [...fila, itemEnfileirado];
+        // Atomic append via RPC — avoids the read-modify-write race when two
+        // images arrive concurrently (last UPDATE would have overwritten the other).
+        const { data: novoTamanho } = await supabase.rpc("append_fila_pendente", {
+          p_sessao_id: sessao.id,
+          p_igreja_id: igrejaId,
+          p_item: itemEnfileirado,
+        });
 
-        await supabase
-          .from("atendimentos_bot")
-          .update({ meta_dados: { ...metaDados, fila_pendente: filaAtualizada } })
-          .eq("id", sessao.id)
-          .eq("igreja_id", igrejaId);
+        const quantidadeFila = typeof novoTamanho === "number" ? novoTamanho : fila.length + 1;
 
         const resposta =
           `📥 Recebido! Vou revisar este assim que você concluir o comprovante atual.\n\n` +
-          `📋 ${filaAtualizada.length} ${filaAtualizada.length === 1 ? "comprovante" : "comprovantes"} aguardando na fila.\n\n` +
+          `📋 ${quantidadeFila} ${quantidadeFila === 1 ? "comprovante" : "comprovantes"} aguardando na fila.\n\n` +
           `👆 Pode responder agora sobre o comprovante mostrado: *Sim*, *Remover* ou uma correção (ex: "valor 89,90").`;
 
         return new Response(JSON.stringify({ text: resposta }), {

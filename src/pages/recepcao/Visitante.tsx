@@ -16,14 +16,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, UserPlus } from "lucide-react";
 import InputMask from "react-input-mask";
 import { supabase } from "@/integrations/supabase/client";
-import { useIgrejaId } from "@/hooks/useIgrejaId";
+import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { toast } from "sonner";
 
 type Step = 1 | 2;
 
 export default function RecepcaoVisitante() {
   const navigate = useNavigate();
-  const { igrejaId } = useIgrejaId();
+  const { igrejaId, filialId } = useAuthContext();
 
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
@@ -67,6 +67,7 @@ export default function RecepcaoVisitante() {
             aceitou_jesus: form.aceitou_jesus,
             deseja_contato: form.deseja_contato,
             igreja_id: igrejaId,
+            filial_id: filialId || null,
           },
         },
       });

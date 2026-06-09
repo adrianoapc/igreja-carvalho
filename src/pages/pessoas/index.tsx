@@ -277,7 +277,10 @@ export default function Pessoas() {
                 </Button>
               )}
             </div>
-            <Button onClick={() => navigate("/pessoas/cadastrar")} className="shrink-0">
+            <Button
+              onClick={() => navigate("/pessoas/cadastrar")}
+              className="shrink-0"
+            >
               <Plus className="w-4 h-4 mr-2" />
               Cadastrar Pessoa
             </Button>
@@ -321,72 +324,6 @@ export default function Pessoas() {
 
       {/* Aniversários Dashboard */}
       <AniversariosDashboard />
-
-      {/* Quick Actions */}
-      <Card className="border-0 bg-slate-50">
-        <CardHeader className="p-4 md:p-6">
-          <CardTitle className="text-lg md:text-xl">Acesso Rápido</CardTitle>
-        </CardHeader>
-        <CardContent className="p-3 md:p-6">
-          <div className="grid grid-cols-1 gap-3 md:gap-4">
-            {quickActions.map((action, index) => {
-              const Icon = action.icon;
-              const colors = [
-                "bg-blue-50 border-blue-100 hover:shadow-md",
-                "bg-green-50 border-green-100 hover:shadow-md",
-                "bg-orange-50 border-orange-100 hover:shadow-md",
-                "bg-purple-50 border-purple-100 hover:shadow-md",
-              ];
-              const iconColors = [
-                "text-blue-600",
-                "text-green-600",
-                "text-orange-600",
-                "text-purple-600",
-              ];
-              const bgColors = [
-                "bg-blue-100",
-                "bg-green-100",
-                "bg-orange-100",
-                "bg-purple-100",
-              ];
-              return (
-                <div
-                  key={action.title}
-                  className={`flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    colors[index]
-                  }`}
-                  onClick={() => action.path !== "#" && navigate(action.path)}
-                >
-                  <div
-                    className={`p-2 md:p-3 rounded-full bg-white/60 flex-shrink-0`}
-                  >
-                    <Icon
-                      className={`w-5 h-5 md:w-6 md:h-6 ${iconColors[index]} opacity-70`}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                      <h3 className="font-semibold text-sm md:text-base truncate">
-                        {action.title}
-                      </h3>
-                      <Badge
-                        variant="secondary"
-                        className="text-xs w-fit font-bold"
-                      >
-                        {action.count} {action.label}
-                      </Badge>
-                    </div>
-                    <p className="text-xs md:text-sm text-muted-foreground line-clamp-1">
-                      {action.description}
-                    </p>
-                  </div>
-                  <ArrowRight className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0 opacity-60" />
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Perfis Pendentes de Aprovação */}
       <Card className="border border-orange-100 bg-orange-50">
@@ -504,7 +441,6 @@ export default function Pessoas() {
 
       {/* Recent Activity Summary */}
       <AtividadeRecenteSummary />
-
     </div>
   );
 }

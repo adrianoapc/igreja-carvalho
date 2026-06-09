@@ -125,18 +125,22 @@ async function sincronizarContatosPerfil(
     isWhatsapp: boolean,
     isLogin: boolean,
   ) => {
+    // For phone types, search across all subtypes (celular/fixo/telefone) so we
+    // don't insert a duplicate when the number changes size (10↔11 digits) or
+    // when the existing row was created with the legacy 'telefone' type.
+    const tiposBusca = tipo === "email" ? ["email"] : ["celular", "fixo", "telefone"];
     const { data: existing } = await supabase
       .from("profile_contatos")
       .select("id")
       .eq("profile_id", profileId)
-      .eq("tipo", tipo)
+      .in("tipo", tiposBusca)
       .eq("is_primary", true)
       .maybeSingle();
 
     if (existing) {
       await supabase
         .from("profile_contatos")
-        .update({ valor, is_whatsapp: isWhatsapp, is_login: isLogin })
+        .update({ tipo, valor, is_whatsapp: isWhatsapp, is_login: isLogin })
         .eq("id", existing.id);
     } else {
       await supabase.from("profile_contatos").insert({
@@ -312,15 +316,19 @@ Deno.serve(async (req) => {
 
         // Fallback: buscar em profile_contatos
         if (!visitanteExistente) {
-          const { data: byEmailContato } = await supabase
+          let byEmailContatoQuery = supabase
             .from("profile_contatos")
             .select("profile_id, profiles!inner(*)")
             .eq("tipo", "email")
             .eq("valor", emailBusca)
             .eq("profiles.igreja_id", visitanteData.igreja_id)
-            .in("profiles.status", ["visitante", "frequentador"])
-            .limit(1)
-            .maybeSingle();
+            .in("profiles.status", ["visitante", "frequentador"]);
+
+          if (!visitanteData.todas_filiais && visitanteData.filial_id) {
+            byEmailContatoQuery = byEmailContatoQuery.eq("profiles.filial_id", visitanteData.filial_id);
+          }
+
+          const { data: byEmailContato } = await byEmailContatoQuery.limit(1).maybeSingle();
 
           if (byEmailContato?.profiles) {
             visitanteExistente = byEmailContato.profiles;
@@ -345,15 +353,19 @@ Deno.serve(async (req) => {
 
         // Fallback: buscar em profile_contatos
         if (!visitanteExistente) {
-          const { data: byTelContato } = await supabase
+          let byTelContatoQuery = supabase
             .from("profile_contatos")
             .select("profile_id, profiles!inner(*)")
-            .in("tipo", ["celular", "fixo"])
+            .in("tipo", ["celular", "fixo", "telefone"])
             .eq("valor", telefoneNormalizado)
             .eq("profiles.igreja_id", visitanteData.igreja_id)
-            .in("profiles.status", ["visitante", "frequentador"])
-            .limit(1)
-            .maybeSingle();
+            .in("profiles.status", ["visitante", "frequentador"]);
+
+          if (!visitanteData.todas_filiais && visitanteData.filial_id) {
+            byTelContatoQuery = byTelContatoQuery.eq("profiles.filial_id", visitanteData.filial_id);
+          }
+
+          const { data: byTelContato } = await byTelContatoQuery.limit(1).maybeSingle();
 
           if (byTelContato?.profiles) {
             visitanteExistente = byTelContato.profiles;
