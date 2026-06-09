@@ -79,10 +79,17 @@ jobs:
           PY
 
           # Renderiza cada .mmd para .png (um por bloco)
+          PUPPETEER_CONFIG="/tmp/puppeteer-config.json"
+          cat > "$PUPPETEER_CONFIG" << 'JSON'
+          {
+            "args": ["--no-sandbox", "--disable-setuid-sandbox"]
+          }
+          JSON
+
           shopt -s nullglob
           for mmd in "$OUT_DIR"/*.mmd; do
             png="${mmd%.mmd}.png"
-            mmdc -i "$mmd" -o "$png" -b transparent --scale 2
+            mmdc -i "$mmd" -o "$png" -b transparent --scale 2 -p "$PUPPETEER_CONFIG"
             echo "Gerado: $png"
           done
 
