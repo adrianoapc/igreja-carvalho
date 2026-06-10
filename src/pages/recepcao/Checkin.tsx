@@ -140,6 +140,7 @@ export default function RecepcaoCheckin() {
           .from("inscricoes_eventos")
           .select("*", { count: "exact", head: true })
           .eq("evento_id", eventoSelecionado.id)
+          .is("cancelado_em", null)
           .not("checkin_validado_em", "is", null),
       ]);
       return { total: total ?? 0, presentes: presentes ?? 0 };

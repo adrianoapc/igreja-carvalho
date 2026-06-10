@@ -29,11 +29,11 @@ interface CriancaAtiva {
 
 export default function RecepcaoInfantil() {
   const navigate = useNavigate();
-  const { igrejaId } = useAuthContext();
+  const { igrejaId, filialId, isAllFiliais } = useAuthContext();
 
   // Culto do dia (para exibir no header e filtrar ativos)
   const { data: cultoHoje, isLoading: cultoLoading } = useQuery({
-    queryKey: ["kids-recepcao-culto-hoje", igrejaId],
+    queryKey: ["kids-recepcao-culto-hoje", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return null;
       const inicio = new Date();
@@ -41,13 +41,19 @@ export default function RecepcaoInfantil() {
       const fim = new Date();
       fim.setHours(23, 59, 59, 999);
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("eventos")
         .select("id, titulo")
         .eq("igreja_id", igrejaId)
         .gte("data_evento", inicio.toISOString())
         .lte("data_evento", fim.toISOString())
-        .in("status", ["planejado", "confirmado"])
+        .in("status", ["planejado", "confirmado"]);
+
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+
+      const { data, error } = await query
         .order("data_evento", { ascending: true })
         .limit(1)
         .maybeSingle();

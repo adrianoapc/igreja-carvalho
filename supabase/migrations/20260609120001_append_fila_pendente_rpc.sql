@@ -6,13 +6,14 @@
 --
 -- Returns the new length of fila_pendente after appending.
 
-CREATE OR REPLACE FUNCTION append_fila_pendente(
+CREATE OR REPLACE FUNCTION public.append_fila_pendente(
   p_sessao_id UUID,
   p_igreja_id UUID,
   p_item JSONB
 ) RETURNS INT
 LANGUAGE sql
 SECURITY DEFINER
+SET search_path = public
 AS $$
   WITH updated AS (
     UPDATE public.atendimentos_bot
@@ -28,3 +29,11 @@ AS $$
   )
   SELECT COALESCE(jsonb_array_length(fila), 0) FROM updated;
 $$;
+
+-- Funções novas recebem EXECUTE de PUBLIC por padrão; como esta é
+-- SECURITY DEFINER, isso permitiria que qualquer cliente (anon/authenticated)
+-- chamasse a RPC diretamente e contornasse o RLS de atendimentos_bot.
+-- Apenas o Edge Function (service_role) precisa executá-la.
+REVOKE ALL ON FUNCTION public.append_fila_pendente(UUID, UUID, JSONB) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.append_fila_pendente(UUID, UUID, JSONB) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.append_fila_pendente(UUID, UUID, JSONB) TO service_role;
