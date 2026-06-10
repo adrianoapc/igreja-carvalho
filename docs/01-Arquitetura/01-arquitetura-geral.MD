@@ -716,3 +716,36 @@ flowchart TD
 # ADRs — Architectural Decision Records
 
 Registro das decisões arquiteturais do sistema.
+
+---
+
+# 🚀 05 — CI/CD: Deploy do Supabase
+
+O workflow [`.github/workflows/supabase-deploy.yml`](../../.github/workflows/supabase-deploy.yml) automatiza
+o deploy do backend Supabase (migrations + edge functions) sempre que houver
+push na branch `main` que altere arquivos em `supabase/migrations/**` ou
+`supabase/functions/**` (também pode ser disparado manualmente via
+`workflow_dispatch`).
+
+O que o workflow faz:
+
+1. Lê o `project_id` em `supabase/config.toml` e faz `supabase link` com esse projeto.
+2. Roda `supabase db push` para aplicar as migrations pendentes.
+3. Detecta quais edge functions mudaram desde o commit anterior (se
+   `supabase/functions/_shared/` mudou, redeploya todas as functions; caso
+   contrário, só as functions cujos diretórios mudaram) e roda
+   `supabase functions deploy` para cada uma.
+
+**Secrets necessários no repositório** (Settings → Secrets and variables →
+Actions):
+
+- `SUPABASE_ACCESS_TOKEN`: token de acesso pessoal do Supabase (gerado em
+  https://supabase.com/dashboard/account/tokens), usado para autenticar a CLI.
+- `SUPABASE_DB_PASSWORD`: senha do banco de dados do projeto (Settings →
+  Database no painel do Supabase), usada pelo `supabase db push`.
+
+Sem esses secrets configurados, o workflow falha ao tentar `supabase link`/
+`supabase db push`. Antes deste workflow existir, migrations e edge functions
+mergeadas em `main` não eram aplicadas automaticamente ao projeto Supabase —
+era necessário rodar `supabase db push`/`supabase functions deploy`
+manualmente.
