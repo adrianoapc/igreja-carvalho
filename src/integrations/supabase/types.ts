@@ -6652,39 +6652,48 @@ export type Database = {
       otp_verificacao: {
         Row: {
           codigo: string
+          codigo_hash: string | null
           created_at: string | null
           expira_em: string
           id: string
           igreja_id: string | null
+          meta_error: string | null
           profile_id: string | null
           telefone: string | null
           tentativas: number | null
           tipo: string
           usado: boolean | null
+          wamid: string | null
         }
         Insert: {
           codigo: string
+          codigo_hash?: string | null
           created_at?: string | null
           expira_em: string
           id?: string
           igreja_id?: string | null
+          meta_error?: string | null
           profile_id?: string | null
           telefone?: string | null
           tentativas?: number | null
           tipo: string
           usado?: boolean | null
+          wamid?: string | null
         }
         Update: {
           codigo?: string
+          codigo_hash?: string | null
           created_at?: string | null
           expira_em?: string
           id?: string
           igreja_id?: string | null
+          meta_error?: string | null
           profile_id?: string | null
           telefone?: string | null
           tentativas?: number | null
           tipo?: string
           usado?: boolean | null
+          wamid?: string | null
         }
         Relationships: [
           {
@@ -11737,6 +11746,10 @@ export type Database = {
         Args: { p_sugestao_id: string; p_usuario_id?: string }
         Returns: boolean
       }
+      append_fila_pendente: {
+        Args: { p_igreja_id: string; p_item: Json; p_sessao_id: string }
+        Returns: number
+      }
       aprovar_onboarding: { Args: { p_request_id: string }; Returns: Json }
       buscar_pessoa_por_contato: {
         Args: { p_email?: string; p_nome?: string; p_telefone?: string }
@@ -11963,6 +11976,7 @@ export type Database = {
         Args: { p_time_id: string; p_user_id: string }
         Returns: boolean
       }
+      limpar_otps_expirados: { Args: never; Returns: number }
       listar_transferencias_dessincronizadas: {
         Args: { p_filial_id?: string; p_igreja_id: string; p_limite?: number }
         Returns: {
