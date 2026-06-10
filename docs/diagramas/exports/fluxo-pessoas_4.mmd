@@ -1,0 +1,6 @@
+flowchart TD
+    A([Acessar /cadastro/visitante]) --> S1[Step 1: Nome + Sexo + Aniversário]
+    S1 --> S2[Step 2: Telefone + Email]
+    S2 --> S3[Step 3: Como conheceu + Obs + Checkboxes]
+    S3 --> SUB[Edge: cadastro-publico<br/>action: cadastrar_visitante]
+    SUB --> OK([Tela de sucesso])

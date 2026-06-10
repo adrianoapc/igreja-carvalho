@@ -1,11 +1,7 @@
 flowchart TD
-    QR([Escanear QR Code]) --> T[Digitar telefone]
-    T --> OTP[Edge: send-otp<br/>WhatsApp envia código]
-    OTP --> C[Digitar código 6 dígitos]
-    C --> V{Edge: verify-otp}
-    V -->|Inválido| E[Exibe erro<br/>tentativas restantes]
-    E --> C
-    V -->|Válido| CI[Edge: checkin-evento<br/>registra presença]
-    CI --> S{Encontrou perfil?}
-    S -->|Sim| OK[Presença confirmada<br/>nome mascarado]
-    S -->|Não| NF[Redireciona para<br/>/cadastro/visitante]
+    A([AniversariosDashboard]) --> B[Listar Esta Semana e Este Mês]
+    B --> C{Usuário clica no<br/>cabeçalho da seção?}
+    C -->|Esta Semana| D[Alterna semanaColapsada]
+    C -->|Este Mês| E[Alterna mesColapsado]
+    D --> F[Recolhe/expande lista<br/>mantém Badge com contador]
+    E --> F

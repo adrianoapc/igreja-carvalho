@@ -1,6 +1,11 @@
 flowchart TD
-    A([Acessar /cadastro/visitante]) --> S1[Step 1: Nome + Sexo + Aniversário]
-    S1 --> S2[Step 2: Telefone + Email]
-    S2 --> S3[Step 3: Como conheceu + Obs + Checkboxes]
-    S3 --> SUB[Edge: cadastro-publico<br/>action: cadastrar_visitante]
-    SUB --> OK([Tela de sucesso])
+    QR([Escanear QR Code]) --> T[Digitar telefone]
+    T --> OTP[Edge: send-otp<br/>WhatsApp envia código]
+    OTP --> C[Digitar código 6 dígitos]
+    C --> V{Edge: verify-otp}
+    V -->|Inválido| E[Exibe erro<br/>tentativas restantes]
+    E --> C
+    V -->|Válido| CI[Edge: checkin-evento<br/>registra presença]
+    CI --> S{Encontrou perfil?}
+    S -->|Sim| OK[Presença confirmada<br/>nome mascarado]
+    S -->|Não| NF[Redireciona para<br/>/cadastro/visitante]
