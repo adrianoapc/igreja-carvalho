@@ -249,7 +249,7 @@ export function EscalaDetailsSheet({ open, onOpenChange, escala }: EscalaDetails
                                 {cancao.link_youtube && (
                                   <Button size="sm" variant="outline" asChild>
                                     <a href={cancao.link_youtube} target="_blank" rel="noopener noreferrer">
-                                      <Youtube className="h-4 w-4 mr-1" />
+                                      <Video className="h-4 w-4 mr-1" />
                                       YouTube
                                     </a>
                                   </Button>
