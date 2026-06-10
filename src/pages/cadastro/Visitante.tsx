@@ -206,6 +206,15 @@ export default function CadastroVisitante() {
 
           <Card className="shadow-soft">
             <CardContent className="pt-8 pb-8 px-6 space-y-6">
+              {aceitouJesus && step === 1 && (
+                <div className="p-4 bg-primary/10 rounded-lg text-center">
+                  <Heart className="w-8 h-8 text-primary mx-auto mb-2" />
+                  <p className="text-sm font-medium text-primary">
+                    Que alegria saber que você aceitou Jesus! 🎉
+                  </p>
+                </div>
+              )}
+
               {/* Ícone + título */}
               <div className="text-center space-y-2">
                 <div className="flex justify-center mb-3">
@@ -332,9 +341,13 @@ export default function CadastroVisitante() {
                       <Checkbox
                         id="aceitou_jesus"
                         checked={formData.aceitou_jesus}
+                        disabled={aceitouJesus}
                         onCheckedChange={(v) => set("aceitou_jesus", v as boolean)}
                       />
-                      <label htmlFor="aceitou_jesus" className="text-sm font-medium leading-none cursor-pointer">
+                      <label
+                        htmlFor="aceitou_jesus"
+                        className={`text-sm font-medium leading-none ${aceitouJesus ? "" : "cursor-pointer"}`}
+                      >
                         Aceitei Jesus hoje
                       </label>
                     </div>

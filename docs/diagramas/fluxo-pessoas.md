@@ -90,3 +90,8 @@ flowchart TD
     H --> I[ShortLinkRedirect<br/>SELECT target_url WHERE slug]
     I --> J([Redireciona para URL alvo<br/>/cadastro/...])
 ```
+
+> Link "Aceitou Jesus" aponta para `/cadastro/visitante?aceitou=true` (não mais para `/cadastro`):
+> abre direto o formulário de visitante, com a saudação de aceite e o checkbox
+> "Aceitei Jesus hoje" pré-marcado e bloqueado — sem passar pela tela `/cadastro`
+> com os botões de Visitante/Café V&P.
