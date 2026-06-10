@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Music, FileText, Youtube, ExternalLink, BookOpen, ClipboardList, Baby } from "lucide-react";
+import { Music, FileText, Video, ExternalLink, BookOpen, ClipboardList, Baby } from "lucide-react";
 
 interface Escala {
   id: string;
