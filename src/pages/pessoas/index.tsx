@@ -322,6 +322,9 @@ export default function Pessoas() {
         })}
       </div>
 
+      {/* Links Externos de Cadastro */}
+      <LinksExternosCard />
+
       {/* Aniversários Dashboard */}
       <AniversariosDashboard />
 
@@ -362,9 +365,6 @@ export default function Pessoas() {
           )}
         </CardContent>
       </Card>
-
-      {/* Links Externos de Cadastro */}
-      <LinksExternosCard />
 
       {/* Pessoas que Aceitaram Jesus */}
       {aceitaramJesus.length > 0 && (

@@ -97,6 +97,19 @@ interface BuscarMembroData {
   todas_filiais?: boolean;
 }
 
+// Quando a pessoa aceita Jesus pela primeira vez, registra a data da
+// conversão (usada pelo painel "Aceitaram Jesus" em /pessoas). Se já houver
+// uma data registrada, ela é preservada.
+function calcularDataConversao(
+  aceitouAgora: boolean | undefined,
+  dataConversaoExistente: string | null | undefined,
+): string | null | undefined {
+  if (aceitouAgora && !dataConversaoExistente) {
+    return new Date().toISOString().slice(0, 10);
+  }
+  return dataConversaoExistente;
+}
+
 // deno-lint-ignore no-explicit-any
 function applyTenantFilters(
   query: any,
@@ -396,6 +409,10 @@ Deno.serve(async (req) => {
             status: novoStatus,
             aceitou_jesus:
               visitanteData.aceitou_jesus || visitanteExistente.aceitou_jesus,
+            data_conversao: calcularDataConversao(
+              visitanteData.aceitou_jesus,
+              visitanteExistente.data_conversao,
+            ),
             deseja_contato:
               visitanteData.deseja_contato ?? visitanteExistente.deseja_contato,
             sexo: visitanteData.sexo || visitanteExistente.sexo,
@@ -435,6 +452,10 @@ Deno.serve(async (req) => {
               visitanteData.necessidades_especiais?.trim() || null,
             observacoes: visitanteData.observacoes?.trim() || null,
             aceitou_jesus: visitanteData.aceitou_jesus || false,
+            data_conversao: calcularDataConversao(
+              visitanteData.aceitou_jesus,
+              null,
+            ),
             deseja_contato: visitanteData.deseja_contato ?? true,
             sexo: visitanteData.sexo || null,
             data_nascimento: visitanteData.data_nascimento || null,
@@ -691,6 +712,10 @@ Deno.serve(async (req) => {
           observacoes: observacoesCombinadas || profileExistente.observacoes,
           aceitou_jesus:
             cafeData.aceitou_jesus || profileExistente.aceitou_jesus,
+          data_conversao: calcularDataConversao(
+            cafeData.aceitou_jesus,
+            profileExistente.data_conversao,
+          ),
           deseja_contato:
             cafeData.deseja_contato ?? profileExistente.deseja_contato,
           entrou_por: profileExistente.entrou_por || "cafe_vp",
@@ -737,6 +762,7 @@ Deno.serve(async (req) => {
             cafeData.necessidades_especiais?.trim() || null,
           observacoes: observacoesCombinadas || null,
           aceitou_jesus: cafeData.aceitou_jesus || false,
+          data_conversao: calcularDataConversao(cafeData.aceitou_jesus, null),
           deseja_contato: cafeData.deseja_contato ?? true,
           entrou_por: "cafe_vp",
           status: "visitante",
