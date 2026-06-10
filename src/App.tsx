@@ -58,6 +58,9 @@ const Comunicados = lazy(() => import("./pages/Comunicados"));
 const Announcements = lazy(() => import("./pages/Announcements"));
 const AnnouncementsAdmin = lazy(() => import("./pages/AnnouncementsAdmin"));
 
+// Short Link Redirect
+const ShortLinkRedirect = lazy(() => import("./pages/ShortLinkRedirect"));
+
 // Cadastro Publico
 const CadastroIndex = lazy(() => import("./pages/cadastro/Index"));
 const CadastroVisitante = lazy(() => import("./pages/cadastro/Visitante"));
@@ -295,6 +298,9 @@ const App = () => (
                     element={<CadastroCafeVP />}
                   />
                   <Route path="/cadastro/igreja" element={<NovaIgreja />} />
+
+                  {/* Short Link Redirect */}
+                  <Route path="/s/:slug" element={<ShortLinkRedirect />} />
 
                   {/* Inscrição Pública (QR Code) */}
                   <Route

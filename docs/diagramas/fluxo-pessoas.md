@@ -63,5 +63,30 @@ flowchart TD
     S1 --> S2[Step 2: Telefone + Email]
     S2 --> S3[Step 3: Como conheceu + Obs + Checkboxes]
     S3 --> SUB[Edge: cadastro-publico<br/>action: cadastrar_visitante]
-    SUB --> OK([Tela de sucesso])
+    SUB --> CONV{aceitou_jesus?}
+    CONV -->|Sim, sem data anterior| DC[Define data_conversao = hoje<br/>alimenta painel Aceitaram Jesus]
+    CONV -->|Não| CT
+    DC --> CT{deseja_contato?}
+    CT -->|Sim| AG[INSERT visitante_contatos<br/>membro_responsavel_id = null<br/>data_contato = +3 dias]
+    CT -->|Não| OK
+    AG --> OK([Tela de sucesso])
+```
+
+> `membro_responsavel_id` é `null` no cadastro público pois não há membro autenticado para assumir o contato.
+> A atribuição a um líder/departamento responsável é uma rotina de roteamento futura (ainda não implementada).
+
+## Links Externos de Cadastro (Shortlinks)
+
+```mermaid
+flowchart TD
+    A([LinksExternosCard monta]) --> B[Monta URL longa por link<br/>+ igreja_id/filial_id/todas_filiais]
+    B --> C[Busca short_links<br/>WHERE igreja_id + target_url IN ...]
+    C --> D{Slug existe?}
+    D -->|Sim| E[Usa slug existente]
+    D -->|Não| F[Gera slug aleatorio<br/>INSERT short_links]
+    F --> E
+    E --> G[Exibe card: titulo + Copiar + QR Code<br/>URL final = origin/s/:slug]
+    G --> H([Usuario compartilha /s/:slug])
+    H --> I[ShortLinkRedirect<br/>SELECT target_url WHERE slug]
+    I --> J([Redireciona para URL alvo<br/>/cadastro/...])
 ```

@@ -16,8 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PublicHeader } from "@/components/layout/PublicHeader";
 import { useToast } from "@/hooks/use-toast";
+import logoCarvalho from "@/assets/logo-carvalho.png";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Loader2,
@@ -355,7 +355,10 @@ export default function CadastroMembro() {
   if (step === "not_found") {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <PublicHeader showBackButton backTo={cadastroBackLink} />
+        <header className="border-b border-border/50 bg-background/80 backdrop-blur-md px-4 py-3 flex items-center gap-3">
+          <img src={logoCarvalho} alt="Igreja Carvalho" className="h-8 w-auto" />
+          <span className="font-semibold text-foreground">Igreja Carvalho</span>
+        </header>
 
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-md shadow-soft text-center">
@@ -395,7 +398,10 @@ export default function CadastroMembro() {
   if (step === "new_register") {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <PublicHeader showBackButton backTo={cadastroBackLink} />
+        <header className="border-b border-border/50 bg-background/80 backdrop-blur-md px-4 py-3 flex items-center gap-3">
+          <img src={logoCarvalho} alt="Igreja Carvalho" className="h-8 w-auto" />
+          <span className="font-semibold text-foreground">Igreja Carvalho</span>
+        </header>
 
         <div className="flex-1 p-4 py-8">
           <Card className="w-full max-w-lg mx-auto shadow-soft">
@@ -744,7 +750,10 @@ export default function CadastroMembro() {
   if (step === "pending") {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <PublicHeader showBackButton backTo={cadastroBackLink} />
+        <header className="border-b border-border/50 bg-background/80 backdrop-blur-md px-4 py-3 flex items-center gap-3">
+          <img src={logoCarvalho} alt="Igreja Carvalho" className="h-8 w-auto" />
+          <span className="font-semibold text-foreground">Igreja Carvalho</span>
+        </header>
 
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-md shadow-soft text-center">
@@ -771,7 +780,10 @@ export default function CadastroMembro() {
   if (step === "success") {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <PublicHeader showBackButton backTo={cadastroBackLink} />
+        <header className="border-b border-border/50 bg-background/80 backdrop-blur-md px-4 py-3 flex items-center gap-3">
+          <img src={logoCarvalho} alt="Igreja Carvalho" className="h-8 w-auto" />
+          <span className="font-semibold text-foreground">Igreja Carvalho</span>
+        </header>
 
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-md shadow-soft text-center">
@@ -797,7 +809,10 @@ export default function CadastroMembro() {
   if (step === "search") {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <PublicHeader showBackButton backTo={cadastroBackLink} />
+        <header className="border-b border-border/50 bg-background/80 backdrop-blur-md px-4 py-3 flex items-center gap-3">
+          <img src={logoCarvalho} alt="Igreja Carvalho" className="h-8 w-auto" />
+          <span className="font-semibold text-foreground">Igreja Carvalho</span>
+        </header>
 
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-md shadow-soft">
@@ -849,7 +864,10 @@ export default function CadastroMembro() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <PublicHeader showBackButton backTo={cadastroBackLink} />
+      <header className="border-b border-border/50 bg-background/80 backdrop-blur-md px-4 py-3 flex items-center gap-3">
+        <img src={logoCarvalho} alt="Igreja Carvalho" className="h-8 w-auto" />
+        <span className="font-semibold text-foreground">Igreja Carvalho</span>
+      </header>
 
       <div className="flex-1 p-4 py-8">
         <Card className="w-full max-w-lg mx-auto shadow-soft">

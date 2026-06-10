@@ -140,6 +140,9 @@ for (const check of checks) {
         entrou_por: complementar.entrou_por || null,
         data_nascimento: dataNascimento,
         aceitou_jesus: checkboxes.aceitou_jesus,
+        data_conversao: checkboxes.aceitou_jesus
+          ? new Date().toISOString().slice(0, 10)
+          : null,
         batizado: checkboxes.batizado,
         deseja_contato: checkboxes.deseja_contato,
         recebeu_brinde: checkboxes.recebeu_brinde,

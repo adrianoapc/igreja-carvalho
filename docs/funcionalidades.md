@@ -160,7 +160,8 @@ Substituiu o modal monolítico `CadastrarPessoaDialog` por uma **página wizard 
   - `StepDadosMembro` (apenas Membro): CPF (máscara), RG, estado civil, profissão, endereço completo com autocomplete por CEP
   - `StepComplementar`: data de aniversário (dia/mês/ano), como conheceu, observações
   - `StepCheckboxes`: aceitou Jesus, batizado, deseja contato, recebeu brinde (visitante)
-- **Ações ao concluir**: verifica duplicata telefone/email, faz `INSERT profiles`, cria `visitante_contatos` agendado para +3 dias se `deseja_contato=true`, redireciona para `/pessoas`
+- **Ações ao concluir**: verifica duplicata telefone/email, faz `INSERT profiles` (define `data_conversao` automaticamente quando `aceitou_jesus=true`, alimentando o painel "Aceitaram Jesus"), cria `visitante_contatos` agendado para +3 dias se `deseja_contato=true`, redireciona para `/pessoas`
+- **Cadastro público** (`/cadastro/visitante`, `/cadastro/cafe-vp`, recepção): a edge function `cadastro-publico` aplica a mesma regra — define `data_conversao` quando `aceitou_jesus=true` (se ainda não houver data registrada) e, quando `deseja_contato=true`, agenda um `visitante_contatos` para +3 dias. Como o cadastro é público/anônimo, `membro_responsavel_id` fica `null` (sem responsável definido); a atribuição a um líder/departamento responsável é uma rotina de roteamento futura, ainda não implementada. A coluna `membro_responsavel_id` é opcional (`NULL` permitido) desde a migração `20260610160000`.
 - **Barra de progresso**: componente `Progress` do Shadcn atualizado por etapa
 
 #### Módulo Pessoas / Membros — visão funcional
@@ -196,6 +197,17 @@ Formulário público (sem autenticação) convertido para wizard de 3 etapas, ac
 - **Etapa 3**: Como conheceu a igreja, necessidades especiais, observações, checkboxes (aceitou Jesus, deseja contato)
 - **Submissão**: chama edge function `cadastro-publico` com `action: "cadastrar_visitante"`
 - **Parâmetros de URL**: `igreja_id`, `filial_id`, `todas_filiais`, `telefone` (pré-preenchimento), `aceitou=true` (muda título e ícone da etapa 1)
+- **Layout público**: páginas `/cadastro`, `/cadastro/visitante`, `/cadastro/membro` e `/cadastro/cafe-vp` usam um cabeçalho minimalista (logo + nome da igreja), sem `PublicHeader`/botões "Instalar"/"Entrar", já que são acessadas externamente sem necessidade de navegação para o app autenticado.
+
+#### Links Externos de Cadastro (Shortlinks)
+
+Card `LinksExternosCard` (`src/components/pessoas/LinksExternosCard.tsx`), exibido na tela Pessoas para staff com filial selecionada.
+
+- **4 links disponíveis**: Visitante (`/cadastro/visitante`), Aceitou Jesus (`/cadastro?aceitou=true`), Membros (`/cadastro/membro`), Café V&P (`/cadastro/cafe-vp`)
+- **Shortlinks reais**: ao montar, o card consulta a tabela `short_links` por `igreja_id` + URL alvo (com `igreja_id`/`filial_id`/`todas_filiais` embutidos); se não existir, cria um registro com `slug` aleatório (7 caracteres) e `created_by` o usuário logado
+- **URL final**: `{origin}/s/:slug`, resolvida pela página pública `src/pages/ShortLinkRedirect.tsx`, que busca `target_url` em `short_links` (acesso `anon`) e redireciona via `window.location.replace`
+- **Layout**: 4 cards compactos em uma única linha (grid 2x2 em mobile, 4 colunas em telas maiores), cada um com título, botão de copiar e botão de QR Code
+- **Migration**: `20260609150000_fix_short_links_anon_select.sql` restaura `SELECT` público (`anon`) em `short_links`, necessário para o redirect funcionar sem autenticação
 
 ---
 

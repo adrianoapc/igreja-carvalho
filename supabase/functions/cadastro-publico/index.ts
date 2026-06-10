@@ -97,6 +97,19 @@ interface BuscarMembroData {
   todas_filiais?: boolean;
 }
 
+// Quando a pessoa aceita Jesus pela primeira vez, registra a data da
+// conversão (usada pelo painel "Aceitaram Jesus" em /pessoas). Se já houver
+// uma data registrada, ela é preservada.
+function calcularDataConversao(
+  aceitouAgora: boolean | undefined,
+  dataConversaoExistente: string | null | undefined,
+): string | null | undefined {
+  if (aceitouAgora && !dataConversaoExistente) {
+    return new Date().toISOString().slice(0, 10);
+  }
+  return dataConversaoExistente;
+}
+
 // deno-lint-ignore no-explicit-any
 function applyTenantFilters(
   query: any,
@@ -166,6 +179,41 @@ async function sincronizarContatosPerfil(
   } catch (err) {
     console.warn(
       "[cadastro-publico] Aviso: erro ao sincronizar profile_contatos:",
+      err,
+    );
+  }
+}
+
+// Agenda um contato de acompanhamento (+3 dias) para um novo visitante que
+// pediu para ser contatado. membro_responsavel_id fica em aberto (null) —
+// a atribuição a um líder/departamento responsável é feita depois, por uma
+// rotina de roteamento. Não lança — erros são apenas logados.
+// deno-lint-ignore no-explicit-any
+async function agendarContatoVisitante(
+  supabase: any,
+  visitanteId: string,
+  igrejaId?: string,
+  filialId?: string | null,
+) {
+  if (!igrejaId) return;
+
+  try {
+    const dataContato = new Date();
+    dataContato.setDate(dataContato.getDate() + 3);
+
+    await supabase.from("visitante_contatos").insert({
+      visitante_id: visitanteId,
+      membro_responsavel_id: null,
+      data_contato: dataContato.toISOString(),
+      tipo_contato: "telefonico",
+      status: "agendado",
+      observacoes: "Contato automático agendado após cadastro externo",
+      igreja_id: igrejaId,
+      filial_id: filialId || null,
+    });
+  } catch (err) {
+    console.warn(
+      "[cadastro-publico] Aviso: erro ao agendar visitante_contatos:",
       err,
     );
   }
@@ -396,6 +444,10 @@ Deno.serve(async (req) => {
             status: novoStatus,
             aceitou_jesus:
               visitanteData.aceitou_jesus || visitanteExistente.aceitou_jesus,
+            data_conversao: calcularDataConversao(
+              visitanteData.aceitou_jesus,
+              visitanteExistente.data_conversao,
+            ),
             deseja_contato:
               visitanteData.deseja_contato ?? visitanteExistente.deseja_contato,
             sexo: visitanteData.sexo || visitanteExistente.sexo,
@@ -435,6 +487,10 @@ Deno.serve(async (req) => {
               visitanteData.necessidades_especiais?.trim() || null,
             observacoes: visitanteData.observacoes?.trim() || null,
             aceitou_jesus: visitanteData.aceitou_jesus || false,
+            data_conversao: calcularDataConversao(
+              visitanteData.aceitou_jesus,
+              null,
+            ),
             deseja_contato: visitanteData.deseja_contato ?? true,
             sexo: visitanteData.sexo || null,
             data_nascimento: visitanteData.data_nascimento || null,
@@ -458,6 +514,15 @@ Deno.serve(async (req) => {
           telefoneNormalizado,
           visitanteData.email?.trim().toLowerCase() || null,
         );
+
+        if (visitanteData.deseja_contato ?? true) {
+          await agendarContatoVisitante(
+            supabase,
+            newData.id,
+            visitanteData.igreja_id,
+            visitanteData.filial_id,
+          );
+        }
 
         console.log(
           `[cadastro-publico] Novo visitante cadastrado: ${resultData.nome}`,
@@ -691,6 +756,10 @@ Deno.serve(async (req) => {
           observacoes: observacoesCombinadas || profileExistente.observacoes,
           aceitou_jesus:
             cafeData.aceitou_jesus || profileExistente.aceitou_jesus,
+          data_conversao: calcularDataConversao(
+            cafeData.aceitou_jesus,
+            profileExistente.data_conversao,
+          ),
           deseja_contato:
             cafeData.deseja_contato ?? profileExistente.deseja_contato,
           entrou_por: profileExistente.entrou_por || "cafe_vp",
@@ -737,6 +806,7 @@ Deno.serve(async (req) => {
             cafeData.necessidades_especiais?.trim() || null,
           observacoes: observacoesCombinadas || null,
           aceitou_jesus: cafeData.aceitou_jesus || false,
+          data_conversao: calcularDataConversao(cafeData.aceitou_jesus, null),
           deseja_contato: cafeData.deseja_contato ?? true,
           entrou_por: "cafe_vp",
           status: "visitante",
@@ -750,6 +820,15 @@ Deno.serve(async (req) => {
         .single();
 
       if (insertError) throw insertError;
+
+      if (cafeData.deseja_contato ?? true) {
+        await agendarContatoVisitante(
+          supabase,
+          created.id,
+          cafeData.igreja_id,
+          cafeData.filial_id,
+        );
+      }
 
       return new Response(
         JSON.stringify({

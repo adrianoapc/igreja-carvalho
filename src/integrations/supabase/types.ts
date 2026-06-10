@@ -10467,7 +10467,7 @@ export type Database = {
           filial_id: string | null
           id: string
           igreja_id: string | null
-          membro_responsavel_id: string
+          membro_responsavel_id: string | null
           observacoes: string | null
           status: string | null
           tipo_contato: string | null
@@ -10480,7 +10480,7 @@ export type Database = {
           filial_id?: string | null
           id?: string
           igreja_id?: string | null
-          membro_responsavel_id: string
+          membro_responsavel_id?: string | null
           observacoes?: string | null
           status?: string | null
           tipo_contato?: string | null
@@ -10493,7 +10493,7 @@ export type Database = {
           filial_id?: string | null
           id?: string
           igreja_id?: string | null
-          membro_responsavel_id?: string
+          membro_responsavel_id?: string | null
           observacoes?: string | null
           status?: string | null
           tipo_contato?: string | null
