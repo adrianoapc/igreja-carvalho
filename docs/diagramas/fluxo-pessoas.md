@@ -65,3 +65,19 @@ flowchart TD
     S3 --> SUB[Edge: cadastro-publico<br/>action: cadastrar_visitante]
     SUB --> OK([Tela de sucesso])
 ```
+
+## Links Externos de Cadastro (Shortlinks)
+
+```mermaid
+flowchart TD
+    A([LinksExternosCard monta]) --> B[Monta URL longa por link<br/>+ igreja_id/filial_id/todas_filiais]
+    B --> C[Busca short_links<br/>WHERE igreja_id + target_url IN ...]
+    C --> D{Slug existe?}
+    D -->|Sim| E[Usa slug existente]
+    D -->|Não| F[Gera slug aleatorio<br/>INSERT short_links]
+    F --> E
+    E --> G[Exibe card: titulo + Copiar + QR Code<br/>URL final = origin/s/:slug]
+    G --> H([Usuario compartilha /s/:slug])
+    H --> I[ShortLinkRedirect<br/>SELECT target_url WHERE slug]
+    I --> J([Redireciona para URL alvo<br/>/cadastro/...])
+```
