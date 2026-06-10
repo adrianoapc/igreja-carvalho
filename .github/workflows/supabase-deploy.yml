@@ -1,11 +1,20 @@
+# Workflow de deploy automatico do backend Supabase (migrations + edge
+# functions). Atualmente disponivel apenas via execucao manual
+# (workflow_dispatch): o gatilho automatico em push para `main` foi removido
+# porque este projeto roda no Supabase gerenciado pelo Lovable, e ainda nao
+# ha confirmacao de que existe um SUPABASE_ACCESS_TOKEN/SUPABASE_DB_PASSWORD
+# com acesso a esse projeto para configurar como secret aqui. Ver
+# docs/01-Arquitetura/01-arquitetura-geral.MD (secao "CI/CD: Deploy do
+# Supabase") para detalhes. Se/quando esse acesso existir, basta reativar o
+# gatilho de push abaixo.
 name: Deploy Supabase
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "supabase/migrations/**"
-      - "supabase/functions/**"
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - "supabase/migrations/**"
+  #     - "supabase/functions/**"
   workflow_dispatch:
 
 jobs:
@@ -42,13 +51,7 @@ jobs:
       - name: Detect changed edge functions
         id: functions
         run: |
-          if [ "${{ github.event_name }}" = "push" ] && git cat-file -e "${{ github.event.before }}" 2>/dev/null; then
-            RANGE="${{ github.event.before }}..${{ github.sha }}"
-          else
-            RANGE="HEAD~1..HEAD"
-          fi
-
-          CHANGED_PATHS=$(git diff --name-only "$RANGE" -- supabase/functions/ || true)
+          CHANGED_PATHS=$(git diff --name-only HEAD~1..HEAD -- supabase/functions/ || true)
 
           if echo "$CHANGED_PATHS" | grep -q '^supabase/functions/_shared/'; then
             # Código compartilhado mudou: redeploy de todas as functions para
