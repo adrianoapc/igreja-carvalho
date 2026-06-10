@@ -7,6 +7,8 @@ import {
   ClipboardList,
   ArrowLeft,
   ChevronRight,
+  CheckIcon,
+  Baby,
 } from "lucide-react";
 
 interface AcaoCard {
@@ -42,18 +44,37 @@ export default function HubRecepcao() {
       rota: "/chamada",
       cor: "from-violet-500 to-violet-600",
     },
+    {
+      icon: <CheckIcon className="w-7 h-7" />,
+      titulo: "Realizar Checkin",
+      descricao: "Check-in por QR Code ou busca manual em eventos",
+      rota: "/recepcao/checkin",
+      cor: "from-green-500 to-green-600",
+    },
+    {
+      icon: <Baby className="w-7 h-7" />,
+      titulo: "Recepção Infantil",
+      descricao: "Check-in e saída de crianças no ministério kids",
+      rota: "/recepcao/infantil",
+      cor: "from-orange-400 to-orange-500",
+    },
+    {
+      icon: <ArrowLeft className="w-7 h-7" />,
+      titulo: "Voltar para a Home",
+      descricao: "Retornar à página inicial",
+      rota: "/",
+      cor: "from-gray-500 to-gray-600",
+    },
   ];
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10 border-b px-4 py-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="mb-1">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar
-        </Button>
         <h1 className="text-2xl font-bold">Recepção</h1>
-        <p className="text-sm text-muted-foreground">Selecione a ação desejada</p>
+        <p className="text-sm text-muted-foreground">
+          Selecione a ação desejada
+        </p>
       </div>
 
       {/* Cards de ação */}
@@ -65,12 +86,16 @@ export default function HubRecepcao() {
             onClick={() => navigate(acao.rota)}
           >
             <CardContent className="p-4 flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${acao.cor} flex items-center justify-center text-white shrink-0`}>
+              <div
+                className={`w-14 h-14 rounded-xl bg-gradient-to-br ${acao.cor} flex items-center justify-center text-white shrink-0`}
+              >
                 {acao.icon}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-base">{acao.titulo}</p>
-                <p className="text-sm text-muted-foreground leading-snug">{acao.descricao}</p>
+                <p className="text-sm text-muted-foreground leading-snug">
+                  {acao.descricao}
+                </p>
               </div>
               <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
             </CardContent>

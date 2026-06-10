@@ -66,6 +66,10 @@ export function PessoaWizard() {
         toast({ title: "Contato necessário", description: "Informe telefone ou email.", variant: "destructive" });
         return false;
       }
+      if (dadosBasicos.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dadosBasicos.email.trim())) {
+        toast({ title: "Email inválido", description: "Informe um endereço de email válido.", variant: "destructive" });
+        return false;
+      }
     }
     return true;
   };
