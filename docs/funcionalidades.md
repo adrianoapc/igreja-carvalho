@@ -198,6 +198,7 @@ Formulário público (sem autenticação) convertido para wizard de 3 etapas, ac
 - **Submissão**: chama edge function `cadastro-publico` com `action: "cadastrar_visitante"`
 - **Parâmetros de URL**: `igreja_id`, `filial_id`, `todas_filiais`, `telefone` (pré-preenchimento), `aceitou=true` (muda título/ícone da etapa 1, exibe a caixa "Que alegria saber que você aceitou Jesus! 🎉" e marca/bloqueia o checkbox "Aceitei Jesus hoje" na etapa 3 — não pode ser desmarcado)
 - **Layout público**: páginas `/cadastro`, `/cadastro/visitante`, `/cadastro/membro` e `/cadastro/cafe-vp` usam um cabeçalho minimalista (logo + nome da igreja), sem `PublicHeader`/botões "Instalar"/"Entrar", já que são acessadas externamente sem necessidade de navegação para o app autenticado.
+- **Validação de tenant**: `igreja_id`/`filial_id` vêm na URL (necessário para roteamento multi-tenant em um link público) — a edge function `cadastro-publico` valida (`validarIgrejaFilial`) que `igreja_id` existe em `igrejas` e, se informado, que `filial_id` pertence a essa igreja, retornando 400 ("Link inválido") caso contrário. Aplica-se às ações `cadastrar_visitante`, `buscar_membro`, `cadastrar_cafe_vp` e `atualizar_membro`.
 
 #### Links Externos de Cadastro (Shortlinks)
 

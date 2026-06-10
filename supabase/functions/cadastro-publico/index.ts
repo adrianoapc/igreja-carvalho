@@ -122,6 +122,44 @@ function applyTenantFilters(
   return nextQuery;
 }
 
+// Confere se igreja_id (e, se informado, filial_id) correspondem a um
+// tenant real antes de aceitar o cadastro público. Os links de cadastro
+// carregam esses IDs na URL (necessário para roteamento multi-tenant), mas
+// nada impede que um valor arbitrário seja enviado diretamente para a edge
+// function — sem essa checagem, viraria lixo/spam em profiles com um
+// igreja_id inexistente.
+// deno-lint-ignore no-explicit-any
+async function validarIgrejaFilial(
+  supabase: any,
+  igrejaId: string,
+  filialId?: string | null,
+): Promise<string | null> {
+  const { data: igreja, error: igrejaError } = await supabase
+    .from("igrejas")
+    .select("id")
+    .eq("id", igrejaId)
+    .maybeSingle();
+
+  if (igrejaError || !igreja) {
+    return "Link inválido: igreja não encontrada.";
+  }
+
+  if (filialId) {
+    const { data: filial, error: filialError } = await supabase
+      .from("filiais")
+      .select("id")
+      .eq("id", filialId)
+      .eq("igreja_id", igrejaId)
+      .maybeSingle();
+
+    if (filialError || !filial) {
+      return "Link inválido: filial não encontrada.";
+    }
+  }
+
+  return null;
+}
+
 // Sincroniza telefone e email em profile_contatos após criar/atualizar um
 // perfil via cadastro público. Não lança — erros são apenas logados para
 // não bloquear o retorno de sucesso ao usuário.
@@ -315,6 +353,18 @@ Deno.serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
+      }
+
+      const erroTenantVisitante = await validarIgrejaFilial(
+        supabase,
+        visitanteData.igreja_id,
+        visitanteData.filial_id,
+      );
+      if (erroTenantVisitante) {
+        return new Response(JSON.stringify({ error: erroTenantVisitante }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       // Validação básica
@@ -562,6 +612,26 @@ Deno.serve(async (req) => {
         );
       }
 
+      const erroTenantBusca = await validarIgrejaFilial(
+        supabase,
+        buscaData.igreja_id,
+        buscaData.filial_id,
+      );
+      if (erroTenantBusca) {
+        await logAudit(
+          supabase,
+          "cadastro-publico",
+          "buscar_membro",
+          clientIP,
+          false,
+          erroTenantBusca,
+        );
+        return new Response(JSON.stringify({ error: erroTenantBusca }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       if (!contato?.trim()) {
         await logAudit(
           supabase,
@@ -671,6 +741,18 @@ Deno.serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
+      }
+
+      const erroTenantCafe = await validarIgrejaFilial(
+        supabase,
+        cafeData.igreja_id,
+        cafeData.filial_id,
+      );
+      if (erroTenantCafe) {
+        return new Response(JSON.stringify({ error: erroTenantCafe }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       if (!cafeData.nome?.trim()) {
@@ -854,6 +936,18 @@ Deno.serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
+      }
+
+      const erroTenantMembro = await validarIgrejaFilial(
+        supabase,
+        membroData.igreja_id,
+        membroData.filial_id,
+      );
+      if (erroTenantMembro) {
+        return new Response(JSON.stringify({ error: erroTenantMembro }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       if (!membroData.id || !membroData.nome?.trim()) {
