@@ -7,8 +7,8 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PublicHeader } from "@/components/layout/PublicHeader";
 import { UserPlus, Heart, Coffee } from "lucide-react";
+import logoCarvalho from "@/assets/logo-carvalho.png";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
@@ -63,7 +63,10 @@ export default function CadastroIndex() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <PublicHeader showBackButton backTo="/public" />
+      <header className="border-b border-border/50 bg-background/80 backdrop-blur-md px-4 py-3 flex items-center gap-3">
+        <img src={logoCarvalho} alt={igrejaInfo.nome} className="h-8 w-auto" />
+        <span className="font-semibold text-foreground">{igrejaInfo.nome}</span>
+      </header>
 
       <div className="flex-1 flex items-center justify-center p-4">
         <Card className="w-full max-w-md shadow-soft">

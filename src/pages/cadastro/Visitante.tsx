@@ -13,7 +13,6 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
-import { PublicHeader } from "@/components/layout/PublicHeader";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -26,6 +25,7 @@ import {
 } from "lucide-react";
 import InputMask from "react-input-mask";
 import { useSearchParams } from "react-router-dom";
+import logoCarvalho from "@/assets/logo-carvalho.png";
 
 type Step = 1 | 2 | 3;
 
@@ -167,7 +167,10 @@ export default function CadastroVisitante() {
   if (success) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <PublicHeader showBackButton backTo={backLink} />
+        <header className="border-b border-border/50 bg-background/80 backdrop-blur-md px-4 py-3 flex items-center gap-3">
+          <img src={logoCarvalho} alt="Igreja Carvalho" className="h-8 w-auto" />
+          <span className="font-semibold text-foreground">Igreja Carvalho</span>
+        </header>
         <div className="flex-1 flex items-center justify-center p-4">
           <Card className="w-full max-w-md text-center shadow-soft">
             <CardContent className="pt-10 pb-10 space-y-4">
@@ -188,7 +191,10 @@ export default function CadastroVisitante() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <PublicHeader showBackButton backTo={backLink} />
+      <header className="border-b border-border/50 bg-background/80 backdrop-blur-md px-4 py-3 flex items-center gap-3">
+        <img src={logoCarvalho} alt="Igreja Carvalho" className="h-8 w-auto" />
+        <span className="font-semibold text-foreground">Igreja Carvalho</span>
+      </header>
 
       <div className="flex-1 flex items-center justify-center p-4 py-8">
         <div className="w-full max-w-md space-y-6">
