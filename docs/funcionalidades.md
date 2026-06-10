@@ -160,7 +160,8 @@ Substituiu o modal monolítico `CadastrarPessoaDialog` por uma **página wizard 
   - `StepDadosMembro` (apenas Membro): CPF (máscara), RG, estado civil, profissão, endereço completo com autocomplete por CEP
   - `StepComplementar`: data de aniversário (dia/mês/ano), como conheceu, observações
   - `StepCheckboxes`: aceitou Jesus, batizado, deseja contato, recebeu brinde (visitante)
-- **Ações ao concluir**: verifica duplicata telefone/email, faz `INSERT profiles`, cria `visitante_contatos` agendado para +3 dias se `deseja_contato=true`, redireciona para `/pessoas`
+- **Ações ao concluir**: verifica duplicata telefone/email, faz `INSERT profiles` (define `data_conversao` automaticamente quando `aceitou_jesus=true`, alimentando o painel "Aceitaram Jesus"), cria `visitante_contatos` agendado para +3 dias se `deseja_contato=true`, redireciona para `/pessoas`
+- **Cadastro público** (`/cadastro/visitante`, `/cadastro/cafe-vp`, recepção): a edge function `cadastro-publico` aplica a mesma regra — define `data_conversao` quando `aceitou_jesus=true` (se ainda não houver data registrada) e, quando `deseja_contato=true`, agenda um `visitante_contatos` para +3 dias. Como o cadastro é público/anônimo, `membro_responsavel_id` fica `null` (sem responsável definido); a atribuição a um líder/departamento responsável é uma rotina de roteamento futura, ainda não implementada. A coluna `membro_responsavel_id` é opcional (`NULL` permitido) desde a migração `20260610160000`.
 - **Barra de progresso**: componente `Progress` do Shadcn atualizado por etapa
 
 #### Módulo Pessoas / Membros — visão funcional

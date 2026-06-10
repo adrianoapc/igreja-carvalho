@@ -184,6 +184,41 @@ async function sincronizarContatosPerfil(
   }
 }
 
+// Agenda um contato de acompanhamento (+3 dias) para um novo visitante que
+// pediu para ser contatado. membro_responsavel_id fica em aberto (null) —
+// a atribuição a um líder/departamento responsável é feita depois, por uma
+// rotina de roteamento. Não lança — erros são apenas logados.
+// deno-lint-ignore no-explicit-any
+async function agendarContatoVisitante(
+  supabase: any,
+  visitanteId: string,
+  igrejaId?: string,
+  filialId?: string | null,
+) {
+  if (!igrejaId) return;
+
+  try {
+    const dataContato = new Date();
+    dataContato.setDate(dataContato.getDate() + 3);
+
+    await supabase.from("visitante_contatos").insert({
+      visitante_id: visitanteId,
+      membro_responsavel_id: null,
+      data_contato: dataContato.toISOString(),
+      tipo_contato: "telefonico",
+      status: "agendado",
+      observacoes: "Contato automático agendado após cadastro externo",
+      igreja_id: igrejaId,
+      filial_id: filialId || null,
+    });
+  } catch (err) {
+    console.warn(
+      "[cadastro-publico] Aviso: erro ao agendar visitante_contatos:",
+      err,
+    );
+  }
+}
+
 // Helper to log audit events
 // deno-lint-ignore no-explicit-any
 async function logAudit(
@@ -479,6 +514,15 @@ Deno.serve(async (req) => {
           telefoneNormalizado,
           visitanteData.email?.trim().toLowerCase() || null,
         );
+
+        if (visitanteData.deseja_contato ?? true) {
+          await agendarContatoVisitante(
+            supabase,
+            newData.id,
+            visitanteData.igreja_id,
+            visitanteData.filial_id,
+          );
+        }
 
         console.log(
           `[cadastro-publico] Novo visitante cadastrado: ${resultData.nome}`,
@@ -776,6 +820,15 @@ Deno.serve(async (req) => {
         .single();
 
       if (insertError) throw insertError;
+
+      if (cafeData.deseja_contato ?? true) {
+        await agendarContatoVisitante(
+          supabase,
+          created.id,
+          cafeData.igreja_id,
+          cafeData.filial_id,
+        );
+      }
 
       return new Response(
         JSON.stringify({

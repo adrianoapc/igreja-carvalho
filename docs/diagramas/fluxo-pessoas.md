@@ -63,8 +63,17 @@ flowchart TD
     S1 --> S2[Step 2: Telefone + Email]
     S2 --> S3[Step 3: Como conheceu + Obs + Checkboxes]
     S3 --> SUB[Edge: cadastro-publico<br/>action: cadastrar_visitante]
-    SUB --> OK([Tela de sucesso])
+    SUB --> CONV{aceitou_jesus?}
+    CONV -->|Sim, sem data anterior| DC[Define data_conversao = hoje<br/>alimenta painel Aceitaram Jesus]
+    CONV -->|Não| CT
+    DC --> CT{deseja_contato?}
+    CT -->|Sim| AG[INSERT visitante_contatos<br/>membro_responsavel_id = null<br/>data_contato = +3 dias]
+    CT -->|Não| OK
+    AG --> OK([Tela de sucesso])
 ```
+
+> `membro_responsavel_id` é `null` no cadastro público pois não há membro autenticado para assumir o contato.
+> A atribuição a um líder/departamento responsável é uma rotina de roteamento futura (ainda não implementada).
 
 ## Links Externos de Cadastro (Shortlinks)
 
