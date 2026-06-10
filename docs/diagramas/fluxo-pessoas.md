@@ -17,11 +17,26 @@ flowchart TD
     I --> I1{Selecionar tipo}
     I1 -->|Visitante/Frequentador| I2[Step 1: Dados básicos<br/>Step 2: Complementar<br/>Step 3: Finalizar]
     I1 -->|Membro| I3[Step 1: Dados básicos<br/>Step 2: Dados do membro<br/>Step 3: Complementar<br/>Step 4: Finalizar]
-    I2 --> K[Salvar cadastro<br/>INSERT profiles]
-    I3 --> K
+    I2 --> VAL{Email preenchido<br/>e válido?}
+    I3 --> VAL
+    VAL -->|Inválido| ERR[Exibe erro<br/>Email inválido]
+    ERR --> I2
+    VAL -->|Ok / vazio| K[Salvar cadastro<br/>INSERT profiles]
     J --> K
     K --> L[Recarregar/atualizar listagem<br/>scoped por igreja]
     L --> M([Fim])
+```
+
+## Aniversariantes — Seções Colapsáveis
+
+```mermaid
+flowchart TD
+    A([AniversariosDashboard]) --> B[Listar Esta Semana e Este Mês]
+    B --> C{Usuário clica no<br/>cabeçalho da seção?}
+    C -->|Esta Semana| D[Alterna semanaColapsada]
+    C -->|Este Mês| E[Alterna mesColapsado]
+    D --> F[Recolhe/expande lista<br/>mantém Badge com contador]
+    E --> F
 ```
 
 ## Fluxo de Check-in com OTP (QR Code do Evento)

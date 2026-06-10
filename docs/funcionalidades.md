@@ -134,6 +134,7 @@ O Super Admin Portal é um subsistema separado para gestão SaaS de múltiplas i
 - Dashboard de aniversários (nascimento, casamento, batismo)
 - Filtros por tipo e período
 - Calendário visual
+- Seções "Esta Semana" e "Este Mês" são colapsáveis individualmente (botão com ícone de chevron), permitindo recolher listas grandes sem perder os contadores (`Badge`)
 
 ### 1.7 Módulo Pessoas / Membros
 
@@ -155,7 +156,7 @@ Substituiu o modal monolítico `CadastrarPessoaDialog` por uma **página wizard 
   - **Membro**: 5 etapas — Selecionar tipo → Dados básicos → Dados do membro → Complementar → Checkboxes
 - **Etapas detalhadas**:
   - `StepTipo`: seleção do tipo (Visitante / Frequentador / Membro) via cards
-  - `StepDadosBasicos`: nome (obrigatório), telefone (máscara), email, sexo
+  - `StepDadosBasicos`: nome (obrigatório), telefone (máscara), email (validado por formato `usuario@dominio`), sexo
   - `StepDadosMembro` (apenas Membro): CPF (máscara), RG, estado civil, profissão, endereço completo com autocomplete por CEP
   - `StepComplementar`: data de aniversário (dia/mês/ano), como conheceu, observações
   - `StepCheckboxes`: aceitou Jesus, batizado, deseja contato, recebeu brinde (visitante)
@@ -164,7 +165,7 @@ Substituiu o modal monolítico `CadastrarPessoaDialog` por uma **página wizard 
 
 #### Módulo Pessoas / Membros — visão funcional
 
-- **Funcionalidades disponíveis**: dashboard com estatísticas por status; busca rápida por nome/email/telefone; listagem com ordenação por nome e avatars (quando cadastrados); criação via wizard (rota dedicada); edição de perfis completos; evolução de status visitante → frequentador → membro; visualização de vínculos familiares bidirecionais; atribuição de funções ministeriais; exportação da listagem; cards de acesso rápido (visitantes, membros, frequentadores, contatos agendados); painel de alterações pendentes; lista das últimas conversões (aceitaram Jesus).
+- **Funcionalidades disponíveis**: dashboard com estatísticas por status; busca rápida por nome/email/telefone; listagem com ordenação por nome e avatars (quando cadastrados); criação via wizard (rota dedicada); edição de perfis completos; evolução de status visitante → frequentador → membro; visualização de vínculos familiares bidirecionais; atribuição de funções ministeriais; exportação da listagem; painel de alterações pendentes; lista das últimas conversões (aceitaram Jesus).
 - **Ações permitidas**: criar pessoa (nome obrigatório, contato recomendado), editar dados pessoais/contatos/status/funções, navegar para detalhes, aplicar busca/filtros, carregar mais itens via scroll, acionar atalhos rápidos para segmentos e contatos agendados, revisar alterações pendentes e acessar lista de conversões recentes.
 - **Regras funcionais**: status restrito a `visitante`/`frequentador`/`membro`; verificação manual de duplicidade (nome/telefone/email) antes de salvar; campos mínimos exigem nome; contatos incompletos reduzem eficácia de busca e follow-up; ao editar contatos, os dados são sanitizados antes de persistir e novos contatos podem gerar enfileiramento em `chatbot_queue`; vínculos familiares exibem ambos os lados com inversão de papel; avatars não são obrigatórios e podem exibir fallback.
 - **Links relacionados**: [Manual do Usuário — Pessoas](manual-usuario.md#3-gestão-de-pessoas) · [Produto — Pessoas/Membros](produto/README_PRODUTO.MD#pessoas--membros-visão-de-produto)
