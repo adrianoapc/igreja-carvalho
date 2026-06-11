@@ -48,31 +48,26 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
-      - name: Detect changed edge functions
+      - name: List edge functions
         id: functions
         run: |
-          CHANGED_PATHS=$(git diff --name-only HEAD~1..HEAD -- supabase/functions/ || true)
-
-          if echo "$CHANGED_PATHS" | grep -q '^supabase/functions/_shared/'; then
-            # Código compartilhado mudou: redeploy de todas as functions para
-            # garantir que todas peguem a versão atualizada de _shared.
-            FUNCTIONS=$(find supabase/functions -mindepth 1 -maxdepth 1 -type d ! -name '_shared' -printf '%f\n' | sort)
-          else
-            FUNCTIONS=$(echo "$CHANGED_PATHS" \
-              | awk -F/ 'NF>=3 && $3 != "_shared" {print $3}' \
-              | sort -u)
-          fi
-
-          echo "$FUNCTIONS" > /tmp/changed-functions.txt
+          # Como esta execucao e manual (workflow_dispatch), nao ha como
+          # saber de forma confiavel qual foi a ultima revisao realmente
+          # deployada (pode haver varios commits acumulados desde entao).
+          # Por isso, deployamos todas as functions a cada execucao manual,
+          # garantindo que nada fique desatualizado em relacao as migrations
+          # recem aplicadas.
+          find supabase/functions -mindepth 1 -maxdepth 1 -type d ! -name '_shared' -printf '%f\n' \
+            | sort > /tmp/functions.txt
           echo "Functions a deployar:"
-          cat /tmp/changed-functions.txt
+          cat /tmp/functions.txt
 
-      - name: Deploy changed edge functions
+      - name: Deploy edge functions
         run: |
           while IFS= read -r fn; do
             [ -z "$fn" ] && continue
             echo "Deploying function: $fn"
             supabase functions deploy "$fn" --project-ref "${{ steps.project.outputs.ref }}"
-          done < /tmp/changed-functions.txt
+          done < /tmp/functions.txt
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
