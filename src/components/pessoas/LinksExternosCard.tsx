@@ -40,7 +40,7 @@ const LINKS: LinkDef[] = [
   {
     linkType: "aceitou",
     title: "Aceitou Jesus",
-    path: "/cadastro",
+    path: "/cadastro/visitante",
     params: { aceitou: "true" },
     icon: Heart,
     color: "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400",

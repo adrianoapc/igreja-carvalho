@@ -1,0 +1,73 @@
+# Workflow de deploy automatico do backend Supabase (migrations + edge
+# functions). Atualmente disponivel apenas via execucao manual
+# (workflow_dispatch): o gatilho automatico em push para `main` foi removido
+# porque este projeto roda no Supabase gerenciado pelo Lovable, e ainda nao
+# ha confirmacao de que existe um SUPABASE_ACCESS_TOKEN/SUPABASE_DB_PASSWORD
+# com acesso a esse projeto para configurar como secret aqui. Ver
+# docs/01-Arquitetura/01-arquitetura-geral.MD (secao "CI/CD: Deploy do
+# Supabase") para detalhes. Se/quando esse acesso existir, basta reativar o
+# gatilho de push abaixo.
+name: Deploy Supabase
+
+on:
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - "supabase/migrations/**"
+  #     - "supabase/functions/**"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Read project ref from supabase/config.toml
+        id: project
+        run: |
+          REF=$(grep '^project_id' supabase/config.toml | cut -d'"' -f2)
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+
+      - name: Link project
+        run: supabase link --project-ref "${{ steps.project.outputs.ref }}"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Push database migrations
+        run: supabase db push
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: List edge functions
+        id: functions
+        run: |
+          # Como esta execucao e manual (workflow_dispatch), nao ha como
+          # saber de forma confiavel qual foi a ultima revisao realmente
+          # deployada (pode haver varios commits acumulados desde entao).
+          # Por isso, deployamos todas as functions a cada execucao manual,
+          # garantindo que nada fique desatualizado em relacao as migrations
+          # recem aplicadas.
+          find supabase/functions -mindepth 1 -maxdepth 1 -type d ! -name '_shared' -printf '%f\n' \
+            | sort > /tmp/functions.txt
+          echo "Functions a deployar:"
+          cat /tmp/functions.txt
+
+      - name: Deploy edge functions
+        run: |
+          while IFS= read -r fn; do
+            [ -z "$fn" ] && continue
+            echo "Deploying function: $fn"
+            supabase functions deploy "$fn" --project-ref "${{ steps.project.outputs.ref }}"
+          done < /tmp/functions.txt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

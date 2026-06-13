@@ -7,7 +7,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Heart, Coffee } from "lucide-react";
+import { UserPlus, Coffee } from "lucide-react";
 import logoCarvalho from "@/assets/logo-carvalho.png";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,6 +39,13 @@ export default function CadastroIndex() {
   };
 
   useEffect(() => {
+    if (aceitouJesus) {
+      navigate(buildCadastroPath("/cadastro/visitante", true), { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aceitouJesus, igrejaIdParam, filialIdParam, todasFiliaisParam]);
+
+  useEffect(() => {
     const fetchIgrejaInfo = async () => {
       if (!igrejaContexto) {
         return;
@@ -61,6 +68,10 @@ export default function CadastroIndex() {
     }
   }, [igrejaContexto, igrejaLoading]);
 
+  if (aceitouJesus) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b border-border/50 bg-background/80 backdrop-blur-md px-4 py-3 flex items-center gap-3">
@@ -81,15 +92,6 @@ export default function CadastroIndex() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            {aceitouJesus && (
-              <div className="p-4 bg-primary/10 rounded-lg text-center mb-4">
-                <Heart className="w-8 h-8 text-primary mx-auto mb-2" />
-                <p className="text-sm font-medium text-primary">
-                  Que alegria saber que você aceitou Jesus! 🎉
-                </p>
-              </div>
-            )}
-
             <div className="space-y-3">
               <div className="space-y-2">
                 <h3 className="font-semibold text-foreground">Visitante</h3>
