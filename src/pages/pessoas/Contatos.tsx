@@ -26,7 +26,7 @@ interface Contato {
   status: string | null;
   observacoes: string | null;
   visitante_id: string;
-  membro_responsavel_id: string;
+  membro_responsavel_id: string | null;
   visitante: {
     nome: string;
     telefone: string | null;
@@ -34,7 +34,7 @@ interface Contato {
   };
   membro_responsavel: {
     nome: string;
-  };
+  } | null;
 }
 export default function ContatosDashboard() {
   const [contatos, setContatos] = useState<Contato[]>([]);
@@ -179,7 +179,7 @@ export default function ContatosDashboard() {
               <p className="text-xs md:text-sm text-muted-foreground flex items-center gap-1 truncate">
                 <User className="w-3 h-3 flex-shrink-0" />
                 <span className="truncate">
-                  {contato.membro_responsavel.nome}
+                  {contato.membro_responsavel?.nome || "Sem responsável definido"}
                 </span>
               </p>
             </div>
