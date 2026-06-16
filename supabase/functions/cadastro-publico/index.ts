@@ -579,14 +579,18 @@ Deno.serve(async (req) => {
         );
       }
 
+      // LGPD: never echo back full profile to unauthenticated caller.
+      // When matching an existing visitor by phone/email, returning `*` leaks
+      // fields the caller did not supply. Return only the minimum needed for UX.
       return new Response(
         JSON.stringify({
           success: true,
-          data: resultData,
+          data: { id: resultData.id, nome: resultData.nome },
           isUpdate: !!visitanteExistente,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+
     }
 
     if (action === "buscar_membro") {
