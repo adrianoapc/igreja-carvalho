@@ -6,7 +6,7 @@ const BIOMETRIC_CREDENTIAL_KEY = 'biometric_credential_id';
 const BIOMETRIC_REFRESH_TOKEN_KEY = 'biometric_refresh_token';
 const BIOMETRIC_ACCESS_TOKEN_KEY = 'biometric_access_token';
 const LAST_EMAIL_KEY = 'last_login_email';
-const BIOMETRIC_TEST_MODE_KEY = 'biometric_test_mode';
+
 
 // Tipos de erro específicos para WebAuthn
 export type BiometricErrorType = 

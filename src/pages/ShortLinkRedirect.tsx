@@ -11,12 +11,10 @@ export default function ShortLinkRedirect() {
       return;
     }
     supabase
-      .from("short_links")
-      .select("target_url")
-      .eq("slug", slug)
-      .maybeSingle()
+      .rpc("resolve_short_link", { _slug: slug })
       .then(({ data }) => {
-        window.location.replace(data?.target_url ?? "/");
+        const target = typeof data === "string" ? data : null;
+        window.location.replace(target ?? "/");
       });
   }, [slug]);
 
