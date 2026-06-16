@@ -316,3 +316,56 @@ Quando estiver 100% validado:
 - [ ] Setup training pipeline (GitHub Actions)
 - [ ] Dashboard de métricas real-time
 - [ ] Active learning feedback loop
+
+---
+
+## Comportamento em Runtime (fundido de ML_SUGGESTION_FLOW.md)
+
+### Sequência ao abrir ConciliacaoInteligente
+
+1. `ConciliacaoInteligente.tsx` carrega → `useEffect` dispara ao detectar `igrejaId`
+2. Parâmetros enviados: `igreja_id`, `conta_id` (opcional), `mes_inicio`/`mes_fim` (mês atual), `score_minimo: 0.7`
+3. `gerar-sugestoes-ml` → `gerar_candidatos_conciliacao()` → 180+ candidatos com score 0.84–0.87 (1:1 matches)
+4. Limpa sugestões antigas (`status='pendente'`), insere novos em `conciliacao_ml_sugestoes`
+
+### RLS necessário
+
+```sql
+-- Ver sugestões da própria igreja
+SELECT * FROM conciliacao_ml_sugestoes WHERE igreja_id = auth.user().igreja_id;
+-- Aceitar/rejeitar
+UPDATE conciliacao_ml_sugestoes SET status = 'aceita' WHERE igreja_id = auth.user().igreja_id;
+-- Ver feedback próprio
+SELECT * FROM conciliacao_ml_feedback WHERE usuario_id = auth.user().id;
+```
+
+### Status atual (2026-02-04, commit db37d71)
+
+- ✅ `useGerarSuggestoesConciliacao`, `SugestoesML`, `gerar-sugestoes-ml`, RPCs, schema/RLS — implementados
+- 🔄 Aguardando: testes e2e no navegador, validação dashboard métricas, training pipeline
+- Score atual é **heurístico** (value match + date proximity + type match); threshold 0.90 para batch apply (conservador)
+
+---
+
+## Checklist de Validação Manual (fundido de TESTING_CHECKLIST.md)
+
+### Teste 1: Auto-trigger ao abrir tela
+- Rota: `Financeiro → Conciliação → Aba "Inteligente"`
+- [ ] Tela carrega sem erros; botão Sparkles ativo
+- [ ] Toast: "X sugestões geradas com score ≥ 0.7"
+- [ ] Network: `POST /functions/v1/gerar-sugestoes-ml` → 200 `{ success: true, sugestoes_criadas: 180 }`
+
+### Teste 2: Aceitar sugestão individual
+- [ ] Clicar "Aceitar" em card de sugestão
+- [ ] `status` muda para `aceita` em `conciliacao_ml_sugestoes`
+- [ ] Extrato e transação desaparecem de pendentes
+
+### Teste 3: Rejeitar sugestão
+- [ ] Clicar "Rejeitar" → `status = 'rejeitada'`, feedback registrado em `conciliacao_ml_feedback`
+
+### Teste 4: Batch apply (score ≥ 0.90)
+- [ ] Botão "Aplicar Todas Acima de 0.90" presente
+- [ ] Aplica em paralelo (~2–3s para 45 pares)
+- [ ] Confirmar que apenas score ≥ 0.90 foram aplicados
+
+> Checklist original: `docs/_archive/_fundidos/TESTING_CHECKLIST.md`

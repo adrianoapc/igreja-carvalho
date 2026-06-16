@@ -68,3 +68,43 @@ super_admin (global)
 - Controle de Isolamento: `../controle-multi-tenant.md`
 - Autenticacao: `02-autenticacao-supabase.MD`
 - Fluxo de dados: `03-fluxo-de-dados.MD`
+
+---
+
+## Inventário de Isolamento Multi-Tenant (fundido de controle-multi-tenant.md, snapshot 2026-01-04)
+
+> ⚠️ Snapshot de jan/2026. Verificar contra migrations recentes antes de usar como referência de estado atual.
+> Original em `docs/_archive/_fundidos/controle-multi-tenant.md`.
+
+### Tabelas com isolamento completo (`igreja_id` + RLS)
+
+`profiles`, `alteracoes_perfil_pendentes`, `familias`, `sentimentos_membros`, `notifications`, `tags_midias`, `midias`, `midia_tags`, `liturgias`, `categorias_financeiras`, `subcategorias_financeiras`, `formas_pagamento`, `contas`, `transacoes_financeiras`, `bases_ministeriais`, `centros_custo`, `fornecedores`, `onboarding_requests`, `user_roles`
+
+### Tabelas globais (sem `igreja_id` — design intencional)
+
+`app_config`, `app_permissions`, `app_roles`, `role_permissions`, `role_permissions_audit`, `edge_function_config`, `igrejas`, `filiais`
+
+### Funções de segurança SQL
+
+| Função | Escopo |
+|---|---|
+| `has_role(uuid, app_role)` | Global (compatibilidade) |
+| `has_role_in_igreja(uuid, app_role, uuid)` | Por igreja |
+| `has_filial_access(uuid, uuid)` | Por filial via JWT |
+| `get_current_user_igreja_id()` | JWT → igreja_id |
+| `get_jwt_igreja_id()` | JWT → igreja_id (raw) |
+
+### Storage buckets com isolamento
+
+| Bucket | Path isolado |
+|---|---|
+| `igreja-logo` | `{igreja_id}/logo.png` |
+| `midias` | `{igreja_id}/{filial_id}/...` |
+| `transaction-attachments` | `{igreja_id}/{transacao_id}/...` |
+| `avatars` | `{user_id}/avatar.png` |
+
+### Pendências (jan/2026)
+
+- [ ] Validar edge functions usam `igreja_id` do contexto JWT (a confirmar)
+- [ ] Revisar queries frontend que buscam `user_roles`
+- [ ] Migrar dados legados sem `igreja_id` (se existirem)

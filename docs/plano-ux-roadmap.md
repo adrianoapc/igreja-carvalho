@@ -219,3 +219,43 @@ Para cada tela, registrar:
 ---
 
 **Observação:** Este documento não realiza nenhuma alteração de código. Ele serve como base de alinhamento e planejamento.
+
+---
+
+## Apêndice: Diagnóstico Mobile (fundido de PLANO_UX_MOBILE_BASE_GEMINI + PLANO_UX_MOBILE_RESPONSIVO)
+
+> Ambos datados de 25/12/2025. Originais em `docs/_archive/_fundidos/`.
+
+### Diagnóstico técnico de pain points (BASE_GEMINI)
+
+| Problema | Causa Técnica | Impacto |
+|---|---|---|
+| Tabelas quebram em < 375px | `Table` padrão sem responsividade | Usuário não vê ações |
+| Modal + teclado virtual cobre campo | `Dialog` centralizado não recalcula viewport | Bloqueio de fluxo |
+| Botões no topo direito (ergonomia) | Padrão desktop "F-pattern" no mobile | Difícil alcance em 6.5"+ |
+| Zoom iOS em inputs | `font-size < 16px` (`text-sm` = 14px) | Layout "quebrado" |
+| Conteúdo cortado por notch | `env(safe-area-inset-*)` não aplicados | Conteúdo inacessível |
+
+### Matriz de componentes Desktop → Mobile
+
+| Componente | Desktop | Mobile | Ação |
+|---|---|---|---|
+| Edição/Criação | `Dialog` modal central | `Drawer` bottom sheet | Componente híbrido `ResponsiveDialog` |
+| Listagem | Tabela com colunas | Lista de cards verticais | `hidden md:table` / `block md:hidden` |
+| Filtros | Barra superior | Botão → Drawer dedicado | Reorganização DOM |
+| Ação principal | Botão topo/direita | FAB ou fixo no rodapé | `position: sticky` |
+
+### Números do diagnóstico detalhado (RESPONSIVO, 25/12/2025)
+
+- 94 páginas / 204 componentes analisados
+- 🔴 15 issues P0 (críticos) — 78+ arquivos com problemas identificados
+- Categorias: Formulários (13 arquivos), Tabelas (14), Navegação (10), Modais (10)
+- Arquivo de maior impacto: `TransacaoDialog.tsx` (370 linhas, sem Drawer mobile)
+
+### Critérios de aceitação (metas mensuráveis)
+
+- [ ] 100% dos formulários responsivos em mobile
+- [ ] Zero scroll horizontal involuntário
+- [ ] Todos os botões ≥ 44×44px
+- [ ] Dialogs grandes convertidos para `Drawer` em mobile
+- [ ] Bottom nav implementada para ações principais

@@ -332,3 +332,20 @@ ORDER BY l.created_at DESC;
 
 **Última atualização:** 26/05/2026  
 **Responsável:** Sistema de Automação Igreja Carvalho
+
+---
+
+## Outros jobs agendados (fundido de crons.md)
+
+> Esses jobs usam `edge_function_config` (não `pg_cron.schedule` direto).
+> Original em `docs/_archive/_fundidos/crons.md`.
+
+### `inscricoes-lembretes` (cobrança)
+- **Frequência:** `*/15 * * * *` (a cada 15 min)
+- **Tabela:** `inscricoes_eventos` (`lembrete_pagamento_em`, `cancelado_em`)
+- **Função:** lembrete de pagamento após 12h; cancelamento automático após 24h
+
+### `inscricoes-lembrete-evento` (evento amanhã)
+- **Frequência:** `0 12 * * *` (diário às 12h UTC / 9h BRT)
+- **Tabela:** `inscricoes_eventos` (`lembrete_evento_em` — anti-spam, envia 1×)
+- **Canal:** WhatsApp + In-App via `disparar-alerta`

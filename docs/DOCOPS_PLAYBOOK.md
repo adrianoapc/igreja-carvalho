@@ -18,3 +18,37 @@
 ## Separação conceitual
 - Comunicação = criação manual de mensagens
 - Notificações = disparo automático por evento
+
+---
+
+## Guard-rails adicionais (fundido de COPILOT_PROMPTS.MD)
+
+> Original em `docs/_archive/_fundidos/COPILOT_PROMPTS.MD`.
+
+### Guard-rails gerais do repo
+
+- Não mover, renomear ou apagar arquivos/pastas existentes em /docs sem aprovação
+- Apenas COMPLEMENTAR docs existentes; não duplicar conteúdo — prefira links relativos
+- Diagramas sempre em Mermaid (`docs/diagramas/`)
+- ADR só quando houver decisão com trade-off claro
+- **Nunca inventar** funcionalidades/telas/integrações sem evidência no código — marcar `(a confirmar)`
+- Saída final pronta para commit
+
+### Separação Comunicação × Notificações (regra-chave)
+
+**Comunicação** (`/comunicados`, `/publicacao`):
+- Criação manual de comunicados/avisos; conteúdo editorial; visibilidade definida manualmente
+- PROIBIDO: triggers automáticos, retries, logs de envio, eventos de sistema
+
+**Notificações**:
+- Disparo automático baseado em evento; destinatários automáticos; templates padronizados
+- PROIBIDO: editor de conteúdo, rascunho/publicação, público manual
+
+Se existir integração, escrever explicitamente:
+> "Comunicação pode gerar evento para Notificações" — sem misturar responsabilidades.
+
+### Antes de documentar qualquer módulo
+
+1. Listar evidências no repo (paths em `src/pages`, `src/components`, `src/integrations`)
+2. Só então documentar com base nessas evidências
+3. Se algo não estiver provado, marcar `(a confirmar)` — não inventar
