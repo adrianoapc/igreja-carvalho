@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireInternalCaller } from "../_shared/internal-auth.ts";
 
 // ============= CORS & CONSTANTS =============
 const corsHeaders = {
@@ -92,6 +93,9 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const unauthorized = await requireInternalCaller(req, corsHeaders);
+  if (unauthorized) return unauthorized;
 
   try {
     const { pedido_id, igreja_id: igrejaId } = await req.json();
