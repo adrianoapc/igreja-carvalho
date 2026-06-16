@@ -291,6 +291,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const unauthorized = await requireInternalCaller(req, corsHeaders);
+  if (unauthorized) return unauthorized;
+
   const startTime = Date.now();
   
   try {

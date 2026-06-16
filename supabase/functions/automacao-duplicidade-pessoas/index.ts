@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { resolverWebhookComRemetente } from "../_shared/webhook-resolver.ts";
+import { requireInternalCaller } from "../_shared/internal-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,6 +34,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const unauthorized = await requireInternalCaller(req, corsHeaders);
+  if (unauthorized) return unauthorized;
 
   try {
     const supabase = createClient(
