@@ -922,17 +922,19 @@ Deno.serve(async (req) => {
         );
       }
 
+      // LGPD: response minimization on public endpoint.
       return new Response(
         JSON.stringify({
           success: true,
           isUpdate: false,
-          data: created,
+          data: { id: created.id, nome: created.nome },
           message: cafeData.deseja_trilha
             ? "Cadastro Café V&P realizado! Já registramos seu interesse na trilha de membros."
             : "Cadastro Café V&P realizado com sucesso!",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+
     }
 
     if (action === "atualizar_membro") {
