@@ -1,0 +1,7 @@
+flowchart TD
+    A([Request autenticada]) --> B[Frontend envia consulta de Pessoas]
+    B --> C[Supabase recebe JWT e contexto de perfil]
+    C --> D[Identificar role/perfil do usuário]
+    D --> E[Aplicar políticas RLS em tabelas de pessoas<br/>WHERE igreja_id = auth.jwt()->'app_metadata'->'igreja_id']
+    E --> F[Resultado filtrado pelo RLS]
+    F --> G[Frontend exibe apenas dados permitidos]
