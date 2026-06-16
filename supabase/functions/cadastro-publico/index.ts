@@ -683,11 +683,13 @@ Deno.serve(async (req) => {
       let profileQuery = supabase
         .from("profiles")
         .select(
-          // Security: minimize PII returned to unauthenticated callers.
-          // Removed: user_id (auth identifier), necessidades_especiais (health data — LGPD sensitive),
-          // and reduced address granularity (cep/cidade/estado kept for prefill; bairro/endereco removed).
-          "id, nome, telefone, email, sexo, data_nascimento, estado_civil, cep, cidade, estado, profissao, status, igreja_id, filial_id",
+          // LGPD minimization: only fields strictly needed to confirm identity
+          // and prefill a self-service form the caller already owns.
+          // Removed: user_id, necessidades_especiais (health), bairro, endereco,
+          // profissao (professional data — not required for prefill).
+          "id, nome, telefone, email, sexo, data_nascimento, estado_civil, cep, cidade, estado, status, igreja_id, filial_id",
         )
+
         .in("status", ["membro", "visitante", "frequentador"]);
 
       profileQuery = applyTenantFilters(profileQuery, buscaData);
