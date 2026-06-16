@@ -163,8 +163,6 @@ export function useBiometricAuth() {
   });
 
   const checkSupport = useCallback(async () => {
-    const testMode = localStorage.getItem(BIOMETRIC_TEST_MODE_KEY) === 'true';
-
     const hasWebAuthn = !!(
       window.PublicKeyCredential &&
       typeof window.PublicKeyCredential === 'function'
@@ -182,11 +180,10 @@ export function useBiometricAuth() {
       }
     }
 
-    const isSupported = testMode || (hasWebAuthn && hasPlatformAuth && !isInIframe);
+    const isSupported = hasWebAuthn && hasPlatformAuth && !isInIframe;
     const biometricType = detectBiometricType();
 
     console.log('[BiometricAuth] Support check:', {
-      testMode,
       hasWebAuthn,
       hasPlatformAuth,
       isInIframe,
@@ -227,18 +224,6 @@ export function useBiometricAuth() {
     }
 
     try {
-      const testMode = localStorage.getItem(BIOMETRIC_TEST_MODE_KEY) === 'true';
-
-      if (testMode) {
-        console.log('[BiometricAuth] Test mode: simulating biometric enrollment');
-        const credentialId = 'test-credential-' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem(BIOMETRIC_ENABLED_KEY, 'true');
-        localStorage.setItem(BIOMETRIC_USER_KEY, userId);
-        localStorage.setItem(BIOMETRIC_CREDENTIAL_KEY, credentialId);
-        setState(prev => ({ ...prev, isEnabled: true }));
-        triggerHapticFeedback('success');
-        return { success: true };
-      }
 
       const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
       
