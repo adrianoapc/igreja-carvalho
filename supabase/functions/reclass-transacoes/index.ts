@@ -53,19 +53,26 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const body = (await req.json()) as ReclassPayload & Contexto;
-    // Extrai usuário do token (se enviado) para registrar ownership do job
-    let userId: string | null = null;
+    // Require authenticated caller with admin or tesoureiro role
     const authHeader = req.headers.get("Authorization");
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.slice(7);
-      const { data: userData, error: authError } = await supabase.auth.getUser(
-        token
-      );
-      if (!authError && userData?.user) {
-        userId = userData.user.id;
-      }
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
     }
+    const { data: userData, error: authError } = await supabase.auth.getUser(
+      authHeader.slice(7)
+    );
+    if (authError || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+    const userId: string = userData.user.id;
+
+    const body = (await req.json()) as ReclassPayload & Contexto;
     const {
       tipo,
       filtros,
@@ -75,6 +82,37 @@ Deno.serve(async (req) => {
       igreja_id,
       filial_id,
     } = body;
+
+    // Verify caller has admin/tesoureiro/super_admin role
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+    const allowed = new Set(["admin", "tesoureiro", "super_admin"]);
+    if (!roles?.some((r: { role: string }) => allowed.has(r.role))) {
+      return new Response(JSON.stringify({ error: "Permissão insuficiente" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // Verify caller belongs to the requested igreja (unless super_admin)
+    if (!roles.some((r) => r.role === "super_admin")) {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("igreja_id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!prof || prof.igreja_id !== igreja_id) {
+        return new Response(
+          JSON.stringify({ error: "Acesso negado a esta igreja" }),
+          {
+            status: 403,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          }
+        );
+      }
+    }
 
     if (!tipo || (tipo !== "entrada" && tipo !== "saida")) {
       return new Response(
