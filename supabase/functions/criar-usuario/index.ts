@@ -171,6 +171,30 @@ serve(async (req) => {
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      // Enforce same-church on target profile (super_admin exempt)
+      if (profile_id && !roles.some((r: any) => r.role === "super_admin")) {
+        const { data: callerProfile } = await supabase
+          .from("profiles")
+          .select("igreja_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        const { data: targetProfile } = await supabase
+          .from("profiles")
+          .select("igreja_id")
+          .eq("id", profile_id)
+          .maybeSingle();
+        if (
+          !callerProfile ||
+          !targetProfile ||
+          callerProfile.igreja_id !== targetProfile.igreja_id
+        ) {
+          return new Response(
+            JSON.stringify({ error: "Perfil não pertence à sua igreja" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
     }
 
     // ========== CRIAR USUÁRIO ==========

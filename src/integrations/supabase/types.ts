@@ -12056,6 +12056,7 @@ export type Database = {
           success: boolean
         }[]
       }
+      resolve_short_link: { Args: { _slug: string }; Returns: string }
       rollback_audit_batch: {
         Args: { target_request_id: string }
         Returns: undefined
