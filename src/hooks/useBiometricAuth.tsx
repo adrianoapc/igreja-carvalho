@@ -312,14 +312,6 @@ export function useBiometricAuth() {
     }
 
     try {
-      const testMode = localStorage.getItem(BIOMETRIC_TEST_MODE_KEY) === 'true';
-
-      if (testMode) {
-        console.log('[BiometricAuth] Test mode: simulating biometric verification');
-        triggerHapticFeedback('success');
-        return { success: true };
-      }
-
       const challenge = new Uint8Array(32);
       crypto.getRandomValues(challenge);
 
