@@ -86,6 +86,7 @@ docs/
 
 ### Produto
 
+- [Visão de produto (estratégia, wedges, posicionamento)](produto/visao-produto.md)
 - [Guia de produto](produto/README_PRODUTO.MD)
 - [Manual do usuário](manual-usuario.md)
 - [Funcionalidades](funcionalidades.md)
