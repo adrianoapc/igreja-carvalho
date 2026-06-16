@@ -10,3 +10,5 @@ flowchart TD
     CT -->|Sim| AG[INSERT visitante_contatos<br/>membro_responsavel_id = null<br/>data_contato = +3 dias]
     CT -->|Não| OK
     AG --> OK([Tela de sucesso])
+    OK --> BT[Botão 'Voltar para o início'<br/>window.location = pathname + search]
+    BT --> A

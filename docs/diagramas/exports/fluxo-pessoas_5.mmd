@@ -1,11 +1,7 @@
 flowchart TD
-    A([LinksExternosCard monta]) --> B[Monta URL longa por link<br/>+ igreja_id/filial_id/todas_filiais]
-    B --> C[Busca short_links<br/>WHERE igreja_id + target_url IN ...]
-    C --> D{Slug existe?}
-    D -->|Sim| E[Usa slug existente]
-    D -->|Não| F[Gera slug aleatorio<br/>INSERT short_links]
-    F --> E
-    E --> G[Exibe card: titulo + Copiar + QR Code<br/>URL final = origin/s/:slug]
-    G --> H([Usuario compartilha /s/:slug])
-    H --> I[ShortLinkRedirect<br/>SELECT target_url WHERE slug]
-    I --> J([Redireciona para URL alvo<br/>/cadastro/...])
+    L([/pessoas/contatos]) --> Q[Buscar visitante_contatos<br/>LEFT JOIN membro_responsavel]
+    Q --> R{membro_responsavel<br/>presente?}
+    R -->|Sim| N[Exibe nome do responsável]
+    R -->|Não/null| NR[Exibe 'Sem responsável definido']
+    N --> UI([Card do contato])
+    NR --> UI
