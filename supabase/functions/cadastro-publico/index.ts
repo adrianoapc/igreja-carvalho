@@ -866,11 +866,12 @@ Deno.serve(async (req) => {
 
         if (updateError) throw updateError;
 
+        // LGPD: minimize response — do not echo full profile data the caller did not supply.
         return new Response(
           JSON.stringify({
             success: true,
             isUpdate: true,
-            data: updated,
+            data: { id: updated.id, nome: updated.nome },
             message:
               profileExistente.status === "membro"
                 ? "Cadastro localizado como membro e atualizado sem duplicidade."
@@ -878,6 +879,7 @@ Deno.serve(async (req) => {
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
+
       }
 
       const { data: created, error: insertError } = await supabase
