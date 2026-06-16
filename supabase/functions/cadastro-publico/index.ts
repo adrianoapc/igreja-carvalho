@@ -679,7 +679,10 @@ Deno.serve(async (req) => {
       let profileQuery = supabase
         .from("profiles")
         .select(
-          "id, nome, telefone, email, sexo, data_nascimento, estado_civil, necessidades_especiais, cep, cidade, bairro, estado, endereco, profissao, status, igreja_id, filial_id, user_id",
+          // Security: minimize PII returned to unauthenticated callers.
+          // Removed: user_id (auth identifier), necessidades_especiais (health data — LGPD sensitive),
+          // and reduced address granularity (cep/cidade/estado kept for prefill; bairro/endereco removed).
+          "id, nome, telefone, email, sexo, data_nascimento, estado_civil, cep, cidade, estado, profissao, status, igreja_id, filial_id",
         )
         .in("status", ["membro", "visitante", "frequentador"]);
 
@@ -723,12 +726,13 @@ Deno.serve(async (req) => {
         null,
         { profile_id: profile.id },
       );
-      console.log(`[cadastro-publico] Membro encontrado: ${profile.nome}`);
+      console.log(`[cadastro-publico] Membro encontrado (id=${profile.id})`);
 
       return new Response(JSON.stringify({ success: true, data: profile }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     if (action === "cadastrar_cafe_vp") {
       const cafeData = data as CadastroVisitanteData;
