@@ -226,3 +226,57 @@ AND c.updated_at < NOW() - INTERVAL '30 days';
 | 2025-01-30 | Permitido múltiplas candidaturas (uma por ministério) |
 | 2025-01-30 | Link permanente no menu lateral |
 | 2025-01-30 | Documentação inicial |
+
+---
+
+## Dashboard de Gestão (fundido de DASHBOARD_VOLUNTARIADO.md)
+
+> Rota: `/voluntariado/candidatos` — acesso pastores/líderes.
+> Status (a confirmar): `MetricCard` e `InsightCard` não localizados em `src/` na auditoria — verificar se foram inlined ou renomeados.
+
+### Funcionalidades do dashboard
+
+- Estatísticas em tempo real: total, pendentes, em análise, aprovados, rejeitados
+- Gráfico de evolução (6 meses), distribuição por ministério (pizza), tendências (LineChart)
+- Cards de insights: alertas (pendentes > 7 dias), metas mensais, tempo médio de resposta
+- Lista de candidatos com filtros status/ministério, ações rápidas por estágio
+- Exportação de dados (preparado)
+
+### Componentes de UI
+
+| Componente | Função |
+|---|---|
+| `MetricCard` | Métrica com ícone, valor e tendência ↑↓ |
+| `InsightCard` | Insight tipado (alerta/meta/tempo/conquista) |
+| Dashboard principal | Framer Motion + Recharts + Shadcn |
+
+---
+
+## Pipeline de Integração de Voluntários (fundido de INTEGRACAO_VOLUNTARIO.md)
+
+> ⚠️ Drift: doc descreve "Fase 1 MVP" como pendente, mas `integracao_voluntario`, `testes_ministerio` e
+> páginas `MinhaJornada.tsx`, `MeuTeste.tsx`, `IntegracaoDashboard.tsx` já existem em produção
+> (migrations até `20260608131528`). Fases 1–3 parecem concluídas. Revisar.
+
+### Funil: `APROVADO → ENTREVISTA → TRILHA → MENTORIA → TESTE → ATIVO`
+
+| Estágio | Duração típica | Transição |
+|---|---|---|
+| ENTREVISTA | 1-3 dias | Admin aprova → entra em TRILHA |
+| TRILHA | 30-45 dias | `percentual_jornada = 100%` → MENTORIA automática |
+| MENTORIA | 15 dias | Mentor marca pronto → TESTE |
+| TESTE | 1-7 dias | Aprovado → ATIVO (`membros_time`); Reprovado → retentar em 30 dias |
+| ATIVO | contínuo | Elegível para escalas; acompanhamento 30/60/90 dias |
+
+### Tabelas envolvidas
+
+- `integracao_voluntario` — registro do pipeline por candidato (status, percentual_jornada, resultado_teste)
+- `testes_ministerio` — catálogo de testes por time (tipo: pratico/escrito/entrevista/hibrido, pontuacao_minima_aprovacao)
+- `resultados_teste` — resposta JSON + pontuação + feedback do avaliador
+
+### Notificações no pipeline
+
+- WhatsApp (via chatbot): aprovação, início de jornada, mentor designado, teste agendado, resultado
+- In-app: card de progresso, badge "Em Integração"/"Teste Pendente"
+
+> Doc original completo: `docs/_archive/_fundidos/INTEGRACAO_VOLUNTARIO.md`

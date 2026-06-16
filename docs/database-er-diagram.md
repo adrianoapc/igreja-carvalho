@@ -1,5 +1,10 @@
 # Diagrama ER - Igreja App
 
+> **TODO (REGENERAR):** este diagrama está desatualizado (snapshot 2025-01-04).
+> Fonte de verdade: `supabase/migrations/*.sql`
+> Para regenerar: executar `supabase db diff` ou usar ferramenta como `tbls` / `pg_dump` + mermaid-er converter.
+> NÃO editar manualmente.
+
 Este documento descreve a estrutura do banco de dados do Igreja App, incluindo todas as tabelas, relacionamentos e regras de negócio.
 
 **Última atualização:** 2025-01-04

@@ -112,3 +112,20 @@ flowchart TD
 > abre direto o formulário de visitante, com a saudação de aceite e o checkbox
 > "Aceitei Jesus hoje" pré-marcado e bloqueado — sem passar pela tela `/cadastro`
 > com os botões de Visitante/Café V&P.
+
+## Controle de Acesso / RLS no Módulo Pessoas (fundido de permissoes-pessoas.md)
+
+> Expandindo o modelo implícito em todos os fluxos acima.
+> Original em `docs/_archive/_fundidos/permissoes-pessoas.md`.
+
+```mermaid
+flowchart TD
+    A([Request autenticada]) --> B[Frontend envia consulta de Pessoas]
+    B --> C[Supabase recebe JWT e contexto de perfil]
+    C --> D[Identificar role/perfil do usuário]
+    D --> E[Aplicar políticas RLS em tabelas de pessoas<br/>WHERE igreja_id = auth.jwt()->'app_metadata'->'igreja_id']
+    E --> F[Resultado filtrado pelo RLS]
+    F --> G[Frontend exibe apenas dados permitidos]
+```
+
+Ver inventário completo de RLS em `docs/01-Arquitetura/04-rls-e-seguranca.MD`.

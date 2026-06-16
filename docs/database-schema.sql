@@ -1,4 +1,9 @@
 -- =============================================================================
+-- TODO (REGENERAR): este arquivo está desatualizado (snapshot 2026-01-26).
+-- Fonte de verdade: supabase/migrations/*.sql
+-- Para regenerar: pg_dump --schema-only <conn> | head -n... OU usar supabase db dump
+-- NÃO editar manualmente — editar apenas as migrations.
+-- =============================================================================
 -- SCHEMA COMPLETO DO BANCO DE DADOS - IGREJA APP
 -- Gerado em: 2026-01-26
 -- Total de Tabelas: 113
