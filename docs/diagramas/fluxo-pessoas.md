@@ -70,10 +70,27 @@ flowchart TD
     CT -->|Sim| AG[INSERT visitante_contatos<br/>membro_responsavel_id = null<br/>data_contato = +3 dias]
     CT -->|Não| OK
     AG --> OK([Tela de sucesso])
+    OK --> BT[Botão 'Voltar para o início'<br/>window.location = pathname + search]
+    BT --> A
 ```
 
 > `membro_responsavel_id` é `null` no cadastro público pois não há membro autenticado para assumir o contato.
 > A atribuição a um líder/departamento responsável é uma rotina de roteamento futura (ainda não implementada).
+> O botão "Voltar para o início" na tela de sucesso recarrega o próprio caminho (`pathname + search`), reiniciando o wizard no passo 1 sem redirecionar para rotas inexistentes.
+
+## Contatos Agendados — Tratamento de Responsável Nulo
+
+```mermaid
+flowchart TD
+    L([/pessoas/contatos]) --> Q[Buscar visitante_contatos<br/>LEFT JOIN membro_responsavel]
+    Q --> R{membro_responsavel<br/>presente?}
+    R -->|Sim| N[Exibe nome do responsável]
+    R -->|Não/null| NR[Exibe 'Sem responsável definido']
+    N --> UI([Card do contato])
+    NR --> UI
+```
+
+> Contatos gerados pelo cadastro público têm `membro_responsavel_id = null`. A tela `/pessoas/contatos` trata esse caso exibindo "Sem responsável definido" em vez de lançar erro.
 
 ## Links Externos de Cadastro (Shortlinks)
 

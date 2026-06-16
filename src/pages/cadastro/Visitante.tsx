@@ -209,7 +209,10 @@ export default function CadastroVisitante() {
                 Obrigado por se cadastrar! Será um prazer ter você conosco.
               </p>
               <Button
-                onClick={() => (window.location.href = "/public")}
+                onClick={() =>
+                  (window.location.href =
+                    window.location.pathname + window.location.search)
+                }
                 className="mt-2"
               >
                 Voltar para o início
