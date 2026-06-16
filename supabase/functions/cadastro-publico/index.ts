@@ -579,14 +579,18 @@ Deno.serve(async (req) => {
         );
       }
 
+      // LGPD: never echo back full profile to unauthenticated caller.
+      // When matching an existing visitor by phone/email, returning `*` leaks
+      // fields the caller did not supply. Return only the minimum needed for UX.
       return new Response(
         JSON.stringify({
           success: true,
-          data: resultData,
+          data: { id: resultData.id, nome: resultData.nome },
           isUpdate: !!visitanteExistente,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+
     }
 
     if (action === "buscar_membro") {
@@ -679,11 +683,13 @@ Deno.serve(async (req) => {
       let profileQuery = supabase
         .from("profiles")
         .select(
-          // Security: minimize PII returned to unauthenticated callers.
-          // Removed: user_id (auth identifier), necessidades_especiais (health data — LGPD sensitive),
-          // and reduced address granularity (cep/cidade/estado kept for prefill; bairro/endereco removed).
-          "id, nome, telefone, email, sexo, data_nascimento, estado_civil, cep, cidade, estado, profissao, status, igreja_id, filial_id",
+          // LGPD minimization: only fields strictly needed to confirm identity
+          // and prefill a self-service form the caller already owns.
+          // Removed: user_id, necessidades_especiais (health), bairro, endereco,
+          // profissao (professional data — not required for prefill).
+          "id, nome, telefone, email, sexo, data_nascimento, estado_civil, cep, cidade, estado, status, igreja_id, filial_id",
         )
+
         .in("status", ["membro", "visitante", "frequentador"]);
 
       profileQuery = applyTenantFilters(profileQuery, buscaData);
@@ -862,11 +868,12 @@ Deno.serve(async (req) => {
 
         if (updateError) throw updateError;
 
+        // LGPD: minimize response — do not echo full profile data the caller did not supply.
         return new Response(
           JSON.stringify({
             success: true,
             isUpdate: true,
-            data: updated,
+            data: { id: updated.id, nome: updated.nome },
             message:
               profileExistente.status === "membro"
                 ? "Cadastro localizado como membro e atualizado sem duplicidade."
@@ -874,6 +881,7 @@ Deno.serve(async (req) => {
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
+
       }
 
       const { data: created, error: insertError } = await supabase
@@ -916,17 +924,19 @@ Deno.serve(async (req) => {
         );
       }
 
+      // LGPD: response minimization on public endpoint.
       return new Response(
         JSON.stringify({
           success: true,
           isUpdate: false,
-          data: created,
+          data: { id: created.id, nome: created.nome },
           message: cafeData.deseja_trilha
             ? "Cadastro Café V&P realizado! Já registramos seu interesse na trilha de membros."
             : "Cadastro Café V&P realizado com sucesso!",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+
     }
 
     if (action === "atualizar_membro") {
