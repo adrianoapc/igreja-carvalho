@@ -12,11 +12,13 @@ import {
 } from "@/components/ui/table";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit2, Trash2, TestTube2, Loader2, Download, History } from "lucide-react";
+import { Plus, Edit2, Trash2, TestTube2, Loader2, Download, History, FolderSearch } from "lucide-react";
 import { toast } from "sonner";
 import { IntegracaoCriarDialog } from "@/components/financas/IntegracoesCriarDialog";
 import { IntegracaoLogsDialog } from "@/components/financas/IntegracaoLogsDialog";
 import { WebhookStatusBadge } from "@/components/financas/IntegracaoWebhookTab";
+import { GetnetListFilesDialog } from "@/components/financas/GetnetListFilesDialog";
+import { GetnetImportDialog } from "@/components/financas/GetnetImportDialog";
 
 import {
   AlertDialog,
@@ -41,8 +43,14 @@ export default function Integracoes() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
-  const [importingId, setImportingId] = useState<string | null>(null);
+
   const [logsIntegracaoId, setLogsIntegracaoId] = useState<string | null>(null);
+  const [listFilesIntegracao, setListFilesIntegracao] = useState<Integracao | null>(null);
+  const [importDialog, setImportDialog] = useState<{
+    integracao: Integracao;
+    initialDate?: string;
+    initialFileName?: string;
+  } | null>(null);
 
 
   // Buscar integrações
@@ -228,31 +236,12 @@ export default function Integracoes() {
     }
   };
 
-  const handleImport = async (integracao: Integracao) => {
-    setImportingId(integracao.id);
-    try {
-      const { data, error } = await supabase.functions.invoke("getnet-sftp", {
-        body: { action: "import_extrato", integracao_id: integracao.id },
-      });
-      if (error) {
-        toast.error(`Erro na importação: ${error.message}`);
-        return;
-      }
-      if (data?.success) {
-        toast.success(`Importação concluída: ${data.arquivo}`, {
-          description: `Recebido: ${data.total_recebido} · Inserido: ${data.total_inserido} · Ignorado: ${data.total_ignorado}`,
-        });
-      } else {
-        toast.error("Falha na importação", {
-          description: data?.error || "Veja o histórico para detalhes",
-        });
-      }
-    } catch (err) {
-      console.error("Import exception:", err);
-      toast.error("Erro ao importar extrato");
-    } finally {
-      setImportingId(null);
-    }
+  const handleImport = (integracao: Integracao) => {
+    setImportDialog({ integracao });
+  };
+
+  const handleImportFile = (integracao: Integracao, fileName: string, dataReferencia: string) => {
+    setImportDialog({ integracao, initialDate: dataReferencia, initialFileName: fileName });
   };
 
 
@@ -394,16 +383,23 @@ export default function Integracoes() {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
+                              setListFilesIntegracao(integracao);
+                            }}
+                            title="Listar arquivos disponíveis no SFTP"
+                          >
+                            <FolderSearch className="w-4 h-4 text-blue-500" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
                               handleImport(integracao);
                             }}
-                            disabled={importingId === integracao.id}
-                            title="Importar extrato agora"
+                            title="Importar extrato"
                           >
-                            {importingId === integracao.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Download className="w-4 h-4 text-green-600" />
-                            )}
+                            <Download className="w-4 h-4 text-green-600" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -483,6 +479,21 @@ export default function Integracoes() {
         open={!!logsIntegracaoId}
         onOpenChange={(open) => !open && setLogsIntegracaoId(null)}
         integracaoId={logsIntegracaoId}
+      />
+
+      <GetnetListFilesDialog
+        open={!!listFilesIntegracao}
+        onOpenChange={(open) => !open && setListFilesIntegracao(null)}
+        integracao={listFilesIntegracao}
+        onImportFile={handleImportFile}
+      />
+
+      <GetnetImportDialog
+        open={!!importDialog}
+        onOpenChange={(open) => !open && setImportDialog(null)}
+        integracao={importDialog?.integracao ?? null}
+        initialDate={importDialog?.initialDate}
+        initialFileName={importDialog?.initialFileName}
       />
 
 

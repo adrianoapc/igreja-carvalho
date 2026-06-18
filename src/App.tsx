@@ -73,9 +73,9 @@ const InscricaoPublica = lazy(() => import("./pages/InscricaoPublica"));
 // Recepção
 const HubRecepcao = lazy(() => import("./pages/recepcao/index"));
 const RecepcaoVisitante = lazy(() => import("./pages/recepcao/Visitante"));
-const RecepcaoFrequentador = lazy(() => import("./pages/recepcao/Frequentador"));
-const RecepcaoCheckin = lazy(() => import("./pages/recepcao/Checkin"));
-const RecepcaoInfantil = lazy(() => import("./pages/recepcao/Infantil"));
+const RecepcaoFrequentador = lazy(
+  () => import("./pages/recepcao/Frequentador"),
+);
 
 // Pessoas
 const PessoasIndex = lazy(() => import("./pages/pessoas/index"));
@@ -187,9 +187,7 @@ const FinancasReclassificacao = lazy(
 const FinancasReconciliacao = lazy(
   () => import("./pages/financas/Reconciliacao"),
 );
-const FinancasPixRecebido = lazy(
-  () => import("./pages/financas/PixRecebido"),
-);
+const FinancasPixRecebido = lazy(() => import("./pages/financas/PixRecebido"));
 const FinancasSessoesContagem = lazy(
   () => import("./pages/financas/SessoesContagem"),
 );
@@ -202,9 +200,7 @@ const FinancasReembolsos = lazy(() => import("./pages/financas/Reembolsos"));
 const FinancasTransferencias = lazy(
   () => import("./pages/financas/Transferencias"),
 );
-const FinancasIntegracoes = lazy(
-  () => import("./pages/financas/Integracoes"),
-);
+const FinancasIntegracoes = lazy(() => import("./pages/financas/Integracoes"));
 
 // Projetos
 const Projetos = lazy(() => import("./pages/Projetos"));
@@ -406,22 +402,6 @@ const App = () => (
                       element={
                         <AuthGate>
                           <RecepcaoFrequentador />
-                        </AuthGate>
-                      }
-                    />
-                    <Route
-                      path="/recepcao/checkin"
-                      element={
-                        <AuthGate>
-                          <RecepcaoCheckin />
-                        </AuthGate>
-                      }
-                    />
-                    <Route
-                      path="/recepcao/infantil"
-                      element={
-                        <AuthGate>
-                          <RecepcaoInfantil />
                         </AuthGate>
                       }
                     />

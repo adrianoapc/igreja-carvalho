@@ -23,6 +23,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import nacl from "npm:tweetnacl@1.0.3";
 import SftpClient from "npm:ssh2-sftp-client@10.0.3";
 import Papa from "npm:papaparse@5.4.1";
+import { parseExtrato } from "./getnetExtratoParser.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -310,117 +311,7 @@ function parseCSV(buf: Uint8Array): Record<string, unknown>[] {
 }
 
 // ==================== PARSER POSICIONAL v10.1 ====================
-
-type ResumoRow = {
-  codigo_produto: string;
-  forma_captura: string;
-  rv: string;
-  data_rv: string; // ISO
-  valor_bruto: number;
-  valor_liquido: number; // já com sinal
-  sinal: string;
-  raw_line: string;
-};
-
-type AnaliticoRow = {
-  rv: string;
-  nsu_cv: string;
-  cartao_truncado: string;
-  valor_transacao: number;
-  codigo_autorizacao: string;
-  forma_captura: string;
-  status: string;
-  raw_line: string;
-};
-
-function f(line: string, ini: number, fim: number): string {
-  return line.slice(ini - 1, fim).trim();
-}
-function money(s: string): number {
-  const n = Number(s);
-  return Number.isFinite(n) ? n / 100 : 0;
-}
-function dateFromDDMMYYYY(s: string): string | null {
-  if (!/^\d{8}$/.test(s)) return null;
-  const dd = s.slice(0, 2);
-  const mm = s.slice(2, 4);
-  const yyyy = s.slice(4, 8);
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-type ParsePosicionalResult = {
-  resumos: ResumoRow[];
-  analiticos: AnaliticoRow[];
-  linhas_invalidas: number;
-  total_linhas: number;
-};
-
-function parseExtratoEletronicoV10(text: string): ParsePosicionalResult {
-  const lines = text.split(/\r?\n/);
-  const resumos: ResumoRow[] = [];
-  const analiticos: AnaliticoRow[] = [];
-  let linhas_invalidas = 0;
-  let total_linhas = 0;
-
-  for (const rawLine of lines) {
-    if (!rawLine || rawLine.length === 0) continue;
-    const tipo = rawLine[0];
-    if (tipo === "0" || tipo === "9") continue; // header/trailer
-    if (tipo !== "1" && tipo !== "2") continue; // outros não suportados
-
-    total_linhas++;
-    if (rawLine.length < 400) {
-      linhas_invalidas++;
-      continue;
-    }
-
-    try {
-      if (tipo === "1") {
-        const data_rv = dateFromDDMMYYYY(f(rawLine, 31, 38));
-        const rv = f(rawLine, 22, 30);
-        if (!data_rv || !rv) {
-          linhas_invalidas++;
-          continue;
-        }
-        const valor_bruto = money(f(rawLine, 85, 96));
-        const valor_liq_abs = money(f(rawLine, 97, 108));
-        const sinal = f(rawLine, 286, 286);
-        const valor_liquido = sinal === "-" ? -valor_liq_abs : valor_liq_abs;
-        resumos.push({
-          codigo_produto: f(rawLine, 17, 18),
-          forma_captura: f(rawLine, 19, 21),
-          rv,
-          data_rv,
-          valor_bruto,
-          valor_liquido,
-          sinal,
-          raw_line: rawLine,
-        });
-      } else if (tipo === "2") {
-        const rv = f(rawLine, 17, 25);
-        const nsu_cv = f(rawLine, 26, 37);
-        if (!rv || !nsu_cv) {
-          linhas_invalidas++;
-          continue;
-        }
-        analiticos.push({
-          rv,
-          nsu_cv,
-          cartao_truncado: f(rawLine, 52, 70),
-          valor_transacao: money(f(rawLine, 71, 82)),
-          codigo_autorizacao: f(rawLine, 131, 140),
-          forma_captura: f(rawLine, 141, 143),
-          status: f(rawLine, 144, 144),
-          raw_line: rawLine,
-        });
-      }
-    } catch (_e) {
-      linhas_invalidas++;
-    }
-  }
-
-  return { resumos, analiticos, linhas_invalidas, total_linhas };
-}
+// Implementação completa importada de getnetExtratoParser.ts (parseExtrato)
 
 async function upsertChunks<T>(
   supabaseAdmin: any,
@@ -862,11 +753,10 @@ async function runExtratoEletronicoV10(args: {
     dataReferencia, requestedFile,
   } = args;
 
-  // regex default: EEVD?_<algo>_DDMMAAAA.txt
-  const defaultRegex = "^EEVD?_.+_(\\d{2})(\\d{2})(\\d{4})\\.txt$";
+  // regex default: getnetextr_YYYYMMDD_XXXXXXXX_c101.txt
+  const defaultRegex = "^getnetextr_(\\d{4})(\\d{2})(\\d{2})_.+\\.txt$";
   const regexStr = filePatternRegex || defaultRegex;
   const fileRegex = new RegExp(regexStr, "i");
-  const targetDDMMYYYY = isoToDDMMYYYY(dataReferencia);
 
   // ===== Log mestre =====
   const parentLogId = await startLog(supabaseAdmin, {
@@ -914,10 +804,10 @@ async function runExtratoEletronicoV10(args: {
       if (requestedFile) return f.name === requestedFile;
       const m = fileRegex.exec(f.name);
       if (!m) return false;
-      // Se a regex captura 3 grupos (DD, MM, AAAA), filtra por data alvo
+      // Se a regex captura 3 grupos (YYYY, MM, DD), filtra por data alvo
       if (m.length >= 4) {
-        const dd = m[1], mm = m[2], yyyy = m[3];
-        return `${dd}${mm}${yyyy}` === targetDDMMYYYY;
+        const fileDate = `${m[1]}-${m[2]}-${m[3]}`; // YYYY-MM-DD
+        return fileDate === dataReferencia;
       }
       return true; // regex custom sem grupos de data: aceita tudo que casa
     });
@@ -1022,94 +912,226 @@ async function runExtratoEletronicoV10(args: {
       const buf = new Uint8Array(await blob.arrayBuffer());
       const text = decoder.decode(buf);
 
-      const { resumos, analiticos, linhas_invalidas, total_linhas } =
-        parseExtratoEletronicoV10(text);
+      const parsed = parseExtrato(text);
+      const { resumos, analiticos, ajustes, financeirosResumo, financeirosDetalhe, validacao } = parsed;
 
-      // Persiste getnet_resumo
+      // ── getnet_arquivos (controle por arquivo) ──────────────────────────
+      await supabaseAdmin
+        .from("getnet_arquivos")
+        .upsert({
+          integracao_id: integracao.id,
+          igreja_id: integracao.igreja_id,
+          arquivo_nome: arq.nome,
+          data_referencia: dataReferencia,
+          storage_path: arq.storage_path,
+          sequencia_remessa: parsed.header?.sequenciaRemessa ?? null,
+          qtd_registros_declarada: validacao.qtdRegistrosDeclarada,
+          qtd_registros_lida: validacao.qtdRegistrosLidos,
+          validacao_ok: validacao.ok,
+          erros_validacao: validacao.erros.length > 0 ? validacao.erros : null,
+          codigo_estabelecimento: parsed.header?.codigoEstabelecimento ?? null,
+          cnpj_adquirente: parsed.header?.cnpjAdquirente ?? null,
+        }, { onConflict: "integracao_id,arquivo_nome" });
+
+      // ── getnet_resumo (tipo 1) — chave inclui indicador para ciclo PF→LQ ─
       const resumoRows = resumos.map((r) => ({
         integracao_id: integracao.id,
         igreja_id: integracao.igreja_id,
         filial_id: integracao.filial_id ?? null,
         arquivo_nome: arq.nome,
-        codigo_produto: r.codigo_produto || null,
-        forma_captura: r.forma_captura || null,
+        codigo_produto: r.codigoProduto || null,
+        forma_captura: r.formaCaptura || null,
         rv: r.rv,
-        data_rv: r.data_rv,
-        valor_bruto: r.valor_bruto,
-        valor_liquido: r.valor_liquido,
+        data_rv: r.dataRv,
+        indicador_tipo_pagamento: r.indicadorTipoPagamento || "",
+        data_pagamento_rv: r.dataPagamentoRv || null,
+        chave_ur: r.chaveUr || null,
+        valor_bruto: r.valorBruto,
+        valor_liquido: r.sinal === "-" ? -Math.abs(r.valorLiquido) : r.valorLiquido,
+        valor_tarifa: r.valorTarifa || null,
+        valor_taxa_desconto: r.valorTaxaDesconto || null,
         sinal: r.sinal || null,
-        raw_line: r.raw_line,
+        banco: r.banco || null,
+        agencia: r.agencia || null,
+        conta_corrente: r.contaCorrente || null,
+        tipo_conta: r.tipoConta || null,
+        num_parcela_rv: r.numParcelaRv || null,
+        qtd_parcelas_rv: r.qtdParcelasRv || null,
+        data_vencimento_original: r.dataVencimentoOriginal || null,
+        moeda: r.moeda || null,
+        raw_line: r.rawLine,
       }));
       const resRes = await upsertChunks(
-        supabaseAdmin,
-        "getnet_resumo",
-        resumoRows,
-        "integracao_id,rv,data_rv"
+        supabaseAdmin, "getnet_resumo", resumoRows,
+        "integracao_id,rv,data_rv,indicador_tipo_pagamento"
       );
       if (resRes.error) throw new Error(`getnet_resumo: ${resRes.error}`);
 
-      // Persiste getnet_analitico
+      // ── getnet_analitico (tipo 2) ───────────────────────────────────────
       const analiticoRows = analiticos.map((a) => ({
         integracao_id: integracao.id,
         igreja_id: integracao.igreja_id,
         filial_id: integracao.filial_id ?? null,
         arquivo_nome: arq.nome,
         rv: a.rv,
-        nsu_cv: a.nsu_cv,
-        cartao_truncado: a.cartao_truncado || null,
-        valor_transacao: a.valor_transacao,
-        codigo_autorizacao: a.codigo_autorizacao || null,
-        forma_captura: a.forma_captura || null,
+        nsu_cv: a.nsuCv,
+        cartao_truncado: a.cartaoTruncado || null,
+        valor_transacao: a.valorTransacao,
+        codigo_autorizacao: a.codigoAutorizacao || null,
+        forma_captura: a.formaCaptura || null,
         status: a.status || null,
-        raw_line: a.raw_line,
+        data_transacao: a.dataTransacao || null,
+        hora_transacao: a.horaTransacao || null,
+        codigo_terminal: a.codigoTerminal || null,
+        valor_comissao: a.valorComissao || null,
+        numero_parcelas: a.numeroParcelas || null,
+        parcela_do_cv: a.parcelaDoCv || null,
+        valor_parcela: a.valorParcela || null,
+        moeda: a.moeda || null,
+        sinal: a.sinal || null,
+        raw_line: a.rawLine,
       }));
       const anaRes = await upsertChunks(
-        supabaseAdmin,
-        "getnet_analitico",
-        analiticoRows,
+        supabaseAdmin, "getnet_analitico", analiticoRows,
         "integracao_id,rv,nsu_cv"
       );
       if (anaRes.error) throw new Error(`getnet_analitico: ${anaRes.error}`);
 
-      // Espelha cada RV em extratos_bancarios (valor com sinal aplicado)
+      // ── getnet_ajustes (tipo 3) ─────────────────────────────────────────
+      let ajusteRes = { inserted: 0, ignored: 0, error: null as string | null };
+      if (ajustes.length > 0) {
+        const ajusteRows = ajustes.map((a) => ({
+          integracao_id: integracao.id,
+          igreja_id: integracao.igreja_id,
+          arquivo_nome: arq.nome,
+          linha_num: a.linhaNum,
+          rv_ajustado: a.rvAjustado,
+          data_rv: a.dataRv || null,
+          data_pagamento_rv: a.dataPagamentoRv || null,
+          identificador_ajuste: a.identificadorAjuste || "",
+          sinal: a.sinal || null,
+          valor_ajuste: a.valorAjuste || null,
+          motivo_ajuste: a.motivoAjuste || null,
+          data_carta: a.dataCarta || null,
+          cartao_truncado: a.cartaoTruncado || null,
+          rv_original: a.rvOriginal || null,
+          nsu_cv: a.nsuCv || null,
+          data_transacao_original: a.dataTransacaoOriginal || null,
+          indicador_tipo_pagamento: a.indicadorTipoPagamento || null,
+          numero_terminal: a.numeroTerminal || null,
+          data_pagamento_original: a.dataPagamentoOriginal || null,
+          moeda: a.moeda || null,
+          valor_comissao: a.valorComissao || null,
+          raw_line: a.rawLine,
+        }));
+        ajusteRes = await upsertChunks(
+          supabaseAdmin, "getnet_ajustes", ajusteRows,
+          "integracao_id,rv_ajustado,identificador_ajuste"
+        );
+        if (ajusteRes.error) throw new Error(`getnet_ajustes: ${ajusteRes.error}`);
+      }
+
+      // ── getnet_financeiro_resumo (tipo 5) ───────────────────────────────
+      let finResRes = { inserted: 0, ignored: 0, error: null as string | null };
+      if (financeirosResumo.length > 0) {
+        const finResRows = financeirosResumo.map((f) => ({
+          integracao_id: integracao.id,
+          igreja_id: integracao.igreja_id,
+          arquivo_nome: arq.nome,
+          linha_num: f.linhaNum,
+          numero_operacao: f.numeroOperacao,
+          chave_ur: f.chaveUr || null,
+          data_operacao: f.dataOperacao || null,
+          data_credito_operacao: f.dataCreditoOperacao || null,
+          tipo_operacao: f.tipoOperacao || null,
+          valor_bruto_operacao: f.valorBrutoOperacao,
+          valor_custo_operacao: f.valorCustoOperacao,
+          valor_liquido_operacao: f.valorLiquidoOperacao,
+          taxa_mensal_operacao: f.taxaMensalOperacao || null,
+          tipo_conta_estabelecimento: f.tipoContaEstabelecimento || null,
+          banco: f.banco || null,
+          agencia: f.agencia || null,
+          conta_corrente: f.contaCorrente || null,
+          canal_operacao: f.canalOperacao || null,
+          tipo_movimento: f.tipoMovimento || null,
+          codigo_arranjo: f.codigoArranjo || null,
+          raw_line: f.rawLine,
+        }));
+        finResRes = await upsertChunks(
+          supabaseAdmin, "getnet_financeiro_resumo", finResRows,
+          "integracao_id,numero_operacao"
+        );
+        if (finResRes.error) throw new Error(`getnet_financeiro_resumo: ${finResRes.error}`);
+      }
+
+      // ── getnet_financeiro_detalhe (tipo 6) ──────────────────────────────
+      let finDetRes = { inserted: 0, ignored: 0, error: null as string | null };
+      if (financeirosDetalhe.length > 0) {
+        const finDetRows = financeirosDetalhe.map((f) => ({
+          integracao_id: integracao.id,
+          igreja_id: integracao.igreja_id,
+          arquivo_nome: arq.nome,
+          linha_num: f.linhaNum,
+          numero_operacao: f.numeroOperacao,
+          chave_ur: f.chaveUr,
+          data_operacao: f.dataOperacao || null,
+          tipo_operacao: f.tipoOperacao || null,
+          codigo_produto: f.codigoProduto || null,
+          data_vencimento_ur: f.dataVencimentoUr || null,
+          valor_liquido_ur: f.valorLiquidoUr,
+          valor_custo_ur: f.valorCustoUr,
+          valor_bruto_ur: f.valorBrutoUr,
+          tipo_conta_estabelecimento: f.tipoContaEstabelecimento || null,
+          tipo_movimento: f.tipoMovimento || null,
+          raw_line: f.rawLine,
+        }));
+        finDetRes = await upsertChunks(
+          supabaseAdmin, "getnet_financeiro_detalhe", finDetRows,
+          "integracao_id,numero_operacao,chave_ur"
+        );
+        if (finDetRes.error) throw new Error(`getnet_financeiro_detalhe: ${finDetRes.error}`);
+      }
+
+      // ── Espelha RVs liquidados (LQ) em extratos_bancarios ──────────────
       let extratosInseridos = 0;
       let extratosIgnorados = 0;
-      if (resumos.length > 0) {
-        const extratosRows = resumos.map((r) => ({
+      const resumosLQ = resumos.filter((r) => r.indicadorTipoPagamento === "LQ" && r.dataRv);
+      if (resumosLQ.length > 0) {
+        const extratosRows = resumosLQ.map((r) => ({
           conta_id: contaId,
           igreja_id: integracao.igreja_id,
           filial_id: integracao.filial_id ?? null,
-          data_transacao: r.data_rv,
+          data_transacao: r.dataPagamentoRv || r.dataRv,
           descricao: `Getnet RV ${r.rv}`,
-          valor: r.valor_liquido,
+          valor: r.sinal === "-" ? -Math.abs(r.valorLiquido) : r.valorLiquido,
           numero_documento: r.rv,
-          tipo: r.valor_liquido < 0 ? "debito" : "credito",
-          external_id: `getnet_rv:${r.rv}:${r.data_rv}`,
+          tipo: r.sinal === "-" ? "debito" : "credito",
+          external_id: `getnet_rv:${r.rv}:${r.dataRv}:LQ`,
           origem: "getnet_sftp_txt",
           reconciliado: false,
         }));
         const exRes = await upsertChunks(
-          supabaseAdmin,
-          "extratos_bancarios",
-          extratosRows,
-          "conta_id,external_id"
+          supabaseAdmin, "extratos_bancarios", extratosRows, "conta_id,external_id"
         );
         if (exRes.error) throw new Error(`extratos_bancarios: ${exRes.error}`);
         extratosInseridos = exRes.inserted;
         extratosIgnorados = exRes.ignored;
       }
 
-      const inseridos = resRes.inserted + anaRes.inserted;
-      const ignorados = resRes.ignored + anaRes.ignored;
+      const totalLinhas = validacao.qtdRegistrosLidos;
+      const inseridos = resRes.inserted + anaRes.inserted + ajusteRes.inserted +
+        finResRes.inserted + finDetRes.inserted;
+      const ignorados = resRes.ignored + anaRes.ignored + ajusteRes.ignored +
+        finResRes.ignored + finDetRes.ignored;
 
       arq.status = "processado";
       arq.totais = {
-        total_recebido: total_linhas,
+        total_recebido: totalLinhas,
         total_inserido: inseridos,
         total_ignorado: ignorados,
         resumos: resumos.length,
         analiticos: analiticos.length,
-        linhas_invalidas,
+        linhas_invalidas: parsed.desconhecidos.length,
       };
 
       await supabaseAdmin
@@ -1118,7 +1140,7 @@ async function runExtratoEletronicoV10(args: {
           status: "success",
           finalizado_em: new Date().toISOString(),
           duracao_ms: Date.now() - childStarted,
-          total_recebido: total_linhas,
+          total_recebido: totalLinhas,
           total_inserido: inseridos,
           total_ignorado: ignorados,
           metadata: {
@@ -1128,14 +1150,18 @@ async function runExtratoEletronicoV10(args: {
             data_referencia: dataReferencia,
             resumos: resumos.length,
             analiticos: analiticos.length,
-            linhas_invalidas,
+            ajustes: ajustes.length,
+            financeiros_resumo: financeirosResumo.length,
+            financeiros_detalhe: financeirosDetalhe.length,
+            validacao_ok: validacao.ok,
+            erros_validacao: validacao.erros,
             extratos_inseridos: extratosInseridos,
             extratos_ignorados: extratosIgnorados,
           },
         })
         .eq("id", childLogId);
 
-      totalRecebido += total_linhas;
+      totalRecebido += totalLinhas;
       totalInserido += inseridos;
       totalIgnorado += ignorados;
     } catch (procErr: any) {
