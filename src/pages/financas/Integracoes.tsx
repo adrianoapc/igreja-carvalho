@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit2, Trash2, TestTube2, Loader2, Download, History, FolderSearch } from "lucide-react";
+import { Plus, Edit2, Trash2, TestTube2, Loader2, Download, History, FolderSearch, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { IntegracaoCriarDialog } from "@/components/financas/IntegracoesCriarDialog";
 import { IntegracaoLogsDialog } from "@/components/financas/IntegracaoLogsDialog";
@@ -46,6 +46,7 @@ export default function Integracoes() {
 
   const [logsIntegracaoId, setLogsIntegracaoId] = useState<string | null>(null);
   const [listFilesIntegracao, setListFilesIntegracao] = useState<Integracao | null>(null);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
   const [importDialog, setImportDialog] = useState<{
     integracao: Integracao;
     initialDate?: string;
@@ -244,6 +245,35 @@ export default function Integracoes() {
     setImportDialog({ integracao, initialDate: dataReferencia, initialFileName: fileName });
   };
 
+  const handleSync = async (integracao: Integracao) => {
+    setSyncingId(integracao.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("getnet-sftp", {
+        body: { action: "sync", integracao_id: integracao.id },
+      });
+      if (error) {
+        toast.error(`Erro na sincronização: ${error.message}`);
+        return;
+      }
+      if (data?.success || data?.status === "partial") {
+        const desc = data.new_found === 0
+          ? "Nenhum arquivo novo encontrado"
+          : `${data.processed} de ${data.new_found} arquivo(s) importado(s)`;
+        toast.success("Sincronização concluída", { description: desc });
+      } else {
+        toast.error("Falha na sincronização", {
+          description: data?.errors > 0
+            ? `${data.errors} erro(s) ao processar arquivos`
+            : data?.error || "Verifique os logs",
+        });
+      }
+    } catch (err) {
+      console.error("Sync exception:", err);
+      toast.error("Erro ao sincronizar");
+    } finally {
+      setSyncingId(null);
+    }
+  };
 
   const getProviderLabel = (provedor: string) => {
     const labels: Record<string, string> = {
@@ -395,9 +425,26 @@ export default function Integracoes() {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
+                              handleSync(integracao);
+                            }}
+                            disabled={syncingId === integracao.id}
+                            title="Sincronizar arquivos pendentes automaticamente"
+                          >
+                            {syncingId === integracao.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+                            ) : (
+                              <RefreshCw className="w-4 h-4 text-purple-600" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
                               handleImport(integracao);
                             }}
-                            title="Importar extrato"
+                            title="Importar extrato por data"
                           >
                             <Download className="w-4 h-4 text-green-600" />
                           </Button>
