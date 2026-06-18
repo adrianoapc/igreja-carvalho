@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon, Loader2, CheckCircle2, XCircle, FileText } from "lucide-react";
@@ -59,6 +59,14 @@ export function GetnetImportDialog({
   );
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
+
+  // Sincroniza a data quando o dialog abre com um arquivo diferente
+  useEffect(() => {
+    if (open) {
+      setDate(initialDate ? new Date(initialDate + "T12:00:00") : new Date());
+      setResult(null);
+    }
+  }, [open, initialDate]);
 
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen) setResult(null);
