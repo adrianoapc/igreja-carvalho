@@ -1,0 +1,57 @@
+graph TD
+    Usuario[Tesoureiro / Admin]
+    SFTP[Servidor SFTP Getnet]
+
+    subgraph UI["Interface (src/pages/financas/Integracoes.tsx)"]
+        ListBtn["Botão: Listar Arquivos SFTP"]
+        ListDialog["GetnetListFilesDialog\nLista arquivos getnetextr_YYYYMMDD_*"]
+        ImportDialog["GetnetImportDialog\nSeleciona data de referência"]
+    end
+
+    subgraph EdgeFn["Edge Function: getnet-sftp"]
+        ActionList["action: list_files\nConecta SFTP e retorna lista"]
+        ActionImport["action: import\nBaixa e parseia arquivo(s)"]
+        Parser["getnetExtratoParser.ts\nLayout V10.1 — 400 bytes/linha"]
+    end
+
+    subgraph Tipos["Tipos de Registro"]
+        T0["Tipo 0 — Header\n(metadados do arquivo)"]
+        T1["Tipo 1 — Resumo Transacional\n(RV, valores bruto/líquido)"]
+        T2["Tipo 2 — Analítico/CV\n(transações individuais)"]
+        T3["Tipo 3 — Ajustes\n(chargebacks, contestações)"]
+        T5["Tipo 5 — Resumo Financeiro\n(UR/chave_ur)"]
+        T6["Tipo 6 — Detalhe Financeiro\n(composição do pagamento)"]
+        T9["Tipo 9 — Trailer\n(validação de contagem)"]
+    end
+
+    subgraph DB["Banco de Dados (Supabase Postgres)"]
+        TbArquivos[(getnet_arquivos\ncontrole por arquivo)]
+        TbResumo[(getnet_resumo\nciclo PF→LQ por RV)]
+        TbAnalitico[(getnet_analitico\ntransações/CVs)]
+        TbAjustes[(getnet_ajustes\najustes e chargebacks)]
+        TbFinResumo[(getnet_financeiro_resumo\nresumo financeiro tipo 5)]
+        TbFinDetalhe[(getnet_financeiro_detalhe\ndetalhe financeiro tipo 6)]
+    end
+
+    Usuario -->|"Abre diálogo"| ListBtn
+    ListBtn --> ListDialog
+    ListDialog -->|"action: list_files"| ActionList
+    ActionList -->|"SFTP ls"| SFTP
+    SFTP -->|"Lista de arquivos"| ActionList
+    ActionList --> ListDialog
+
+    ListDialog -->|"Clica Importar"| ImportDialog
+    ImportDialog -->|"action: import + data"| ActionImport
+    ActionImport -->|"SFTP get"| SFTP
+    SFTP -->|"Conteúdo do arquivo"| ActionImport
+    ActionImport --> Parser
+
+    Parser --> T0 & T1 & T2 & T3 & T5 & T6 & T9
+
+    T0 --> TbArquivos
+    T1 --> TbResumo
+    T2 --> TbAnalitico
+    T3 --> TbAjustes
+    T5 --> TbFinResumo
+    T6 --> TbFinDetalhe
+    T9 -->|"Valida contagem\n(trailer check)"| TbArquivos
