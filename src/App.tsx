@@ -73,7 +73,9 @@ const InscricaoPublica = lazy(() => import("./pages/InscricaoPublica"));
 // Recepção
 const HubRecepcao = lazy(() => import("./pages/recepcao/index"));
 const RecepcaoVisitante = lazy(() => import("./pages/recepcao/Visitante"));
-const RecepcaoFrequentador = lazy(() => import("./pages/recepcao/Frequentador"));
+const RecepcaoFrequentador = lazy(
+  () => import("./pages/recepcao/Frequentador"),
+);
 const RecepcaoCheckin = lazy(() => import("./pages/recepcao/Checkin"));
 const RecepcaoInfantil = lazy(() => import("./pages/recepcao/Infantil"));
 
@@ -187,9 +189,7 @@ const FinancasReclassificacao = lazy(
 const FinancasReconciliacao = lazy(
   () => import("./pages/financas/Reconciliacao"),
 );
-const FinancasPixRecebido = lazy(
-  () => import("./pages/financas/PixRecebido"),
-);
+const FinancasPixRecebido = lazy(() => import("./pages/financas/PixRecebido"));
 const FinancasSessoesContagem = lazy(
   () => import("./pages/financas/SessoesContagem"),
 );
@@ -202,9 +202,7 @@ const FinancasReembolsos = lazy(() => import("./pages/financas/Reembolsos"));
 const FinancasTransferencias = lazy(
   () => import("./pages/financas/Transferencias"),
 );
-const FinancasIntegracoes = lazy(
-  () => import("./pages/financas/Integracoes"),
-);
+const FinancasIntegracoes = lazy(() => import("./pages/financas/Integracoes"));
 
 // Projetos
 const Projetos = lazy(() => import("./pages/Projetos"));

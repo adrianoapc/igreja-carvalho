@@ -1603,6 +1603,95 @@ CREATE TABLE extratos_bancarios (
 
 ---
 
+## 16.2 Integração Getnet SFTP — Parser V10.1 {#getnet-sftp}
+
+### Objetivo do Módulo
+
+Importar automaticamente os arquivos de extrato eletrônico da adquirente Getnet disponibilizados via SFTP, processando todos os tipos de registro do layout posicional V10.1 (400 bytes/linha) e persistindo os dados em tabelas dedicadas para posterior conciliação e relatórios financeiros.
+
+### Rota e Acesso
+
+- **Rota**: `/financas/integracoes`
+- **Acesso**: Via tela de Integrações Financeiras, botão "Listar Arquivos SFTP" e "Importar" para integrações do tipo Getnet
+- **Roles**: Admin / Tesoureiro
+
+### Padrão de Arquivo
+
+Os arquivos seguem o padrão `getnetextr_YYYYMMDD_XXXXXXXX_c101.txt`. A data de referência é extraída automaticamente do nome do arquivo.
+
+### Tipos de Registro Suportados (Layout V10.1)
+
+| Tipo | Nome | Tabela de destino |
+|------|------|-------------------|
+| 0 | Header | `getnet_arquivos` (metadados) |
+| 1 | Resumo Transacional (RV) | `getnet_resumo` |
+| 2 | Analítico / CV | `getnet_analitico` |
+| 3 | Ajustes e Chargebacks | `getnet_ajustes` |
+| 5 | Resumo Financeiro (UR) | `getnet_financeiro_resumo` |
+| 6 | Detalhe Financeiro | `getnet_financeiro_detalhe` |
+| 9 | Trailer | `getnet_arquivos` (validação de contagem) |
+
+### Ciclo de Vida PF → LQ
+
+O tipo 1 pode aparecer duas vezes para o mesmo RV:
+
+- **PF** (Previsto de Pagamento): agendamento do crédito
+- **LQ** (Liquidação): confirmação do pagamento efetivo
+
+O campo `indicador_tipo_pagamento` faz parte da chave única `(integracao_id, rv, data_rv, indicador_tipo_pagamento)`, permitindo armazenar PF e LQ como linhas distintas e suportando reimportações idempotentes.
+
+### Componentes de UI
+
+- **`GetnetListFilesDialog`**: Lista os arquivos disponíveis no servidor SFTP, exibindo nome, tamanho e data de modificação. Detecta a data de referência a partir do nome do arquivo.
+- **`GetnetImportDialog`**: Permite selecionar (ou confirmar) a data de referência antes de iniciar a importação. Exibe resultado detalhado por arquivo (total recebido, inserido, ignorado).
+
+### Edge Function
+
+- **Função**: `getnet-sftp`
+- **Ações**:
+  - `list_files`: Conecta ao SFTP e retorna lista de arquivos disponíveis
+  - `import`: Baixa e processa o arquivo usando `getnetExtratoParser.ts`
+
+### Parser (`getnetExtratoParser.ts`)
+
+Parser posicional sem dependências externas. Destaques:
+
+- Offsets 1-based conforme manual V10.1
+- Valores monetários em centavos (12 dígitos) convertidos para reais
+- Datas no formato `DDMMAAAA` convertidas para ISO `YYYY-MM-DD`
+- Campo sinal (`+`/`-`) aplicado ao valor via `applySign()`
+- Validação de trailer (contagem de registros)
+
+### Migration
+
+`supabase/migrations/20260617000001_getnet_schema_expand.sql` expande o schema com:
+
+- Novas colunas em `getnet_resumo`: `indicador_tipo_pagamento`, `data_pagamento_rv`, `chave_ur`, `valor_tarifa`, `valor_taxa_desconto`, `banco`, `agencia`, `conta_corrente`, `tipo_conta`, `num_parcela_rv`, `qtd_parcelas_rv`, `data_vencimento_original`, `moeda`
+- Novas colunas em `getnet_analitico`: `data_transacao`, `hora_transacao`, `codigo_terminal`, `valor_comissao`, `numero_parcelas`, `parcela_do_cv`, `valor_parcela`, `moeda`, `sinal`
+- Nova tabela `getnet_arquivos` (controle por arquivo importado)
+- Nova tabela `getnet_ajustes` (tipo 3)
+- Nova tabela `getnet_financeiro_resumo` (tipo 5)
+- Nova tabela `getnet_financeiro_detalhe` (tipo 6)
+- Índice auxiliar `idx_getnet_resumo_chave_ur` para junção 1↔5↔6
+
+### Arquivos Criados/Modificados
+
+- `src/components/financas/GetnetImportDialog.tsx` (novo)
+- `src/components/financas/GetnetListFilesDialog.tsx` (novo)
+- `src/pages/financas/Integracoes.tsx` (botões de listagem e importação)
+- `supabase/functions/getnet-sftp/getnetExtratoParser.ts` (novo)
+- `supabase/functions/getnet-sftp/index.ts` (expandido)
+- `supabase/migrations/20260617000001_getnet_schema_expand.sql` (novo)
+- `src/App.tsx` (rota `/financas/integracoes`)
+
+### Referências
+
+- Fluxo: [`docs/diagramas/fluxo-getnet-sftp.md`](diagramas/fluxo-getnet-sftp.md)
+- Integração com conciliação bancária: seção 16.1 acima
+- Fluxo financeiro geral: [`docs/diagramas/fluxo-financeiro.md`](diagramas/fluxo-financeiro.md)
+
+---
+
 ## 17. Bíblia
 
 - Acesso integrado à Bíblia
