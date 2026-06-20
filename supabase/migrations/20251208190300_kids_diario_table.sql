@@ -14,39 +14,33 @@ CREATE TABLE IF NOT EXISTS public.kids_diario (
 );
 
 -- Constraint: apenas um diário por criança por culto (ou por data se culto for nulo)
-CREATE UNIQUE INDEX idx_kids_diario_crianca_culto ON public.kids_diario(crianca_id, culto_id) 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_kids_diario_crianca_culto ON public.kids_diario(crianca_id, culto_id)
   WHERE culto_id IS NOT NULL;
 
-CREATE UNIQUE INDEX idx_kids_diario_crianca_data ON public.kids_diario(crianca_id, data) 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_kids_diario_crianca_data ON public.kids_diario(crianca_id, data)
   WHERE culto_id IS NULL;
 
 -- Índices para performance
-CREATE INDEX idx_kids_diario_crianca ON public.kids_diario(crianca_id);
-CREATE INDEX idx_kids_diario_data ON public.kids_diario(data);
-CREATE INDEX idx_kids_diario_culto ON public.kids_diario(culto_id);
+CREATE INDEX IF NOT EXISTS idx_kids_diario_crianca ON public.kids_diario(crianca_id);
+CREATE INDEX IF NOT EXISTS idx_kids_diario_data ON public.kids_diario(data);
+CREATE INDEX IF NOT EXISTS idx_kids_diario_culto ON public.kids_diario(culto_id);
 
 -- RLS
 ALTER TABLE public.kids_diario ENABLE ROW LEVEL SECURITY;
 
 -- Líderes podem gerenciar diários
+DROP POLICY IF EXISTS "Lideres gerenciam diarios" ON public.kids_diario;
 CREATE POLICY "Lideres gerenciam diarios" ON public.kids_diario
-  FOR ALL 
+  FOR ALL
   USING (
-    has_role(auth.uid(), 'admin'::app_role) OR 
+    has_role(auth.uid(), 'admin'::app_role) OR
     has_role(auth.uid(), 'lider'::app_role) OR
     has_role(auth.uid(), 'secretario'::app_role)
   );
 
--- Pais podem ver diários dos próprios filhos
-CREATE POLICY "Pais veem diarios dos filhos" ON public.kids_diario
-  FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = kids_diario.crianca_id
-      AND p.responsavel_id = (SELECT id FROM public.profiles WHERE user_id = auth.uid())
-    )
-  );
+-- Política de acesso dos pais removida: profiles.responsavel_id não existe neste schema.
+-- Acesso ao diário controlado apenas pela policy de líderes acima.
+DROP POLICY IF EXISTS "Pais veem diarios dos filhos" ON public.kids_diario;
 
 -- Trigger para atualizar updated_at
 CREATE OR REPLACE FUNCTION update_kids_diario_updated_at()
@@ -57,12 +51,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS kids_diario_updated_at ON public.kids_diario;
 CREATE TRIGGER kids_diario_updated_at
   BEFORE UPDATE ON public.kids_diario
   FOR EACH ROW
   EXECUTE FUNCTION update_kids_diario_updated_at();
 
 -- View para facilitar consultas com dados joinados
+DROP VIEW IF EXISTS public.view_kids_diario;
 CREATE OR REPLACE VIEW public.view_kids_diario AS
 SELECT 
   kd.id,

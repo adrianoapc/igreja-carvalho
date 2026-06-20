@@ -31,9 +31,9 @@ COMMENT ON COLUMN solicitacoes_reembolso.valor_total IS 'Soma automática de tod
 COMMENT ON COLUMN solicitacoes_reembolso.comprovante_pagamento_url IS 'URL do comprovante de repasse ao solicitante';
 
 -- Índices para performance
-CREATE INDEX idx_solicitacoes_reembolso_solicitante ON solicitacoes_reembolso(solicitante_id);
-CREATE INDEX idx_solicitacoes_reembolso_status ON solicitacoes_reembolso(status);
-CREATE INDEX idx_solicitacoes_reembolso_data ON solicitacoes_reembolso(data_solicitacao);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_reembolso_solicitante ON solicitacoes_reembolso(solicitante_id);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_reembolso_status ON solicitacoes_reembolso(status);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_reembolso_data ON solicitacoes_reembolso(data_solicitacao);
 
 -- =====================================================
 -- 2. ALTERAÇÃO NA TABELA transacoes_financeiras
@@ -66,12 +66,28 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger para recalcular valor total ao inserir/atualizar/deletar transação
+-- Triggers separados por operação (WHEN com NEW é inválido em DELETE)
 DROP TRIGGER IF EXISTS trigger_atualizar_valor_total_reembolso ON transacoes_financeiras;
-CREATE TRIGGER trigger_atualizar_valor_total_reembolso
-  AFTER INSERT OR UPDATE OR DELETE ON transacoes_financeiras
+DROP TRIGGER IF EXISTS trigger_atualizar_valor_total_reembolso_ins ON transacoes_financeiras;
+DROP TRIGGER IF EXISTS trigger_atualizar_valor_total_reembolso_upd ON transacoes_financeiras;
+DROP TRIGGER IF EXISTS trigger_atualizar_valor_total_reembolso_del ON transacoes_financeiras;
+
+CREATE TRIGGER trigger_atualizar_valor_total_reembolso_ins
+  AFTER INSERT ON transacoes_financeiras
+  FOR EACH ROW
+  WHEN (NEW.solicitacao_reembolso_id IS NOT NULL)
+  EXECUTE FUNCTION atualizar_valor_total_reembolso();
+
+CREATE TRIGGER trigger_atualizar_valor_total_reembolso_upd
+  AFTER UPDATE ON transacoes_financeiras
   FOR EACH ROW
   WHEN (NEW.solicitacao_reembolso_id IS NOT NULL OR OLD.solicitacao_reembolso_id IS NOT NULL)
+  EXECUTE FUNCTION atualizar_valor_total_reembolso();
+
+CREATE TRIGGER trigger_atualizar_valor_total_reembolso_del
+  AFTER DELETE ON transacoes_financeiras
+  FOR EACH ROW
+  WHEN (OLD.solicitacao_reembolso_id IS NOT NULL)
   EXECUTE FUNCTION atualizar_valor_total_reembolso();
 
 -- =====================================================
@@ -103,12 +119,8 @@ CREATE POLICY "Usuários podem ver suas próprias solicitações"
   FOR SELECT
   TO authenticated
   USING (
-    solicitante_id = auth.uid()
-    OR EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.role IN ('admin', 'tesoureiro', 'financeiro')
-    )
+    solicitante_id = (SELECT id FROM public.profiles WHERE user_id = auth.uid() LIMIT 1)
+    OR has_role(auth.uid(), 'admin'::app_role)
   );
 
 -- Policy: Usuário pode criar solicitações para si mesmo
@@ -117,21 +129,19 @@ CREATE POLICY "Usuários podem criar suas solicitações"
   ON solicitacoes_reembolso
   FOR INSERT
   TO authenticated
-  WITH CHECK (solicitante_id = auth.uid());
+  WITH CHECK (
+    solicitante_id = (SELECT id FROM public.profiles WHERE user_id = auth.uid() LIMIT 1)
+  );
 
--- Policy: Usuário pode editar suas próprias solicitações OU admin/tesoureiro podem editar qualquer uma
+-- Policy: Usuário pode editar suas próprias solicitações OU admin pode editar qualquer uma
 DROP POLICY IF EXISTS "Usuários podem editar suas solicitações" ON solicitacoes_reembolso;
 CREATE POLICY "Usuários podem editar suas solicitações"
   ON solicitacoes_reembolso
   FOR UPDATE
   TO authenticated
   USING (
-    solicitante_id = auth.uid()
-    OR EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.role IN ('admin', 'tesoureiro', 'financeiro')
-    )
+    solicitante_id = (SELECT id FROM public.profiles WHERE user_id = auth.uid() LIMIT 1)
+    OR has_role(auth.uid(), 'admin'::app_role)
   );
 
 -- Policy: Apenas pode deletar solicitações em rascunho que são suas
@@ -141,7 +151,7 @@ CREATE POLICY "Usuários podem deletar rascunhos"
   FOR DELETE
   TO authenticated
   USING (
-    solicitante_id = auth.uid()
+    solicitante_id = (SELECT id FROM public.profiles WHERE user_id = auth.uid() LIMIT 1)
     AND status = 'rascunho'
   );
 
@@ -151,14 +161,10 @@ CREATE POLICY "Usuários podem deletar rascunhos"
 CREATE OR REPLACE FUNCTION validar_status_reembolso()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Apenas admin/tesoureiro podem aprovar ou marcar como pago
+  -- Apenas admin podem aprovar ou marcar como pago
   IF NEW.status IN ('aprovado', 'pago', 'rejeitado') AND OLD.status != NEW.status THEN
-    IF NOT EXISTS (
-      SELECT 1 FROM profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.role IN ('admin', 'tesoureiro', 'financeiro')
-    ) THEN
-      RAISE EXCEPTION 'Apenas administradores ou tesoureiros podem aprovar/pagar/rejeitar solicitações';
+    IF NOT has_role(auth.uid(), 'admin'::app_role) THEN
+      RAISE EXCEPTION 'Apenas administradores podem aprovar/pagar/rejeitar solicitações';
     END IF;
   END IF;
 

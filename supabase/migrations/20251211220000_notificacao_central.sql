@@ -21,6 +21,17 @@ CREATE TABLE IF NOT EXISTS notificacao_regras (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
+-- Garantir que a coluna 'evento' existe (tabela pode já existir com estrutura diferente)
+ALTER TABLE notificacao_regras ADD COLUMN IF NOT EXISTS evento VARCHAR(100);
+ALTER TABLE notificacao_regras ADD COLUMN IF NOT EXISTS titulo_template TEXT;
+ALTER TABLE notificacao_regras ADD COLUMN IF NOT EXISTS mensagem_template TEXT;
+ALTER TABLE notificacao_regras ADD COLUMN IF NOT EXISTS descricao TEXT;
+ALTER TABLE notificacao_regras ADD COLUMN IF NOT EXISTS role_destinatario VARCHAR(50);
+ALTER TABLE notificacao_regras ADD COLUMN IF NOT EXISTS canal_inapp BOOLEAN DEFAULT true;
+ALTER TABLE notificacao_regras ADD COLUMN IF NOT EXISTS canal_whatsapp BOOLEAN DEFAULT false;
+ALTER TABLE notificacao_regras ADD COLUMN IF NOT EXISTS canal_push BOOLEAN DEFAULT false;
+ALTER TABLE notificacao_regras ADD COLUMN IF NOT EXISTS ativo BOOLEAN DEFAULT true;
+
 CREATE INDEX IF NOT EXISTS idx_notificacao_regras_evento ON notificacao_regras(evento);
 CREATE INDEX IF NOT EXISTS idx_notificacao_regras_ativo ON notificacao_regras(ativo);
 
@@ -44,6 +55,15 @@ CREATE TABLE IF NOT EXISTS notifications (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
+-- Garantir colunas adicionais na tabela notifications (pode já existir com esquema diferente)
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS titulo VARCHAR(255);
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS mensagem TEXT;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS tipo VARCHAR(100);
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS icone VARCHAR(50);
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS cor VARCHAR(20);
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS link VARCHAR(500);
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS lido BOOLEAN DEFAULT false;
+
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_lido ON notifications(user_id, lido);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
@@ -62,15 +82,20 @@ CREATE POLICY "Usuários marcam leitura de suas notificações"
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
--- Dados de exemplo
-INSERT INTO notificacao_regras (evento, titulo_template, mensagem_template, role_destinatario, canal_inapp, canal_whatsapp, descricao)
-VALUES
-  ('novo_visitante', 'Novo Visitante', 'Um novo visitante chegou: {{nome}}', 'pastor', true, true, 'Notifica pastor quando visitante se registra'),
-  ('reembolso_solicitado', 'Nova Solicitação de Reembolso', '{{solicitante}} solicitou R$ {{valor}}', 'tesoureiro', true, true, 'Notifica tesoureiro de novo reembolso'),
-  ('reembolso_aprovado', 'Reembolso Aprovado', 'Seu reembolso de R$ {{valor}} foi aprovado!', null, true, false, 'Notifica solicitante quando aprovado (user_id_alvo)'),
-  ('tarefas_atrasadas', 'Tarefas Atrasadas', 'Você tem {{quantidade}} tarefa(s) atrasada(s)', 'lider_projeto', true, false, 'Notifica líderes sobre tarefas atrasadas'),
-  ('evento_proxima_semana', 'Evento Próximo', '{{evento}} acontece em {{dias}} dia(s) - {{local}}', 'membro', true, true, 'Lembra membros de eventos próximos')
-ON CONFLICT (evento) DO NOTHING;
+-- Dados de exemplo (apenas se a constraint UNIQUE existir na coluna evento)
+DO $$
+BEGIN
+  INSERT INTO notificacao_regras (evento, titulo_template, mensagem_template, role_destinatario, canal_inapp, canal_whatsapp, descricao)
+  VALUES
+    ('novo_visitante', 'Novo Visitante', 'Um novo visitante chegou: {{nome}}', 'pastor', true, true, 'Notifica pastor quando visitante se registra'),
+    ('reembolso_solicitado', 'Nova Solicitação de Reembolso', '{{solicitante}} solicitou R$ {{valor}}', 'tesoureiro', true, true, 'Notifica tesoureiro de novo reembolso'),
+    ('reembolso_aprovado', 'Reembolso Aprovado', 'Seu reembolso de R$ {{valor}} foi aprovado!', null, true, false, 'Notifica solicitante quando aprovado (user_id_alvo)'),
+    ('tarefas_atrasadas', 'Tarefas Atrasadas', 'Você tem {{quantidade}} tarefa(s) atrasada(s)', 'lider_projeto', true, false, 'Notifica líderes sobre tarefas atrasadas'),
+    ('evento_proxima_semana', 'Evento Próximo', '{{evento}} acontece em {{dias}} dia(s) - {{local}}', 'membro', true, true, 'Lembra membros de eventos próximos')
+  ON CONFLICT (evento) DO NOTHING;
+EXCEPTION WHEN others THEN
+  RAISE NOTICE 'Seed de notificacao_regras ignorado: %', SQLERRM;
+END $$;
 
 -- Comentários para documentação
 COMMENT ON TABLE notificacao_regras IS 'Regras de disparo de notificações - determina quando e como notificar usuários';

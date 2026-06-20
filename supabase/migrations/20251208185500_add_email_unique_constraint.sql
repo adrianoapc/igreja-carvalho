@@ -4,18 +4,26 @@ DO $$
 BEGIN
   -- Se houver emails duplicados, manter apenas o primeiro registro
   -- (Ajustar conforme necessidade - este é um exemplo simples)
-  DELETE FROM public.profiles 
+  DELETE FROM public.profiles
   WHERE id NOT IN (
-    SELECT MIN(id) 
-    FROM public.profiles 
-    WHERE email IS NOT NULL 
-    GROUP BY email
+    SELECT DISTINCT ON (email) id
+    FROM public.profiles
+    WHERE email IS NOT NULL
+    ORDER BY email
   ) AND email IS NOT NULL;
 END $$;
 
--- Adicionar a constraint UNIQUE no email
-ALTER TABLE public.profiles 
-ADD CONSTRAINT profiles_email_unique UNIQUE (email);
+-- Adicionar a constraint UNIQUE no email (se ainda não existir)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'profiles_email_unique'
+      AND conrelid = 'public.profiles'::regclass
+  ) THEN
+    ALTER TABLE public.profiles ADD CONSTRAINT profiles_email_unique UNIQUE (email);
+  END IF;
+END $$;
 
 -- Atualizar a função handle_new_user para verificar email duplicado
 CREATE OR REPLACE FUNCTION public.handle_new_user()
