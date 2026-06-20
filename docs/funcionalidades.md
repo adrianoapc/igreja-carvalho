@@ -1650,7 +1650,16 @@ O campo `indicador_tipo_pagamento` faz parte da chave única `(integracao_id, rv
 - **Função**: `getnet-sftp`
 - **Ações**:
   - `list_files`: Conecta ao SFTP e retorna lista de arquivos disponíveis
-  - `import`: Baixa e processa o arquivo usando `getnetExtratoParser.ts`
+  - `import_extrato`: Baixa e processa arquivo(s) de uma data específica usando `getnetExtratoParser.ts`
+  - `sync`: Detecta automaticamente arquivos pendentes (diff SFTP vs `getnet_arquivos`) e importa em lote (padrão: até 7 arquivos por execução, do mais antigo para o mais novo). Usado pelo cron e pelo botão "Sincronizar" na UI. `getnet_arquivos` só é gravado após sucesso total, garantindo que falhas sejam retentadas.
+
+### Sincronização Automática (Cron)
+
+O cron dispara periodicamente a action `sync` via service_role key. Parâmetros:
+
+- **`batch_size`**: Número máximo de arquivos por execução (padrão 7, máximo 30)
+- **`created_by`**: `NULL` para execuções do cron (campo UUID — não aceita string)
+- **Idempotência**: Todos os `upsert` usam `ON CONFLICT DO NOTHING`, tornando seguros os reprocessamentos de arquivos já parcialmente importados
 
 ### Parser (`getnetExtratoParser.ts`)
 
@@ -1662,7 +1671,7 @@ Parser posicional sem dependências externas. Destaques:
 - Campo sinal (`+`/`-`) aplicado ao valor via `applySign()`
 - Validação de trailer (contagem de registros)
 
-### Migration
+### Migrations
 
 `supabase/migrations/20260617000001_getnet_schema_expand.sql` expande o schema com:
 
@@ -1673,6 +1682,10 @@ Parser posicional sem dependências externas. Destaques:
 - Nova tabela `getnet_financeiro_resumo` (tipo 5)
 - Nova tabela `getnet_financeiro_detalhe` (tipo 6)
 - Índice auxiliar `idx_getnet_resumo_chave_ur` para junção 1↔5↔6
+
+`supabase/migrations/20260619000001_fix_getnet_sync_constraint.sql` corrige o constraint de auditoria:
+
+- Adiciona `'sync'` e `'import_extrato_arquivo'` ao CHECK constraint de `integracoes_execucoes_log.acao`
 
 ### Arquivos Criados/Modificados
 

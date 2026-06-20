@@ -440,7 +440,7 @@ Deno.serve(async (req) => {
       igreja_id: integracao.igreja_id,
       filial_id: integracao.filial_id ?? null,
       provedor: integracao.provedor,
-      created_by: userId,
+      created_by: userId === "cron" ? null : userId,
     };
 
     // ===== Credenciais =====
@@ -953,24 +953,6 @@ async function runExtratoEletronicoV10(args: {
       const parsed = parseExtrato(text);
       const { resumos, analiticos, ajustes, financeirosResumo, financeirosDetalhe, validacao } = parsed;
 
-      // ── getnet_arquivos (controle por arquivo) ──────────────────────────
-      await supabaseAdmin
-        .from("getnet_arquivos")
-        .upsert({
-          integracao_id: integracao.id,
-          igreja_id: integracao.igreja_id,
-          arquivo_nome: arq.nome,
-          data_referencia: dataReferencia,
-          storage_path: arq.storage_path,
-          sequencia_remessa: parsed.header?.sequenciaRemessa ?? null,
-          qtd_registros_declarada: validacao.qtdRegistrosDeclarada,
-          qtd_registros_lida: validacao.qtdRegistrosLidos,
-          validacao_ok: validacao.ok,
-          erros_validacao: validacao.erros.length > 0 ? validacao.erros : null,
-          codigo_estabelecimento: parsed.header?.codigoEstabelecimento ?? null,
-          cnpj_adquirente: parsed.header?.cnpjAdquirente ?? null,
-        }, { onConflict: "integracao_id,arquivo_nome" });
-
       // ── getnet_resumo (tipo 1) — chave inclui indicador para ciclo PF→LQ ─
       const resumoRows = resumos.map((r) => ({
         integracao_id: integracao.id,
@@ -1155,6 +1137,25 @@ async function runExtratoEletronicoV10(args: {
         extratosInseridos = exRes.inserted;
         extratosIgnorados = exRes.ignored;
       }
+
+      // ── getnet_arquivos (controle por arquivo) — written only after all upserts succeed
+      // so failed imports are not silently skipped on the next sync run.
+      await supabaseAdmin
+        .from("getnet_arquivos")
+        .upsert({
+          integracao_id: integracao.id,
+          igreja_id: integracao.igreja_id,
+          arquivo_nome: arq.nome,
+          data_referencia: dataReferencia,
+          storage_path: arq.storage_path,
+          sequencia_remessa: parsed.header?.sequenciaRemessa ?? null,
+          qtd_registros_declarada: validacao.qtdRegistrosDeclarada,
+          qtd_registros_lida: validacao.qtdRegistrosLidos,
+          validacao_ok: validacao.ok,
+          erros_validacao: validacao.erros.length > 0 ? validacao.erros : null,
+          codigo_estabelecimento: parsed.header?.codigoEstabelecimento ?? null,
+          cnpj_adquirente: parsed.header?.cnpjAdquirente ?? null,
+        }, { onConflict: "integracao_id,arquivo_nome" });
 
       const totalLinhas = validacao.qtdRegistrosLidos;
       const inseridos = resRes.inserted + anaRes.inserted + ajusteRes.inserted +
