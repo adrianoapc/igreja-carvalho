@@ -127,35 +127,32 @@ export function useAppConfig() {
     [toast]
   );
 
+  // Carrega dados quando o auth terminar de inicializar
   useEffect(() => {
-    const loadAll = async () => {
-      setIsLoading(true);
-      await Promise.all([fetchConfig(), fetchIgrejaConfig()]);
+    if (igrejaLoading) return;
+    setIsLoading(true);
+    Promise.all([fetchConfig(), fetchIgrejaConfig()]).finally(() => {
       setIsLoading(false);
-    };
-    if (!igrejaLoading) {
-      loadAll();
-    }
+    });
+  }, [fetchConfig, fetchIgrejaConfig, igrejaLoading]);
 
-    const subscription = supabase
-      .channel(`app_config_changes_${Date.now()}`)
+  // Subscription isolada — monta uma vez, sem deps de estado
+  useEffect(() => {
+    const channel = supabase
+      .channel('app_config_changes')
       .on(
         'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'app_config',
-        },
-        () => {
-          fetchConfig();
-        }
+        { event: 'UPDATE', schema: 'public', table: 'app_config' },
+        fetchConfig
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(subscription);
+      supabase.removeChannel(channel);
     };
-  }, [fetchConfig, fetchIgrejaConfig, igrejaLoading]);
+  // fetchConfig tem deps [], então nunca muda — seguro omitir aqui
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     config,
