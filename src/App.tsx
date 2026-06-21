@@ -15,6 +15,7 @@ import { SuperAdminLayout } from "./components/layout/SuperAdminLayout";
 import { AuthGate } from "./components/auth/AuthGate";
 import { ThemeProvider } from "next-themes";
 import { AuthContextProvider } from "./contexts/AuthContextProvider";
+import { AppConfigProvider } from "./contexts/AppConfigContext";
 import { HideValuesProvider } from "./hooks/useHideValues";
 
 // Pages Imports
@@ -253,6 +254,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <AuthContextProvider>
+              <AppConfigProvider>
               <ScrollToTop />
               <Suspense
                 fallback={
@@ -1327,6 +1329,7 @@ const App = () => (
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
+              </AppConfigProvider>
             </AuthContextProvider>
           </BrowserRouter>
         </HideValuesProvider>
