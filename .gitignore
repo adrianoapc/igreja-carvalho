@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Supabase
+.env
+supabase/.temp/
+
+# Dados de migração (PII)
+imports/
+Imports/
+migrate_auth.js
