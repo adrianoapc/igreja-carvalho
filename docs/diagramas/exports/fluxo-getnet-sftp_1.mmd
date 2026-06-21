@@ -10,7 +10,7 @@ graph TD
 
     subgraph EdgeFn["Edge Function: getnet-sftp"]
         ActionList["action: list_files\nConecta SFTP e retorna lista"]
-        ActionImport["action: import\nBaixa e parseia arquivo(s)"]
+        ActionImport["action: import_extrato\nBaixa e parseia arquivo(s)"]
         Parser["getnetExtratoParser.ts\nLayout V10.1 — 400 bytes/linha"]
     end
 
@@ -25,7 +25,7 @@ graph TD
     end
 
     subgraph DB["Banco de Dados (Supabase Postgres)"]
-        TbArquivos[(getnet_arquivos\ncontrole por arquivo)]
+        TbArquivos[(getnet_arquivos\ncontrole por arquivo\n— gravado só após sucesso)]
         TbResumo[(getnet_resumo\nciclo PF→LQ por RV)]
         TbAnalitico[(getnet_analitico\ntransações/CVs)]
         TbAjustes[(getnet_ajustes\najustes e chargebacks)]
@@ -41,7 +41,7 @@ graph TD
     ActionList --> ListDialog
 
     ListDialog -->|"Clica Importar"| ImportDialog
-    ImportDialog -->|"action: import + data"| ActionImport
+    ImportDialog -->|"action: import_extrato + data"| ActionImport
     ActionImport -->|"SFTP get"| SFTP
     SFTP -->|"Conteúdo do arquivo"| ActionImport
     ActionImport --> Parser

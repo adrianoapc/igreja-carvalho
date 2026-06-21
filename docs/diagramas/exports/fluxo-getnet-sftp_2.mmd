@@ -1,30 +1,26 @@
 sequenceDiagram
     autonumber
-    participant Tesoureiro
-    participant UI as Integracoes.tsx
-    participant Fn as getnet-sftp (Edge Fn)
+    participant Cron as Cron / Botão "Sincronizar"
+    participant Fn as getnet-sftp (action=sync)
     participant SFTP as SFTP Getnet
     participant DB as Supabase DB
 
-    Tesoureiro->>UI: Clica em "Listar Arquivos SFTP"
-    UI->>Fn: action=list_files, integracao_id
-    Fn->>SFTP: Conecta e lista diretório
-    SFTP-->>Fn: Lista de arquivos getnetextr_*
-    Fn-->>UI: [{ name, size, modified }]
-    UI->>Tesoureiro: Exibe GetnetListFilesDialog
+    Cron->>Fn: action=sync, integracao_id
+    Fn->>SFTP: Conecta e lista diretório (regex getnetextr_YYYYMMDD_*)
+    SFTP-->>Fn: Lista de arquivos correspondentes
+    Fn->>DB: SELECT arquivo_nome FROM getnet_arquivos WHERE integracao_id=?
+    DB-->>Fn: Conjunto de arquivos já importados com sucesso
+    Fn->>Fn: Diff: SFTP − DB = arquivos pendentes (sorted oldest-first)
+    Fn->>Fn: Seleciona até batch_size=7 arquivos
 
-    Tesoureiro->>UI: Seleciona arquivo e clica Importar
-    UI->>Tesoureiro: Abre GetnetImportDialog (confirma data)
-    Tesoureiro->>UI: Confirma data de referência
-    UI->>Fn: action=import, data_referencia, arquivo_nome
-    Fn->>SFTP: Download do arquivo
-    SFTP-->>Fn: Conteúdo posicional (400 bytes/linha)
-    Fn->>Fn: Parser V10.1 processa cada linha
-    Fn->>DB: Upsert em getnet_arquivos (header/trailer)
-    Fn->>DB: Upsert em getnet_resumo (tipo 1)
-    Fn->>DB: Upsert em getnet_analitico (tipo 2)
-    Fn->>DB: Upsert em getnet_ajustes (tipo 3)
-    Fn->>DB: Upsert em getnet_financeiro_resumo (tipo 5)
-    Fn->>DB: Upsert em getnet_financeiro_detalhe (tipo 6)
-    Fn-->>UI: { success, total_recebido, total_inserido, total_ignorado }
-    UI->>Tesoureiro: Exibe resultado da importação
+    loop Para cada arquivo pendente
+        Fn->>Fn: Chama runExtratoEletronicoV10(arquivo_nome)
+        Note over Fn: Upserta getnet_resumo, getnet_analitico,<br/>getnet_ajustes, getnet_fin_resumo,<br/>getnet_fin_detalhe, extratos_bancarios
+        alt Todos os upserts OK
+            Fn->>DB: Upsert getnet_arquivos (marca como importado)
+        else Qualquer upsert falhou
+            Note over DB: getnet_arquivos NÃO é gravado → arquivo será retentado
+        end
+    end
+
+    Fn-->>Cron: { total_sftp, already_imported, new_found, processed, errors }
