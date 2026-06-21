@@ -138,7 +138,7 @@ export function useAppConfig() {
     }
 
     const subscription = supabase
-      .channel('app_config_changes')
+      .channel(`app_config_changes_${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -153,7 +153,7 @@ export function useAppConfig() {
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      supabase.removeChannel(subscription);
     };
   }, [fetchConfig, fetchIgrejaConfig, igrejaLoading]);
 

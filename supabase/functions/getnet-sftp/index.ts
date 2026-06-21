@@ -337,10 +337,11 @@ async function upsertChunks<T>(
 // ==================== HANDLER ====================
 
 type Payload = {
-  action: "test_connection" | "list_files" | "import_extrato";
+  action: "test_connection" | "list_files" | "import_extrato" | "sync";
   integracao_id: string;
   arquivo_nome?: string;
   data_referencia?: string; // YYYY-MM-DD (override do "hoje")
+  batch_size?: number;      // sync: máx de arquivos por execução (default 7)
 };
 
 Deno.serve(async (req) => {
@@ -376,23 +377,29 @@ Deno.serve(async (req) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
 
-    const { data: claimsData, error: claimsError } =
-      await supabaseUser.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims?.sub) {
-      return json(401, { error: "Unauthorized" });
+    // Service-role bypass: cron jobs authenticate with the service_role key directly
+    let userId: string;
+    if (token === serviceKey) {
+      userId = "cron";
+    } else {
+      const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: claimsData, error: claimsError } =
+        await supabaseUser.auth.getClaims(token);
+      if (claimsError || !claimsData?.claims?.sub) {
+        return json(401, { error: "Unauthorized" });
+      }
+      userId = claimsData.claims.sub;
     }
-    const userId = claimsData.claims.sub;
 
     const payload = (await req.json().catch(() => null)) as Payload | null;
     if (!payload || !payload.integracao_id || !payload.action) {
       return json(400, { error: "Invalid payload" });
     }
     if (
-      !["test_connection", "list_files", "import_extrato"].includes(
+      !["test_connection", "list_files", "import_extrato", "sync"].includes(
         payload.action
       )
     ) {
@@ -412,12 +419,14 @@ Deno.serve(async (req) => {
       return json(404, { error: "Integration not found" });
     }
 
-    const hasPermission = await validatePermissions(
-      supabaseAdmin,
-      userId,
-      integracao.igreja_id
-    );
-    if (!hasPermission) return json(403, { error: "Insufficient permissions" });
+    if (userId !== "cron") {
+      const hasPermission = await validatePermissions(
+        supabaseAdmin,
+        userId,
+        integracao.igreja_id
+      );
+      if (!hasPermission) return json(403, { error: "Insufficient permissions" });
+    }
 
     if (integracao.tipo_auth !== "sftp") {
       return json(200, {
@@ -431,7 +440,7 @@ Deno.serve(async (req) => {
       igreja_id: integracao.igreja_id,
       filial_id: integracao.filial_id ?? null,
       provedor: integracao.provedor,
-      created_by: userId,
+      created_by: userId === "cron" ? null : userId,
     };
 
     // ===== Credenciais =====
@@ -538,6 +547,35 @@ Deno.serve(async (req) => {
           error: sftpErr?.message || "SFTP connection failed",
         });
       }
+    }
+
+    // ===== sync =====
+    if (payload.action === "sync") {
+      if (!contaId) {
+        logId = await startLog(supabaseAdmin, { ...baseLogCtx, acao: "sync" });
+        await finishLog(supabaseAdmin, logId, startedAt, {
+          status: "error",
+          erro_mensagem: "config.sftp.conta_id não configurado",
+        });
+        return json(200, { success: false, error: "Conta bancária não configurada." });
+      }
+      if (layout !== "extrato_eletronico_v10") {
+        return json(200, { success: false, error: `Sync não suportado para layout: ${layout}` });
+      }
+      return await runSyncExtratoV10({
+        supabaseAdmin,
+        baseLogCtx,
+        startedAt,
+        host,
+        port,
+        path,
+        username,
+        password,
+        filePatternRegex: sftpCfg.file_pattern_regex || null,
+        contaId,
+        integracao,
+        batchSize: Math.min(payload.batch_size ?? 7, 30),
+      });
     }
 
     // ===== import_extrato =====
@@ -915,24 +953,6 @@ async function runExtratoEletronicoV10(args: {
       const parsed = parseExtrato(text);
       const { resumos, analiticos, ajustes, financeirosResumo, financeirosDetalhe, validacao } = parsed;
 
-      // ── getnet_arquivos (controle por arquivo) ──────────────────────────
-      await supabaseAdmin
-        .from("getnet_arquivos")
-        .upsert({
-          integracao_id: integracao.id,
-          igreja_id: integracao.igreja_id,
-          arquivo_nome: arq.nome,
-          data_referencia: dataReferencia,
-          storage_path: arq.storage_path,
-          sequencia_remessa: parsed.header?.sequenciaRemessa ?? null,
-          qtd_registros_declarada: validacao.qtdRegistrosDeclarada,
-          qtd_registros_lida: validacao.qtdRegistrosLidos,
-          validacao_ok: validacao.ok,
-          erros_validacao: validacao.erros.length > 0 ? validacao.erros : null,
-          codigo_estabelecimento: parsed.header?.codigoEstabelecimento ?? null,
-          cnpj_adquirente: parsed.header?.cnpjAdquirente ?? null,
-        }, { onConflict: "integracao_id,arquivo_nome" });
-
       // ── getnet_resumo (tipo 1) — chave inclui indicador para ciclo PF→LQ ─
       const resumoRows = resumos.map((r) => ({
         integracao_id: integracao.id,
@@ -1118,6 +1138,25 @@ async function runExtratoEletronicoV10(args: {
         extratosIgnorados = exRes.ignored;
       }
 
+      // ── getnet_arquivos (controle por arquivo) — written only after all upserts succeed
+      // so failed imports are not silently skipped on the next sync run.
+      await supabaseAdmin
+        .from("getnet_arquivos")
+        .upsert({
+          integracao_id: integracao.id,
+          igreja_id: integracao.igreja_id,
+          arquivo_nome: arq.nome,
+          data_referencia: dataReferencia,
+          storage_path: arq.storage_path,
+          sequencia_remessa: parsed.header?.sequenciaRemessa ?? null,
+          qtd_registros_declarada: validacao.qtdRegistrosDeclarada,
+          qtd_registros_lida: validacao.qtdRegistrosLidos,
+          validacao_ok: validacao.ok,
+          erros_validacao: validacao.erros.length > 0 ? validacao.erros : null,
+          codigo_estabelecimento: parsed.header?.codigoEstabelecimento ?? null,
+          cnpj_adquirente: parsed.header?.cnpjAdquirente ?? null,
+        }, { onConflict: "integracao_id,arquivo_nome" });
+
       const totalLinhas = validacao.qtdRegistrosLidos;
       const inseridos = resRes.inserted + anaRes.inserted + ajusteRes.inserted +
         finResRes.inserted + finDetRes.inserted;
@@ -1226,5 +1265,175 @@ async function runExtratoEletronicoV10(args: {
       total_ignorado: totalIgnorado,
     },
     parent_log_id: parentLogId,
+  });
+}
+
+// ==================== runner: sync (extrato_eletronico_v10) ====================
+// Lists SFTP files, diffs against getnet_arquivos, and imports missing files
+// oldest-first up to batchSize. Called by cron and by the manual Sincronizar button.
+
+async function runSyncExtratoV10(args: {
+  supabaseAdmin: any;
+  baseLogCtx: any;
+  startedAt: number;
+  host: string;
+  port: number;
+  path: string;
+  username: string;
+  password: string;
+  filePatternRegex: string | null;
+  contaId: string;
+  integracao: any;
+  batchSize: number;
+}): Promise<Response> {
+  const {
+    supabaseAdmin, baseLogCtx, startedAt,
+    host, port, path, username, password,
+    filePatternRegex, contaId, integracao, batchSize,
+  } = args;
+
+  const defaultRegex = "^getnetextr_(\\d{4})(\\d{2})(\\d{2})_.+\\.txt$";
+  const regexStr = filePatternRegex || defaultRegex;
+  const fileRegex = new RegExp(regexStr, "i");
+
+  const logId = await startLog(supabaseAdmin, {
+    ...baseLogCtx,
+    acao: "sync",
+    metadata: { host, port, path, batch_size: batchSize },
+  });
+
+  // 1. List SFTP files matching the regex
+  type SftpCandidate = { name: string; m: RegExpExecArray };
+  const sftp = new SftpClient();
+  let sftpCandidates: SftpCandidate[] = [];
+  try {
+    await sftp.connect({ host, port, username, password, readyTimeout: 20000 });
+    const listing = (await sftp.list(path)) as any[];
+    for (const f of listing) {
+      if (f.type !== "-") continue;
+      const m = fileRegex.exec(f.name);
+      if (m && m.length >= 4) sftpCandidates.push({ name: f.name, m });
+    }
+    await sftp.end();
+  } catch (sftpErr: any) {
+    try { await sftp.end(); } catch (_) { /* ignore */ }
+    await finishLog(supabaseAdmin, logId, startedAt, {
+      status: "error",
+      erro_mensagem: sftpErr?.message || "SFTP error",
+      erro_stack: typeof sftpErr?.stack === "string" ? sftpErr.stack.slice(0, 4000) : null,
+    });
+    return json(200, { success: false, error: sftpErr?.message || "SFTP connection failed" });
+  }
+
+  // 2. Query already-imported filenames for this integration
+  const { data: importedRows, error: dbErr } = await supabaseAdmin
+    .from("getnet_arquivos")
+    .select("arquivo_nome")
+    .eq("integracao_id", integracao.id);
+
+  if (dbErr) {
+    await finishLog(supabaseAdmin, logId, startedAt, {
+      status: "error",
+      erro_mensagem: dbErr.message,
+    });
+    return json(200, { success: false, error: dbErr.message });
+  }
+
+  const importedSet = new Set<string>(
+    (importedRows ?? []).map((r: any) => r.arquivo_nome as string)
+  );
+
+  // 3. Diff: files on SFTP not yet in DB, sorted oldest-first (YYYYMMDD prefix)
+  const missing = sftpCandidates
+    .filter((c) => !importedSet.has(c.name))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const batch = missing.slice(0, batchSize);
+
+  type ArquivoResult = {
+    nome: string;
+    data_referencia: string;
+    status: string;
+    totais?: Record<string, number>;
+    erro?: string;
+  };
+  const resultArquivos: ArquivoResult[] = [];
+  let totalInserido = 0;
+  let totalIgnorado = 0;
+  let errors = 0;
+
+  // 4. Import each missing file by reusing runExtratoEletronicoV10
+  for (const c of batch) {
+    const dataReferencia = `${c.m[1]}-${c.m[2]}-${c.m[3]}`;
+    try {
+      const resp = await runExtratoEletronicoV10({
+        supabaseAdmin,
+        baseLogCtx,
+        startedAt: Date.now(),
+        host, port, path, username, password,
+        filePatternRegex,
+        contaId,
+        integracao,
+        dataReferencia,
+        requestedFile: c.name,
+      });
+      const result = await resp.json();
+      if (result.status === "success" || result.status === "partial") {
+        resultArquivos.push({
+          nome: c.name,
+          data_referencia: dataReferencia,
+          status: result.status,
+          totais: result.totais,
+        });
+        totalInserido += result.totais?.total_inserido ?? 0;
+        totalIgnorado += result.totais?.total_ignorado ?? 0;
+      } else {
+        errors++;
+        resultArquivos.push({
+          nome: c.name,
+          data_referencia: dataReferencia,
+          status: "erro",
+          erro: result.error ?? "Falha desconhecida",
+        });
+      }
+    } catch (e: any) {
+      errors++;
+      resultArquivos.push({
+        nome: c.name,
+        data_referencia: dataReferencia,
+        status: "erro",
+        erro: e?.message || String(e),
+      });
+    }
+  }
+
+  const processed = batch.length - errors;
+  const finalStatus: "success" | "partial" | "error" =
+    errors === 0 ? "success" : processed > 0 ? "partial" : "error";
+
+  await finishLog(supabaseAdmin, logId, startedAt, {
+    status: finalStatus,
+    total_inserido: totalInserido,
+    total_ignorado: totalIgnorado,
+    metadata: {
+      total_sftp: sftpCandidates.length,
+      already_imported: importedSet.size,
+      new_found: missing.length,
+      batch: batch.length,
+      processed,
+      errors,
+    },
+  });
+
+  return json(200, {
+    success: finalStatus !== "error",
+    status: finalStatus,
+    total_sftp: sftpCandidates.length,
+    already_imported: importedSet.size,
+    new_found: missing.length,
+    batch: batch.length,
+    processed,
+    errors,
+    arquivos: resultArquivos,
   });
 }

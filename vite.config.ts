@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
+import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
@@ -15,26 +16,31 @@ export default defineConfig(({ mode }) => ({
     chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
-        manualChunks: {
-          "vendor-react": ["react", "react-dom", "react-router-dom"],
-          "vendor-supabase": ["@supabase/supabase-js"],
-          "vendor-date": ["date-fns"],
-          "vendor-charts": ["recharts"],
-          "vendor-html2canvas": ["html2canvas"],
-          "vendor-carousel": [
-            "embla-carousel-react",
-            "embla-carousel-autoplay",
-          ],
+        manualChunks: (id) => {
+          if (id.includes("react") || id.includes("react-dom") || id.includes("react-router-dom")) {
+            return "vendor-react";
+          }
+          if (id.includes("@supabase/supabase-js")) {
+            return "vendor-supabase";
+          }
+          if (id.includes("date-fns")) {
+            return "vendor-date";
+          }
+          if (id.includes("recharts")) {
+            return "vendor-charts";
+          }
+          if (id.includes("html2canvas")) {
+            return "vendor-html2canvas";
+          }
+          if (id.includes("embla-carousel")) {
+            return "vendor-carousel";
+          }
         },
       },
     },
   },
-  optimizeDeps: {
-    esbuildOptions: {
-      target: "esnext",
-    },
-  },
   plugins: [
+    tailwindcss(),
     react(),
     mode === "development" && componentTagger(),
     VitePWA({

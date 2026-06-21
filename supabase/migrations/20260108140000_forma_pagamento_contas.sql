@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS forma_pagamento_contas (
   conta_id UUID NOT NULL REFERENCES contas(id) ON DELETE CASCADE,
   igreja_id UUID NOT NULL REFERENCES igrejas(id) ON DELETE CASCADE,
   filial_id UUID REFERENCES filiais(id) ON DELETE SET NULL,
-  prioridade INTEGER DEFAULT 1 COMMENT 'Se forma tem 2+ contas, qual preferência?',
+  prioridade INTEGER DEFAULT 1,
   criado_em TIMESTAMP DEFAULT now(),
   
   UNIQUE(forma_pagamento_id, conta_id, igreja_id, filial_id)
@@ -53,13 +53,13 @@ CREATE POLICY "Admin edita mapeamentos"
 
 -- Adicionar colunas em formas_pagamento para taxa e status
 ALTER TABLE formas_pagamento
-ADD COLUMN IF NOT EXISTS taxa_administrativa DECIMAL(5,2) DEFAULT 0 COMMENT 'Percentual de taxa (ex: 3.50)';
+ADD COLUMN IF NOT EXISTS taxa_administrativa DECIMAL(5,2) DEFAULT 0;
 
 ALTER TABLE formas_pagamento
-ADD COLUMN IF NOT EXISTS taxa_administrativa_fixa DECIMAL(10,2) DEFAULT NULL COMMENT 'Taxa em valor fixo (ex: R$ 1.50)';
+ADD COLUMN IF NOT EXISTS taxa_administrativa_fixa DECIMAL(10,2) DEFAULT NULL;
 
 ALTER TABLE formas_pagamento
-ADD COLUMN IF NOT EXISTS gera_pago BOOLEAN DEFAULT false COMMENT 'Dinheiro/PIX=true (pago), Cartão=false (pendente)';
+ADD COLUMN IF NOT EXISTS gera_pago BOOLEAN DEFAULT false;
 
 -- Inserir dados de migração automática (opcional, comentado para manual)
 -- INSERT INTO forma_pagamento_contas (forma_pagamento_id, conta_id, igreja_id, prioridade)

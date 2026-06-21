@@ -128,6 +128,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 -- 3. TRIGGER: Notificação ao registrar Diário
 -- ===========================================
 
+DROP TRIGGER IF EXISTS trigger_notify_kids_diario ON public.kids_diario;
 CREATE TRIGGER trigger_notify_kids_diario
   AFTER INSERT ON public.kids_diario
   FOR EACH ROW
@@ -141,6 +142,7 @@ COMMENT ON TRIGGER trigger_notify_kids_diario ON public.kids_diario IS
 -- 4. TRIGGER: Notificação ao fazer Check-out
 -- ===========================================
 
+DROP TRIGGER IF EXISTS trigger_notify_kids_checkout ON public.kids_checkins;
 CREATE TRIGGER trigger_notify_kids_checkout
   AFTER UPDATE ON public.kids_checkins
   FOR EACH ROW
@@ -195,8 +197,8 @@ COMMENT ON FUNCTION public.notify_kids_checkout() IS
 -- 6. Índices para melhor performance
 -- ==================================
 
-CREATE INDEX idx_notifications_type_created ON public.notifications(type, created_at DESC);
-CREATE INDEX idx_notifications_unread ON public.notifications(user_id, read) WHERE read = false;
+CREATE INDEX IF NOT EXISTS idx_notifications_type_created ON public.notifications(type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON public.notifications(user_id, read) WHERE read = false;
 
 -- ======================================================================
 -- OBSERVAÇÕES:

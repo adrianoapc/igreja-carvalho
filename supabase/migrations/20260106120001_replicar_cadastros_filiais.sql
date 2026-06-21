@@ -16,15 +16,11 @@ alter table public.logs_auditoria_replicacao enable row level security;
 create policy "Admins podem ver logs de replicacao" on public.logs_auditoria_replicacao
   for select using (
     has_role(auth.uid(), 'admin'::app_role)
-    or has_role(auth.uid(), 'admin_igreja'::app_role)
-    or has_role(auth.uid(), 'super_admin'::app_role)
   );
 
 create policy "Admins podem inserir logs de replicacao" on public.logs_auditoria_replicacao
   for insert with check (
     has_role(auth.uid(), 'admin'::app_role)
-    or has_role(auth.uid(), 'admin_igreja'::app_role)
-    or has_role(auth.uid(), 'super_admin'::app_role)
   );
 
 create or replace function public.replicar_cadastros_para_filiais(

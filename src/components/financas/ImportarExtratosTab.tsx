@@ -22,7 +22,7 @@ import {
   CheckCircle2,
   Download,
 } from "lucide-react";
-import OFX from "ofx-js";
+import { parse as parseOFX } from "ofx-js";
 
 const MAX_FILE_SIZE_MB = 10;
 const COL_MIN_WIDTH_PX = 140;
@@ -196,7 +196,7 @@ export function ImportarExtratosTab() {
   const handleOFXFile = async (file: File) => {
     try {
       const text = await file.text();
-      const ofxData = await OFX.parse(text);
+      const ofxData = await parseOFX(text);
 
       // Extrair transações do OFX
       const transactions =

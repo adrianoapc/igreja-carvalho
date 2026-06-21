@@ -89,7 +89,7 @@ export function DateTimePicker({
             mode="single"
             selected={selectedDate}
             onSelect={handleDateSelect}
-            initialFocus
+            autoFocus
             className={cn("p-3 pointer-events-auto")}
           />
         </PopoverContent>

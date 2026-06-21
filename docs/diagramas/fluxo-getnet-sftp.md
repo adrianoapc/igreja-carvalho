@@ -1,14 +1,18 @@
 # Fluxo Getnet SFTP — Importação de Extrato Eletrônico V10.1
 
+> **Atualizado em 2026-06-19**: adicionado fluxo de `sync` automático (action: sync) disparado por cron e pelo botão "Sincronizar" na UI.
+
 ## Objetivo
 
-Documentar o ciclo completo de importação dos arquivos de extrato eletrônico Getnet via SFTP, desde a listagem dos arquivos disponíveis até a persistência dos registros no banco de dados, cobrindo os 7 tipos de registro do layout V10.1.
+Documentar o ciclo completo de importação dos arquivos de extrato eletrônico Getnet via SFTP, desde a listagem dos arquivos disponíveis até a persistência dos registros no banco de dados, cobrindo os 7 tipos de registro do layout V10.1. Inclui sincronização automática via cron que detecta e importa arquivos pendentes.
 
 ## Contexto
 
 A Getnet disponibiliza extratos eletrônicos posicionais (400 bytes por linha) via SFTP no padrão `getnetextr_YYYYMMDD_*`. O sistema conecta ao servidor SFTP da Getnet, lista os arquivos disponíveis, faz o download e processa cada linha com o parser V10.1, distribuindo os registros pelas tabelas correspondentes.
 
-## Fluxo de Importação
+A action `sync` automatiza o processo: lista todos os arquivos do SFTP, compara com `getnet_arquivos` (que só recebe registros após importação bem-sucedida), e importa os arquivos pendentes em lotes de até 7 por execução.
+
+## Fluxo de Importação Manual
 
 ```mermaid
 graph TD
@@ -23,7 +27,7 @@ graph TD
 
     subgraph EdgeFn["Edge Function: getnet-sftp"]
         ActionList["action: list_files\nConecta SFTP e retorna lista"]
-        ActionImport["action: import\nBaixa e parseia arquivo(s)"]
+        ActionImport["action: import_extrato\nBaixa e parseia arquivo(s)"]
         Parser["getnetExtratoParser.ts\nLayout V10.1 — 400 bytes/linha"]
     end
 
@@ -38,7 +42,7 @@ graph TD
     end
 
     subgraph DB["Banco de Dados (Supabase Postgres)"]
-        TbArquivos[(getnet_arquivos\ncontrole por arquivo)]
+        TbArquivos[(getnet_arquivos\ncontrole por arquivo\n— gravado só após sucesso)]
         TbResumo[(getnet_resumo\nciclo PF→LQ por RV)]
         TbAnalitico[(getnet_analitico\ntransações/CVs)]
         TbAjustes[(getnet_ajustes\najustes e chargebacks)]
@@ -54,7 +58,7 @@ graph TD
     ActionList --> ListDialog
 
     ListDialog -->|"Clica Importar"| ImportDialog
-    ImportDialog -->|"action: import + data"| ActionImport
+    ImportDialog -->|"action: import_extrato + data"| ActionImport
     ActionImport -->|"SFTP get"| SFTP
     SFTP -->|"Conteúdo do arquivo"| ActionImport
     ActionImport --> Parser
@@ -68,6 +72,39 @@ graph TD
     T5 --> TbFinResumo
     T6 --> TbFinDetalhe
     T9 -->|"Valida contagem\n(trailer check)"| TbArquivos
+```
+
+## Fluxo de Sincronização Automática (action: sync)
+
+O sync detecta e importa arquivos pendentes com segurança de reprocessamento: `getnet_arquivos` só é gravado **após** todas as tabelas de dados serem inseridas com sucesso. Se a importação falhar no meio, o arquivo não constará em `getnet_arquivos` e será retentado na próxima execução do cron.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Cron as Cron / Botão "Sincronizar"
+    participant Fn as getnet-sftp (action=sync)
+    participant SFTP as SFTP Getnet
+    participant DB as Supabase DB
+
+    Cron->>Fn: action=sync, integracao_id
+    Fn->>SFTP: Conecta e lista diretório (regex getnetextr_YYYYMMDD_*)
+    SFTP-->>Fn: Lista de arquivos correspondentes
+    Fn->>DB: SELECT arquivo_nome FROM getnet_arquivos WHERE integracao_id=?
+    DB-->>Fn: Conjunto de arquivos já importados com sucesso
+    Fn->>Fn: Diff: SFTP − DB = arquivos pendentes (sorted oldest-first)
+    Fn->>Fn: Seleciona até batch_size=7 arquivos
+
+    loop Para cada arquivo pendente
+        Fn->>Fn: Chama runExtratoEletronicoV10(arquivo_nome)
+        Note over Fn: Upserta getnet_resumo, getnet_analitico,<br/>getnet_ajustes, getnet_fin_resumo,<br/>getnet_fin_detalhe, extratos_bancarios
+        alt Todos os upserts OK
+            Fn->>DB: Upsert getnet_arquivos (marca como importado)
+        else Qualquer upsert falhou
+            Note over DB: getnet_arquivos NÃO é gravado → arquivo será retentado
+        end
+    end
+
+    Fn-->>Cron: { total_sftp, already_imported, new_found, processed, errors }
 ```
 
 ## Ciclo de Vida PF → LQ

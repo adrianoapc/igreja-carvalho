@@ -14,23 +14,25 @@ CREATE TABLE IF NOT EXISTS public.kids_checkins (
 );
 
 -- Índices para performance
-CREATE INDEX idx_kids_checkins_crianca ON public.kids_checkins(crianca_id);
-CREATE INDEX idx_kids_checkins_responsavel ON public.kids_checkins(responsavel_id);
-CREATE INDEX idx_kids_checkins_ativo ON public.kids_checkins(crianca_id) WHERE checkout_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_kids_checkins_crianca ON public.kids_checkins(crianca_id);
+CREATE INDEX IF NOT EXISTS idx_kids_checkins_responsavel ON public.kids_checkins(responsavel_id);
+CREATE INDEX IF NOT EXISTS idx_kids_checkins_ativo ON public.kids_checkins(crianca_id) WHERE checkout_at IS NULL;
 
 -- RLS
 ALTER TABLE public.kids_checkins ENABLE ROW LEVEL SECURITY;
 
 -- Líderes podem fazer check-in/check-out
+DROP POLICY IF EXISTS "Lideres gerenciam kids checkins" ON public.kids_checkins;
 CREATE POLICY "Lideres gerenciam kids checkins" ON public.kids_checkins
-  FOR ALL 
+  FOR ALL
   USING (
-    has_role(auth.uid(), 'admin'::app_role) OR 
+    has_role(auth.uid(), 'admin'::app_role) OR
     has_role(auth.uid(), 'lider'::app_role) OR
     has_role(auth.uid(), 'secretario'::app_role)
   );
 
 -- Pais podem ver check-ins dos próprios filhos
+DROP POLICY IF EXISTS "Pais veem checkins dos filhos" ON public.kids_checkins;
 CREATE POLICY "Pais veem checkins dos filhos" ON public.kids_checkins
   FOR SELECT
   USING (
@@ -38,6 +40,7 @@ CREATE POLICY "Pais veem checkins dos filhos" ON public.kids_checkins
   );
 
 -- Pais podem fazer check-out dos próprios filhos
+DROP POLICY IF EXISTS "Pais podem fazer checkout dos filhos" ON public.kids_checkins;
 CREATE POLICY "Pais podem fazer checkout dos filhos" ON public.kids_checkins
   FOR UPDATE
   USING (
@@ -49,12 +52,14 @@ CREATE POLICY "Pais podem fazer checkout dos filhos" ON public.kids_checkins
   );
 
 -- Trigger para atualizar updated_at
+DROP TRIGGER IF EXISTS update_kids_checkins_updated_at ON public.kids_checkins;
 CREATE TRIGGER update_kids_checkins_updated_at
   BEFORE UPDATE ON public.kids_checkins
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
 -- View para checkins ativos
+DROP VIEW IF EXISTS public.view_kids_checkins_ativos;
 CREATE OR REPLACE VIEW public.view_kids_checkins_ativos AS
 SELECT 
   kc.id,
@@ -76,15 +81,6 @@ LEFT JOIN public.profiles cp ON cp.id = kc.checkin_por
 WHERE kc.checkout_at IS NULL
 ORDER BY kc.checkin_at DESC;
 
--- Permitir SELECT na view para pais e líderes
-CREATE POLICY "View kids checkins ativos readable" ON public.view_kids_checkins_ativos
-  FOR SELECT
-  USING (
-    responsavel_id = (SELECT id FROM public.profiles WHERE user_id = auth.uid())
-    OR has_role(auth.uid(), 'admin'::app_role)
-    OR has_role(auth.uid(), 'lider'::app_role)
-    OR has_role(auth.uid(), 'secretario'::app_role)
-  );
 
 -- ======================================================================
 -- INTEGRAÇÃO: Registrar presença no culto automaticamente após checkout
@@ -134,6 +130,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Trigger que dispara após checkout
+DROP TRIGGER IF EXISTS kids_checkout_registra_presenca ON public.kids_checkins;
 CREATE TRIGGER kids_checkout_registra_presenca
   AFTER UPDATE OF checkout_at ON public.kids_checkins
   FOR EACH ROW
