@@ -13,7 +13,7 @@ import { useNavigate } from "react-router-dom";
 
 const AUTH_CACHE_KEY = "auth_context_cache_v1";
 const FILIAL_OVERRIDE_KEY = "lovable_filial_override";
-const RPC_TIMEOUT_MS = 3000;
+const RPC_TIMEOUT_MS = 8000;
 
 interface FilialData {
   id: string;
