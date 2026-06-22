@@ -75,23 +75,24 @@ export function LinksExternosCard() {
 
   const baseUrl = window.location.origin;
 
-  // Quando filialId é null (admin sem filial atribuída), usa a primeira filial disponível
-  // (normalmente a Matriz). Isso garante que links sempre tenham filial_id no banco.
-  const effectiveFilialId = filialId ?? (filiais.length === 1 ? filiais[0].id : null);
+  // Se só existe uma filial, usa ela independente do modo (filialId ou isAllFiliais).
+  // Isso cobre: admin sem filial no perfil, ou admin em modo "Todas" com filial única.
+  const singleFilial = filiais.length === 1 ? filiais[0] : null;
+  const effectiveFilialId = filialId ?? singleFilial?.id ?? null;
+  const effectiveIsAllFiliais = isAllFiliais && !singleFilial;
 
   const buildFullUrl = useCallback(
     (path: string, extra?: Record<string, string | boolean | string>) => {
       const params = new URLSearchParams();
       if (igrejaId) params.set("igreja_id", igrejaId);
-      if (!isAllFiliais && effectiveFilialId) params.set("filial_id", effectiveFilialId);
-      if (isAllFiliais) params.set("todas_filiais", "true");
+      if (effectiveFilialId) params.set("filial_id", effectiveFilialId);
       if (extra) {
         Object.entries(extra).forEach(([k, v]) => params.set(k, String(v)));
       }
       const q = params.toString();
       return q ? `${baseUrl}${path}?${q}` : `${baseUrl}${path}`;
     },
-    [baseUrl, igrejaId, effectiveFilialId, isAllFiliais],
+    [baseUrl, igrejaId, effectiveFilialId],
   );
 
   const longUrls = useMemo(
@@ -103,7 +104,7 @@ export function LinksExternosCard() {
   );
 
   useEffect(() => {
-    if (loading || isAllFiliais || !igrejaId || !effectiveFilialId) return;
+    if (loading || effectiveIsAllFiliais || !igrejaId || !effectiveFilialId) return;
 
     const fetchOrCreate = async () => {
       setLoadingSlugs(true);
@@ -153,7 +154,7 @@ export function LinksExternosCard() {
     };
 
     fetchOrCreate();
-  }, [igrejaId, effectiveFilialId, isAllFiliais, loading, longUrls]);
+  }, [igrejaId, effectiveFilialId, effectiveIsAllFiliais, loading, longUrls]);
 
   const getUrl = (linkType: LinkType) => {
     const slug = slugs[linkType];
@@ -203,7 +204,7 @@ export function LinksExternosCard() {
             <p className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg">
               Carregando contexto da igreja...
             </p>
-          ) : isAllFiliais || !igrejaId || !effectiveFilialId ? (
+          ) : effectiveIsAllFiliais || !igrejaId || !effectiveFilialId ? (
             <div className="p-4 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-lg">
               <p className="text-sm text-yellow-800 dark:text-yellow-200">
                 <strong>⚠️ Selecione uma filial específica</strong> para gerar os links de cadastro.
