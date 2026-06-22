@@ -1,4 +1,5 @@
 import { MapPin, ChevronDown, Building2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +18,7 @@ interface FilialSwitcherProps {
 }
 
 export function FilialSwitcher({ className }: FilialSwitcherProps) {
+  const navigate = useNavigate();
   const {
     filialId,
     filialNome,
@@ -32,8 +34,7 @@ export function FilialSwitcher({ className }: FilialSwitcherProps) {
 
   const handleSelectFilial = (id: string | null, isAll = false) => {
     setFilialOverride(id, isAll);
-    // Recarregar a página para aplicar o novo contexto
-    window.location.reload();
+    navigate("/");
   };
 
   // Skeleton loading - não bloqueia UI
