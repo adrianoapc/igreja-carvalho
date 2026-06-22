@@ -1,4 +1,4 @@
-import { useState, useEffect, type InputHTMLAttributes } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -27,7 +27,7 @@ import {
   UserPlus,
   AlertCircle,
 } from "lucide-react";
-import InputMask from "react-input-mask";
+import { MaskedInput } from "@/components/ui/masked-input";
 import { useSearchParams } from "react-router-dom";
 
 type Step =
@@ -454,23 +454,17 @@ export default function CadastroMembro() {
 
                 <div className="space-y-2">
                   <Label htmlFor="telefone_new">Telefone</Label>
-                  <InputMask
+                  <MaskedInput
                     mask="(99) 99999-9999"
                     value={formData.telefone}
                     onChange={(e) =>
                       setFormData({ ...formData, telefone: e.target.value })
                     }
                     disabled={loading}
-                  >
-                    {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                      <Input
-                        {...inputProps}
-                        id="telefone_new"
-                        type="tel"
-                        placeholder="(00) 00000-0000"
-                      />
-                    )}
-                  </InputMask>
+                    id="telefone_new"
+                    type="tel"
+                    placeholder="(00) 00000-0000"
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -614,24 +608,16 @@ export default function CadastroMembro() {
                   <div className="space-y-3">
                     <div className="space-y-2">
                       <Label htmlFor="cep_new">CEP</Label>
-                      <InputMask
+                      <MaskedInput
                         mask="99999-999"
                         value={formData.cep}
                         onChange={(e) =>
                           setFormData({ ...formData, cep: e.target.value })
                         }
                         disabled={loading}
-                      >
-                        {(
-                          inputProps: InputHTMLAttributes<HTMLInputElement>,
-                        ) => (
-                          <Input
-                            {...inputProps}
-                            id="cep_new"
-                            placeholder="00000-000"
-                          />
-                        )}
-                      </InputMask>
+                        id="cep_new"
+                        placeholder="00000-000"
+                      />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -912,23 +898,17 @@ export default function CadastroMembro() {
 
               <div className="space-y-2">
                 <Label htmlFor="telefone">Telefone</Label>
-                <InputMask
+                <MaskedInput
                   mask="(99) 99999-9999"
                   value={formData.telefone}
                   onChange={(e) =>
                     setFormData({ ...formData, telefone: e.target.value })
                   }
                   disabled={loading}
-                >
-                  {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                    <Input
-                      {...inputProps}
-                      id="telefone"
-                      type="tel"
-                      placeholder="(00) 00000-0000"
-                    />
-                  )}
-                </InputMask>
+                  id="telefone"
+                  type="tel"
+                  placeholder="(00) 00000-0000"
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1070,22 +1050,16 @@ export default function CadastroMembro() {
                 <div className="space-y-3">
                   <div className="space-y-2">
                     <Label htmlFor="cep">CEP</Label>
-                    <InputMask
+                    <MaskedInput
                       mask="99999-999"
                       value={formData.cep}
                       onChange={(e) =>
                         setFormData({ ...formData, cep: e.target.value })
                       }
                       disabled={loading}
-                    >
-                      {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                        <Input
-                          {...inputProps}
-                          id="cep"
-                          placeholder="00000-000"
-                        />
-                      )}
-                    </InputMask>
+                      id="cep"
+                      placeholder="00000-000"
+                    />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

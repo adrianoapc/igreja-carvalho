@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { useCepAutocomplete } from "@/hooks/useCepAutocomplete";
-import InputMask from "react-input-mask";
+import { MaskedInput } from "@/components/ui/masked-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CompletarCadastroInscritoDialogProps {
@@ -203,15 +203,12 @@ export function CompletarCadastroInscritoDialog({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>Telefone</Label>
-                  <InputMask
+                  <MaskedInput
                     mask="(99) 99999-9999"
                     value={form.telefone}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => update("telefone", e.target.value)}
-                  >
-                    {(inputProps: React.InputHTMLAttributes<HTMLInputElement>) => (
-                      <Input {...inputProps} placeholder="(00) 00000-0000" />
-                    )}
-                  </InputMask>
+                    onChange={(e) => update("telefone", e.target.value)}
+                    placeholder="(00) 00000-0000"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>

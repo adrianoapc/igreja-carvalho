@@ -1,4 +1,3 @@
-import type { InputHTMLAttributes } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -8,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import InputMask from "react-input-mask";
+import { MaskedInput } from "@/components/ui/masked-input";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCepAutocomplete } from "@/hooks/useCepAutocomplete";
@@ -77,16 +76,14 @@ const handleCepBlur = async () => {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="cpf">CPF</Label>
-          <InputMask
+          <MaskedInput
             mask="999.999.999-99"
             value={data.cpf}
             onChange={(e) => set("cpf", e.target.value)}
             disabled={disabled}
-          >
-            {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-              <Input {...inputProps} id="cpf" placeholder="000.000.000-00" />
-            )}
-          </InputMask>
+            id="cpf"
+            placeholder="000.000.000-00"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="rg">RG</Label>
@@ -132,17 +129,16 @@ const handleCepBlur = async () => {
         <div className="space-y-2">
           <Label htmlFor="cep">CEP</Label>
           <div className="relative">
-            <InputMask
+            <MaskedInput
               mask="99999-999"
               value={data.cep}
               onChange={(e) => set("cep", e.target.value)}
               onBlur={handleCepBlur}
               disabled={disabled}
-            >
-              {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                <Input {...inputProps} id="cep" placeholder="00000-000" className={cn(cepLoading && "pr-10")} />
-              )}
-            </InputMask>
+              id="cep"
+              placeholder="00000-000"
+              className={cn(cepLoading && "pr-10")}
+            />
             {cepLoading && (
               <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
             )}

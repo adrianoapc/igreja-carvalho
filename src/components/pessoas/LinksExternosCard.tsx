@@ -99,7 +99,7 @@ export function LinksExternosCard() {
   );
 
   useEffect(() => {
-    if (loading || isAllFiliais || !igrejaId || !filialId) return;
+    if (loading || isAllFiliais || !igrejaId) return;
 
     const fetchOrCreate = async () => {
       setLoadingSlugs(true);
@@ -199,10 +199,10 @@ export function LinksExternosCard() {
             <p className="text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg">
               Carregando contexto da igreja...
             </p>
-          ) : isAllFiliais || !igrejaId || !filialId ? (
+          ) : isAllFiliais || !igrejaId ? (
             <div className="p-4 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-lg">
               <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                <strong>⚠️ Selecione uma filial</strong> para gerar os links de cadastro.
+                <strong>⚠️ Selecione uma filial específica</strong> para gerar os links de cadastro.
               </p>
             </div>
           ) : (

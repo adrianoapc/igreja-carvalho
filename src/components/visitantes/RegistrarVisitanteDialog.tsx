@@ -1,4 +1,4 @@
-import { useState, type InputHTMLAttributes } from "react";
+import { useState } from "react";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
-import InputMask from "react-input-mask";
+import { MaskedInput } from "@/components/ui/masked-input";
 import { removerFormatacao } from "@/lib/validators";
 
 interface RegistrarVisitanteDialogProps {
@@ -326,21 +326,15 @@ export function RegistrarVisitanteDialog({ open, onOpenChange, onSuccess }: Regi
 
           <div className="space-y-2">
             <Label htmlFor="telefone">Telefone</Label>
-            <InputMask
+            <MaskedInput
               mask="(99) 99999-9999"
               value={formData.telefone}
               onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
               disabled={loading}
-            >
-              {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                <Input
-                  {...inputProps}
-                  id="telefone"
-                  type="tel"
-                  placeholder="(00) 00000-0000"
-                />
-              )}
-            </InputMask>
+              id="telefone"
+              type="tel"
+              placeholder="(00) 00000-0000"
+            />
           </div>
 
           <div className="space-y-2">

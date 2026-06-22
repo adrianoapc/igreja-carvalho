@@ -4,10 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Upload, Save, X, Phone, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState, type InputHTMLAttributes } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import InputMask from "react-input-mask";
+import { MaskedInput } from "@/components/ui/masked-input";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
 
 interface Props {
@@ -303,19 +303,13 @@ export default function ConfiguracoesIgreja({ onBack }: Props) {
               <Phone className="w-4 h-4" />
               Plantão Pastoral (Whatsapp/Tel)
             </Label>
-            <InputMask
+            <MaskedInput
               mask="(99) 99999-9999"
               value={config.telefone_plantao_pastoral || ""}
               onChange={(e) => setConfig(prev => ({ ...prev, telefone_plantao_pastoral: e.target.value }))}
-            >
-              {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                <Input
-                  {...inputProps}
-                  id="telefone-plantao"
-                  placeholder="(11) 99999-9999"
-                />
-              )}
-            </InputMask>
+              id="telefone-plantao"
+              placeholder="(11) 99999-9999"
+            />
             <p className="text-xs text-muted-foreground">
               Este número será exibido aos membros em caso de urgência.
             </p>

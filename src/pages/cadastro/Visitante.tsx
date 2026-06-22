@@ -1,4 +1,4 @@
-import { useState, useMemo, type InputHTMLAttributes } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +23,7 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
-import InputMask from "react-input-mask";
+import { MaskedInput } from "@/components/ui/masked-input";
 import { useSearchParams } from "react-router-dom";
 import logoCarvalho from "@/assets/logo-carvalho.png";
 
@@ -342,21 +342,15 @@ export default function CadastroVisitante() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="telefone">Telefone (WhatsApp)</Label>
-                    <InputMask
+                    <MaskedInput
                       mask="(99) 99999-9999"
                       value={formData.telefone}
                       onChange={(e) => set("telefone", e.target.value)}
-                    >
-                      {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                        <Input
-                          {...inputProps}
-                          id="telefone"
-                          type="tel"
-                          placeholder="(00) 00000-0000"
-                          autoFocus
-                        />
-                      )}
-                    </InputMask>
+                      id="telefone"
+                      type="tel"
+                      placeholder="(00) 00000-0000"
+                      autoFocus
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>

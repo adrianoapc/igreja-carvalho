@@ -1,4 +1,4 @@
-import { useState, type InputHTMLAttributes } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, UserPlus } from "lucide-react";
-import InputMask from "react-input-mask";
+import { MaskedInput } from "@/components/ui/masked-input";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { toast } from "sonner";
@@ -160,15 +160,15 @@ export default function RecepcaoVisitante() {
               <>
                 <div className="space-y-2">
                   <Label htmlFor="telefone">Telefone (WhatsApp)</Label>
-                  <InputMask
+                  <MaskedInput
                     mask="(99) 99999-9999"
                     value={form.telefone}
                     onChange={(e) => set("telefone", e.target.value)}
-                  >
-                    {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                      <Input {...inputProps} id="telefone" type="tel" placeholder="(00) 00000-0000" autoFocus />
-                    )}
-                  </InputMask>
+                    id="telefone"
+                    type="tel"
+                    placeholder="(00) 00000-0000"
+                    autoFocus
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>

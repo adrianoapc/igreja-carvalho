@@ -1,4 +1,4 @@
-import { useState, type InputHTMLAttributes } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import InputMask from "react-input-mask";
+import { MaskedInput } from "@/components/ui/masked-input";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { useFilialId } from "@/hooks/useFilialId";
@@ -175,36 +175,24 @@ export function FornecedorDialog({ open, onOpenChange, fornecedor }: FornecedorD
 
               <div>
                 <Label htmlFor="cpf-cnpj">{tipoPessoa === 'juridica' ? 'CNPJ' : 'CPF'}</Label>
-                <InputMask
+                <MaskedInput
                   mask={tipoPessoa === 'juridica' ? "99.999.999/9999-99" : "999.999.999-99"}
                   value={cpfCnpj}
                   onChange={(e) => setCpfCnpj(e.target.value)}
-                >
-                  {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                    <Input
-                      {...inputProps}
-                      id="cpf-cnpj"
-                      placeholder={tipoPessoa === 'juridica' ? "00.000.000/0000-00" : "000.000.000-00"}
-                    />
-                  )}
-                </InputMask>
+                  id="cpf-cnpj"
+                  placeholder={tipoPessoa === 'juridica' ? "00.000.000/0000-00" : "000.000.000-00"}
+                />
               </div>
 
               <div>
                 <Label htmlFor="telefone">Telefone</Label>
-                <InputMask
+                <MaskedInput
                   mask="(99) 99999-9999"
                   value={telefone}
                   onChange={(e) => setTelefone(e.target.value)}
-                >
-                  {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                    <Input
-                      {...inputProps}
-                      id="telefone"
-                      placeholder="(00) 00000-0000"
-                    />
-                  )}
-                </InputMask>
+                  id="telefone"
+                  placeholder="(00) 00000-0000"
+                />
               </div>
 
               <div className="md:col-span-2">
@@ -230,19 +218,13 @@ export function FornecedorDialog({ open, onOpenChange, fornecedor }: FornecedorD
 
               <div>
                 <Label htmlFor="cep">CEP</Label>
-                <InputMask
+                <MaskedInput
                   mask="99999-999"
                   value={cep}
                   onChange={(e) => setCep(e.target.value)}
-                >
-                  {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                    <Input
-                      {...inputProps}
-                      id="cep"
-                      placeholder="00000-000"
-                    />
-                  )}
-                </InputMask>
+                  id="cep"
+                  placeholder="00000-000"
+                />
               </div>
 
               <div>

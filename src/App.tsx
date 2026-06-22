@@ -16,6 +16,7 @@ import { AuthGate } from "./components/auth/AuthGate";
 import { ThemeProvider } from "next-themes";
 import { AuthContextProvider } from "./contexts/AuthContextProvider";
 import { AppConfigProvider } from "./contexts/AppConfigContext";
+import { NotificationsProvider } from "./contexts/NotificationsContext";
 import { HideValuesProvider } from "./hooks/useHideValues";
 
 // Pages Imports
@@ -254,6 +255,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <AuthContextProvider>
+              <NotificationsProvider>
               <AppConfigProvider>
               <ScrollToTop />
               <Suspense
@@ -1330,6 +1332,7 @@ const App = () => (
                 </Routes>
               </Suspense>
               </AppConfigProvider>
+              </NotificationsProvider>
             </AuthContextProvider>
           </BrowserRouter>
         </HideValuesProvider>

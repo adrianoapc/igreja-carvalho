@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Lock, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PasswordStrengthIndicator } from "@/components/auth/PasswordStrengthIndicator";
-import InputMask from "react-input-mask";
+import { MaskedInput } from "@/components/ui/masked-input";
 import logoCarvalho from "@/assets/logo-carvalho.png";
 
 export default function DefinirSenha() {
@@ -113,22 +113,16 @@ export default function DefinirSenha() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="telefone">Telefone</Label>
-              <InputMask
+              <MaskedInput
                 mask="(99) 99999-9999"
                 value={telefone}
                 onChange={(e) => setTelefone(e.target.value)}
                 disabled={isLoading}
-              >
-                {(inputProps: React.InputHTMLAttributes<HTMLInputElement>) => (
-                  <Input
-                    {...inputProps}
-                    id="telefone"
-                    type="tel"
-                    placeholder="(11) 99999-9999"
-                    required
-                  />
-                )}
-              </InputMask>
+                id="telefone"
+                type="tel"
+                placeholder="(11) 99999-9999"
+                required
+              />
             </div>
 
             <div className="space-y-2">

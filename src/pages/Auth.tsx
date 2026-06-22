@@ -15,7 +15,7 @@ import { GoogleIcon } from "@/components/auth/GoogleIcon";
 import logoCarvalho from "@/assets/logo-carvalho.png";
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
 import { parseAuthError } from "@/hooks/useAuthErrors";
-import InputMask from "react-input-mask";
+import { MaskedInput } from "@/components/ui/masked-input";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { checkIsSuperAdmin, getPreferredContext } from "@/utils/checkSuperAdminRole";
 
@@ -980,22 +980,16 @@ export default function Auth() {
               <form onSubmit={handleWhatsAppRecovery} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="recovery-phone">Telefone cadastrado</Label>
-                  <InputMask
+                  <MaskedInput
                     mask="(99) 99999-9999"
                     value={recoveryPhone}
                     onChange={(e) => setRecoveryPhone(e.target.value)}
                     disabled={isLoading}
-                  >
-                    {(inputProps: React.InputHTMLAttributes<HTMLInputElement>) => (
-                      <Input
-                        {...inputProps}
-                        id="recovery-phone"
-                        type="tel"
-                        placeholder="(11) 99999-9999"
-                        required
-                      />
-                    )}
-                  </InputMask>
+                    id="recovery-phone"
+                    type="tel"
+                    placeholder="(11) 99999-9999"
+                    required
+                  />
                   <p className="text-xs text-muted-foreground">
                     Um código será enviado para o WhatsApp deste número.
                   </p>
@@ -1211,23 +1205,17 @@ export default function Auth() {
             <form onSubmit={handlePhoneSignIn} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="login-phone">Telefone</Label>
-                <InputMask
+                <MaskedInput
                   mask="(99) 99999-9999"
                   value={loginPhone}
                   onChange={(e) => setLoginPhone(e.target.value)}
                   disabled={isLoading}
-                >
-                  {(inputProps: React.InputHTMLAttributes<HTMLInputElement>) => (
-                    <Input
-                      {...inputProps}
-                      id="login-phone"
-                      type="tel"
-                      placeholder="(11) 99999-9999"
-                      required
-                      autoComplete="tel"
-                    />
-                  )}
-                </InputMask>
+                  id="login-phone"
+                  type="tel"
+                  placeholder="(11) 99999-9999"
+                  required
+                  autoComplete="tel"
+                />
                 <button
                   type="button"
                   onClick={() => setLoginMethod("email")}

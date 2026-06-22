@@ -1,4 +1,3 @@
-import type { InputHTMLAttributes } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -8,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import InputMask from "react-input-mask";
+import { MaskedInput } from "@/components/ui/masked-input";
 
 export interface DadosBasicos {
   nome: string;
@@ -43,21 +42,15 @@ export function StepDadosBasicos({ data, onChange, disabled }: Props) {
 
       <div className="space-y-2">
         <Label htmlFor="telefone">Telefone</Label>
-        <InputMask
+        <MaskedInput
           mask="(99) 99999-9999"
           value={data.telefone}
           onChange={(e) => set("telefone", e.target.value)}
           disabled={disabled}
-        >
-          {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-            <Input
-              {...inputProps}
-              id="telefone"
-              type="tel"
-              placeholder="(00) 00000-0000"
-            />
-          )}
-        </InputMask>
+          id="telefone"
+          type="tel"
+          placeholder="(00) 00000-0000"
+        />
       </div>
 
       <div className="space-y-2">

@@ -1,4 +1,4 @@
-import { useState, useEffect, type InputHTMLAttributes } from "react";
+import { useState, useEffect } from "react";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { z } from "zod";
-import InputMask from "react-input-mask";
+import { MaskedInput } from "@/components/ui/masked-input";
 import { validarCPF, removerFormatacao } from "@/lib/validators";
 
 const dadosPessoaisSchema = z.object({
@@ -318,21 +318,15 @@ export function EditarDadosPessoaisDialog({
 
             <div className="space-y-2">
               <Label htmlFor="cpf">CPF</Label>
-              <InputMask
+              <MaskedInput
                 mask="999.999.999-99"
                 value={formData.cpf}
                 onChange={(e) =>
                   setFormData({ ...formData, cpf: e.target.value })
                 }
-              >
-                {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                  <Input
-                    {...inputProps}
-                    id="cpf"
-                    placeholder="000.000.000-00"
-                  />
-                )}
-              </InputMask>
+                id="cpf"
+                placeholder="000.000.000-00"
+              />
             </div>
 
             <div className="space-y-2 md:col-span-2">

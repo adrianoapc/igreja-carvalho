@@ -1,4 +1,4 @@
-import { useState, type InputHTMLAttributes } from "react";
+import { useState } from "react";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, UserPlus, UserCheck, Users, ArrowLeft } from "lucide-react";
-import InputMask from "react-input-mask";
+import { MaskedInput } from "@/components/ui/masked-input";
 import { removerFormatacao } from "@/lib/validators";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCepAutocomplete } from "@/hooks/useCepAutocomplete";
@@ -487,23 +487,17 @@ export function CadastrarPessoaDialog({
 
           <div className="space-y-2">
             <Label htmlFor="telefone">Telefone</Label>
-            <InputMask
+            <MaskedInput
               mask="(99) 99999-9999"
               value={formData.telefone}
               onChange={(e) =>
                 setFormData({ ...formData, telefone: e.target.value })
               }
               disabled={loading}
-            >
-              {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                <Input
-                  {...inputProps}
-                  id="telefone"
-                  type="tel"
-                  placeholder="(00) 00000-0000"
-                />
-              )}
-            </InputMask>
+              id="telefone"
+              type="tel"
+              placeholder="(00) 00000-0000"
+            />
           </div>
 
           <div className="space-y-2">
@@ -611,22 +605,16 @@ export function CadastrarPessoaDialog({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="cpf">CPF</Label>
-                  <InputMask
+                  <MaskedInput
                     mask="999.999.999-99"
                     value={formData.cpf}
                     onChange={(e) =>
                       setFormData({ ...formData, cpf: e.target.value })
                     }
                     disabled={loading}
-                  >
-                    {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                      <Input
-                        {...inputProps}
-                        id="cpf"
-                        placeholder="000.000.000-00"
-                      />
-                    )}
-                  </InputMask>
+                    id="cpf"
+                    placeholder="000.000.000-00"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="rg">RG</Label>
@@ -688,7 +676,7 @@ export function CadastrarPessoaDialog({
                 <div className="space-y-2">
                   <Label htmlFor="cep">CEP</Label>
                   <div className="relative">
-                    <InputMask
+                    <MaskedInput
                       mask="99999-999"
                       value={formData.cep}
                       onChange={(e) =>
@@ -696,16 +684,10 @@ export function CadastrarPessoaDialog({
                       }
                       onBlur={handleCepBlur}
                       disabled={loading}
-                    >
-                      {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                        <Input
-                          {...inputProps}
-                          id="cep"
-                          placeholder="00000-000"
-                          className={cn(cepLoading && "pr-10")}
-                        />
-                      )}
-                    </InputMask>
+                      id="cep"
+                      placeholder="00000-000"
+                      className={cn(cepLoading && "pr-10")}
+                    />
                     {cepLoading && (
                       <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
                     )}

@@ -211,7 +211,7 @@ export default function IntegracaoDashboard() {
         .from("profiles")
         .select("id, nome")
         .eq("igreja_id", igrejaId)
-        .eq("ativo", true)
+        .in("status", ["membro", "frequentador"])
         .order("nome");
 
       if (error) throw error;

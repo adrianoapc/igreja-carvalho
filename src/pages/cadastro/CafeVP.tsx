@@ -1,6 +1,6 @@
-import { useMemo, useState, type InputHTMLAttributes } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import InputMask from "react-input-mask";
+import { MaskedInput } from "@/components/ui/masked-input";
 import {
   ArrowLeft,
   ArrowRight,
@@ -372,7 +372,7 @@ export default function CadastroCafeVP() {
 
                   <div className="space-y-2">
                     <Label htmlFor="telefone">Telefone</Label>
-                    <InputMask
+                    <MaskedInput
                       mask="(99) 99999-9999"
                       value={formData.telefone}
                       onChange={(event) =>
@@ -382,16 +382,10 @@ export default function CadastroCafeVP() {
                         })
                       }
                       disabled={loading}
-                    >
-                      {(inputProps: InputHTMLAttributes<HTMLInputElement>) => (
-                        <Input
-                          {...inputProps}
-                          id="telefone"
-                          type="tel"
-                          placeholder="(00) 00000-0000"
-                        />
-                      )}
-                    </InputMask>
+                      id="telefone"
+                      type="tel"
+                      placeholder="(00) 00000-0000"
+                    />
                   </div>
 
                   <div className="space-y-2">
