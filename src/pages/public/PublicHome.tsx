@@ -15,6 +15,7 @@ import { PublicBannerCarousel } from "@/components/public/PublicBannerCarousel";
 import { EventoCard } from "@/components/public/EventoCard";
 import { useEventosPublicos } from "@/hooks/useEventosPublicos";
 import { ContatoSection } from "@/components/public/ContatoSection";
+import { InstagramSection } from "@/components/public/InstagramSection";
 
 /* ─── Conteúdo editável ──────────────────────────────────────────────────────
  * Edite CONTENT para atualizar textos sem tocar no layout.
@@ -467,7 +468,10 @@ export default function PublicHome() {
         </div>
       </section>
 
-      {/* ══ 6. PEDIDO DE ORAÇÃO ══════════════════════════════════════════════ */}
+      {/* ══ 6. INSTAGRAM ════════════════════════════════════════════════════ */}
+      <InstagramSection />
+
+      {/* ══ 7. PEDIDO DE ORAÇÃO ══════════════════════════════════════════════ */}
       <section
         className="bg-pub-green px-4 py-20 sm:py-24"
         aria-labelledby="oracao-heading"
@@ -501,7 +505,7 @@ export default function PublicHome() {
         </div>
       </section>
 
-      {/* ══ 7. ONDE ESTAMOS / CONTATO ════════════════════════════════════════ */}
+      {/* ══ 8. ONDE ESTAMOS / CONTATO ════════════════════════════════════════ */}
       <ContatoSection />
     </>
   );

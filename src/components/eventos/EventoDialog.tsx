@@ -84,6 +84,8 @@ interface Evento {
   conta_financeira_id?: string | null;
   // Campos financeiros
   tem_oferta?: boolean | null;
+  // Site público
+  publicar_no_site?: boolean | null;
 }
 
 interface EventoDialogProps {
@@ -154,6 +156,8 @@ const eventoSchema = z.object({
   exigir_documento_checkin: z.boolean().default(false),
   // Campos financeiros
   tem_oferta: z.boolean().default(false),
+  // Site público
+  publicar_no_site: z.boolean().default(false),
 });
 
 type EventoFormData = z.infer<typeof eventoSchema>;
@@ -416,6 +420,7 @@ export default function EventoDialog({
           categoria_financeira_id: evento.categoria_financeira_id ?? null,
           conta_financeira_id: evento.conta_financeira_id ?? null,
           tem_oferta: evento.tem_oferta || false,
+          publicar_no_site: evento.publicar_no_site || false,
         });
       } else {
         const defaultDate = initialDate || new Date();
@@ -637,6 +642,7 @@ export default function EventoDialog({
             ? data.exigir_documento_checkin || false
             : false,
         tem_oferta: data.tem_oferta || false,
+        publicar_no_site: data.publicar_no_site || false,
       };
 
       if (isEditing) {
@@ -1157,6 +1163,30 @@ export default function EventoDialog({
                       <p className="text-xs text-muted-foreground">
                         Permite que membros contribuam com oferta durante o
                         evento
+                      </p>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              {/* PUBLICAR NO SITE */}
+              <FormField
+                control={form.control}
+                name="publicar_no_site"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-3 space-y-0 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-0.5 flex-1">
+                      <FormLabel className="font-medium cursor-pointer">
+                        🌐 Publicar na agenda do site
+                      </FormLabel>
+                      <p className="text-xs text-muted-foreground">
+                        Exibe este evento na agenda pública do site institucional
                       </p>
                     </div>
                   </FormItem>
