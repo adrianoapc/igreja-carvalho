@@ -1,200 +1,316 @@
+/**
+ * receber-pedido-make
+ *
+ * Dois caminhos em uma única função:
+ *
+ * A) SERVIDOR-A-SERVIDOR (WhatsApp / Make)
+ *    · Detectado pela presença do header `x-webhook-secret`
+ *    · Autenticado por timing-safe compare contra MAKE_WEBHOOK_SECRET
+ *    · Não exige Turnstile
+ *
+ * B) FORMULÁRIO PÚBLICO (site institucional)
+ *    · Detectado pela ausência de `x-webhook-secret`
+ *    · Pipeline: honeypot → Turnstile → rate-limit → consentimento → gravação
+ *
+ * Variáveis de ambiente necessárias:
+ *   SUPABASE_URL                    — injetado automaticamente pelo Supabase
+ *   SUPABASE_SERVICE_ROLE_KEY       — injetado automaticamente pelo Supabase
+ *   MAKE_WEBHOOK_SECRET             — segredo compartilhado com Make/n8n
+ *   CLOUDFLARE_TURNSTILE_SECRET_KEY — chave secreta do Turnstile (painel Cloudflare)
+ */
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.86.0';
-import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
+import { z }            from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-secret',
+// ─── CORS ─────────────────────────────────────────────────────────────────────
+
+const CORS = {
+  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, x-webhook-secret',
 };
 
-// Função para verificar assinatura do webhook
-const verifyWebhookSecret = (req: Request): { valid: boolean; error?: string } => {
-  const webhookSecret = Deno.env.get('MAKE_WEBHOOK_SECRET');
-  
-  // SECURITY: Secret MUST be configured - no fallback allowed
-  if (!webhookSecret) {
-    console.error('❌ MAKE_WEBHOOK_SECRET não configurado - requisição rejeitada por segurança');
-    return { valid: false, error: 'Webhook secret not configured on server' };
-  }
-  
-  const requestSecret = req.headers.get('x-webhook-secret');
-  
-  if (!requestSecret) {
-    console.error('❌ Header x-webhook-secret não fornecido');
-    return { valid: false, error: 'Missing x-webhook-secret header' };
-  }
-  
-  // Comparação segura de strings (timing-safe comparison)
-  if (webhookSecret.length !== requestSecret.length) {
-    return { valid: false, error: 'Invalid webhook secret' };
-  }
-  
-  let result = 0;
-  for (let i = 0; i < webhookSecret.length; i++) {
-    result |= webhookSecret.charCodeAt(i) ^ requestSecret.charCodeAt(i);
-  }
-  
-  if (result !== 0) {
-    return { valid: false, error: 'Invalid webhook secret' };
-  }
-  
-  return { valid: true };
-};
+// ─── Utilitários ──────────────────────────────────────────────────────────────
 
-// Schema de validação
-const pedidoSchema = z.object({
-  telefone: z.string().trim().min(1, "Telefone é obrigatório").max(20),
-  mensagem: z.string().trim().min(1, "Mensagem é obrigatória").max(5000),
-  tema: z.string().trim().optional(),
-  urgente: z.boolean().optional(),
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+function clientIp(req: Request): string {
+  return (
+    req.headers.get('cf-connecting-ip')                          ??
+    req.headers.get('x-real-ip')                                 ??
+    req.headers.get('x-forwarded-for')?.split(',')[0].trim()     ??
+    'unknown'
+  );
+}
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+  });
+}
+
+function makeServiceClient() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  );
+}
+
+// ─── Rate limiter (Deno KV) ───────────────────────────────────────────────────
+// Sem tabela extra: estado persistido no KV nativo do runtime com TTL automático.
+
+const RATE_LIMIT_MAX    = 5;
+const RATE_LIMIT_WINDOW = 60; // segundos
+
+async function checkRateLimit(ip: string): Promise<boolean> {
+  const kv  = await Deno.openKv();
+  const key = ['rl', 'pedido_site', ip] as const;
+  const now = Math.floor(Date.now() / 1_000);
+
+  const entry = await kv.get<{ count: number; windowStart: number }>(key);
+
+  if (!entry.value || now - entry.value.windowStart >= RATE_LIMIT_WINDOW) {
+    await kv.set(key, { count: 1, windowStart: now }, { expireIn: RATE_LIMIT_WINDOW * 1_000 });
+    return true;
+  }
+
+  if (entry.value.count >= RATE_LIMIT_MAX) return false;
+
+  await kv.set(
+    key,
+    { count: entry.value.count + 1, windowStart: entry.value.windowStart },
+    { expireIn: RATE_LIMIT_WINDOW * 1_000 },
+  );
+  return true;
+}
+
+// ─── Turnstile ────────────────────────────────────────────────────────────────
+
+async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
+  const secret = Deno.env.get('CLOUDFLARE_TURNSTILE_SECRET_KEY');
+  if (!secret) {
+    console.error('[turnstile] CLOUDFLARE_TURNSTILE_SECRET_KEY não configurado');
+    return false;
+  }
+
+  const res  = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ secret, response: token, remoteip: ip }),
+  });
+  const data = await res.json();
+
+  if (!data.success) console.warn('[turnstile] Falhou:', data['error-codes']);
+  return data.success === true;
+}
+
+// ─── Schemas ──────────────────────────────────────────────────────────────────
+
+const schemaWhatsapp = z.object({
+  nome:       z.string().trim().min(1).max(255),
+  telefone:   z.string().trim().min(1).max(20),
+  mensagem:   z.string().trim().min(1).max(5_000),
+  tema:       z.string().trim().optional(),
+  urgente:    z.boolean().optional(),
   dataPedido: z.string().optional(),
-  nome: z.string().trim().min(1, "Nome é obrigatório").max(255),
 });
 
-// Mapear tema para tipo_pedido enum
-const mapearTemaParaTipo = (tema?: string): string => {
-  if (!tema) return 'outro';
-  
-  const temaLower = tema.toLowerCase();
-  if (temaLower.includes('saúde') || temaLower.includes('saude')) return 'saude';
-  if (temaLower.includes('família') || temaLower.includes('familia')) return 'familia';
-  if (temaLower.includes('financeiro') || temaLower.includes('dinheiro')) return 'financeiro';
-  if (temaLower.includes('trabalho') || temaLower.includes('emprego')) return 'trabalho';
-  if (temaLower.includes('espiritual') || temaLower.includes('fé')) return 'espiritual';
-  if (temaLower.includes('agradecimento') || temaLower.includes('gratidão')) return 'agradecimento';
-  
-  return 'outro';
-};
+const schemaSite = z.object({
+  mensagem:           z.string().trim().min(10, 'Descreva um pouco mais o pedido.').max(5_000),
+  nome:               z.string().trim().max(255).optional(),
+  anonimo:            z.boolean().default(false),
+  contato:            z.string().trim().max(200).optional(),
+  confidencial:       z.boolean().default(false),
+  consentimento:      z.literal(true, {
+    errorMap: () => ({ message: 'O consentimento é obrigatório.' }),
+  }),
+  cf_turnstile_token: z.string().min(1, 'Token de verificação ausente.'),
+  website:            z.string().optional(), // honeypot — deve estar vazio
+});
 
-Deno.serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+// ─── Mapeamento tema → enum tipo_pedido ───────────────────────────────────────
+
+function mapTema(tema?: string): string {
+  if (!tema) return 'outro';
+  const t = tema.toLowerCase();
+  if (t.includes('saúde')         || t.includes('saude'))    return 'saude';
+  if (t.includes('família')       || t.includes('familia'))  return 'familia';
+  if (t.includes('financeiro')    || t.includes('dinheiro')) return 'financeiro';
+  if (t.includes('trabalho')      || t.includes('emprego'))  return 'trabalho';
+  if (t.includes('espiritual')    || t.includes('fé'))       return 'espiritual';
+  if (t.includes('agradecimento') || t.includes('gratidão')) return 'agradecimento';
+  return 'outro';
+}
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
   try {
-    console.log('🔔 Webhook receber-pedido-make chamado');
+    const requestSecret = req.headers.get('x-webhook-secret');
 
-    // Verificar autenticação do webhook
-    const secretCheck = verifyWebhookSecret(req);
-    if (!secretCheck.valid) {
-      console.error('❌ Falha na verificação do webhook secret:', secretCheck.error);
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Unauthorized',
-          message: secretCheck.error,
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401,
-        }
-      );
-    }
-
-    // Inicializar cliente Supabase
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Parse e valida o body
-    const body = await req.json();
-    console.log('📥 Dados recebidos:', { ...body, mensagem: '[redacted]' });
-
-    const validatedData = pedidoSchema.parse(body);
-
-    // Buscar pessoa existente por telefone
-    console.log('🔍 Buscando pessoa por telefone:', validatedData.telefone);
-    const { data: pessoaId } = await supabase.rpc('buscar_pessoa_por_contato', {
-      p_telefone: validatedData.telefone,
-      p_nome: validatedData.nome,
-    });
-
-    console.log('👤 Pessoa encontrada:', pessoaId ? 'Sim' : 'Não');
-
-    // Mapear tipo do pedido
-    const tipo = mapearTemaParaTipo(validatedData.tema);
-
-    // Preparar dados do pedido
-    const pedidoData: Record<string, unknown> = {
-      pedido: validatedData.mensagem,
-      tipo: tipo,
-      status: 'pendente',
-      anonimo: false,
-    };
-
-    // Se pessoa existe, vincular
-    if (pessoaId) {
-      pedidoData.pessoa_id = pessoaId;
+    if (requestSecret !== null) {
+      // ── Caminho A: servidor a servidor (WhatsApp / Make) ────────────
+      const webhookSecret = Deno.env.get('MAKE_WEBHOOK_SECRET');
+      if (!webhookSecret) {
+        console.error('[s2s] MAKE_WEBHOOK_SECRET não configurado');
+        return json({ error: 'Serviço indisponível.' }, 503);
+      }
+      if (!timingSafeEqual(webhookSecret, requestSecret)) {
+        console.warn('[s2s] Falha na verificação do segredo');
+        return json({ error: 'Não autorizado.' }, 401);
+      }
+      return await handleWhatsapp(req);
     } else {
-      // Dados externos
-      pedidoData.nome_solicitante = validatedData.nome;
-      pedidoData.telefone_solicitante = validatedData.telefone;
+      // ── Caminho B: formulário público do site ────────────────────────
+      return await handleSite(req);
     }
-
-    // Adicionar observações se urgente
-    if (validatedData.urgente) {
-      pedidoData.observacoes_intercessor = `URGENTE: ${validatedData.tema || 'Pedido urgente'}`;
-    }
-
-    console.log('💾 Salvando pedido de oração...');
-    const { data: pedido, error: pedidoError } = await supabase
-      .from('pedidos_oracao')
-      .insert(pedidoData)
-      .select()
-      .single();
-
-    if (pedidoError) {
-      console.error('❌ Erro ao salvar pedido:', pedidoError);
-      throw pedidoError;
-    }
-
-    console.log('✅ Pedido salvo com sucesso:', pedido.id);
-
-    // Notificar admins (o trigger do banco já faz isso, mas vamos garantir)
-    console.log('📢 Notificação automática enviada via trigger do banco');
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        pedido_id: pedido.id,
-        message: 'Pedido de oração recebido com sucesso',
-        pessoa_encontrada: !!pessoaId,
-        tipo_identificado: tipo,
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    );
-  } catch (error) {
-    console.error('❌ Erro no webhook:', error);
-
-    // Erro de validação
-    if (error instanceof z.ZodError) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Dados inválidos',
-          details: error.errors,
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
-        }
-      );
-    }
-
-    // Outros erros
-    const errorMessage = error instanceof Error ? error.message : 'Erro ao processar pedido';
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: errorMessage,
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      }
-    );
+  } catch (err) {
+    console.error('[receber-pedido-make] Erro inesperado:', err);
+    return json({ error: 'Erro interno. Tente novamente.' }, 500);
   }
 });
+
+// ─── Caminho A ────────────────────────────────────────────────────────────────
+
+async function handleWhatsapp(req: Request): Promise<Response> {
+  const body   = await req.json();
+  console.log('[s2s] Recebido:', { ...body, mensagem: '[redacted]' });
+
+  const parsed = schemaWhatsapp.safeParse(body);
+  if (!parsed.success) {
+    return json({ error: 'Dados inválidos.', details: parsed.error.errors }, 400);
+  }
+
+  const { nome, telefone, mensagem, tema, urgente } = parsed.data;
+  const supabase = makeServiceClient();
+
+  // Tenta vincular a uma pessoa existente pelo telefone
+  const { data: pessoaId } = await supabase.rpc('buscar_pessoa_por_contato', {
+    p_telefone: telefone,
+    p_nome:     nome,
+  });
+
+  const payload: Record<string, unknown> = {
+    pedido:           mensagem,
+    tipo:             mapTema(tema),
+    status:           'pendente',
+    anonimo:          false,
+    confidencial:     false,
+    origem:           'whatsapp',
+    consentimento_em: new Date().toISOString(), // consentiu ao enviar a mensagem
+    classificacao:    'PESSOAL',
+  };
+
+  if (pessoaId) {
+    payload.pessoa_id = pessoaId;
+  } else {
+    payload.nome_solicitante     = nome;
+    payload.telefone_solicitante = telefone;
+  }
+
+  if (urgente) {
+    payload.observacoes_intercessor = `URGENTE: ${tema ?? 'pedido urgente'}`;
+  }
+
+  const { data: pedido, error } = await supabase
+    .from('pedidos_oracao')
+    .insert(payload)
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('[s2s] Erro ao salvar:', error);
+    throw error;
+  }
+
+  console.log('[s2s] Pedido salvo:', pedido.id);
+  return json({
+    success:           true,
+    pedido_id:         pedido.id,
+    pessoa_encontrada: !!pessoaId,
+    tipo_identificado: payload.tipo,
+  });
+}
+
+// ─── Caminho B ────────────────────────────────────────────────────────────────
+
+async function handleSite(req: Request): Promise<Response> {
+  const ip   = clientIp(req);
+  const body = await req.json();
+
+  // 1. HONEYPOT — campo isca preenchido → bot; 200 falso para não revelar detecção
+  if (body.website) {
+    console.log(`[honeypot] IP ${ip} descartado silenciosamente`);
+    return json({ success: true, message: 'Pedido de oração recebido com amor.' });
+  }
+
+  // 2. Schema + consentimento obrigatório (literal true)
+  const parsed = schemaSite.safeParse(body);
+  if (!parsed.success) {
+    return json({ error: 'Dados inválidos.', details: parsed.error.flatten().fieldErrors }, 400);
+  }
+
+  const { mensagem, nome, anonimo, contato, confidencial, cf_turnstile_token } = parsed.data;
+
+  // 3. TURNSTILE — verificação remota com Cloudflare
+  const turnstileOk = await verifyTurnstile(cf_turnstile_token, ip);
+  if (!turnstileOk) {
+    return json({ error: 'Verificação anti-bot falhou. Tente novamente.' }, 403);
+  }
+
+  // 4. RATE LIMIT — máx. 5 por minuto por IP (Deno KV, TTL automático)
+  const allowed = await checkRateLimit(ip);
+  if (!allowed) {
+    console.warn(`[rate-limit] IP ${ip} excedeu o limite`);
+    return json({ error: 'Muitas tentativas. Aguarde alguns minutos.' }, 429);
+  }
+
+  // 5. Gravação (service_role bypassa RLS; segurança garantida nas etapas acima)
+  const supabase = makeServiceClient();
+
+  const payload: Record<string, unknown> = {
+    pedido:           mensagem,
+    tipo:             'outro',
+    status:           'pendente',
+    anonimo:          anonimo,
+    confidencial:     confidencial,
+    origem:           'site',
+    consentimento_em: new Date().toISOString(),
+    classificacao:    'PESSOAL',
+  };
+
+  // Dados de identidade: só grava se não for anônimo
+  if (!anonimo && nome) {
+    payload.nome_solicitante = nome;
+  }
+  if (!anonimo && contato) {
+    // Heurística: @ → e-mail; caso contrário → telefone/WhatsApp
+    if (contato.includes('@')) {
+      payload.email_solicitante = contato;
+    } else {
+      payload.telefone_solicitante = contato;
+    }
+  }
+
+  const { data: pedido, error } = await supabase
+    .from('pedidos_oracao')
+    .insert(payload)
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('[site] Erro ao salvar pedido:', error);
+    throw error;
+  }
+
+  console.log('[site] Pedido salvo:', pedido.id, '| conf:', confidencial, '| anon:', anonimo);
+  return json({ success: true, message: 'Pedido de oração recebido com amor.' });
+}

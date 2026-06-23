@@ -1,16 +1,19 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
 User-agent: *
 Allow: /
 
-Sitemap: https://app.igrejacarvalho.com.br/sitemap.xml
+# Área autenticada — não indexar
+Disallow: /dashboard
+Disallow: /agenda/
+Disallow: /membros
+Disallow: /financeiro
+Disallow: /kids
+Disallow: /escalas
+Disallow: /comunicados
+Disallow: /settings
+Disallow: /auth
+Disallow: /cadastro
+Disallow: /biblia
+Disallow: /links-externos
+Disallow: /admin
+
+Sitemap: https://igrejacarvalho.com.br/sitemap.xml

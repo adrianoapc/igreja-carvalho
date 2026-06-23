@@ -495,7 +495,7 @@ export default function Auth() {
         setPendingUserId(data.user.id);
         setShowBiometricDialog(true);
       } else {
-        navigate("/");
+        navigate("/dashboard");
       }
     } catch (error: unknown) {
       const authError = parseAuthError(error);
@@ -653,17 +653,16 @@ export default function Auth() {
   };
 
   const handleBackFromLogin = () => {
-    // Se usuário está na tela de login principal, voltar para index (público)
     navigate("/");
   };
 
   // Se está verificando autenticação, mostrar loading
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-pub-green flex items-center justify-center">
         <div className="flex flex-col items-center gap-2 text-center">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          <p className="text-muted-foreground">
+          <Loader2 className="w-6 h-6 animate-spin text-pub-beige" />
+          <p className="text-pub-beige/60">
             {isAutoBiometricAttempt ? "Verificando credenciais..." : "Carregando..."}
           </p>
         </div>
@@ -674,7 +673,7 @@ export default function Auth() {
   // Tela de verificação OTP
   if (authView === "phone-otp") {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-pub-green flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-md mb-4">
           <button
             onClick={() => {
@@ -685,7 +684,7 @@ export default function Auth() {
               }
               setOtpCooldown(0);
             }}
-            className="flex items-center gap-2 text-primary hover:underline text-sm"
+            className="flex items-center gap-2 text-pub-beige/80 hover:text-pub-beige text-sm"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Voltar</span>
@@ -700,8 +699,8 @@ export default function Auth() {
               className="h-16 w-auto mx-auto mb-3"
             />
             <div className="flex items-center justify-center gap-2 mb-1">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-primary" />
+              <div className="w-10 h-10 bg-pub-green/10 rounded-full flex items-center justify-center">
+                <MessageSquare className="w-5 h-5 text-pub-green" />
               </div>
               <CardTitle className="text-2xl font-bold text-foreground">Verificação</CardTitle>
             </div>
@@ -729,7 +728,7 @@ export default function Auth() {
                 </InputOTP>
               </div>
 
-              <Button type="submit" className="w-full bg-gradient-primary" disabled={isLoading || otpCode.length < 6}>
+              <Button type="submit" className="w-full bg-pub-green hover:bg-pub-green/90 text-pub-beige" disabled={isLoading || otpCode.length < 6}>
                 {isLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -771,7 +770,7 @@ export default function Auth() {
   // Tela de cadastro
   if (authView === "signup") {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-pub-green flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-md mb-4">
           <button
             onClick={() => {
@@ -781,7 +780,7 @@ export default function Auth() {
               setSignupNome("");
               setSignupEmail("");
             }}
-            className="flex items-center gap-2 text-primary hover:underline text-sm"
+            className="flex items-center gap-2 text-pub-beige/80 hover:text-pub-beige text-sm"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Voltar para login</span>
@@ -796,8 +795,8 @@ export default function Auth() {
               className="h-16 w-auto mx-auto mb-3"
             />
             <div className="flex items-center justify-center gap-2 mb-1">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                <UserPlus className="w-5 h-5 text-primary" />
+              <div className="w-10 h-10 bg-pub-green/10 rounded-full flex items-center justify-center">
+                <UserPlus className="w-5 h-5 text-pub-green" />
               </div>
               <CardTitle className="text-2xl font-bold text-foreground">Cadastro</CardTitle>
             </div>
@@ -873,7 +872,7 @@ export default function Auth() {
 
               <Button 
                 type="submit" 
-                className="w-full bg-gradient-primary" 
+                className="w-full bg-pub-green hover:bg-pub-green/90 text-pub-beige" 
                 disabled={isLoading || (signupConfirmPassword.length > 0 && signupPassword !== signupConfirmPassword)}
               >
                 <UserPlus className="w-4 h-4 mr-2" /> 
@@ -889,11 +888,11 @@ export default function Auth() {
   // Tela de recuperação de senha
   if (authView === "forgot-password") {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-pub-green flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-md mb-4">
           <button 
             onClick={() => setAuthView("login")}
-            className="flex items-center gap-2 text-primary hover:underline text-sm"
+            className="flex items-center gap-2 text-pub-beige/80 hover:text-pub-beige text-sm"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Voltar para login</span>
@@ -908,8 +907,8 @@ export default function Auth() {
               className="h-16 w-auto mx-auto mb-3"
             />
             <div className="flex items-center justify-center gap-2 mb-1">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                <Mail className="w-5 h-5 text-primary" />
+              <div className="w-10 h-10 bg-pub-green/10 rounded-full flex items-center justify-center">
+                <Mail className="w-5 h-5 text-pub-green" />
               </div>
               <CardTitle className="text-2xl font-bold text-foreground">
                 Recuperar Senha
@@ -960,7 +959,7 @@ export default function Auth() {
                 </div>
                 <Button
                   type="submit"
-                  className="w-full bg-gradient-primary"
+                  className="w-full bg-pub-green hover:bg-pub-green/90 text-pub-beige"
                   disabled={isLoading}
                 >
                   {isLoading ? (
@@ -996,7 +995,7 @@ export default function Auth() {
                 </div>
                 <Button
                   type="submit"
-                  className="w-full bg-gradient-primary"
+                  className="w-full bg-pub-green hover:bg-pub-green/90 text-pub-beige"
                   disabled={isLoading}
                 >
                   {isLoading ? (
@@ -1021,12 +1020,12 @@ export default function Auth() {
 
   // Tela de login principal
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-pub-green flex flex-col items-center justify-center p-4">
       {/* Logo e Título */}
       <div className="w-full max-w-md mb-4">
         <button
           onClick={handleBackFromLogin}
-          className="flex items-center gap-2 text-primary hover:underline text-sm"
+          className="flex items-center gap-2 text-pub-beige/80 hover:text-pub-beige text-sm"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Voltar</span>
@@ -1056,11 +1055,11 @@ export default function Auth() {
               className="h-16 w-auto mx-auto mb-3"
           />
           <div className="flex items-center justify-center gap-2 mb-1">
-            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 bg-pub-green/10 rounded-full flex items-center justify-center">
               {loginMethod === "email" ? (
-                <Lock className="w-5 h-5 text-primary" />
+                <Lock className="w-5 h-5 text-pub-green" />
               ) : (
-                <Smartphone className="w-5 h-5 text-primary" />
+                <Smartphone className="w-5 h-5 text-pub-green" />
               )}
             </div>
             <CardTitle className="text-2xl font-bold text-foreground">
@@ -1116,7 +1115,7 @@ export default function Auth() {
                 <button
                   type="button"
                   onClick={() => setLoginMethod("phone")}
-                  className="text-xs text-primary hover:underline"
+                  className="text-xs text-pub-green hover:underline"
                 >
                   Entrar com telefone
                 </button>
@@ -1160,7 +1159,7 @@ export default function Auth() {
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-primary"
+                className="w-full bg-pub-green hover:bg-pub-green/90 text-pub-beige"
                 disabled={isLoading}
               >
                 <LogIn className="w-4 h-4 mr-2" />
@@ -1193,7 +1192,7 @@ export default function Auth() {
                   <Button
                     variant="link"
                     onClick={() => setAuthView("signup")}
-                    className="p-0 h-auto text-primary hover:underline"
+                    className="p-0 h-auto text-pub-green hover:underline"
                   >
                     Cadastre-se
                   </Button>
@@ -1219,7 +1218,7 @@ export default function Auth() {
                 <button
                   type="button"
                   onClick={() => setLoginMethod("email")}
-                  className="text-xs text-primary hover:underline"
+                  className="text-xs text-pub-green hover:underline"
                 >
                   Entrar com e-mail
                 </button>
@@ -1231,7 +1230,7 @@ export default function Auth() {
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-primary"
+                className="w-full bg-pub-green hover:bg-pub-green/90 text-pub-beige"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -1273,7 +1272,7 @@ export default function Auth() {
                   <Button
                     variant="link"
                     onClick={() => setAuthView("signup")}
-                    className="p-0 h-auto text-primary hover:underline"
+                    className="p-0 h-auto text-pub-green hover:underline"
                   >
                     Cadastre-se
                   </Button>

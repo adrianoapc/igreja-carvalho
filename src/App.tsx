@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import { HelmetProvider } from "react-helmet-async";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,6 +19,15 @@ import { AuthContextProvider } from "./contexts/AuthContextProvider";
 import { AppConfigProvider } from "./contexts/AppConfigContext";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
 import { HideValuesProvider } from "./hooks/useHideValues";
+
+// Páginas e layout do site público
+const PublicLayout    = lazy(() => import("./components/public/PublicLayout"));
+const PublicHome      = lazy(() => import("./pages/public/PublicHome"));
+const PublicAgenda    = lazy(() => import("./pages/public/PublicAgenda"));
+const PublicMensagens = lazy(() => import("./pages/public/PublicMensagens"));
+const PublicOracao    = lazy(() => import("./pages/public/PublicOracao"));
+const Privacidade     = lazy(() => import("./pages/public/Privacidade"));
+const PublicContato   = lazy(() => import("./pages/public/PublicContato").then(m => ({ default: m.PublicContato })));
 
 // Pages Imports
 const Index = lazy(() => import("./pages/Index"));
@@ -247,6 +257,7 @@ const ScrollToTop = () => {
 };
 
 const App = () => (
+  <HelmetProvider>
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <TooltipProvider>
@@ -310,10 +321,20 @@ const App = () => (
                     element={<InscricaoPublica />}
                   />
 
+                  {/* --- SITE PÚBLICO --- */}
+                  <Route element={<PublicLayout />}>
+                    <Route index element={<PublicHome />} />
+                    <Route path="/agenda"      element={<PublicAgenda />} />
+                    <Route path="/mensagens"   element={<PublicMensagens />} />
+                    <Route path="/oracao"      element={<PublicOracao />} />
+                    <Route path="/privacidade" element={<Privacidade />} />
+                    <Route path="/contato"     element={<PublicContato />} />
+                  </Route>
+
                   {/* --- ROTAS PROTEGIDAS (MainLayout) --- */}
                   <Route element={<MainLayout />}>
                     <Route
-                      path="/"
+                      path="/dashboard"
                       element={
                         <AuthGate>
                           <Dashboard />
@@ -1339,6 +1360,7 @@ const App = () => (
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
+  </HelmetProvider>
 );
 
 export default App;

@@ -1,8 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
 @import 'tailwindcss';
 @config '../tailwind.config.ts';
@@ -65,6 +62,15 @@
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
 
+  /* ─── Site público ─── */
+  --color-pub-green:       hsl(var(--pub-green));
+  --color-pub-green-light: hsl(var(--pub-green-light));
+  --color-pub-beige:       hsl(var(--pub-beige));
+  --color-pub-beige-dark:  hsl(var(--pub-beige-dark));
+  --color-pub-gold:        hsl(var(--pub-gold));
+  --color-pub-gold-light:  hsl(var(--pub-gold-light));
+  --color-pub-bark:        hsl(var(--pub-bark));
+
   --background-image-gradient-primary: var(--gradient-primary);
   --background-image-gradient-accent: var(--gradient-accent);
   --background-image-gradient-subtle: var(--gradient-subtle);
@@ -87,9 +93,9 @@
   --animate-accordion-up: accordion-up 0.2s ease-out;
 
   --font-sans:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "DM Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, sans-serif;
-  --font-serif: Lora, ui-serif, Georgia, Cambria, Times New Roman, Times, serif;
+  --font-serif: "Playfair Display", ui-serif, Georgia, Cambria, Times New Roman, Times, serif;
   --font-mono:
     Space Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     Liberation Mono, Courier New, monospace;
@@ -237,6 +243,15 @@ All colors MUST be HSL.
     --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
     --tracking-normal: 0em;
     --spacing: 0.25rem;
+
+    /* ─── Site público: paleta oficial da marca Igreja Carvalho ─── */
+    --pub-green:       113 29% 22%;  /* #2C4828 Verde Escuro (header, hero, seções escuras)  */
+    --pub-green-light: 113 20% 93%;  /* Tint verde escuro (seção sutil)                      */
+    --pub-beige:       62 52% 88%;   /* #EFF0CF Creme (fundos claros, texto em bg escuro)    */
+    --pub-beige-dark:  62 35% 76%;   /* Creme mais escuro                                    */
+    --pub-gold:        129 52% 47%;  /* #39B54B Verde Claro (acento, CTAs, badges)           */
+    --pub-gold-light:  129 45% 93%;  /* Tint verde claro (fundos de ícone)                   */
+    --pub-bark:        25 61% 15%;   /* #3F220F Marrom escuro (texto sobre fundos claros)    */
   }
 
   .dark {
