@@ -82,6 +82,9 @@ export function MidiaDialog({
     midia?.expires_at ? new Date(midia.expires_at) : undefined
   );
 
+  const [eventoId, setEventoId] = useState<string | null>(midia?.evento_id ?? null);
+  const [eventos, setEventos] = useState<{ id: string; titulo: string; data_evento: string }[]>([]);
+
   // Tags
   const [tags, setTags] = useState<Tag[]>([]);
   const [tagsSelecionadas, setTagsSelecionadas] = useState<string[]>([]);
@@ -98,6 +101,7 @@ export function MidiaDialog({
       setCanal(midia.canal || "telao");
       setAtivo(midia.ativo ?? true);
       setPreviewUrl(midia.url || "");
+      setEventoId(midia.evento_id ?? null);
       setScheduledAt(
         midia.scheduled_at ? new Date(midia.scheduled_at) : undefined
       );
@@ -112,6 +116,7 @@ export function MidiaDialog({
   useEffect(() => {
     if (open) {
       loadTags();
+      loadEventos();
       if (midia?.id) {
         loadTagsMidia();
       } else {
@@ -119,6 +124,20 @@ export function MidiaDialog({
       }
     }
   }, [open, midia?.id, igrejaId]);
+
+  const loadEventos = async () => {
+    if (!igrejaId) return;
+    let q = supabase
+      .from("eventos")
+      .select("id, titulo, data_evento")
+      .eq("igreja_id", igrejaId)
+      .not("status", "in", '("cancelado","realizado")')
+      .order("data_evento", { ascending: false })
+      .limit(50);
+    if (!isAllFiliais && filialId) q = q.eq("filial_id", filialId);
+    const { data } = await q;
+    setEventos(data ?? []);
+  };
 
   const loadTags = async () => {
     try {
@@ -274,6 +293,7 @@ export function MidiaDialog({
             canal,
             ativo,
             url: urlFinal,
+            evento_id: eventoId || null,
             scheduled_at: scheduledAt?.toISOString() || null,
             expires_at: expiresAt?.toISOString() || null,
             updated_at: new Date().toISOString(),
@@ -311,7 +331,7 @@ export function MidiaDialog({
         if (!isAllFiliais && filialId) {
           maxOrdemQuery = maxOrdemQuery.eq("filial_id", filialId);
         }
-        const { data: maxOrdem } = await maxOrdemQuery.single();
+        const { data: maxOrdem } = await maxOrdemQuery.maybeSingle();
 
         const novaOrdem = (maxOrdem?.ordem || 0) + 1;
 
@@ -326,7 +346,7 @@ export function MidiaDialog({
             canal,
             ordem: novaOrdem,
             ativo,
-            evento_id: null,
+            evento_id: eventoId || null,
             scheduled_at: scheduledAt?.toISOString() || null,
             expires_at: expiresAt?.toISOString() || null,
             igreja_id: igrejaId,
@@ -466,6 +486,7 @@ export function MidiaDialog({
     setScheduledAt(undefined);
     setExpiresAt(undefined);
     setTagsSelecionadas([]);
+    setEventoId(null);
   };
 
   return (
@@ -624,6 +645,33 @@ export function MidiaDialog({
                       </SelectItem>
                       <SelectItem value="telao">Telão do Evento</SelectItem>
                       <SelectItem value="site">Site</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Evento vinculado */}
+                <div>
+                  <Label htmlFor="evento-vinculado">Evento vinculado</Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Associa esta mídia a um evento específico
+                  </p>
+                  <Select
+                    value={eventoId ?? "nenhum"}
+                    onValueChange={(v) => setEventoId(v === "nenhum" ? null : v)}
+                  >
+                    <SelectTrigger id="evento-vinculado">
+                      <SelectValue placeholder="Nenhum" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nenhum">Nenhum</SelectItem>
+                      {eventos.map((ev) => (
+                        <SelectItem key={ev.id} value={ev.id}>
+                          {ev.titulo}{" "}
+                          <span className="text-muted-foreground text-xs">
+                            — {format(new Date(ev.data_evento), "dd/MM/yyyy", { locale: ptBR })}
+                          </span>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

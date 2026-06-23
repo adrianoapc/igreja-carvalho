@@ -253,7 +253,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-border/40 px-4 py-3">
-        <Link to="/" className="flex items-center gap-3">
+        <Link to="/dashboard" className="flex items-center gap-3">
           {igrejaConfig?.logo_url ? (
             <img
               src={igrejaConfig.logo_url}

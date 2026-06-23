@@ -1,4 +1,4 @@
-project_id = "mcomwaelbwvyotvudnzt"
+project_id = "ugnrumtngcskbfpwynsr"
 
 [functions.processar-nota-fiscal]
 verify_jwt = false

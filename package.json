@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender.mjs",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -69,6 +69,7 @@
     "react-day-picker": "^9.14.0",
     "react-dom": "^19.2.7",
     "react-easy-crop": "^6.0.2",
+    "react-helmet-async": "^3.0.0",
     "react-hook-form": "^7.61.1",
     "react-imask": "^7.6.1",
     "react-input-mask": "^2.0.4",

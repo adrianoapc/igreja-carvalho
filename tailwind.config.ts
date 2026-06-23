@@ -69,6 +69,15 @@ export default {
           "4": "hsl(var(--chart-4))",
           "5": "hsl(var(--chart-5))",
         },
+        pub: {
+          green:        "hsl(var(--pub-green))",
+          "green-light":"hsl(var(--pub-green-light))",
+          beige:        "hsl(var(--pub-beige))",
+          "beige-dark": "hsl(var(--pub-beige-dark))",
+          gold:         "hsl(var(--pub-gold))",
+          "gold-light": "hsl(var(--pub-gold-light))",
+          bark:         "hsl(var(--pub-bark))",
+        },
       },
       backgroundImage: {
         "gradient-primary": "var(--gradient-primary)",
@@ -115,7 +124,7 @@ export default {
       },
       fontFamily: {
         sans: [
-          "Inter",
+          "DM Sans",
           "ui-sans-serif",
           "system-ui",
           "-apple-system",
@@ -128,7 +137,7 @@ export default {
           "sans-serif",
         ],
         serif: [
-          "Lora",
+          "Playfair Display",
           "ui-serif",
           "Georgia",
           "Cambria",
