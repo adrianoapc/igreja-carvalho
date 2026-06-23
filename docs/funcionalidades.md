@@ -1760,3 +1760,41 @@ Componente unificado (`src/components/ui/responsive-dialog.tsx`) que adapta auto
 **Impacto**: Experiência consistente e nativa mobile; melhor uso de espaço em telas pequenas; drawer bottom sheet substitui modais sobrepostos.
 
 ---
+
+## 19. Site Público Institucional
+
+Landing page pública em `igrejacarvalho.com.br`, acessível sem autenticação. Conteúdo gerenciado pelo painel admin. Ver diagrama: [`docs/diagramas/fluxo-site-publico.md`](diagramas/fluxo-site-publico.md).
+
+### 19.1 Páginas
+
+| Rota | Componente | Descrição |
+|---|---|---|
+| `/` | `PublicHome` | Landing com hero, quem somos, propósitos, banners, eventos, Instagram, oração e contato |
+| `/agenda` | `PublicAgenda` | Grade de eventos agrupados por mês, filtrados pela flag `publicar_no_site` |
+| `/mensagens` | `PublicMensagens` | Grid de vídeos via YouTube Data API v3 |
+| `/oracao` | `PublicOracao` | Formulário de pedido de oração com consentimento LGPD e Cloudflare Turnstile |
+| `/contato` | `PublicContato` | Endereço, horários, WhatsApp, e-mail e mapa com cookie consent gate |
+| `/privacidade` | `Privacidade` | Política de privacidade completa (LGPD) |
+
+### 19.2 Integração de Conteúdo
+
+- **Banners/Carrossel**: alimentado pela view `comunicados_publicos` — comunicados com `tipo = 'banner'` e `exibir_site = true`. Publicar via Comunicação → Nova Publicação → ativar "Exibir no site"
+- **Agenda**: view `eventos_publicos` — eventos com `publicar_no_site = true`, data futura, status não cancelado/realizado. Ativar per-evento no `EventoDialog` via toggle "🌐 Publicar na agenda do site"
+- **Pedidos de oração**: tabela `pedidos_oracao` com expurgo automático após 12 meses (pg_cron)
+- **Mídias vinculadas a eventos**: coluna `evento_id` em `midias` para associar banner/vídeo ao evento correspondente
+
+### 19.3 Integrações Externas
+
+- **YouTube Data API v3**: `useYoutubeVideos` hook busca a uploads playlist do canal. Requer `VITE_YOUTUBE_API_KEY` e `VITE_YOUTUBE_CHANNEL_ID`
+- **Instagram (Behold.so)**: widget de feed via `VITE_BEHOLD_WIDGET_ID`, sem cookie consent para exibição de thumbnails
+- **Google Maps**: embed condicional via `ThirdPartyGate` — carrega apenas após consentimento de cookies (LGPD)
+- **Cloudflare Turnstile**: anti-spam no formulário de oração via `VITE_TURNSTILE_SITE_KEY`
+
+### 19.4 Identidade Visual
+
+- Paleta da marca: Verde Escuro `#2C4828`, Verde Claro `#39B54B`, Creme `#EFF0CF`, Marrom `#3F220F`
+- Tokens Tailwind: `pub-green`, `pub-gold`, `pub-beige`, `pub-bark`
+- Tipografia: Playfair Display (títulos) + DM Sans (corpo)
+- Wordmark "Igreja Carvalho" no header e footer
+
+---

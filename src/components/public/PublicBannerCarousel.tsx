@@ -80,7 +80,17 @@ export function PublicBannerCarousel() {
     if (!isPaused) autoplayPlugin.current.play();
   }, [isPaused]);
 
-  if (loading || banners.length === 0) return null;
+  if (loading) return null;
+  if (banners.length === 0) {
+    if (import.meta.env.DEV) {
+      return (
+        <div className="flex min-h-30 items-center justify-center bg-pub-bark/5 border-y border-dashed border-pub-bark/15 text-pub-bark/30 text-sm">
+          Carrossel de banners — nenhum comunicado com <code className="mx-1 text-xs bg-pub-beige px-1 rounded">exibir_site = true</code> encontrado
+        </div>
+      );
+    }
+    return null;
+  }
 
   const total = banners.length;
 
