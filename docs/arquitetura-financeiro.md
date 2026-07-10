@@ -16,11 +16,14 @@
 | 1 | Regras de lançamento vivem no frontend | `TransacaoDialog.tsx` (1788 l.) monta payload e faz insert/update direto; `Entradas.tsx`/`Saidas.tsx` duplicam ~60-70% de código | Toda regra nova é escrita 2-3×; divergência silenciosa |
 | 2 | Bot duplica as regras | `chatbot-financeiro/index.ts` (2538 l.) insere direto em `transacoes_financeiras` com service role | ADR-027, validações e defaults reimplementados; drift provável |
 | 3 | Conciliação fragmentada | 3 motores de score, 3 modelos de vínculo, confirmação multi-tabela **não transacional no frontend** | Risco de estado inconsistente; impossível reusar pelo bot/API |
-| 4 | UX mobile desigual | Lançamentos OK; conciliação inutilizável no celular | Fluxo central do tesoureiro preso ao desktop |
+| 4 | Ofertas é um canal de escrita paralelo | `RelatorioOferta.tsx` (**2627 l., o maior arquivo do financeiro**) monta payload de transação à mão em 3 pontos, sem reusar TransacaoDialog | Terceira cópia das regras; inconsistências de status já no código |
+| 5 | Consultas agregam no cliente sem limite | Dashboard, Insights, Projeções, Contas e Ofertas leem linhas cruas e agregam no navegador, sem `.limit()` | **Truncamento silencioso** no teto de 1000 linhas do PostgREST em períodos grandes |
+| 6 | UX mobile desigual | Lançamentos OK; conciliação inutilizável no celular | Fluxo central do tesoureiro preso ao desktop |
 
-**Causa raiz comum (1-3): não existe porta de entrada única de escrita no
-domínio financeiro.** Cada canal (UI, bot, edges de integração) escreve
-direto nas tabelas.
+**Causa raiz comum (1-4): não existe porta de entrada única de escrita no
+domínio financeiro.** Quatro canais (TransacaoDialog, bot, RelatorioOferta e
+importações/integrações) escrevem direto nas tabelas, cada um com sua cópia
+das regras.
 
 ---
 
@@ -214,9 +217,131 @@ flowchart TD
 
 ---
 
-## 5. Estado atual — UX Web / Mobile (Tablet e Celular)
+## 5. Estado atual — Demais entrypoints e consultas
 
-### 5.1 Infraestrutura já existente (boa base)
+### 5.1 Relatório de Ofertas / Sessão de contagem (o 4º canal de escrita)
+
+- **`src/pages/financas/RelatorioOferta.tsx` (2627 l.) é o maior arquivo do
+  financeiro.** Wizard de 4 passos: data do culto, período, conferentes,
+  linhas físicas + digitais, sincronização de PIX de `pix_webhook_temp`,
+  rascunho em `sessoes_itens_draft`, conferência cega (blind count) e
+  aprovação via `notifications`.
+- **Modelo**: `sessoes_contagem` (status CHECK: aberto / aguardando_conferencia
+  / divergente / validado / cancelado / reaberto; snapshot dos parâmetros de
+  conferência cega; `conferentes` JSONB; `evento_id`) + `contagens` (1 linha
+  por conferente) + `sessoes_itens_draft` + coluna
+  `transacoes_financeiras.sessao_id`.
+- **RPCs existentes**: `open_sessao_contagem` — **duas versões divergentes**
+  (uma lê `financeiro_config`, outra `configuracoes_financeiro`; dedup
+  diferente) — e `confrontar_contagens` (conferência cega com tolerância).
+- **Contagem vira transação por INSERT direto montado no cliente em 3
+  pontos** (`RelatorioOferta.tsx:1074` no fluxo de aprovação — sem
+  `sessao_id`; `:2337` no "Encerrar e Lançar" — com `sessao_id`; payload
+  duplicado entre físico/digital/aprovação). O `TransacaoDialog` **não** é
+  reutilizado. Conta destino vem do mapeamento `forma_pagamento_contas`;
+  status vem de `forma.gera_pago`.
+- **Inconsistências**: `finalizarSessao` grava `status='finalizado'` +
+  `data_fechamento`, ambos **fora do CHECK/DDL** da tabela; o StatusBadge da
+  UI exibe estados que não existem no banco (em_contagem, fechada,
+  rejeitada).
+- `SessaoLancamentos.tsx` (226 l.) é leitura: lista as transações da sessão e
+  cruza com `extratos_bancarios` para marcar Conciliado × Conferido
+  (`conferido_manual` para dinheiro).
+
+### 5.2 Conta corrente (`Contas.tsx` 1330 l.)
+
+- Botão **"Ver Extrato"** (`Contas.tsx:890-921`) abre `ExtratoPreviewDialog`,
+  que **consulta o extrato online no banco** via edge `santander-api`
+  (`ExtratoPreviewDialog.tsx:100,146`) e **importa para `extratos_bancarios`**
+  (`:257-299`) — ou seja, Contas é o 4º ponto de ingestão de extrato (API
+  online), além de GerenciarDados (OFX/CSV), Getnet SFTP e PIX webhook.
+  Há também teste de conexão (`test-santander`) e busca de saldo online.
+- Movimentações do período: 2 queries diretas em `transacoes_financeiras`
+  (`Contas.tsx:224-263`, `:266-292`), totais agregados **client-side** sem
+  limite de linhas.
+- **`AjusteSaldoDialog` sobrescreve `contas.saldo_atual` direto**
+  (`AjusteSaldoDialog.tsx:52-58`) — não cria transação de ajuste; o ajuste
+  manual fica sem trilha de auditoria.
+- Importação de arquivo (OFX/CSV/XLSX) fica em `GerenciarDados.tsx` (aba
+  extratos → `ImportarExtratosTab`); histórico em `Reconciliacao.tsx`.
+
+### 5.3 Consultas e dashboards — comportamentos e melhorias
+
+| Dashboard | Linhas | Fonte de dados | Comportamento |
+|---|---|---|---|
+| `pages/Dashboard.tsx` | 841 | queries diretas + `view_solicitacoes_reembolso` | Mês atual vs anterior, pendências, sessões; agregação client-side, sem limite |
+| `pages/DashboardOfertas.tsx` | 606 | query direta | **Filtra ofertas por `.ilike("descricao","%oferta%")`** — heurística de texto frágil (não usa categoria nem `sessao_id`); joins manuais com formas/contas |
+| `pages/DRE.tsx` | 505 | **RPC `get_dre_anual`** | Único com agregação no servidor — o padrão a seguir |
+| `pages/Insights.tsx` | 633 | query direta | Top fornecedores/categorias/mensal via Map client-side, sem limite |
+| `pages/Projecao.tsx` | 401 | 2 queries diretas | Projeção 100% client-side |
+| `components/DashboardConciliacao.tsx` | 795 | **RPCs legadas** `reconciliar_transacoes` + `aplicar_conciliacao` | É o acionador do motor de score LEGADO — remoção depende da F4 |
+| `components/RelatorioCobertura.tsx` | 585 | tabelas cruas (`contas`, `extratos_bancarios`, `reconciliacao_audit_logs`) | Não usa a `view_reconciliacao_cobertura` que já existe |
+
+**DRE em detalhe**: `get_dre_anual(p_ano)` (SECURITY DEFINER, tenant via JWT)
+soma `transacoes_financeiras` JOIN categorias por seção/mês, **apenas
+`status='pago'`**, excluindo reembolsos não pagos. Melhorias: parametrizar o
+regime (caixa vs competência — hoje mistura: filtra por pago, mas
+`data_competencia` e o ADR-001 apontam para competência); recorte por filial;
+visão mobile em cards (hoje só `overflow-x-auto`).
+
+**Projeções em detalhe**: histórico por `data_pagamento` + futuras por
+`data_vencimento`, cálculo no cliente, sem limite. Melhoria estrutural:
+como as parcelas/recorrências futuras **não existem no banco** (bug da
+parcela única, seção 2.6), a projeção **subestima compromissos futuros** —
+corrigir a materialização (D6) é pré-requisito de qualquer projeção séria.
+
+**Melhorias transversais de consulta:**
+1. Padronizar leitura agregada no servidor seguindo o modelo do DRE:
+   RPCs/views `fin_resumo_periodo`, `fin_ofertas_periodo` etc. — elimina o
+   truncamento silencioso de 1000 linhas e o tráfego de linhas cruas.
+2. DashboardOfertas: trocar `ilike '%oferta%'` por filtro estrutural
+   (categoria ou `sessao_id IS NOT NULL`).
+3. DashboardConciliacao: migrar para o motor único (F4).
+4. RelatorioCobertura: consumir `view_reconciliacao_cobertura`.
+5. Skeletons e estados vazios consistentes em todos os dashboards.
+
+### 5.4 Reembolsos
+
+- **ADR-001 (fato gerador)**: `itens_reembolso` = competência (alimenta o
+  DRE); `transacoes_financeiras` = caixa, criada **só no pagamento**
+  (`Reembolsos.tsx:452-476` — insert direto de UMA transação
+  `tipo=saida, status=pago` + update da solicitação para `pago`).
+- Workflow no schema: `rascunho → pendente → aprovado → pago` (+ rejeitado).
+  **A UI não tem ação de aprovar/rejeitar — o fluxo real é
+  `pendente → pago`** (o estado `aprovado` existe mas nunca é exercido).
+- **Divergência de permissão**: o trigger `validar_status_reembolso` exige
+  role `admin` para aprovar/pagar/rejeitar, mas a UI libera o botão para
+  `tesoureiro` — possível bloqueio em runtime.
+- **Divergência entre canais**: o bot (fluxo REEMBOLSO,
+  `chatbot-financeiro:1847-1985`) grava nas mesmas tabelas mas cria como
+  `rascunho` → insere itens → promove a `pendente`, popula sugestões da IA e
+  **dispara a notificação `financeiro_reembolso_aprovacao` — que a UI não
+  dispara**.
+- Trigger `atualizar_valor_total_reembolso` soma itens (4 migrations de
+  retrabalho até estabilizar no ADR-001).
+
+### 5.5 Reclassificação — o modelo de auditoria a replicar
+
+- `Reclassificacao.tsx` (1016 l.): wizard em lote — filtros + seleção fina
+  por checkbox; altera categoria/subcategoria/centro/conta (payload aceita
+  também fornecedor, status e **`data_competencia`**); limite 5000.
+- **Único fluxo de escrita em lote com arquitetura correta**: edge
+  `reclass-transacoes` (411 l.) valida roles e cada destino contra o banco,
+  grava job em `reclass_jobs` + **snapshot antes/depois por transação** em
+  `reclass_job_items`; `undo-reclass` reverte por upsert do snapshot.
+  **Este padrão (job + snapshot + undo) deve virar convenção das RPCs
+  `fin_*`.**
+- Lacunas: **não bloqueia transação conciliada** (TODO explícito em
+  `reclass-transacoes/index.ts:324`); janela de tempo do undo comentada e
+  não implementada; como pode alterar `data_competencia` e categorias,
+  **muda o DRE retroativamente** sem trilha visível no relatório;
+  `itens_reembolso` (competência) fica fora do alcance da reclassificação.
+
+---
+
+## 6. Estado atual — UX Web / Mobile (Tablet e Celular)
+
+### 6.1 Infraestrutura já existente (boa base)
 
 - PWA real (`vite-plugin-pwa` + workbox), meta viewport, safe-area insets
   iOS (`src/index.css:196-199`), anti-zoom iOS (font-size 16px em inputs),
@@ -225,7 +350,7 @@ flowchart TD
   `sheet`, `skeleton`, `useIsMobile` (768px), `useMediaQuery`.
 - Sidebar vira Sheet no mobile; bottom-nav `MobileNavbar` com animações.
 
-### 5.2 O que está bem no financeiro
+### 6.2 O que está bem no financeiro
 
 - **Entradas/Saídas**: listas em cards (não tabela), filtros em
   `FiltrosSheet`, resumo `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`.
@@ -233,7 +358,7 @@ flowchart TD
   dedicado com barra de ações fixa no rodapé, grids `md:grid-cols-2`.
 - **Dashboard**: Recharts com `ResponsiveContainer`, grids responsivos.
 
-### 5.3 Lacunas concretas
+### 6.3 Lacunas concretas
 
 1. **`ConciliacaoInteligente.tsx:841` — crítico**: duas colunas fixas
    lado-a-lado + coluna central `w-32`, zero classes responsivas/`isMobile`.
@@ -250,7 +375,7 @@ flowchart TD
 7. **Tablet**: >768px cai direto no layout desktop denso.
 8. **`useIsMobile` aplicado de forma desigual** entre componentes.
 
-### 5.4 Avaliação honesta
+### 6.4 Avaliação honesta
 
 - **Celular: parcialmente utilizável** — lançar e consultar funciona bem;
   a conciliação (fluxo central do tesoureiro) é inutilizável.
@@ -260,7 +385,7 @@ flowchart TD
   financeiro. **Modularizar é pré-requisito**: ajuste responsivo em um
   arquivo de 1239 linhas é cirurgia de alto risco.
 
-### 5.5 Direção de melhoria premium
+### 6.5 Direção de melhoria premium
 
 - Conciliação mobile: alternar painéis por Tabs/stepper (padrão já usado em
   `ConciliacaoManual:534`); abas de `Reconciliacao` com scroll horizontal ou
@@ -274,9 +399,9 @@ flowchart TD
 
 ---
 
-## 6. Arquitetura alvo — CORE + Módulos
+## 7. Arquitetura alvo — CORE + Módulos
 
-### 6.1 Decisão central: o CORE de escrita vive no banco (RPCs `fin_*`)
+### 7.1 Decisão central: o CORE de escrita vive no banco (RPCs `fin_*`)
 
 Alternativas avaliadas:
 
@@ -299,7 +424,7 @@ flowchart TD
     EDGES[Edges de integração<br/>getnet-sftp, santander, pix] -->|service role + p_contexto| CORE
 
     subgraph CORE FINANCEIRO — Postgres
-        CORE[RPCs canônicas fin_*<br/>fin_criar_lancamento · fin_atualizar_lancamento<br/>fin_alterar_status_lancamento · fin_excluir_lancamento<br/>fin_criar_transferencia · fin_ingerir_extratos<br/>fin_confirmar_conciliacao · fin_desconciliar<br/>fin_gerar_candidatos_conciliacao]
+        CORE[RPCs canônicas fin_*<br/>fin_criar_lancamento · fin_atualizar_lancamento<br/>fin_alterar_status_lancamento · fin_excluir_lancamento<br/>fin_criar_transferencia · fin_ingerir_extratos<br/>fin_confirmar_conciliacao · fin_desconciliar<br/>fin_gerar_candidatos_conciliacao<br/>fin_lancar_sessao · fin_pagar_reembolso · fin_ajustar_saldo]
         CORE --> T[(transacoes_financeiras<br/>transferencias_contas<br/>extratos_bancarios<br/>conciliacoes_*)]
         T --> TRG[triggers saldo · RLS leitura · auditoria]
     end
@@ -310,7 +435,7 @@ flowchart TD
 tabelas de conciliação. Escrita só via RPC `fin_*` (enforçável ao final
 revogando privilégios de escrita do role `authenticated`).
 
-### 6.2 Contratos das RPCs (conceituais)
+### 7.2 Contratos das RPCs (conceituais)
 
 Convenções: prefixo `fin_`; escalares para o essencial + `p_extras jsonb`
 para opcionais; retorno `jsonb {ok, id(s), warnings[]}`; auditoria em todas.
@@ -339,7 +464,32 @@ para opcionais; retorno `jsonb {ok, id(s), warnings[]}`; auditoria em todas.
 - `fin_criar_transferencia(...)` — par em `transferencias_contas` +
   transações espelho, atomicamente.
 
-### 6.3 Frontend: `src/features/financeiro/`
+**Entrypoints especializados (decorrentes da extensão do mapeamento):**
+- `fin_lancar_sessao(p_sessao_id, p_itens jsonb[], p_contexto)` — lançamento
+  em lote da sessão de contagem (substitui os 3 inserts diretos do
+  `RelatorioOferta`): valida sessão validada/tolerância, resolve conta por
+  `forma_pagamento_contas`, cria todas as transações com `sessao_id` numa
+  transação e finaliza a sessão. Pré-requisito: corrigir o CHECK de
+  `sessoes_contagem` (incluir `finalizado`/`data_fechamento`) e unificar as
+  duas versões de `open_sessao_contagem`.
+- `fin_pagar_reembolso(p_solicitacao_id, p_conta_id, p_dados, p_contexto)` —
+  transação de caixa + status da solicitação + notificação via fila, numa
+  transação (resolve a divergência UI×bot: hoje só o bot notifica). Alinhar
+  trigger `validar_status_reembolso` (`admin`) × UI (`tesoureiro`).
+- `fin_ajustar_saldo(p_conta_id, p_valor, p_motivo, p_contexto)` — substitui
+  o UPDATE direto do `AjusteSaldoDialog`: cria lançamento de ajuste auditável
+  em vez de sobrescrever `contas.saldo_atual`.
+
+**Leitura agregada (modelo DRE):** RPCs/views de leitura —
+`fin_resumo_periodo`, `fin_ofertas_periodo`, `fin_projecao_mensal` — seguindo
+o padrão de `get_dre_anual`, para Dashboard, Ofertas, Insights e Projeções.
+Elimina o truncamento silencioso de 1000 linhas e a agregação client-side.
+
+**Padrão de auditoria:** replicar o modelo `reclass_jobs` +
+`reclass_job_items` (job + snapshot antes/depois + undo) como convenção das
+RPCs `fin_*` de escrita em lote.
+
+### 7.3 Frontend: `src/features/financeiro/`
 
 ```
 src/features/financeiro/
@@ -371,7 +521,7 @@ módulo; módulo não importa módulo (se precisar, promove ao core).
 `src/pages/financas/*` viram cascas de rota (re-export) — roteamento do
 `App.tsx` intocado durante a migração.
 
-### 6.4 Bot como módulo consumidor
+### 7.4 Bot como módulo consumidor
 
 `chatbot-financeiro` **mantém**: máquina de estados, mídia WhatsApp, OCR,
 diálogo. **Perde**: todo INSERT direto — vira chamada às mesmas RPCs `fin_*`
@@ -387,14 +537,14 @@ demais edges Make.
 
 ---
 
-## 7. Fluxo de conciliação alvo
+## 8. Fluxo de conciliação alvo
 
 ```mermaid
 flowchart TD
     subgraph Adaptadores por fonte
         OFX[OFX/CSV/XLSX<br/>parse client-side]
         GET[getnet-sftp<br/>tabelas getnet_* = staging]
-        SAN[santander-extrato]
+        SAN[santander-api / santander-extrato<br/>inclui botão Ver Extrato em Contas]
         PIX[pix-webhook<br/>pix_recebimentos = staging]
     end
     OFX & GET & SAN & PIX -->|ExtratoItem: data, valor, tipo,<br/>descricao, external_id, meta| ING[fin_ingerir_extratos<br/>dedupe + auditoria únicas]
@@ -430,16 +580,18 @@ flowchart TD
 
 ---
 
-## 8. Roadmap incremental (strangler fig, sem big-bang)
+## 9. Roadmap incremental (strangler fig, sem big-bang)
 
 Cada fase é deployável isolada; legado convive com o novo.
 
 | Fase | Escopo | Observações |
 |---|---|---|
 | **F0 Fundações** | Este doc + ADR-029/030; extrair helpers puros (moeda, status, agrupamento) para `features/financeiro/core`; convenção `fin_*` e padrão `p_contexto` | Refactor sem mudança de comportamento |
-| **F1 RPC de lançamento + bot** | Migrations `fin_criar/atualizar/status/excluir_lancamento` + `fin_criar_transferencia`; **bot troca inserts por RPC primeiro** (menos variação de payload, onde o drift dói mais) + `x-webhook-secret`; depois `TransacaoDialog`/`ActionsMenu` | **Maior ROI.** Gate de saída: nenhum canal insere direto |
+| **F1 RPC de lançamento + bot** | Migrations `fin_criar/atualizar/status/excluir_lancamento` + `fin_criar_transferencia` + `fin_ajustar_saldo`; **bot troca inserts por RPC primeiro** (menos variação de payload, onde o drift dói mais) + `x-webhook-secret`; depois `TransacaoDialog`/`ActionsMenu`/`AjusteSaldoDialog` | **Maior ROI.** Gate de saída: nenhum canal insere direto |
+| **F1.5 Ofertas e reembolso no CORE** | `fin_lancar_sessao` (substitui os 3 inserts do `RelatorioOferta`) + correção do CHECK de `sessoes_contagem` + unificação de `open_sessao_contagem`; `fin_pagar_reembolso` (notificação igual para UI e bot; alinhar trigger×UI, decisão D9) | Depende de F1; RelatorioOferta continua com a UI atual |
 | **F2 Unificação Entradas/Saídas** | `useLancamentos` + `TransacoesPage` por tipo; páginas viram re-exports; decomposição do `TransacaoDialog`; **UX: tap único + skeletons padronizados** | Só frontend; paralelo a F1 |
-| **F3 Conciliação transacional** | `fin_confirmar_conciliacao` + `fin_desconciliar` (porta a lógica de `ConciliacaoInteligente.tsx:421-703`); feature flag de rollback 1-2 releases | Depende de F1 (status via RPC) |
+| **F2.5 Leitura agregada no servidor** | RPCs/views modelo `get_dre_anual` (`fin_resumo_periodo`, `fin_ofertas_periodo`, `fin_projecao_mensal`); DashboardOfertas troca `ilike '%oferta%'` por filtro estrutural; RelatorioCobertura consome `view_reconciliacao_cobertura`; DRE parametriza regime caixa×competência | Independente; resolve truncamento de 1000 linhas |
+| **F3 Conciliação transacional** | `fin_confirmar_conciliacao` + `fin_desconciliar` (porta a lógica de `ConciliacaoInteligente.tsx:421-703`); reclassificação passa a bloquear/alertar transação conciliada | Depende de F1 (status via RPC) |
 | **F4 Motor único de score** | Estabilizar `fin_gerar_candidatos_conciliacao`; remover score client-side; deprecar RPCs legadas; validar via ModoABToggle e removê-lo | Depende de F3 |
 | **F5 Pipeline de ingestão** | `fin_ingerir_extratos`; ordem: manual → pix → santander → getnet; gancho pós-ingestão (ADR-028) | Independente após F0 |
 | **F6 Getnet tipo 5** | Após decisão D5; novos períodos apenas; backfill opcional | Depende de F5 |
@@ -447,7 +599,7 @@ Cada fase é deployável isolada; legado convive com o novo.
 
 ---
 
-## 9. Decisões em aberto (bater o martelo)
+## 10. Decisões em aberto (bater o martelo)
 
 | # | Decisão | Recomendação |
 |---|---|---|
@@ -458,11 +610,12 @@ Cada fase é deployável isolada; legado convive com o novo.
 | D5 | Getnet tipo 1 vs tipo 5 | Tipo 5 como verdade do espelho, só novos períodos |
 | D6 | Recorrência/parcelamento | Materializar tudo na criação (parcelado); job mensal (recorrente) |
 | D7 | Efeitos colaterais (alertas) | Fila no banco lida por edge — bot e front geram os mesmos alertas |
-| D8 | Status ENUM vs TEXT+CHECK | Padronizar na F1 (barato agora, caro depois) |
+| D8 | Status ENUM vs TEXT+CHECK | Padronizar na F1 (barato agora, caro depois) — inclui sanear os status de `sessoes_contagem` (CHECK × `finalizado` × StatusBadge) |
+| D9 | Workflow de reembolso | O estado `aprovado` entra no fluxo real (com ação de aprovar/rejeitar na UI e notificação) ou sai do schema? Quem aprova: `admin` (trigger atual) ou também `tesoureiro` (UI atual)? |
 
-## 10. Riscos
+## 11. Riscos
 
-- **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (6.2) é
+- **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
   inegociável; revisão de segurança dedicada (checklist de
   `docs/01-Arquitetura/04-rls-e-seguranca.MD`).
 - **Trigger de saldo dentro de RPCs** → testar reentrância; criar
