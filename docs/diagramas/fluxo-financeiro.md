@@ -173,3 +173,36 @@ flowchart LR
     NORMALIZE --> XLSX[exportToExcel]
     XLSX --> FILE[Arquivo XLSX com células numéricas]
 ```
+
+## CORE do Financeiro — Fase F0 (ADR-029)
+
+Camada de helpers puros compartilhados inaugurada em
+`src/features/financeiro/core`, consumida por Entradas e Saídas sem mudança
+de comportamento. Fases seguintes (F1+) adicionam `core/api` (wrappers das
+RPCs `fin_*`) e `core/hooks`. Roadmap completo em
+[`../arquitetura-financeiro.md`](../arquitetura-financeiro.md).
+
+```mermaid
+flowchart TD
+    subgraph PAGES["Páginas legadas (migração gradual)"]
+        ENT[Entradas.tsx]
+        SAI[Saidas.tsx]
+    end
+
+    subgraph CORE["src/features/financeiro/core"]
+        STATUS["lib/status - cores e rótulos por tipo"]
+        AGRUP["lib/agrupamento - agrupar por data"]
+        PERIODO["lib/periodo - mês ou range customizado"]
+        TYPES["model/types - TipoTransacao, TransacaoResumo"]
+    end
+
+    ENT --> STATUS
+    ENT --> AGRUP
+    ENT --> PERIODO
+    SAI --> STATUS
+    SAI --> PERIODO
+    STATUS --> TYPES
+
+    FUT["F1+: core/api (RPCs fin_*) e core/hooks"]
+    CORE -.evolui para.-> FUT
+```
