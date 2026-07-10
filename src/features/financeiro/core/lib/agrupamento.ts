@@ -2,12 +2,13 @@
  * Agrupa transações pela data de vencimento (chave "" quando ausente),
  * preservando a ordem de entrada dentro de cada grupo.
  */
-export function agruparPorData<T extends { data_vencimento?: string | null }>(
+export function agruparPorData<T extends object>(
   transacoes: T[] | undefined | null,
 ): Record<string, T[]> {
   if (!transacoes) return {};
   return transacoes.reduce((acc: Record<string, T[]>, t) => {
-    const data = t.data_vencimento || "";
+    const data =
+      (t as { data_vencimento?: string | null }).data_vencimento || "";
     if (!acc[data]) acc[data] = [];
     acc[data].push(t);
     return acc;

@@ -35,7 +35,7 @@ import { TablePagination } from "@/components/ui/table-pagination";
 import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
 import { formatLocalDate } from "@/utils/dateUtils";
 import {
-  agruparPorData,
+  agruparPorData as agruparTransacoesPorData,
   ordenarDatasDesc,
   getPeriodoRange,
   getStatusColorDynamic,
@@ -230,7 +230,7 @@ export default function Entradas() {
 
   // Agrupamento por data (sempre ativo para o calendário)
   const transacoesAgrupadas = useMemo(
-    () => agruparPorData(transacoesFiltradas),
+    () => agruparTransacoesPorData(transacoesFiltradas),
     [transacoesFiltradas],
   );
 
