@@ -162,3 +162,14 @@ graph TD
 - **Sequência Temporal**: [Diagrama de Sequência](sequencia-financeira.md)
 - **Composição do DRE**: [Diagrama DRE](dre.md)
 - **Modelo de Dados**: [Database ER Diagram](../database-er-diagram.md)
+
+## Fluxo de Exportação (Entradas e Saídas)
+
+```mermaid
+flowchart LR
+    UI[Entradas/Saídas] --> TAB[ExportarTab]
+    TAB --> MAP[Mapeamento para colunas]
+    MAP --> NORMALIZE[Normalização de valor numérico]
+    NORMALIZE --> XLSX[exportToExcel]
+    XLSX --> FILE[Arquivo XLSX com células numéricas]
+```

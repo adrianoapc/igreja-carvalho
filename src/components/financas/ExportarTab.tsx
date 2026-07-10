@@ -22,11 +22,7 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useFilialId } from "@/hooks/useFilialId";
-import {
-  exportToExcel,
-  formatDateForExport,
-  formatCurrencyForExport,
-} from "@/lib/exportUtils";
+import { exportToExcel, formatDateForExport } from "@/lib/exportUtils";
 import {
   Download,
   Calendar as CalendarIcon,
@@ -252,8 +248,7 @@ export function ExportarTab() {
 
         if (colunasSelecionadas.includes("descricao"))
           row.Descrição = t.descricao;
-        if (colunasSelecionadas.includes("valor"))
-          row.Valor = formatCurrencyForExport(t.valor);
+        if (colunasSelecionadas.includes("valor")) row.Valor = t.valor;
         if (colunasSelecionadas.includes("status")) row.Status = t.status;
         if (colunasSelecionadas.includes("data_vencimento"))
           row["Data Vencimento"] = formatDateForExport(t.data_vencimento);
@@ -287,6 +282,7 @@ export function ExportarTab() {
         dadosExportacao,
         nomeArquivo,
         tipoExportacao === "entradas" ? "Entradas" : "Saídas",
+        { Valor: "#,##0.00" },
       );
       toast.success(`${transacoes.length} registros exportados com sucesso!`);
     } catch (error) {

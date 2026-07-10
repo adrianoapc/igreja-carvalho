@@ -3,8 +3,16 @@ import { format } from 'date-fns';
 
 /**
  * Export data to Excel file
+ *
+ * @param numberFormats - maps column header -> Excel number format code (e.g. `{ Valor: '#,##0.00' }`)
+ *   applied to numeric cells so they stay real numbers (summable) while displaying with the desired format.
  */
-export function exportToExcel(data: Record<string, unknown>[], filename: string, sheetName: string = 'Dados') {
+export function exportToExcel(
+  data: Record<string, unknown>[],
+  filename: string,
+  sheetName: string = 'Dados',
+  numberFormats?: Record<string, string>,
+) {
   if (!data || data.length === 0) {
     throw new Error('Não há dados para exportar');
   }
@@ -12,6 +20,21 @@ export function exportToExcel(data: Record<string, unknown>[], filename: string,
   // Create workbook and worksheet
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(data);
+
+  if (numberFormats) {
+    const headers = Object.keys(data[0]);
+    Object.entries(numberFormats).forEach(([column, numFmt]) => {
+      const colIndex = headers.indexOf(column);
+      if (colIndex === -1) return;
+      for (let row = 0; row < data.length; row++) {
+        const cellRef = XLSX.utils.encode_cell({ r: row + 1, c: colIndex });
+        const cell = ws[cellRef];
+        if (cell && cell.t === 'n') {
+          cell.z = numFmt;
+        }
+      }
+    });
+  }
 
   // Auto-size columns
   const colWidths = Object.keys(data[0]).map(key => {
