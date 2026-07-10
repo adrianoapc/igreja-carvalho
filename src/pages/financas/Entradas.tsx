@@ -26,7 +26,6 @@ import { toast } from "sonner";
 import {
   exportToExcel,
   formatDateForExport,
-  formatCurrencyForExport,
   formatBooleanForExport,
 } from "@/lib/exportUtils";
 import { useNavigate } from "react-router-dom";
@@ -352,7 +351,7 @@ export default function Entradas() {
 
       const dadosExportacao = transacoesFiltradas.map((t) => ({
         Descrição: t.descricao,
-        Valor: formatCurrencyForExport(t.valor),
+        Valor: t.valor,
         Status: getStatusDisplay(t),
         Conciliado: formatBooleanForExport(!!conciliacaoMap.get(t.id)),
         "Conferido Manual": formatBooleanForExport(!!t.conferido_manual),
@@ -367,7 +366,9 @@ export default function Entradas() {
         Observações: t.observacoes || "",
       }));
 
-      exportToExcel(dadosExportacao, "Entradas", "Entradas");
+      exportToExcel(dadosExportacao, "Entradas", "Entradas", {
+        Valor: "#,##0.00",
+      });
       toast.success("Dados exportados com sucesso!");
     } catch (error) {
       console.error("Erro ao exportar:", error);
