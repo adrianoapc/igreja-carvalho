@@ -33,13 +33,15 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { usePagination } from "@/hooks/usePagination";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
+import { formatLocalDate } from "@/utils/dateUtils";
 import {
-  formatLocalDate,
-  startOfMonthLocal,
-  endOfMonthLocal,
-  startOfDayLocal,
-  endOfDayLocal,
-} from "@/utils/dateUtils";
+  ordenarDatasDesc,
+  getPeriodoRange,
+  getStatusColorDynamic,
+  getStatusDisplay as getStatusDisplayCore,
+  isPagamentoDinheiro,
+  type TransacaoResumo,
+} from "@/features/financeiro/core";
 import { useTransacoesFiltro } from "@/hooks/useTransacoesFiltro";
 // import { ImportarExcelWizard } from "@/components/financas/ImportarExcelWizard";
 import { TransacaoActionsMenu } from "@/components/financas/TransacaoActionsMenu";
@@ -120,19 +122,7 @@ export default function Saidas() {
   const [extratoDrawerOpen, setExtratoDrawerOpen] = useState(false);
 
   // Calcular datas de início e fim baseado no período selecionado
-  const getDateRange = () => {
-    if (customRange) {
-      return {
-        inicio: formatLocalDate(startOfDayLocal(customRange.from)),
-        fim: formatLocalDate(endOfDayLocal(customRange.to)),
-      };
-    }
-
-    return {
-      inicio: formatLocalDate(startOfMonthLocal(selectedMonth)),
-      fim: formatLocalDate(endOfMonthLocal(selectedMonth)),
-    };
-  };
+  const getDateRange = () => getPeriodoRange(selectedMonth, customRange);
 
   const dateRange = getDateRange();
 
@@ -347,11 +337,10 @@ export default function Saidas() {
   }, [transacoesFiltradas]);
 
   // Ordenar as datas dos grupos (mais recente primeiro)
-  const datasOrdenadas = useMemo(() => {
-    return Object.keys(transacoesAgrupadas).sort(
-      (a, b) => new Date(b).getTime() - new Date(a).getTime(),
-    );
-  }, [transacoesAgrupadas]);
+  const datasOrdenadas = useMemo(
+    () => ordenarDatasDesc(transacoesAgrupadas),
+    [transacoesAgrupadas],
+  );
 
   // Toggle de grupo expandido
   const toggleGrupo = (dataKey: string) => {
@@ -396,9 +385,6 @@ export default function Saidas() {
     return formatValue(value);
   };
 
-  const isPagamentoDinheiro = (forma?: string | null) =>
-    (forma || "").toLowerCase().includes("dinheiro");
-
   // Separar transferências das transações normais
   const transacoesNormais =
     transacoesFiltradas?.filter((t) => !t.transferencia_id) || [];
@@ -418,51 +404,8 @@ export default function Saidas() {
   const totalTransferencias =
     transferencias?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pago":
-        return "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400";
-      case "pendente":
-        return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400";
-      case "atrasado":
-        return "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400";
-      default:
-        return "bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-400";
-    }
-  };
-
-  type TransacaoResumo = {
-    status: string;
-    data_vencimento?: string | Date | null;
-  };
-
-  const getStatusDisplay = (transacao: TransacaoResumo) => {
-    if (transacao.status === "pago") return "Pago";
-    if (transacao.status === "pendente") {
-      const hoje = new Date();
-      const vencimento = new Date(transacao.data_vencimento + "T00:00:00");
-      if (vencimento < hoje) {
-        return "Atrasado";
-      }
-      return "Pendente";
-    }
-    return "Atrasado";
-  };
-
-  const getStatusColorDynamic = (transacao: TransacaoResumo) => {
-    if (transacao.status === "pago") {
-      return "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400";
-    }
-    if (transacao.status === "pendente") {
-      const hoje = new Date();
-      const vencimento = new Date(transacao.data_vencimento + "T00:00:00");
-      if (vencimento < hoje) {
-        return "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400";
-      }
-      return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400";
-    }
-    return "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400";
-  };
+  const getStatusDisplay = (transacao: TransacaoResumo) =>
+    getStatusDisplayCore(transacao, "saida");
 
   const handleExportar = () => {
     try {
