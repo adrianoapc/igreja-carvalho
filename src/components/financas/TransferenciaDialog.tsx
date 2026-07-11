@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { criarTransferencia } from "@/features/financeiro/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
@@ -202,87 +203,25 @@ export function TransferenciaDialog({
     setLoading(true);
 
     try {
-      // 1. Criar a transferência
-      const { data: transferencia, error: errTransf } = await supabase
-        .from("transferencias_contas")
-        .insert({
-          conta_origem_id: contaOrigem,
-          conta_destino_id: contaDestino,
-          valor: valorNum,
-          data_transferencia: dataTransferencia,
-          data_competencia: dataTransferencia,
+      // Transferência atômica via fin_criar_transferencia (ADR-029):
+      // registro + par de transações espelho + ajuste de saldo numa transação.
+      await criarTransferencia({
+        conta_origem_id: contaOrigem,
+        conta_destino_id: contaDestino,
+        valor: valorNum,
+        data: dataTransferencia,
+        extras: {
+          categoria_saida_id: categoriaTransferencia.saida.id,
+          categoria_entrada_id: categoriaTransferencia.entrada.id,
+          subcategoria_saida_id: subcategoriaDepositoSaida?.id || null,
+          base_ministerial_id: baseMinisterial?.id || null,
+          centro_custo_id: centroCusto?.id || null,
+          descricao_saida: `Transferência para ${contaDestinoData?.nome || "outra conta"}`,
+          descricao_entrada: `Transferência de ${contaOrigemData?.nome || "outra conta"}`,
           observacoes: observacoes || null,
-          igreja_id: igrejaId,
           filial_id: !isAllFiliais ? filialId : null,
-          status: "executada",
-        })
-        .select("id")
-        .single();
-
-      if (errTransf) throw errTransf;
-
-      // 2. Criar transação de SAÍDA (da conta origem)
-      const { data: transacaoSaida, error: errSaida } = await supabase
-        .from("transacoes_financeiras")
-        .insert({
-          tipo: "saida",
-          tipo_lancamento: "unico",
-          descricao: `Transferência para ${contaDestinoData?.nome || "outra conta"}`,
-          valor: valorNum,
-          data_vencimento: dataTransferencia,
-          data_pagamento: dataTransferencia,
-          data_competencia: dataTransferencia,
-          status: "pago",
-          forma_pagamento: "Transferência Bancária",
-          conta_id: contaOrigem,
-          categoria_id: categoriaTransferencia.saida.id,
-          subcategoria_id: subcategoriaDepositoSaida?.id || null,
-          base_ministerial_id: baseMinisterial?.id || null,
-          centro_custo_id: centroCusto?.id || null,
-          transferencia_id: transferencia.id,
-          igreja_id: igrejaId!,
-          filial_id: !isAllFiliais ? filialId : null,
-        })
-        .select("id")
-        .single();
-
-      if (errSaida) throw errSaida;
-
-      // 3. Criar transação de ENTRADA (na conta destino)
-      const { data: transacaoEntrada, error: errEntrada } = await supabase
-        .from("transacoes_financeiras")
-        .insert({
-          tipo: "entrada",
-          tipo_lancamento: "unico",
-          descricao: `Transferência de ${contaOrigemData?.nome || "outra conta"}`,
-          valor: valorNum,
-          data_vencimento: dataTransferencia,
-          data_pagamento: dataTransferencia,
-          data_competencia: dataTransferencia,
-          status: "pago",
-          forma_pagamento: "Transferência Bancária",
-          conta_id: contaDestino,
-          categoria_id: categoriaTransferencia.entrada.id,
-          subcategoria_id: null, // Entrada não precisa de subcategoria específica
-          base_ministerial_id: baseMinisterial?.id || null,
-          centro_custo_id: centroCusto?.id || null,
-          transferencia_id: transferencia.id,
-          igreja_id: igrejaId!,
-          filial_id: !isAllFiliais ? filialId : null,
-        })
-        .select("id")
-        .single();
-
-      if (errEntrada) throw errEntrada;
-
-      // 4. Atualizar a transferência com os IDs das transações
-      await supabase
-        .from("transferencias_contas")
-        .update({
-          transacao_saida_id: transacaoSaida.id,
-          transacao_entrada_id: transacaoEntrada.id,
-        })
-        .eq("id", transferencia.id);
+        },
+      });
 
       toast.success("Transferência realizada com sucesso!");
 

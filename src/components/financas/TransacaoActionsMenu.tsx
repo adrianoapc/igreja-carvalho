@@ -42,6 +42,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState } from "react";
 import { ConfirmarPagamentoDialog } from "./ConfirmarPagamentoDialog";
 import { DesconciliarDialog } from "./DesconciliarDialog";
+import {
+  alterarStatusLancamento,
+  excluirLancamento,
+} from "@/features/financeiro/core";
 
 interface TransacaoActionsMenuProps {
   transacaoId: string;
@@ -210,30 +214,12 @@ export function TransacaoActionsMenu({
 
   const handleStatusChange = async (newStatus: string) => {
     try {
-      const updateData: {
-        status: string;
-        data_pagamento?: null;
-        juros?: number;
-        multas?: number;
-        desconto?: number;
-        taxas_administrativas?: number;
-      } = { status: newStatus };
-
-      // Se marcar como pendente, remover todos os dados de pagamento/recebimento
-      if (newStatus === "pendente") {
-        updateData.data_pagamento = null;
-        updateData.juros = 0;
-        updateData.multas = 0;
-        updateData.desconto = 0;
-        updateData.taxas_administrativas = 0;
-      }
-
-      const { error } = await supabase
-        .from("transacoes_financeiras")
-        .update(updateData)
-        .eq("id", transacaoId);
-
-      if (error) throw error;
+      // Porta única de status (fin_alterar_status_lancamento, ADR-029):
+      // voltar a pendente limpa dados de pagamento no banco.
+      await alterarStatusLancamento(
+        transacaoId,
+        newStatus as "pendente" | "pago" | "cancelado",
+      );
 
       toast.success(
         `Status atualizado para ${newStatus === "pendente" ? "Pendente" : "Pago"}`,
@@ -242,25 +228,25 @@ export function TransacaoActionsMenu({
       queryClient.invalidateQueries({ queryKey: ["saidas"] });
     } catch (error) {
       console.error("Erro ao atualizar status:", error);
-      toast.error("Erro ao atualizar status");
+      toast.error(
+        error instanceof Error ? error.message : "Erro ao atualizar status",
+      );
     }
   };
 
   const handleDelete = async () => {
     try {
-      const { error } = await supabase
-        .from("transacoes_financeiras")
-        .delete()
-        .eq("id", transacaoId);
-
-      if (error) throw error;
+      const resultado = await excluirLancamento(transacaoId);
+      resultado.warnings?.forEach((w) => toast.info(w));
 
       toast.success("Transação excluída com sucesso");
       queryClient.invalidateQueries({ queryKey: ["entradas"] });
       queryClient.invalidateQueries({ queryKey: ["saidas"] });
     } catch (error) {
       console.error("Erro ao excluir:", error);
-      toast.error("Erro ao excluir transação");
+      toast.error(
+        error instanceof Error ? error.message : "Erro ao excluir transação",
+      );
     }
   };
 

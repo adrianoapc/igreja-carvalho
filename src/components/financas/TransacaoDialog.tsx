@@ -37,6 +37,10 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  criarLancamento,
+  atualizarLancamento,
+} from "@/features/financeiro/core";
 
 // Helper para converter string ISO (YYYY-MM-DD) para Date no timezone local
 const parseLocalDate = (
@@ -952,19 +956,9 @@ export function TransacaoDialog({
           valorNumerico + jurosNum + multasNum + taxasAdmNum - descontoNum;
       }
 
-      const transacaoData = {
-        tipo,
-        tipo_lancamento: tipoLancamento,
-        descricao,
-        valor: valorNumerico,
-        valor_liquido: valorLiquidoFinal,
-        data_vencimento: formatLocalDate(dataVencimento),
-        data_competencia: formatLocalDate(dataCompetencia),
-        data_pagamento:
-          foiPago && dataPagamento ? formatLocalDate(dataPagamento) : null,
-        conta_id: contaId,
-        categoria_id:
-          categoriaId && categoriaId !== "none" ? categoriaId : null,
+      // Campos comuns criar/editar — a escrita acontece nas RPCs fin_* do
+      // CORE (ADR-029); tenant e permissão são validados no banco.
+      const camposComuns = {
         subcategoria_id:
           subcategoriaId && subcategoriaId !== "none" ? subcategoriaId : null,
         centro_custo_id:
@@ -977,43 +971,71 @@ export function TransacaoDialog({
           fornecedorId && fornecedorId !== "none" ? fornecedorId : null,
         forma_pagamento:
           formaPagamento && formaPagamento !== "none" ? formaPagamento : null,
-        total_parcelas:
-          tipoLancamento === "parcelado" ? parseInt(totalParcelas) : null,
-        numero_parcela: tipoLancamento === "parcelado" ? 1 : null,
-        recorrencia: tipoLancamento === "recorrente" ? recorrencia : null,
-        data_fim_recorrencia:
-          tipoLancamento === "recorrente" && dataFimRecorrencia
-            ? formatLocalDate(dataFimRecorrencia)
-            : null,
-        observacoes: observacoes || null,
-        anexo_url: anexoPath || null,
-        lancado_por: userData.user?.id,
-        status: foiPago ? "pago" : "pendente",
-        // Juros e multas só quando pago (atraso)
+        data_competencia: formatLocalDate(dataCompetencia),
+        data_pagamento:
+          foiPago && dataPagamento ? formatLocalDate(dataPagamento) : null,
+        // Juros e multas só quando pago (atraso); desconto/taxas sempre
         juros: jurosNum,
         multas: multasNum,
-        // Desconto e taxas sempre persistem (conhecidos antes do pagamento)
         desconto: descontoNum,
         taxas_administrativas: taxasAdmNum,
-        igreja_id: igrejaId,
+        valor_liquido: valorLiquidoFinal,
+        observacoes: observacoes || null,
+        anexo_url: anexoPath || null,
         filial_id: isAllFiliais ? null : filialId,
       };
 
-      let error;
       if (transacao) {
-        const result = await supabase
-          .from("transacoes_financeiras")
-          .update(transacaoData)
-          .eq("id", String(transacao.id));
-        error = result.error;
+        await atualizarLancamento(String(transacao.id), {
+          ...camposComuns,
+          tipo,
+          tipo_lancamento: tipoLancamento as "unico" | "parcelado" | "recorrente",
+          descricao,
+          valor: valorNumerico,
+          data_vencimento: formatLocalDate(dataVencimento),
+          conta_id: contaId,
+          categoria_id:
+            categoriaId && categoriaId !== "none" ? categoriaId : null,
+          status: foiPago ? "pago" : "pendente",
+          total_parcelas:
+            tipoLancamento === "parcelado" ? parseInt(totalParcelas) : undefined,
+          recorrencia: tipoLancamento === "recorrente" ? recorrencia : null,
+          data_fim_recorrencia:
+            tipoLancamento === "recorrente" && dataFimRecorrencia
+              ? formatLocalDate(dataFimRecorrencia)
+              : null,
+          lancado_por: userData.user?.id,
+        });
       } else {
-        const result = await supabase
-          .from("transacoes_financeiras")
-          .insert(transacaoData);
-        error = result.error;
+        const resultado = await criarLancamento({
+          tipo: tipo as "entrada" | "saida",
+          valor: valorNumerico,
+          data_vencimento: formatLocalDate(dataVencimento),
+          conta_id: contaId,
+          descricao,
+          categoria_id:
+            categoriaId && categoriaId !== "none" ? categoriaId : null,
+          extras: {
+            ...camposComuns,
+            status: foiPago ? "pago" : "pendente",
+            tipo_lancamento: tipoLancamento as
+              | "unico"
+              | "parcelado"
+              | "recorrente",
+            total_parcelas:
+              tipoLancamento === "parcelado"
+                ? parseInt(totalParcelas)
+                : undefined,
+            recorrencia: tipoLancamento === "recorrente" ? recorrencia : null,
+            data_fim_recorrencia:
+              tipoLancamento === "recorrente" && dataFimRecorrencia
+                ? formatLocalDate(dataFimRecorrencia)
+                : null,
+            lancado_por: userData.user?.id,
+          },
+        });
+        resultado.warnings?.forEach((w) => toast.info(w));
       }
-
-      if (error) throw error;
 
       // Apenas notificar se for uma NOVA transação (não na edição) e se for uma SAÍDA (Conta a Pagar)
       if (!transacao && tipo === "saida") {
