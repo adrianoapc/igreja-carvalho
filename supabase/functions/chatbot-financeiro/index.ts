@@ -6,12 +6,28 @@ import {
   getActiveWhatsAppProvider,
 } from "../_shared/secrets.ts";
 import { normalizarTelefone, formatarParaWhatsApp } from "../_shared/telefone-utils.ts";
+import {
+  criarLancamento,
+  criarTransferencia,
+  type FinContexto,
+} from "../_shared/financeiro-core.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-webhook-secret",
 };
+
+// Comparação tempo-constante (mesmo padrão de receber-pedido-make/pix-webhook)
+function timingSafeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const ba = enc.encode(a);
+  const bb = enc.encode(b);
+  let diff = ba.length ^ bb.length;
+  const len = Math.max(ba.length, bb.length);
+  for (let i = 0; i < len; i++) diff |= (ba[i] ?? 0) ^ (bb[i] ?? 0);
+  return diff === 0;
+}
 
 // Estados da máquina de estados
 type EstadoSessao =
@@ -496,6 +512,25 @@ async function finalizarRecebimentoComprovantes(
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
+  }
+
+  // Shared secret do Make (x-webhook-secret, timing-safe). Rollout seguro:
+  // enquanto MAKE_WEBHOOK_SECRET não estiver configurado no ambiente, apenas
+  // loga o aviso — configure o secret aqui e no cenário Make para enforçar.
+  const expectedSecret = Deno.env.get("MAKE_WEBHOOK_SECRET");
+  if (expectedSecret) {
+    const providedSecret = req.headers.get("x-webhook-secret") ?? "";
+    if (!timingSafeEqual(providedSecret, expectedSecret)) {
+      console.warn("[Financeiro] x-webhook-secret inválido ou ausente");
+      return new Response(JSON.stringify({ error: "Não autorizado" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  } else {
+    console.warn(
+      "[Financeiro] MAKE_WEBHOOK_SECRET não configurado — webhook aberto (configurar para enforçar)"
+    );
   }
 
   try {
@@ -1607,42 +1642,48 @@ serve(async (req) => {
           `Solicitante: ${metaDados.nome_perfil}`,
         ].filter(Boolean).join("\n");
 
-        console.log(`[Transação] Criando: valor=${item.valor}, fornecedor=${item.fornecedor} (id: ${item.fornecedor_id}), data=${dataVencimento}, data_pagamento=${dataPagamentoFinal}, forma=${formaPagamentoBanco}, categoria=${item.categoria_sugerida_id}, centro_custo=${item.centro_custo_sugerido_id}, base_ministerial=${item.base_ministerial_sugerido_id}`);
+        console.log(`[Transação] Criando via fin_criar_lancamento: valor=${item.valor}, fornecedor=${item.fornecedor} (id: ${item.fornecedor_id}), data=${dataVencimento}, data_pagamento=${dataPagamentoFinal}, forma=${formaPagamentoBanco}, categoria=${item.categoria_sugerida_id}`);
 
-        const { data: tx, error } = await supabase
-          .from("transacoes_financeiras")
-          .insert({
-            descricao:
-              item.descricao ||
-              `Despesa - ${item.fornecedor || "WhatsApp"}`,
-            valor: item.valor || 0,
-            tipo: "saida",
-            tipo_lancamento: "unico",
-            data_vencimento: dataVencimento,
-            data_competencia: dataVencimento, // Competência = data do comprovante
-            status: statusTransacao,
-            data_pagamento: dataPagamentoFinal,
-            conta_id: contaPadrao.id,
-            categoria_id: item.categoria_sugerida_id,
-            subcategoria_id: item.subcategoria_sugerida_id,
-            centro_custo_id: item.centro_custo_sugerido_id,
-            base_ministerial_id: item.base_ministerial_sugerido_id,
-            fornecedor_id: item.fornecedor_id,
-            forma_pagamento: formaPagamentoBanco,
-            anexo_url: item.anexo_storage,
-            observacoes: observacoesTransacao,
-            igreja_id: igrejaId,
-            filial_id: filialIdFromWhatsApp,
-          })
-          .select("id")
-          .single();
+        const finContexto: FinContexto = {
+          igreja_id: igrejaId,
+          filial_id: filialIdFromWhatsApp,
+          ator_profile_id: metaDados.pessoa_id || membroAutorizado.id,
+          canal: "bot",
+        };
 
-        if (error) {
-          console.error(`[Transação] Erro ao criar:`, error.message, error.details);
-        }
-        if (tx) {
-          transacoesCriadas.push(tx.id);
-          console.log(`[Transação] Criada com sucesso: ${tx.id}`);
+        try {
+          const resultado = await criarLancamento(
+            supabase,
+            {
+              tipo: "saida",
+              valor: item.valor || 0,
+              data_vencimento: dataVencimento,
+              conta_id: contaPadrao.id,
+              descricao:
+                item.descricao || `Despesa - ${item.fornecedor || "WhatsApp"}`,
+              categoria_id: item.categoria_sugerida_id,
+              extras: {
+                data_competencia: dataVencimento, // Competência = data do comprovante
+                status: statusTransacao,
+                data_pagamento: dataPagamentoFinal,
+                subcategoria_id: item.subcategoria_sugerida_id,
+                centro_custo_id: item.centro_custo_sugerido_id,
+                base_ministerial_id: item.base_ministerial_sugerido_id,
+                fornecedor_id: item.fornecedor_id,
+                forma_pagamento: formaPagamentoBanco,
+                anexo_url: item.anexo_storage,
+                observacoes: observacoesTransacao,
+                filial_id: filialIdFromWhatsApp,
+              },
+            },
+            finContexto
+          );
+          if (resultado.id) {
+            transacoesCriadas.push(resultado.id);
+            console.log(`[Transação] Criada com sucesso: ${resultado.id}`);
+          }
+        } catch (err) {
+          console.error(`[Transação] Erro ao criar:`, err instanceof Error ? err.message : err);
         }
       }
 
@@ -2367,119 +2408,47 @@ serve(async (req) => {
         const categoriaId = categoriaTransferencia?.id || null;
         const dataHoje = new Date().toISOString().split("T")[0];
 
-        // Criar registro de transferência
-        const { data: transferencia, error: transfError } = await supabase
-          .from("transferencias_contas")
-          .insert({
-            conta_origem_id: metaDados.conta_origem_id,
-            conta_destino_id: metaDados.conta_destino_id,
-            valor: valorFinal,
-            data_transferencia: dataHoje,
-            data_competencia: dataHoje,
-            observacoes: `Via WhatsApp por ${metaDados.nome_perfil}`,
-            anexo_url: metaDados.anexo_comprovante || null,
-            igreja_id: igrejaId,
-            filial_id: filialIdFromWhatsApp,
-            criado_por: metaDados.pessoa_id,
-            sessao_id: sessao.id,
-          })
-          .select("id")
-          .single();
-
-        if (transfError || !transferencia) {
-          console.error("[Transferencia] Erro ao criar:", transfError);
+        // Criar transferência + par de transações + saldos numa transação
+        // atômica (fin_criar_transferencia, ADR-029)
+        let transferencia: { id: string; saida?: string; entrada?: string };
+        try {
+          const resultado = await criarTransferencia(
+            supabase,
+            {
+              conta_origem_id: metaDados.conta_origem_id,
+              conta_destino_id: metaDados.conta_destino_id,
+              valor: valorFinal,
+              data: dataHoje,
+              extras: {
+                categoria_saida_id: categoriaId,
+                categoria_entrada_id: categoriaId,
+                descricao_saida: "Transferência para conta destino",
+                descricao_entrada: "Transferência de conta origem",
+                observacoes: `Via WhatsApp por ${metaDados.nome_perfil}`,
+                anexo_url: metaDados.anexo_comprovante || null,
+                criado_por: metaDados.pessoa_id,
+                sessao_bot_id: sessao.id,
+                filial_id: filialIdFromWhatsApp,
+              },
+            },
+            {
+              igreja_id: igrejaId,
+              filial_id: filialIdFromWhatsApp,
+              ator_profile_id: metaDados.pessoa_id || membroAutorizado.id,
+              canal: "bot",
+            }
+          );
+          transferencia = {
+            id: resultado.id as string,
+            saida: resultado.transacao_saida_id as string | undefined,
+            entrada: resultado.transacao_entrada_id as string | undefined,
+          };
+        } catch (transfErr) {
+          console.error("[Transferencia] Erro ao criar:", transfErr);
           return new Response(
             JSON.stringify({ text: "❌ Erro ao criar transferência. Tente novamente." }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
-        }
-
-        // Criar transação de SAÍDA
-        const { data: txSaida } = await supabase
-          .from("transacoes_financeiras")
-          .insert({
-            descricao: `Transferência para conta destino`,
-            valor: valorFinal,
-            tipo: "saida",
-            tipo_lancamento: "unico",
-            data_vencimento: dataHoje,
-            data_competencia: dataHoje,
-            data_pagamento: dataHoje,
-            status: "pago",
-            conta_id: metaDados.conta_origem_id,
-            categoria_id: categoriaId,
-            transferencia_id: transferencia.id,
-            observacoes: `Transferência entre contas - Via WhatsApp`,
-            anexo_url: metaDados.anexo_comprovante || null,
-            igreja_id: igrejaId,
-            filial_id: filialIdFromWhatsApp,
-          })
-          .select("id")
-          .single();
-
-        // Criar transação de ENTRADA
-        const { data: txEntrada } = await supabase
-          .from("transacoes_financeiras")
-          .insert({
-            descricao: `Transferência de conta origem`,
-            valor: valorFinal,
-            tipo: "entrada",
-            tipo_lancamento: "unico",
-            data_vencimento: dataHoje,
-            data_competencia: dataHoje,
-            data_pagamento: dataHoje,
-            status: "pago",
-            conta_id: metaDados.conta_destino_id,
-            categoria_id: categoriaId,
-            transferencia_id: transferencia.id,
-            observacoes: `Transferência entre contas - Via WhatsApp`,
-            anexo_url: metaDados.anexo_comprovante || null,
-            igreja_id: igrejaId,
-            filial_id: filialIdFromWhatsApp,
-          })
-          .select("id")
-          .single();
-
-        // Atualizar transferência com os IDs das transações
-        if (txSaida && txEntrada) {
-          await supabase
-            .from("transferencias_contas")
-            .update({
-              transacao_saida_id: txSaida.id,
-              transacao_entrada_id: txEntrada.id,
-            })
-            .eq("id", transferencia.id);
-
-          // Atualizar saldos das contas manualmente
-          try {
-            const { data: contaOrigemData } = await supabase
-              .from("contas")
-              .select("saldo_atual")
-              .eq("id", metaDados.conta_origem_id)
-              .single();
-
-            if (contaOrigemData) {
-              await supabase
-                .from("contas")
-                .update({ saldo_atual: contaOrigemData.saldo_atual - valorFinal })
-                .eq("id", metaDados.conta_origem_id);
-            }
-
-            const { data: contaDestinoData } = await supabase
-              .from("contas")
-              .select("saldo_atual")
-              .eq("id", metaDados.conta_destino_id)
-              .single();
-
-            if (contaDestinoData) {
-              await supabase
-                .from("contas")
-                .update({ saldo_atual: contaDestinoData.saldo_atual + valorFinal })
-                .eq("id", metaDados.conta_destino_id);
-            }
-          } catch (saldoErr) {
-            console.error("[Transferencia] Erro ao atualizar saldos:", saldoErr);
-          }
         }
 
         // Encerrar sessão
@@ -2492,8 +2461,8 @@ serve(async (req) => {
               estado_atual: "FINALIZADO",
               resultado: "TRANSFERENCIA_CRIADA",
               transferencia_id: transferencia.id,
-              transacao_saida_id: txSaida?.id,
-              transacao_entrada_id: txEntrada?.id,
+              transacao_saida_id: transferencia.saida,
+              transacao_entrada_id: transferencia.entrada,
             },
           })
           .eq("id", sessao.id)

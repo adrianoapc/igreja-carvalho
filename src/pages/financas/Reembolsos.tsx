@@ -2,6 +2,7 @@ import { type ElementType } from "react";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { pagarReembolso } from "@/features/financeiro/core";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { Database } from "@/integrations/supabase/types";
@@ -448,50 +449,15 @@ export default function Reembolsos() {
         throw new Error("Nenhuma solicitação selecionada");
       if (!igrejaId) throw new Error("Igreja não identificada.");
 
-      // 1. Criar UMA ÚNICA transação financeira para o pagamento do reembolso (Fluxo de Caixa - ADR-001)
-      const { error: transacaoError } = await supabase
-        .from("transacoes_financeiras")
-        .insert({
-          descricao: `Reembolso - ${
-            solicitacaoSelecionada.solicitante_nome || "Solicitante"
-          }`,
-          valor: solicitacaoSelecionada.valor_total || 0,
-          tipo: "saida",
-          tipo_lancamento: "unico",
-          data_vencimento:
-            solicitacaoSelecionada.data_vencimento ||
-            new Date(dataPagamento).toISOString().split("T")[0],
-          data_pagamento: new Date(dataPagamento).toISOString().split("T")[0],
-          data_competencia: new Date(dataPagamento).toISOString().split("T")[0],
-          status: "pago",
-          conta_id: contaSaida,
-          forma_pagamento:
-            solicitacaoSelecionada.forma_pagamento_preferida || "pix",
-          solicitacao_reembolso_id: solicitacaoSelecionada.id,
-          observacoes: `Pagamento de reembolso #${solicitacaoSelecionada.id
-            ?.slice(0, 8)
-            .toUpperCase()}`,
-          igreja_id: igrejaId,
-          filial_id: !isAllFiliais ? filialId : null,
-        });
-
-      if (transacaoError) throw transacaoError;
-
-      // 2. Atualizar a solicitação como paga
-      let solicitacaoQuery = supabase
-        .from("solicitacoes_reembolso")
-        .update({
-          status: "pago",
-          data_pagamento: new Date(dataPagamento).toISOString(),
-        })
-        .eq("id", solicitacaoSelecionada.id)
-        .eq("igreja_id", igrejaId);
-      if (!isAllFiliais && filialId) {
-        solicitacaoQuery = solicitacaoQuery.eq("filial_id", filialId);
-      }
-      const { error: solicitacaoError } = await solicitacaoQuery;
-
-      if (solicitacaoError) throw solicitacaoError;
+      // Pagamento atômico via fin_pagar_reembolso (ADR-029/ADR-001):
+      // transação de caixa + status da solicitação + notificação ao
+      // solicitante numa única transação no banco (D9: admin OU tesoureiro).
+      const resultado = await pagarReembolso({
+        solicitacao_id: solicitacaoSelecionada.id,
+        conta_id: contaSaida,
+        data_pagamento: new Date(dataPagamento).toISOString().split("T")[0],
+      });
+      resultado.warnings?.forEach((w) => toast.info(w));
     },
     onSuccess: () => {
       toast.success("Reembolso pago com sucesso!");

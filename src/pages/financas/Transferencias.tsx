@@ -11,6 +11,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { estornarTransferencia } from "@/features/financeiro/core";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
@@ -101,59 +102,10 @@ export default function Transferencias() {
     try {
       const t = estornoDialog.transferencia;
 
-      // 1. Marcar transferência como estornada
-      await supabase
-        .from("transferencias_contas")
-        .update({ status: "estornada" })
-        .eq("id", t.id);
-
-      // 2. Estornar transações vinculadas (marcar como canceladas)
-      if (t.transacao_saida_id) {
-        await supabase
-          .from("transacoes_financeiras")
-          .update({ status: "cancelado" })
-          .eq("id", t.transacao_saida_id);
-      }
-
-      if (t.transacao_entrada_id) {
-        await supabase
-          .from("transacoes_financeiras")
-          .update({ status: "cancelado" })
-          .eq("id", t.transacao_entrada_id);
-      }
-
-      // 3. Reverter saldos das contas
-      // Buscar saldos atuais
-      const { data: contaOrigem } = await supabase
-        .from("contas")
-        .select("saldo_atual")
-        .eq("id", t.conta_origem_id)
-        .single();
-
-      const { data: contaDestino } = await supabase
-        .from("contas")
-        .select("saldo_atual")
-        .eq("id", t.conta_destino_id)
-        .single();
-
-      // Devolver para origem, tirar do destino
-      if (contaOrigem) {
-        await supabase
-          .from("contas")
-          .update({
-            saldo_atual: (contaOrigem.saldo_atual || 0) + Number(t.valor),
-          })
-          .eq("id", t.conta_origem_id);
-      }
-
-      if (contaDestino) {
-        await supabase
-          .from("contas")
-          .update({
-            saldo_atual: (contaDestino.saldo_atual || 0) - Number(t.valor),
-          })
-          .eq("id", t.conta_destino_id);
-      }
+      // Estorno atômico via fin_estornar_transferencia (ADR-029): cancela as
+      // transações espelho (o trigger de saldo reverte uma única vez) e marca
+      // a transferência — elimina a reversão em dobro do fluxo antigo.
+      await estornarTransferencia(t.id);
 
       toast.success("Transferência estornada com sucesso!");
       queryClient.invalidateQueries({ queryKey: ["transferencias"] });

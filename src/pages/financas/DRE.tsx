@@ -85,16 +85,21 @@ export default function DRE() {
   const { igrejaId, loading: authLoading } = useAuthContext();
   const currentYear = new Date().getFullYear();
   const [anoSelecionado, setAnoSelecionado] = useState(currentYear);
+  // Regime do DRE (F2.5/ADR-001): caixa = apenas pagos (comportamento
+  // histórico); competência = tudo que compete ao período, exceto cancelados.
+  const [regime, setRegime] = useState<"caixa" | "competencia">("caixa");
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(),
   );
 
   const { data: dreData, isLoading } = useQuery({
-    queryKey: ["dre-anual", anoSelecionado, igrejaId],
+    queryKey: ["dre-anual", anoSelecionado, regime, igrejaId],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase.rpc("get_dre_anual", {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)("get_dre_anual", {
         p_ano: anoSelecionado,
+        p_regime: regime,
       });
       if (error) throw error;
       return data as DreItem[];
@@ -227,6 +232,18 @@ export default function DRE() {
           </div>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
+          <Select
+            value={regime}
+            onValueChange={(v) => setRegime(v as "caixa" | "competencia")}
+          >
+            <SelectTrigger className="w-[150px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="caixa">Regime de Caixa</SelectItem>
+              <SelectItem value="competencia">Competência</SelectItem>
+            </SelectContent>
+          </Select>
           <Select
             value={anoSelecionado.toString()}
             onValueChange={(v) => setAnoSelecionado(Number(v))}

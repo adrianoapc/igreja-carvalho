@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { supabase } from "@/integrations/supabase/client";
+import { alterarStatusLancamento } from "@/features/financeiro/core";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -37,28 +37,15 @@ export function ConfirmarPagamentoDialog({
     try {
       setLoading(true);
 
-      const updateData: {
-        status: "pago";
-        data_pagamento: string;
-        juros: number;
-        multas: number;
-        desconto: number;
-        taxas_administrativas: number;
-      } = {
-        status: "pago",
+      // Porta única de status (fin_alterar_status_lancamento, ADR-029);
+      // o valor líquido é recalculado no banco (ADR-027).
+      await alterarStatusLancamento(transacaoId, "pago", {
         data_pagamento: format(dataPagamento, "yyyy-MM-dd"),
         juros: juros ? parseFloat(juros) : 0,
         multas: multas ? parseFloat(multas) : 0,
         desconto: desconto ? parseFloat(desconto) : 0,
         taxas_administrativas: taxasAdministrativas ? parseFloat(taxasAdministrativas) : 0,
-      };
-
-      const { error } = await supabase
-        .from("transacoes_financeiras")
-        .update(updateData)
-        .eq("id", transacaoId);
-
-      if (error) throw error;
+      });
 
       toast.success(tipo === "entrada" ? "Recebimento confirmado" : "Pagamento confirmado");
       queryClient.invalidateQueries({ queryKey: ['entradas'] });

@@ -38,8 +38,8 @@ import {
   confrontarContagens,
   SessaoContagem,
   calcularJanelaSincronizacao,
-  finalizarSessao,
 } from "@/hooks/useFinanceiroSessao";
+import { lancarSessao } from "@/features/financeiro/core";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import {
@@ -1005,8 +1005,9 @@ export default function RelatorioOferta() {
       }
       const { data: categoriaOferta } = await categoriaQuery.maybeSingle();
 
-      // Criar transações para cada forma de pagamento com valor
-      const transacoes = [];
+      // Monta itens para fin_lancar_sessao (ADR-029): conta/status/taxa são
+      // resolvidos no banco pela forma de pagamento, salvo override por item.
+      const itensSessao = [];
       for (const linha of linhasMetadata) {
         const valorNumerico =
           parseFloat(String(linha.valor).replace(",", ".")) || 0;
@@ -1015,67 +1016,32 @@ export default function RelatorioOferta() {
         const forma = formasPagamento?.find((f) => f.id === linha.formaId);
         if (!forma) continue;
 
-        // 🎯 NOVO: Buscar conta no mapeamento dinâmico
-        const mapeamentos = mapeamentosPorForma[linha.formaId];
-        const contaId = linha.contaId || mapeamentos?.[0]?.contaId;
-        if (!contaId) {
-          toast.error(
-            `Forma "${forma.nome}" não está mapeada para uma conta. ` +
-              `Configure em Financas → Formas de Pagamento`,
-          );
-          setLoading(false);
-          return;
-        }
-
-        // 🎯 NOVO: Taxa vem da forma, não do form
-        const taxaAdministrativa = forma.taxa_administrativa || 0;
-        const taxaAdministrativaFixa = forma.taxa_administrativa_fixa;
-
-        // 🎯 NOVO: Status vem da forma, não de parsing de nome
-        const status = forma.gera_pago ? "pago" : "pendente";
-        const dataPagamento = forma.gera_pago ? dataFormatada : null;
-
-        // Calcular taxa
-        let taxasAdministrativas = null;
-        if (taxaAdministrativa > 0) {
-          taxasAdministrativas = valorNumerico * (taxaAdministrativa / 100);
-        }
-        if (taxaAdministrativaFixa && taxaAdministrativaFixa > 0) {
-          taxasAdministrativas =
-            (taxasAdministrativas || 0) + taxaAdministrativaFixa;
-        }
-
-        const transacao = {
-          tipo: "entrada",
-          tipo_lancamento: "unico",
-          descricao: `${forma.is_digital ? "Digital" : "Físico"} (${forma.nome}) - Oferta - Culto ${format(
-            new Date(metadata.data_evento),
-            "dd/MM/yyyy",
-          )}`,
+        itensSessao.push({
+          forma_pagamento_id: linha.formaId,
           valor: valorNumerico,
-          data_vencimento: dataFormatada,
-          data_competencia: dataFormatada,
-          data_pagamento: dataPagamento,
-          conta_id: contaId, // ✅ Agora dinâmico
+          conta_id: linha.contaId || null,
           categoria_id: categoriaOferta?.id || null,
-          forma_pagamento: linha.formaId,
-          status: status, // ✅ Agora dinâmico
-          taxas_administrativas: taxasAdministrativas, // ✅ Agora dinâmico
           observacoes: `Lançado por: ${metadata.lancado_por}\nConferido por: ${profile?.nome}`,
-          lancado_por: userData.user?.id,
-          igreja_id: igrejaId,
-          filial_id: !isAllFiliais ? filialId : null,
-        };
-
-        transacoes.push(transacao);
+        });
       }
 
-      // Inserir todas as transações
-      const { error } = await supabase
-        .from("transacoes_financeiras")
-        .insert(transacoes);
+      if (itensSessao.length === 0) {
+        toast.error("Nenhum valor a lançar");
+        setLoading(false);
+        return;
+      }
 
-      if (error) throw error;
+      // Sessão do culto: as transações ganham sessao_id (antes o fluxo de
+      // aprovação criava transações órfãs de sessão). Não finaliza aqui.
+      const sessao = await findOrOpenSessao(dataFormatada, periodo);
+      if (!sessao?.id) {
+        toast.error("Não foi possível obter a sessão de contagem do culto");
+        setLoading(false);
+        return;
+      }
+
+      const resultado = await lancarSessao(sessao.id, itensSessao, false);
+      resultado.warnings?.forEach((w) => toast.info(w));
 
       // Marcar notificação como lida
       let notificationQuery = supabase
@@ -1089,7 +1055,7 @@ export default function RelatorioOferta() {
       await notificationQuery;
 
       toast.success(
-        `${transacoes.length} lançamento(s) criado(s) com sucesso!`,
+        `${resultado.ids?.length ?? itensSessao.length} lançamento(s) criado(s) com sucesso!`,
       );
       queryClient.invalidateQueries({ queryKey: ["entradas"] });
       queryClient.invalidateQueries({ queryKey: ["contas-resumo"] });
@@ -2240,27 +2206,20 @@ export default function RelatorioOferta() {
                           taxasAdministrativas =
                             (taxasAdministrativas || 0) + taxaFixa;
                         fisicoTransacoes.push({
-                          tipo: "entrada",
-                          tipo_lancamento: "unico",
+                          forma_pagamento_id: l.formaId,
+                          valor: valorNumerico,
+                          conta_id: contaId,
+                          categoria_id: categoriaId,
                           descricao: `Físico (${forma?.nome || "N/A"}) - ${
                             (l.tipo || "Oferta").charAt(0).toUpperCase() +
                             (l.tipo || "oferta").slice(1)
                           } - Culto ${format(dataCulto, "dd/MM/yyyy")}`,
-                          valor: valorNumerico,
-                          data_vencimento: format(dataCulto, "yyyy-MM-dd"),
-                          data_competencia: format(dataCulto, "yyyy-MM-dd"),
-                          data_pagamento: format(dataCulto, "yyyy-MM-dd"),
-                          conta_id: contaId,
-                          categoria_id: categoriaId,
-                          forma_pagamento: l.formaId,
-                          status: "pago",
+                          status: "pago" as const,
                           taxas_administrativas: taxasAdministrativas,
                           observacoes: `Lançado por: ${profile?.nome}`,
-                          lancado_por: profile?.user_id,
-                          igreja_id: igrejaId,
-                          filial_id: !isAllFiliais ? filialId : null,
                           pessoa_id: l.pessoaId || null,
                           origem_registro: "manual",
+                          data_pagamento: format(dataCulto, "yyyy-MM-dd"),
                         });
                       }
 
@@ -2289,20 +2248,15 @@ export default function RelatorioOferta() {
                         const contaId =
                           d.contaId || contaMap?.[0]?.contaId || null;
                         digitaisTransacoes.push({
-                          tipo: "entrada",
-                          tipo_lancamento: "unico",
+                          forma_pagamento_id: d.formaId,
+                          valor: valorNumerico,
+                          conta_id: contaId,
+                          categoria_id: d.categoriaId || idDigitalCfg,
                           descricao: `Digital (${forma?.nome || "N/A"}) - Culto ${format(
                             dataCulto,
                             "dd/MM/yyyy",
                           )}`,
-                          valor: valorNumerico,
-                          data_vencimento: format(dataCulto, "yyyy-MM-dd"),
-                          data_competencia: format(dataCulto, "yyyy-MM-dd"),
-                          data_pagamento: format(dataCulto, "yyyy-MM-dd"),
-                          conta_id: contaId,
-                          categoria_id: d.categoriaId || idDigitalCfg,
-                          forma_pagamento: d.formaId,
-                          status: "pago",
+                          status: "pago" as const,
                           taxas_administrativas: forma
                             ? Number(forma.taxa_administrativa || 0) > 0
                               ? valorNumerico *
@@ -2310,11 +2264,9 @@ export default function RelatorioOferta() {
                               : null
                             : null,
                           observacoes: `Digital (${d.origem})`,
-                          lancado_por: profile?.user_id,
-                          igreja_id: igrejaId,
-                          filial_id: !isAllFiliais ? filialId : null,
                           pessoa_id: d.pessoaId || null,
                           origem_registro: d.origem,
+                          data_pagamento: format(dataCulto, "yyyy-MM-dd"),
                         });
                       }
 
@@ -2328,27 +2280,23 @@ export default function RelatorioOferta() {
                         return;
                       }
 
-                      // Anexa sessão ao lançamento para consulta posterior
-                      const payload = todas.map((t) => ({
-                        ...t,
-                        sessao_id: sessao?.id || null,
-                      }));
-
-                      const { error } = await supabase
-                        .from("transacoes_financeiras")
-                        .insert(payload);
-                      if (error) throw error;
-
-                      // Limpa rascunho ao encerrar
-                      if (sessao?.id) {
-                        await supabase
-                          .from("sessoes_itens_draft")
-                          .delete()
-                          .eq("sessao_id", sessao.id);
-
-                        // Marca sessão como finalizada
-                        await finalizarSessao(sessao.id);
+                      if (!sessao?.id) {
+                        toast.error(
+                          "Sessão de contagem não encontrada — reabra o relatório",
+                        );
+                        setLoading(false);
+                        return;
                       }
+
+                      // Lote atômico via fin_lancar_sessao (ADR-029): cria as
+                      // transações com sessao_id, limpa rascunhos e finaliza
+                      // a sessão numa única transação no banco.
+                      const resultado = await lancarSessao(
+                        sessao.id,
+                        todas,
+                        true,
+                      );
+                      resultado.warnings?.forEach((w) => toast.info(w));
                       toast.success(`${todas.length} lançamento(s) criado(s)!`);
                       queryClient.invalidateQueries({
                         queryKey: ["sessoes-contagem"],

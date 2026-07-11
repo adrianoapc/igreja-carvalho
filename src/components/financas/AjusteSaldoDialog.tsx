@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { supabase } from "@/integrations/supabase/client";
+import { ajustarSaldo } from "@/features/financeiro/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -48,31 +48,23 @@ export function AjusteSaldoDialog({ open, onOpenChange, conta }: AjusteSaldoDial
         return;
       }
       const valorNumerico = parseFloat(valor.replace(',', '.')) || 0;
-      const novoSaldo = tipoAjuste === "entrada" 
-        ? conta.saldo_atual + valorNumerico
-        : conta.saldo_atual - valorNumerico;
 
-      let updateQuery = supabase
-        .from('contas')
-        .update({
-          saldo_atual: novoSaldo,
-          observacoes: conta.observacoes 
-            ? `${conta.observacoes}\n\nAjuste ${format(data, 'dd/MM/yyyy', { locale: ptBR })}: ${tipoAjuste === "entrada" ? "+" : "-"}R$ ${valor} - ${descricao}`
-            : `Ajuste ${format(data, 'dd/MM/yyyy', { locale: ptBR })}: ${tipoAjuste === "entrada" ? "+" : "-"}R$ ${valor} - ${descricao}`
-        })
-        .eq('id', String(conta.id))
-        .eq('igreja_id', igrejaId);
-      if (!isAllFiliais && filialId) {
-        updateQuery = updateQuery.eq('filial_id', filialId);
-      }
-
-      const { error } = await updateQuery;
-
-      if (error) throw error;
+      // Ajuste auditável via fin_ajustar_saldo (ADR-029): cria lançamento na
+      // categoria "Ajuste de Saldo" e o trigger move o saldo — substitui o
+      // UPDATE direto de contas.saldo_atual, que não deixava trilha.
+      await ajustarSaldo({
+        conta_id: String(conta.id),
+        valor: valorNumerico,
+        tipo: tipoAjuste,
+        motivo: descricao || undefined,
+        data: format(data, 'yyyy-MM-dd'),
+      });
 
       toast.success("Saldo ajustado com sucesso!");
       queryClient.invalidateQueries({ queryKey: ['contas'] });
       queryClient.invalidateQueries({ queryKey: ['contas-resumo'] });
+      queryClient.invalidateQueries({ queryKey: ['entradas'] });
+      queryClient.invalidateQueries({ queryKey: ['saidas'] });
       onOpenChange(false);
       
       // Reset form

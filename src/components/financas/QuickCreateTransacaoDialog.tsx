@@ -5,6 +5,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { criarLancamento } from "@/features/financeiro/core";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -120,31 +121,27 @@ export function QuickCreateTransacaoDialog({
     mutationFn: async (values: FormValues) => {
       if (!extratoItem || !igrejaId) throw new Error("Dados incompletos.");
 
-      const { data: transacaoData, error: transacaoError } = await supabase
-        .from("transacoes_financeiras")
-        .insert({
-          descricao: values.descricao,
-          valor: values.valor,
-          data_pagamento: values.data_pagamento,
-          data_vencimento: values.data_pagamento,
-          data_competencia: values.data_pagamento,
-          conta_id: values.conta_id,
-          categoria_id: values.categoria_id,
-          igreja_id: igrejaId,
-          tipo: extratoItem.tipo === "credit" ? "entrada" : "saida",
-          tipo_lancamento: "unico",
+      // Criação via CORE (fin_criar_lancamento, ADR-029); o vínculo com o
+      // extrato permanece direto até a F3 (fin_confirmar_conciliacao).
+      const resultado = await criarLancamento({
+        tipo: extratoItem.tipo === "credit" ? "entrada" : "saida",
+        valor: values.valor,
+        data_vencimento: values.data_pagamento,
+        conta_id: values.conta_id,
+        descricao: values.descricao,
+        categoria_id: values.categoria_id,
+        extras: {
           status: "pago",
-        })
-        .select("id")
-        .single();
-
-      if (transacaoError) throw transacaoError;
+          data_pagamento: values.data_pagamento,
+          data_competencia: values.data_pagamento,
+        },
+      });
 
       const { error: extratoError } = await supabase
         .from("extratos_bancarios")
         .update({
           reconciliado: true,
-          transacao_vinculada_id: transacaoData.id,
+          transacao_vinculada_id: resultado.id,
         })
         .eq("id", extratoItem.id);
 
