@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { callFinRpc } from "@/features/financeiro/core";
 import {
   addMonths,
   format,
@@ -39,66 +39,35 @@ export default function Projecao() {
   const { formatValue } = useHideValues();
   const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
 
-  // Buscar transações dos últimos 12 meses para análise
-  const { data: historicoTransacoes } = useQuery({
-    queryKey: [
-      "historico-transacoes-12meses",
-      igrejaId,
-      filialId,
-      isAllFiliais,
-    ],
+  // Agregado mensal no servidor (fin_projecao_mensal, F2.5/ADR-029):
+  // realizado por data_pagamento × previsto por data_vencimento — elimina o
+  // tráfego de linhas cruas e o teto de 1000 linhas do PostgREST.
+  const { data: projecaoMensal } = useQuery({
+    queryKey: ["fin-projecao-mensal", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      if (!igrejaId) return [];
-      const dataInicio = subMonths(new Date(), 12);
-
-      let query = supabase
-        .from("transacoes_financeiras")
-        .select("*")
-        .eq("status", "pago")
-        .eq("igreja_id", igrejaId)
-        .gte("data_pagamento", dataInicio.toISOString().split("T")[0])
-        .order("data_pagamento");
-      if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
-      }
-      const { data, error } = await query;
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !loading && !!igrejaId,
-  });
-
-  // Buscar transações futuras (pendentes)
-  const { data: transacoesFuturas } = useQuery({
-    queryKey: ["transacoes-futuras", igrejaId, filialId, isAllFiliais],
-    queryFn: async () => {
-      if (!igrejaId) return [];
-      const hoje = new Date();
-
-      let query = supabase
-        .from("transacoes_financeiras")
-        .select("*")
-        .eq("status", "pendente")
-        .eq("igreja_id", igrejaId)
-        .gte("data_vencimento", hoje.toISOString().split("T")[0])
-        .order("data_vencimento");
-      if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
-      }
-      const { data, error } = await query;
-
-      if (error) throw error;
-      return data;
+      const resultado = await callFinRpc("fin_projecao_mensal", {
+        p_meses_historico: 12,
+        p_meses_futuro: 6,
+        p_filial_id: !isAllFiliais && filialId ? filialId : null,
+      });
+      return resultado as unknown as {
+        mes: string;
+        tipo: string;
+        realizado: number;
+        previsto: number;
+      }[];
     },
     enabled: !loading && !!igrejaId,
   });
 
   const formatCurrency = (value: number) => formatValue(value);
 
-  // Calcular médias mensais baseadas no histórico
+  // Calcular médias mensais baseadas no histórico agregado
   const calcularMediasMensais = () => {
-    if (!historicoTransacoes || historicoTransacoes.length === 0) {
+    const historico = (projecaoMensal || []).filter(
+      (r) => Number(r.realizado) > 0,
+    );
+    if (historico.length === 0) {
       return { mediaEntradas: 0, mediaSaidas: 0 };
     }
 
@@ -106,14 +75,12 @@ export default function Projecao() {
     let totalEntradas = 0;
     let totalSaidas = 0;
 
-    historicoTransacoes.forEach((t) => {
-      const mesAno = format(new Date(t.data_pagamento!), "yyyy-MM");
-      mesesUnicos.add(mesAno);
-
-      if (t.tipo === "entrada") {
-        totalEntradas += Number(t.valor);
+    historico.forEach((r) => {
+      mesesUnicos.add(r.mes);
+      if (r.tipo === "entrada") {
+        totalEntradas += Number(r.realizado);
       } else {
-        totalSaidas += Number(t.valor);
+        totalSaidas += Number(r.realizado);
       }
     });
 
@@ -135,23 +102,18 @@ export default function Projecao() {
     for (let i = 0; i < 6; i++) {
       const mes = addMonths(hoje, i);
       const mesAno = format(mes, "MMM/yy", { locale: ptBR });
-      const inicioMes = startOfMonth(mes);
-      const fimMes = endOfMonth(mes);
+      const chaveMes = format(startOfMonth(mes), "yyyy-MM-dd");
 
-      // Transações confirmadas para este mês
-      const transacoesMes =
-        transacoesFuturas?.filter((t) => {
-          const dataVenc = new Date(t.data_vencimento);
-          return dataVenc >= inicioMes && dataVenc <= fimMes;
-        }) || [];
-
-      const entradasConfirmadas = transacoesMes
-        .filter((t) => t.tipo === "entrada")
-        .reduce((sum, t) => sum + Number(t.valor), 0);
-
-      const saidasConfirmadas = transacoesMes
-        .filter((t) => t.tipo === "saida")
-        .reduce((sum, t) => sum + Number(t.valor), 0);
+      // Compromissos pendentes já agendados para este mês
+      const linhasMes = (projecaoMensal || []).filter((r) =>
+        r.mes.startsWith(chaveMes),
+      );
+      const entradasConfirmadas = linhasMes
+        .filter((r) => r.tipo === "entrada")
+        .reduce((sum, r) => sum + Number(r.previsto), 0);
+      const saidasConfirmadas = linhasMes
+        .filter((r) => r.tipo === "saida")
+        .reduce((sum, r) => sum + Number(r.previsto), 0);
 
       // Projeção baseada em médias históricas + confirmadas
       const entradasProjetadas =

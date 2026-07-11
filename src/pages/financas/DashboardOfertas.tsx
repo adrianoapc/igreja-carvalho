@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { callFinRpc } from "@/features/financeiro/core";
 import {
   ArrowLeft,
   TrendingUp,
@@ -76,66 +77,32 @@ export default function DashboardOfertas() {
 
   const datas = getDatasIntervalo();
 
-  const { data: transacoes, isLoading } = useQuery({
+  // Agregado no servidor (fin_ofertas_periodo, F2.5/ADR-029): filtro
+  // ESTRUTURAL (sessao_id ou categoria de oferta/dízimo) no lugar do frágil
+  // ilike em descricao; dia×forma×conta já somados — sem teto de 1000 linhas.
+  const { data: ofertasAgregadas, isLoading } = useQuery({
     queryKey: [
       "ofertas-dashboard",
-      selectedMonth,
-      customRange,
+      datas.inicio,
+      datas.fim,
       igrejaId,
       filialId,
       isAllFiliais,
     ],
     queryFn: async () => {
-      if (!igrejaId) return [];
-      let query = supabase
-        .from("transacoes_financeiras")
-        .select("*")
-        .eq("tipo", "entrada")
-        .ilike("descricao", "%oferta%")
-        .gte("data_vencimento", datas.inicio)
-        .lte("data_vencimento", datas.fim)
-        .eq("igreja_id", igrejaId)
-        .order("data_vencimento", { ascending: false });
-      if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
-      }
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      // Buscar formas e contas separadamente
-      if (!data || data.length === 0) return [];
-
-      const formaIds = [
-        ...new Set(data.map((t) => t.forma_pagamento).filter(Boolean)),
-      ];
-      const contaIds = [
-        ...new Set(data.map((t) => t.conta_id).filter(Boolean)),
-      ];
-
-      const [formasRes, contasRes] = await Promise.all([
-        formaIds.length > 0
-          ? supabase
-              .from("formas_pagamento")
-              .select("id, nome")
-              .in("id", formaIds)
-          : { data: [], error: null },
-        contaIds.length > 0
-          ? supabase.from("contas").select("id, nome").in("id", contaIds)
-          : { data: [], error: null },
-      ]);
-
-      const formasMap = new Map((formasRes.data || []).map((f) => [f.id, f]));
-      const contasMap = new Map((contasRes.data || []).map((c) => [c.id, c]));
-
-      // Enriquecer os dados
-      return data.map((t) => ({
-        ...t,
-        formas_pagamento: t.forma_pagamento
-          ? formasMap.get(t.forma_pagamento)
-          : null,
-        contas: t.conta_id ? contasMap.get(t.conta_id) : null,
-      }));
+      const resultado = await callFinRpc("fin_ofertas_periodo", {
+        p_inicio: datas.inicio,
+        p_fim: datas.fim,
+        p_filial_id: !isAllFiliais && filialId ? filialId : null,
+      });
+      return resultado as unknown as {
+        dia: string;
+        forma_pagamento_id: string | null;
+        forma_nome: string;
+        conta_nome: string;
+        total: number;
+        quantidade: number;
+      }[];
     },
     enabled: !!igrejaId && !filialLoading,
   });
@@ -164,7 +131,7 @@ export default function DashboardOfertas() {
   });
 
   const processarDados = () => {
-    if (!transacoes || transacoes.length === 0) {
+    if (!ofertasAgregadas || ofertasAgregadas.length === 0) {
       return {
         totalGeral: 0,
         porFormaPagamento: [],
@@ -176,13 +143,15 @@ export default function DashboardOfertas() {
     }
 
     // Total geral
-    const totalGeral = transacoes.reduce((acc, t) => acc + Number(t.valor), 0);
+    const totalGeral = ofertasAgregadas.reduce(
+      (acc, t) => acc + Number(t.total),
+      0,
+    );
 
     // Por forma de pagamento
     const porForma: Record<string, number> = {};
-    transacoes.forEach((t) => {
-      const forma = t.formas_pagamento?.nome || "Não especificado";
-      porForma[forma] = (porForma[forma] || 0) + Number(t.valor);
+    ofertasAgregadas.forEach((t) => {
+      porForma[t.forma_nome] = (porForma[t.forma_nome] || 0) + Number(t.total);
     });
 
     const porFormaPagamento = Object.entries(porForma).map(([name, value]) => ({
@@ -192,9 +161,9 @@ export default function DashboardOfertas() {
 
     // Por conta
     const porContaMap: Record<string, number> = {};
-    transacoes.forEach((t) => {
-      const conta = t.contas?.nome || "Sem conta";
-      porContaMap[conta] = (porContaMap[conta] || 0) + Number(t.valor);
+    ofertasAgregadas.forEach((t) => {
+      porContaMap[t.conta_nome] =
+        (porContaMap[t.conta_nome] || 0) + Number(t.total);
     });
 
     const porConta = Object.entries(porContaMap).map(([name, value]) => ({
@@ -205,17 +174,15 @@ export default function DashboardOfertas() {
     // Evolução temporal - agrupado por dia
     const evolucaoMap: Record<string, Record<string, number>> = {};
 
-    transacoes.forEach((t) => {
-      const data = parseISO(t.data_vencimento);
-      const chave = format(data, "dd/MM", { locale: ptBR });
+    ofertasAgregadas.forEach((t) => {
+      const chave = format(parseISO(t.dia), "dd/MM", { locale: ptBR });
 
       if (!evolucaoMap[chave]) {
         evolucaoMap[chave] = {};
       }
 
-      const forma = t.formas_pagamento?.nome || "Não especificado";
-      evolucaoMap[chave][forma] =
-        (evolucaoMap[chave][forma] || 0) + Number(t.valor);
+      evolucaoMap[chave][t.forma_nome] =
+        (evolucaoMap[chave][t.forma_nome] || 0) + Number(t.total);
     });
 
     const evolucaoMensal = Object.entries(evolucaoMap)
@@ -280,10 +247,7 @@ export default function DashboardOfertas() {
   }
 
   const formasPagamento = Array.from(
-    new Set(
-      transacoes?.map((t) => t.formas_pagamento?.nome || "Não especificado") ||
-        []
-    )
+    new Set(ofertasAgregadas?.map((t) => t.forma_nome) || []),
   );
 
   return (
@@ -342,7 +306,11 @@ export default function DashboardOfertas() {
               {formatValue(dados.totalGeral)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {transacoes?.length || 0} registros
+              {ofertasAgregadas?.reduce(
+                (acc, t) => acc + Number(t.quantidade),
+                0,
+              ) || 0}{" "}
+              registros
             </p>
           </CardContent>
         </Card>

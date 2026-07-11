@@ -98,70 +98,38 @@ export function RelatorioCobertura() {
       const dataInicio = format(startOfMonth(subMonths(new Date(), parseInt(periodoMeses))), "yyyy-MM-dd");
       const dataFim = format(endOfMonth(new Date()), "yyyy-MM-dd");
       
+      // Agregado no servidor via view_reconciliacao_cobertura
+      // (F2.5/ADR-029) — antes lia linhas cruas de extratos_bancarios e
+      // agregava no navegador, sujeito ao teto de 1000 linhas.
       let query = supabase
-        .from("extratos_bancarios")
-        .select(`
-          id,
-          conta_id,
-          data_transacao,
-          valor,
-          reconciliado,
-          contas!inner(nome)
-        `)
+        .from("view_reconciliacao_cobertura")
+        .select("*")
         .eq("igreja_id", igrejaId)
-        .gte("data_transacao", dataInicio)
-        .lte("data_transacao", dataFim);
-      
+        .gte("periodo", dataInicio)
+        .lte("periodo", dataFim);
+
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
-      
+
       if (contaFiltro !== "all") {
         query = query.eq("conta_id", contaFiltro);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
-      
-      // Processar dados para agrupar por mês e conta
-      const grouped = (data || []).reduce((acc, item) => {
-        const periodo = format(new Date(item.data_transacao), "yyyy-MM");
-        const key = `${periodo}-${item.conta_id}`;
-        
-        if (!acc[key]) {
-          acc[key] = {
-            periodo,
-            conta_id: item.conta_id,
-            conta_nome: (item.contas as any)?.nome || "Sem conta",
-            total_extratos: 0,
-            extratos_reconciliados: 0,
-            extratos_pendentes: 0,
-            valor_total: 0,
-            valor_reconciliado: 0,
-            valor_pendente: 0,
-          };
-        }
-        
-        acc[key].total_extratos++;
-        acc[key].valor_total += Math.abs(Number(item.valor));
-        
-        if (item.reconciliado) {
-          acc[key].extratos_reconciliados++;
-          acc[key].valor_reconciliado += Math.abs(Number(item.valor));
-        } else {
-          acc[key].extratos_pendentes++;
-          acc[key].valor_pendente += Math.abs(Number(item.valor));
-        }
-        
-        return acc;
-      }, {} as Record<string, any>);
-      
-      // Calcular percentuais
-      return Object.values(grouped).map((item: any) => ({
-        ...item,
-        percentual_cobertura: item.total_extratos > 0 
-          ? Math.round((item.extratos_reconciliados / item.total_extratos) * 100) 
-          : 0,
+
+      return (data || []).map((item) => ({
+        periodo: format(new Date(item.periodo as string), "yyyy-MM"),
+        conta_id: item.conta_id,
+        conta_nome: item.conta_nome || "Sem conta",
+        total_extratos: Number(item.total_extratos),
+        extratos_reconciliados: Number(item.extratos_reconciliados),
+        extratos_pendentes: Number(item.extratos_pendentes),
+        valor_total: Number(item.valor_total),
+        valor_reconciliado: Number(item.valor_reconciliado || 0),
+        valor_pendente: Number(item.valor_pendente || 0),
+        percentual_cobertura: Math.round(Number(item.percentual_cobertura || 0)),
       })) as CoberturaData[];
     },
     enabled: !igrejaLoading && !filialLoading && !!igrejaId,

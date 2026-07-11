@@ -14,6 +14,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { callFinRpc } from "@/features/financeiro/core";
 import {
   startOfMonth,
   endOfMonth,
@@ -182,37 +183,22 @@ export default function Dashboard() {
     enabled: !loading && !!igrejaId,
   });
 
-  // Dados do mês anterior
-  const { data: transacoesMesAnterior } = useQuery({
+  // Totais do mês anterior agregados no servidor (fin_resumo_periodo,
+  // F2.5/ADR-029) — só o comparativo precisa deles, não das linhas cruas.
+  const { data: resumoMesAnterior } = useQuery({
     queryKey: ["dashboard-mes-anterior", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      if (!igrejaId) return [];
-      let query = supabase
-        .from("transacoes_financeiras")
-        .select(
-          `
-          *,
-          solicitacao_reembolso:solicitacao_reembolso_id(status)
-        `,
-        )
-        .eq("igreja_id", igrejaId)
-        .gte("data_vencimento", formatLocalDate(startOfMonthLocal(mesAnterior)))
-        .lte("data_vencimento", formatLocalDate(endOfMonthLocal(mesAnterior)));
-      if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
-      }
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      // Filtrar: exclui transações de reembolso que NÃO estão pagas
-      return (
-        data?.filter(
-          (t) =>
-            !t.solicitacao_reembolso_id ||
-            t.solicitacao_reembolso?.status === "pago",
-        ) || []
-      );
+      const resultado = await callFinRpc("fin_resumo_periodo", {
+        p_inicio: formatLocalDate(startOfMonthLocal(mesAnterior)),
+        p_fim: formatLocalDate(endOfMonthLocal(mesAnterior)),
+        p_filial_id: !isAllFiliais && filialId ? filialId : null,
+      });
+      return resultado as unknown as {
+        tipo: string;
+        status: string;
+        total: number;
+        quantidade: number;
+      }[];
     },
     enabled: !loading && !!igrejaId,
   });
@@ -382,15 +368,15 @@ export default function Dashboard() {
       .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
   const saldoMesAtual = receitasMesAtual - despesasMesAtual;
 
-  // Cálculos do mês anterior
+  // Cálculos do mês anterior (agregado do servidor)
   const receitasMesAnterior =
-    transacoesMesAnterior
-      ?.filter((t) => t.tipo === "entrada")
-      .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+    resumoMesAnterior
+      ?.filter((r) => r.tipo === "entrada")
+      .reduce((sum, r) => sum + Number(r.total), 0) || 0;
   const despesasMesAnterior =
-    transacoesMesAnterior
-      ?.filter((t) => t.tipo === "saida")
-      .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+    resumoMesAnterior
+      ?.filter((r) => r.tipo === "saida")
+      .reduce((sum, r) => sum + Number(r.total), 0) || 0;
 
   // Variações percentuais
   const variacaoReceitas =
