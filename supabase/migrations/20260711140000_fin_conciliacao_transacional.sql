@@ -132,10 +132,11 @@ BEGIN
       v_valor_trx numeric := COALESCE((SELECT valor FROM public.transacoes_financeiras WHERE id = v_transacao_ids[1]), 0);
       v_soma_ext numeric := COALESCE((SELECT SUM(valor) FROM public.extratos_bancarios WHERE id = ANY(v_extrato_ids)), 0);
     BEGIN
+      -- diferenca é GENERATED ALWAYS (valor_transacao - valor_extratos): não inserir.
       INSERT INTO public.conciliacoes_lote
-        (transacao_id, igreja_id, filial_id, conta_id, valor_transacao, valor_extratos, diferenca, status, created_by)
+        (transacao_id, igreja_id, filial_id, conta_id, valor_transacao, valor_extratos, status, created_by)
       VALUES (v_transacao_ids[1], v_igreja, NULLIF(v_ctx ->> 'filial_id','')::uuid, v_conta,
-              v_valor_trx, v_soma_ext, abs(v_soma_ext - v_valor_trx),
+              v_valor_trx, v_soma_ext,
               -- preserva a distinção do fluxo antigo: balanceado × discrepância
               CASE WHEN abs(v_soma_ext - v_valor_trx) < 0.01 THEN 'conciliada' ELSE 'discrepancia' END,
               (v_ctx ->> 'ator_user_id')::uuid)
@@ -207,12 +208,16 @@ BEGIN
   END LOOP;
 
   -- ── Auditoria (reconciliacao_audit_logs por par + ML feedback + fin_audit) ──
+  -- tipo_reconciliacao restrito ao CHECK (automatica|manual|lote|desconciliacao);
+  -- o formato fino (1:1/N:1/1:N) vai em metadata.tipo_match.
   INSERT INTO public.reconciliacao_audit_logs
     (extrato_id, transacao_id, conta_id, igreja_id, filial_id, acao,
      tipo_reconciliacao, score, valor_extrato, valor_transacao, diferenca,
      conciliacao_lote_id, usuario_id, metadata)
   SELECT e_id, t_id, v_conta, v_igreja, NULLIF(v_ctx ->> 'filial_id','')::uuid,
-         'conciliacao', v_tipo_match, v_score,
+         'conciliacao',
+         CASE WHEN v_tipo_match = 'N:1' THEN 'lote' ELSE 'manual' END,
+         v_score,
          (SELECT valor FROM public.extratos_bancarios WHERE id = e_id),
          (SELECT valor FROM public.transacoes_financeiras WHERE id = t_id),
          NULL, v_lote_id, NULLIF(v_ctx ->> 'ator_profile_id','')::uuid,
