@@ -82,10 +82,14 @@ BEGIN
   --      TODAS as filiais quando escolhe "Todas" (p_filial_id NULL), mesmo tendo
   --      uma filial default no JWT — não pode ser estreitado ao default.
   -- p_filial_id explícito é sempre validado por has_filial_access.
+  -- Papel amplo é POR IGREJA (user_roles.igreja_id); igreja_id NULL = papel
+  -- global (super_admin). Sem o recorte por igreja, um usuário admin na igreja A
+  -- e restrito a uma filial na igreja B veria todas as filiais de B.
   v_pode_todas := auth.uid() IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.user_roles ur
      WHERE ur.user_id = auth.uid()
        AND ur.role::text IN ('admin', 'admin_igreja', 'super_admin')
+       AND (ur.igreja_id = v_igreja OR ur.igreja_id IS NULL)
   );
   IF p_filial_id IS NOT NULL THEN
     IF NOT public.has_filial_access(v_igreja, p_filial_id) THEN

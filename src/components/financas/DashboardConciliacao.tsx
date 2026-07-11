@@ -125,6 +125,26 @@ async function fetchSugestoes1x1(
   return out;
 }
 
+/**
+ * Janela de candidatos derivada dos extratos pendentes VISÍVEIS (a lista do
+ * dashboard não tem corte de data). Sem isso, um extrato mais antigo que a
+ * janela fixa nunca receberia sugestão nem seria auto-conciliado.
+ */
+function periodoDosExtratos(
+  extratos: Array<{ data_transacao?: string | null }>,
+): { inicio: string; fim: string } {
+  const hoje = format(new Date(), "yyyy-MM-dd");
+  const datas = extratos
+    .map((e) => e.data_transacao)
+    .filter((d): d is string => !!d)
+    .sort();
+  if (datas.length === 0) {
+    return { inicio: format(subDays(new Date(), 90), "yyyy-MM-dd"), fim: hoje };
+  }
+  const maxData = datas[datas.length - 1];
+  return { inicio: datas[0], fim: maxData > hoje ? maxData : hoje };
+}
+
 export function DashboardConciliacao() {
   const { formatValue } = useHideValues();
   const { igrejaId, loading: igrejaLoading } = useIgrejaId();
@@ -313,8 +333,7 @@ export function DashboardConciliacao() {
         ? [selectedContaId]
         : [...new Set(extratosPendentes.map((e) => e.conta_id))];
 
-      const periodoInicio = format(subDays(new Date(), 90), "yyyy-MM-dd");
-      const periodoFim = format(new Date(), "yyyy-MM-dd");
+      const { inicio: periodoInicio, fim: periodoFim } = periodoDosExtratos(extratosPendentes);
       const allSugestoes = await fetchSugestoes1x1(contaIds, periodoInicio, periodoFim, isAllFiliais ? null : filialId);
 
       // Create map with best suggestion per extrato
@@ -346,8 +365,7 @@ export function DashboardConciliacao() {
 
     try {
       // Candidatos 1:1 pelo motor único (F4).
-      const periodoInicio = format(subDays(new Date(), 90), "yyyy-MM-dd");
-      const periodoFim = format(new Date(), "yyyy-MM-dd");
+      const { inicio: periodoInicio, fim: periodoFim } = periodoDosExtratos(extratosPendentes);
       const allMatches = await fetchSugestoes1x1(contaIds, periodoInicio, periodoFim, isAllFiliais ? null : filialId);
 
       if (allMatches.length === 0) {

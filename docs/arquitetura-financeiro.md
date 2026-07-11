@@ -730,6 +730,12 @@ p_score_minimo, p_contexto)`.
   client-side antiga sugeria pendentes e `fin_confirmar_conciliacao` faz a baixa
   `pendente→pago` — sem isso a substituição do motor regrediria o fluxo.
   (3 × P2 da 4ª rodada.)
+- **Papel amplo é por igreja**: o `v_pode_todas` recorta `user_roles` por
+  `igreja_id = v_igreja` (ou NULL global) — sem isso um usuário admin na igreja A
+  e restrito a uma filial na igreja B veria todas as filiais de B. O
+  `DashboardConciliacao` deriva a janela de candidatos dos extratos pendentes
+  visíveis (a lista não tem corte de data) em vez de fixar 90 dias, senão um
+  extrato antigo nunca receberia sugestão. (P1/P2 da 5ª rodada.)
 - **Frontend migrado**: `ConciliacaoManual` e `DashboardConciliacao` trocam
   `reconciliar_transacoes`→motor único e `aplicar_conciliacao`→
   `fin_confirmar_conciliacao` (F3, transacional, com baixa `pendente→pago` e
