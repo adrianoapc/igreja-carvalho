@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { confirmarConciliacao } from "@/features/financeiro/core";
 import { toast } from "sonner";
 import { format, parseISO, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -165,91 +166,20 @@ export function DividirExtratoDialog({
 
     setLoading(true);
     try {
-      // Get current user
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      // Create divisao record
-      const { data: divisao, error: divisaoError } = await supabase
-        .from("conciliacoes_divisao")
-        .insert({
-          extrato_id: extrato.id,
-          igreja_id: igrejaId,
-          filial_id: filialId || null,
-          conta_id: extrato.conta_id,
-          valor_extrato: Math.abs(extrato.valor),
-          status: "conciliada",
-          created_by: user?.id,
-        })
-        .select("id")
-        .single();
-
-      if (divisaoError) {
-        console.error("Erro ao criar divisão:", divisaoError);
-        throw divisaoError;
-      }
-
-      // Create transaction links
-      const transacoesLinks = Array.from(selectedTransacoes.entries()).map(
-        ([transacaoId, item]) => ({
-          conciliacao_divisao_id: divisao.id,
-          transacao_id: transacaoId,
-          valor: item.valor,
-        })
-      );
-
-      const { error: linksError } = await supabase
-        .from("conciliacoes_divisao_transacoes")
-        .insert(transacoesLinks);
-
-      if (linksError) {
-        console.error("Erro ao vincular transações:", linksError);
-        throw linksError;
-      }
-
-      const { error: extratoError } = await supabase
-        .from("extratos_bancarios")
-        .update({ reconciliado: true })
-        .eq("id", extrato.id);
-
-      if (extratoError) {
-        console.error("Erro ao marcar extrato conciliado:", extratoError);
-        throw extratoError;
-      }
-
-      const transacaoIds = Array.from(selectedTransacoes.keys());
-      if (transacaoIds.length > 0) {
-        const { error: transacoesError } = await supabase
-          .from("transacoes_financeiras")
-          .update({ conciliacao_status: "conciliado_extrato" })
-          .in("id", transacaoIds);
-
-        if (transacoesError) {
-          console.error("Erro ao marcar transações conciliadas:", transacoesError);
-          throw transacoesError;
-        }
-
-        // Sincronizar transferências: para cada entrada conciliada, sincronizar saída
-        const { data: transacoesConciliadas } = await supabase
-          .from("transacoes_financeiras")
-          .select("id, tipo, transferencia_id")
-          .in("id", transacaoIds);
-
-        if (transacoesConciliadas && transacoesConciliadas.length > 0) {
-          const transferenciasIds = transacoesConciliadas
-            .filter((t: any) => t.tipo === "entrada" && t.transferencia_id)
-            .map((t: any) => t.transferencia_id);
-
-          if (transferenciasIds.length > 0) {
-            await supabase
-              .from("transacoes_financeiras")
-              .update({ conciliacao_status: "conciliado_extrato" })
-              .in("transferencia_id", transferenciasIds)
-              .eq("tipo", "saida");
-          }
-        }
-      }
+      // Divisão 1:N atômica via fin_confirmar_conciliacao (ADR-030/F3):
+      // cria a divisão, vincula as transações com o valor parcial, marca o
+      // extrato e concilia as transações (+ irmã de transferência) numa
+      // única transação — substitui os ~5 updates sequenciais deste fluxo.
+      await confirmarConciliacao({
+        extrato_ids: [extrato.id],
+        transacao_ids: Array.from(selectedTransacoes.keys()),
+        divisoes: Array.from(selectedTransacoes.entries()).map(
+          ([transacaoId, item]) => ({
+            transacao_id: transacaoId,
+            valor: item.valor,
+          }),
+        ),
+      });
 
       toast.success(
         `Extrato dividido em ${selectedTransacoes.size} transações`
@@ -260,7 +190,9 @@ export function DividirExtratoDialog({
       onSuccess();
     } catch (err) {
       console.error("Erro ao dividir extrato:", err);
-      toast.error("Erro ao dividir extrato");
+      toast.error(
+        err instanceof Error ? err.message : "Erro ao dividir extrato",
+      );
     } finally {
       setLoading(false);
     }

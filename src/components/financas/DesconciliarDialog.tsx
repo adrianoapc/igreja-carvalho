@@ -8,7 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { supabase } from "@/integrations/supabase/client";
+import { desconciliar } from "@/features/financeiro/core";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -31,13 +31,9 @@ export function DesconciliarDialog({
   const handleDesconciliar = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc("desconciliar_transacao", {
-        p_transacao_id: transacaoId,
-      });
-
-      if (error) throw error;
-
-      const result = data as any;
+      // Desconciliação transacional (fin_desconciliar, ADR-030/F3): limpa os
+      // 3 mecanismos de vínculo (1:1, lote, divisão) numa única transação.
+      const result = (await desconciliar(transacaoId)) as any;
       const total =
         (result?.extratos_1a1 || 0) +
         (result?.extratos_lote || 0) +

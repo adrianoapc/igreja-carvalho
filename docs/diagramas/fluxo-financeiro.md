@@ -269,3 +269,45 @@ flowchart TD
     T -->|trigger saldo| SALDO[contas.saldo_atual]
     READ -.consumido por.-> DASH[Dashboard, DashboardOfertas,\nProjeção, DRE, RelatorioCobertura]
 ```
+
+## Conciliação transacional — Fase F3 (ADR-030)
+
+Implementado em jul/2026 (migration `20260711140000`). A confirmação
+multi-tabela que rodava no frontend (`ConciliacaoInteligente.tsx:421-703`, ~6
+updates sem transação) vira uma chamada a `fin_confirmar_conciliacao`, com o
+formato inferido pela cardinalidade. O motor de score legado
+(`ConciliacaoManual`/`DashboardConciliacao`) fica para a F4.
+
+```mermaid
+flowchart TD
+    subgraph UI["Frontend de conciliação (F3)"]
+        CI["ConciliacaoInteligente\n(sugestão + confirmação)"]
+        DIV["DividirExtratoDialog (1:N)"]
+        LOTE["useConciliacaoLote (N:1)"]
+        DESC["DesconciliarDialog"]
+    end
+
+    CAPI["core/api/conciliacao.api\nconfirmarConciliacao · desconciliar"]
+
+    CI --> CAPI
+    DIV --> CAPI
+    LOTE --> CAPI
+    DESC --> CAPI
+
+    subgraph RPC["RPCs transacionais (uma transação)"]
+        CONF["fin_confirmar_conciliacao(p_vinculo)\ncardinalidade → 1:1 | N:1 | 1:N"]
+        UNDO["fin_desconciliar(p_transacao_id)\nlimpa os 3 vínculos"]
+    end
+    CAPI --> CONF
+    CAPI --> UNDO
+
+    CONF --> V11["1:1 · extratos_bancarios.transacao_vinculada_id"]
+    CONF --> VN1["N:1 · conciliacoes_lote (+_extratos)\nstatus: conciliada × discrepancia"]
+    CONF --> V1N["1:N · conciliacoes_divisao (+_transacoes)"]
+    CONF --> BAIXA["extrato reconciliado + transação\nconciliado_extrato + pendente→pago\n+ perna irmã da transferência"]
+    BAIXA -->|trigger| SALDO2[contas.saldo_atual]
+    CONF --> AUD2[(reconciliacao_audit_logs +\nconciliacao_ml_feedback + fin_audit_log)]
+
+    LEG["Motor de score legado\nreconciliar_transacoes · aplicar_conciliacao\n(ConciliacaoManual, DashboardConciliacao)"]
+    LEG -.reescrito na F4.-> RPC
+```

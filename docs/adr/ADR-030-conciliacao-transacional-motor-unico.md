@@ -1,6 +1,10 @@
 # ADR-030 — Conciliação Transacional e Motor Único de Score
 
-**Status:** Aceito  
+**Status:** Aceito — F3 (confirmação transacional) implementada em 2026-07-11
+(migration `20260711140000`; `fin_confirmar_conciliacao`/`fin_desconciliar`;
+notas em `docs/arquitetura-financeiro.md` §9.2). Motor único de score (F4),
+pipeline de ingestão (F5) e Getnet duas pernas (F6, ver §8 ponto 4 do doc de
+arquitetura) permanecem pendentes.  
 **Data:** 2026-07-10  
 **Decisores:** Produto, Tecnologia  
 **Contexto:** Sistema Financeiro / Conciliação Bancária / Getnet / ML  
