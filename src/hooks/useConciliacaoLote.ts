@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { confirmarConciliacao } from "@/features/financeiro/core";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { useFilialId } from "@/hooks/useFilialId";
 import { toast } from "sonner";
@@ -178,110 +179,20 @@ export function useConciliacaoLote({
         throw new Error("Dados insuficientes para criar lote");
       }
 
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
-
-      // Determine status based on difference
+      // Conciliação N:1 atômica via fin_confirmar_conciliacao (ADR-030/F3):
+      // cria o lote, vincula os N extratos, marca reconciliado e concilia a
+      // transação (+ irmã de transferência) numa única transação. O status
+      // do lote (conciliada × discrepancia) é derivado no banco pela
+      // diferença extratos × transação.
       const status = Math.abs(diferenca) < 0.01 ? "conciliada" : "discrepancia";
 
-      // Create the batch record
-      const { data: lote, error: loteError } = await supabase
-        .from("conciliacoes_lote")
-        .insert({
-          transacao_id: transacao.id,
-          igreja_id: igrejaId,
-          filial_id: filialId || null,
-          conta_id: effectiveContaId || null,
-          valor_transacao: valorTransacao,
-          valor_extratos: somaSelecionados,
-          status,
-          created_by: user.id,
-        })
-        .select("id")
-        .single();
+      const resultado = await confirmarConciliacao({
+        extrato_ids: Array.from(selectedExtratos),
+        transacao_ids: [transacao.id],
+      });
+      resultado.warnings?.forEach((w) => console.warn(w));
 
-      if (loteError) throw loteError;
-
-      // Filtrar extratos já vinculados em lotes para evitar duplicate key
-      const { data: jaVinculados } = await supabase
-        .from("conciliacoes_lote_extratos")
-        .select("extrato_id")
-        .in("extrato_id", Array.from(selectedExtratos));
-      
-      const idsJaVinculados = new Set((jaVinculados || []).map(v => v.extrato_id));
-      const extratosNovos = Array.from(selectedExtratos).filter(id => !idsJaVinculados.has(id));
-      
-      if (extratosNovos.length === 0) {
-        throw new Error("Todos os extratos selecionados já estão vinculados a outros lotes");
-      }
-
-      if (idsJaVinculados.size > 0) {
-        console.warn(`${idsJaVinculados.size} extrato(s) já vinculados foram ignorados`);
-      }
-
-      // Link new statements to the batch
-      const vinculos = extratosNovos.map(extratoId => ({
-        conciliacao_lote_id: lote.id,
-        extrato_id: extratoId,
-      }));
-
-      const { error: vinculoError } = await supabase
-        .from("conciliacoes_lote_extratos")
-        .insert(vinculos);
-
-      if (vinculoError) throw vinculoError;
-
-      // Mark statements as reconciled
-      const { error: updateError } = await supabase
-        .from("extratos_bancarios")
-        .update({ reconciliado: true })
-        .in("id", Array.from(selectedExtratos));
-
-      if (updateError) throw updateError;
-
-      // Sincronizar transferência se aplicável
-      if (transacao.transferencia_id && transacao.tipo === "entrada") {
-        await supabase
-          .from("transacoes_financeiras")
-          .update({
-            conciliacao_status: "conciliado_extrato",
-            status: "pago",
-            data_pagamento: new Date().toISOString().split('T')[0],
-          })
-          .eq("transferencia_id", transacao.transferencia_id)
-          .eq("tipo", "saida");
-      }
-
-      // Insert audit logs for batch reconciliation
-      const extratosParaLog = extratosFiltrados.filter(e => selectedExtratos.has(e.id));
-      const auditLogs = extratosParaLog.map(extrato => ({
-        extrato_id: extrato.id,
-        transacao_id: transacao.id,
-        conciliacao_lote_id: lote.id,
-        igreja_id: igrejaId,
-        filial_id: filialId || null,
-        conta_id: effectiveContaId || null,
-        tipo_reconciliacao: "lote" as const,
-        valor_extrato: Math.abs(extrato.valor),
-        valor_transacao: valorTransacao,
-        diferenca: Math.abs(Math.abs(extrato.valor) - valorTransacao),
-        usuario_id: user.id,
-        observacoes: `Conciliação em lote - ${status}`,
-      }));
-
-      if (auditLogs.length > 0) {
-        const { error: auditError } = await supabase
-          .from("reconciliacao_audit_logs")
-          .insert(auditLogs);
-        
-        if (auditError) {
-          console.warn("Erro ao inserir logs de auditoria:", auditError);
-          // Não falha a operação principal por causa do log
-        }
-      }
-
-      return { loteId: lote.id, count: selectedExtratos.size, status };
+      return { count: selectedExtratos.size, status };
     },
     onSuccess: (result) => {
       const message = result.status === "conciliada" 

@@ -7,6 +7,10 @@ import { useHideValues } from "@/hooks/useHideValues";
 import { useGerarSuggestoesConciliacao } from "@/hooks/useGerarSuggestoesConciliacao";
 import { useSuggestoesMLMapeadas } from "@/hooks/useSuggestoesMLMapeadas";
 import {
+  confirmarConciliacao as confirmarConciliacaoRpc,
+  type VinculoConciliacao,
+} from "@/features/financeiro/core";
+import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
@@ -424,261 +428,29 @@ export function ConciliacaoInteligente() {
         throw new Error("Selecione pelo menos um item de cada lado");
       }
 
-      const { data } = await supabase.auth.getUser();
-      const authUserId = data?.user?.id;
+      // Confirmação transacional (fin_confirmar_conciliacao, ADR-030/F3): o
+      // formato (1:1, N:1, 1:N) é inferido pela cardinalidade no banco, numa
+      // única transação — substitui os ~6 updates sequenciais deste fluxo.
+      const vinculo: VinculoConciliacao = {
+        extrato_ids: selectedExtratos,
+        transacao_ids: selectedTransacoes,
+      };
 
-      // `conciliacao_ml_feedback.usuario_id` referencia `profiles.id` (não auth.users.id)
-      let usuarioProfileId: string | null = null;
-      if (authUserId) {
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("user_id", authUserId)
-          .maybeSingle();
-
-        if (profileError) {
-          console.warn(
-            "⚠️ Não foi possível carregar profile do usuário:",
-            profileError,
+      // 1 extrato → N transações = divisão; o split usa o valor de cada uma.
+      if (selectedExtratos.length === 1 && selectedTransacoes.length > 1) {
+        vinculo.divisoes = selectedTransacoes.map((transacaoId) => {
+          const transacao = transacoesFiltradas?.find(
+            (t) => t.id === transacaoId,
           );
-        }
-        usuarioProfileId = profile?.id ?? null;
-      }
-
-      if (selectedTransacoes.length === 1) {
-        // Caso 1:1 - Um extrato para uma transação
-        const transacaoId = selectedTransacoes[0];
-        const transacao = transacoesFiltradas?.find(
-          (t) => t.id === transacaoId,
+          return { transacao_id: transacaoId, valor: Number(transacao?.valor) || 0 };
+        });
+      } else if (selectedExtratos.length > 1 && selectedTransacoes.length > 1) {
+        throw new Error(
+          "Múltiplos extratos com múltiplas transações não é suportado",
         );
-
-        for (const extratoId of selectedExtratos) {
-          const extrato = extratosFiltrados?.find((e) => e.id === extratoId);
-
-          // Atualizar extrato: vincular + marcar como reconciliado
-          const { error: erroExtrato } = await supabase
-            .from("extratos_bancarios")
-            .update({
-              reconciliado: true,
-              transacao_vinculada_id: transacaoId,
-            })
-            .eq("id", extratoId);
-
-          if (erroExtrato) throw erroExtrato;
-
-          // Atualizar transação: conciliação via extrato (e pagamento se pendente)
-          if (transacao && extrato) {
-            const updateTransacao: {
-              conciliacao_status: string;
-              status?: string;
-              data_pagamento?: string;
-            } = {
-              conciliacao_status: "conciliado_extrato",
-            };
-
-            if (transacao.status === "pendente") {
-              updateTransacao.status = "pago";
-              updateTransacao.data_pagamento = extrato.data_transacao;
-            }
-
-            const { error: erroTransacao } = await supabase
-              .from("transacoes_financeiras")
-              .update(updateTransacao)
-              .eq("id", transacaoId);
-
-            if (erroTransacao) throw erroTransacao;
-
-            // Se for transferência, concilia a transação irmã (entrada/saída)
-            if (transacao.transferencia_id) {
-              const { error: erroTransferencia } = await supabase
-                .from("transacoes_financeiras")
-                .update({
-                  conciliacao_status: "conciliado_extrato",
-                  status: updateTransacao.status,
-                  data_pagamento: updateTransacao.data_pagamento,
-                })
-                .eq("transferencia_id", transacao.transferencia_id)
-                .neq("id", transacaoId);
-
-              if (erroTransferencia) throw erroTransferencia;
-            }
-          }
-
-          // Gravar feedback da reconciliação manual para ML aprender
-          if (extrato && transacao) {
-            // Apenas gravar feedback se o Profile ID existir
-            if (usuarioProfileId) {
-              const { error: erroFeedback } = await supabase
-                .from("conciliacao_ml_feedback")
-                .insert({
-                  igreja_id: igrejaId,
-                  filial_id: filialId,
-                  conta_id: extrato.conta_id,
-                  tipo_match: "1:1",
-                  extrato_ids: [extratoId],
-                  transacao_ids: [transacaoId],
-                  acao: "ajustada",
-                  score: 1.0,
-                  modelo_versao: "v1",
-                  usuario_id: usuarioProfileId,
-                  ajustes: {
-                    valor_extrato: extrato.valor,
-                    valor_transacao: transacao.valor,
-                    valor_liquido: transacao.valor_liquido,
-                  },
-                });
-
-              if (erroFeedback)
-                console.error("Erro ao gravar feedback ML:", erroFeedback);
-            } else {
-              console.warn(
-                "⚠️ profile.id não disponível, feedback não gravado",
-              );
-            }
-          }
-        }
-      } else {
-        // Caso 1:N - Um extrato para múltiplas transações (lote)
-        if (selectedExtratos.length === 1) {
-          const extratoId = selectedExtratos[0];
-          const extrato = extratosFiltrados?.find((e) => e.id === extratoId);
-
-          if (!extrato) throw new Error("Extrato não encontrado");
-
-          try {
-            // 1. Criar registros de lote para cada transação (em batch)
-            const lotesData = selectedTransacoes.map((transacaoId) => {
-              const transacao = transacoesFiltradas?.find(
-                (t) => t.id === transacaoId,
-              );
-              return {
-                transacao_id: transacaoId,
-                igreja_id: igrejaId,
-                filial_id: filialId,
-                conta_id: extrato.conta_id,
-                valor_transacao: transacao?.valor || 0,
-                valor_extratos: 0, // Será atualizado pelo trigger
-                created_by: authUserId,
-              };
-            });
-
-            const { data: lotesCriados, error: erroLote } = await supabase
-              .from("conciliacoes_lote")
-              .insert(lotesData)
-              .select("id");
-
-            if (erroLote) throw erroLote;
-            if (!lotesCriados || lotesCriados.length === 0)
-              throw new Error("Nenhum lote criado");
-
-            // 2. Vincular todos os lotes ao mesmo extrato (em batch)
-            const vinculos = lotesCriados.map((lote) => ({
-              conciliacao_lote_id: lote.id,
-              extrato_id: extratoId,
-            }));
-
-            const { error: erroVinculos } = await supabase
-              .from("conciliacoes_lote_extratos")
-              .insert(vinculos);
-
-            if (erroVinculos) throw erroVinculos;
-
-            // 3. Marcar extrato como reconciliado
-            const { error: erroExtrato } = await supabase
-              .from("extratos_bancarios")
-              .update({ reconciliado: true })
-              .eq("id", extratoId);
-
-            if (erroExtrato) throw erroExtrato;
-
-            // 4. Atualizar transações: conciliação via extrato (e pagamento se pendente)
-            for (const transacaoId of selectedTransacoes) {
-              const transacao = transacoesFiltradas?.find(
-                (t) => t.id === transacaoId,
-              );
-              if (transacao) {
-                const updateTransacao: {
-                  conciliacao_status: string;
-                  status?: string;
-                  data_pagamento?: string;
-                } = {
-                  conciliacao_status: "conciliado_extrato",
-                };
-
-                if (transacao.status === "pendente") {
-                  updateTransacao.status = "pago";
-                  updateTransacao.data_pagamento = extrato.data_transacao;
-                }
-
-                const { error: erroTransacao } = await supabase
-                  .from("transacoes_financeiras")
-                  .update(updateTransacao)
-                  .eq("id", transacaoId);
-
-                if (erroTransacao) throw erroTransacao;
-
-                // Se for transferência, concilia a transação irmã (entrada/saída)
-                if (transacao.transferencia_id) {
-                  const { error: erroTransferencia } = await supabase
-                    .from("transacoes_financeiras")
-                    .update({
-                      conciliacao_status: "conciliado_extrato",
-                      status: updateTransacao.status,
-                      data_pagamento: updateTransacao.data_pagamento,
-                    })
-                    .eq("transferencia_id", transacao.transferencia_id)
-                    .neq("id", transacaoId);
-
-                  if (erroTransferencia) throw erroTransferencia;
-                }
-              }
-            }
-          } catch (error) {
-            // Rollback: desmarcar extrato como reconciliado
-            await supabase
-              .from("extratos_bancarios")
-              .update({ reconciliado: false })
-              .eq("id", extratoId);
-
-            throw error;
-          }
-
-          // Gravar feedback da reconciliação manual em lote para ML aprender
-          if (extrato) {
-            if (usuarioProfileId) {
-              const { error: erroFeedback } = await supabase
-                .from("conciliacao_ml_feedback")
-                .insert({
-                  igreja_id: igrejaId,
-                  filial_id: filialId,
-                  conta_id: extrato.conta_id,
-                  tipo_match: "N:1",
-                  extrato_ids: [extratoId],
-                  transacao_ids: selectedTransacoes,
-                  acao: "ajustada",
-                  score: 1.0,
-                  modelo_versao: "v1",
-                  usuario_id: usuarioProfileId,
-                  ajustes: {
-                    valor_extrato: extrato.valor,
-                    num_transacoes: selectedTransacoes.length,
-                  },
-                });
-
-              if (erroFeedback)
-                console.error("Erro ao gravar feedback ML:", erroFeedback);
-            } else {
-              console.warn(
-                "⚠️ profile.id não disponível, feedback em lote não gravado",
-              );
-            }
-          }
-        } else {
-          throw new Error(
-            "Múltiplos extratos com múltiplas transações não é suportado",
-          );
-        }
       }
+
+      await confirmarConciliacaoRpc(vinculo);
     },
     onSuccess: () => {
       toast.success(
