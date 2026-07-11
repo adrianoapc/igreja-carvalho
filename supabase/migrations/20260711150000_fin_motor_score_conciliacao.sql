@@ -76,13 +76,17 @@ BEGIN
   v_ini := COALESCE(p_periodo_inicio, date_trunc('month', CURRENT_DATE)::date);
   v_fim := COALESCE(p_periodo_fim, (date_trunc('month', CURRENT_DATE) + interval '1 month - 1 day')::date);
 
-  -- Corte: parâmetro explícito › config por igreja/filial › default 0.6.
+  -- Corte: parâmetro explícito › config da filial › config da igreja (filial_id
+  -- NULL) › default 0.6. A linha específica da filial tem prioridade sobre a
+  -- linha global da igreja (ORDER BY filial_id NULLS LAST = não-nulo primeiro);
+  -- ignora linhas com score nulo para não mascarar um fallback válido.
   v_corte := COALESCE(
     p_score_minimo,
     (SELECT fc.conciliacao_score_minimo
        FROM public.financeiro_config fc
       WHERE fc.igreja_id = v_igreja
-        AND (fc.filial_id = v_filial OR (fc.filial_id IS NULL AND v_filial IS NULL))
+        AND (fc.filial_id = v_filial OR fc.filial_id IS NULL)
+        AND fc.conciliacao_score_minimo IS NOT NULL
       ORDER BY fc.filial_id NULLS LAST
       LIMIT 1),
     0.6
@@ -138,12 +142,19 @@ BEGIN
       AND (e.filial_id = t.filial_id OR e.filial_id IS NULL OR t.filial_id IS NULL)
     WHERE
       e.igreja_id = v_igreja
+      -- Reimpõe o escopo de filial (SECURITY DEFINER bypassa RLS): treasurer de
+      -- uma filial não pode receber candidatos de outra. v_filial NULL = acesso
+      -- amplo (admin/igreja); filial_id NULL na linha = registro da igreja.
+      AND (v_filial IS NULL OR e.filial_id = v_filial OR e.filial_id IS NULL)
+      AND (v_filial IS NULL OR t.filial_id = v_filial OR t.filial_id IS NULL)
       AND (p_conta_id IS NULL OR e.conta_id = p_conta_id)
       AND e.reconciliado = false
       AND e.transacao_vinculada_id IS NULL
       AND t.status = 'pago'
-      AND t.conciliacao_status IS DISTINCT FROM 'conciliado_extrato'
-      AND t.conciliacao_status IS DISTINCT FROM 'conciliado_bot'
+      -- Apenas transações não conciliadas por NENHUM meio (extrato, bot ou
+      -- manual/conferência de caixa) — os fluxos automáticos aplicam estas
+      -- linhas direto e não podem sobrescrever uma conciliação já existente.
+      AND COALESCE(t.conciliacao_status, 'nao_conciliado') = 'nao_conciliado'
       AND e.data_transacao BETWEEN v_ini AND v_fim
       AND t.data_pagamento BETWEEN v_ini - INTERVAL '30 days' AND v_fim + INTERVAL '30 days'
       AND ABS(e.data_transacao - t.data_pagamento) <= 30
@@ -177,12 +188,13 @@ BEGIN
       AND (e.filial_id = t.filial_id OR e.filial_id IS NULL OR t.filial_id IS NULL)
     WHERE
       e.igreja_id = v_igreja
+      AND (v_filial IS NULL OR e.filial_id = v_filial OR e.filial_id IS NULL)
+      AND (v_filial IS NULL OR t.filial_id = v_filial OR t.filial_id IS NULL)
       AND (p_conta_id IS NULL OR e.conta_id = p_conta_id)
       AND e.reconciliado = false
       AND e.transacao_vinculada_id IS NULL
       AND t.status = 'pago'
-      AND t.conciliacao_status IS DISTINCT FROM 'conciliado_extrato'
-      AND t.conciliacao_status IS DISTINCT FROM 'conciliado_bot'
+      AND COALESCE(t.conciliacao_status, 'nao_conciliado') = 'nao_conciliado'
       AND e.data_transacao BETWEEN v_ini AND v_fim
       AND t.data_pagamento BETWEEN e.data_transacao - INTERVAL '7 days' AND e.data_transacao + INTERVAL '7 days'
       AND NOT EXISTS (

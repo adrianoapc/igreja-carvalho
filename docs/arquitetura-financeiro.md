@@ -699,9 +699,15 @@ p_score_minimo, p_contexto)`.
   conciliacao_score_minimo` (coluna nova, nullable) › default 0.6. Satisfaz o
   "pesos/limiar parametrizáveis por igreja" do ADR-030 §8.1 sem reescrever a
   fórmula (tuning fino de pesos fica como evolução).
-- **Correção de escopo**: o motor agora também exclui transações já
-  conciliadas 1:1 (`conciliacao_status` in `conciliado_extrato`/`conciliado_bot`),
-  não só as em `conciliacoes_lote` — evita propor uma transação já baixada.
+- **Correção de escopo (candidatos)**: o motor só propõe transação
+  `conciliacao_status = 'nao_conciliado'` (allow-list) — exclui `conciliado_extrato`,
+  `conciliado_bot` **e** `conciliado_manual` (dinheiro conferido em caixa), pois
+  os fluxos automáticos aplicam as linhas direto e não podem sobrescrever uma
+  conciliação existente. Reimpõe também o **escopo de filial** em ambas as CTEs
+  (`v_filial` do contexto) — `SECURITY DEFINER` bypassa a RLS, então sem isso um
+  tesoureiro de uma filial receberia candidatos de outra. O corte por igreja faz
+  **fallback filial → igreja** (linha `filial_id IS NULL`), ignorando linhas com
+  score nulo. (P1/P2 do review Codex.)
 - **Frontend migrado**: `ConciliacaoManual` e `DashboardConciliacao` trocam
   `reconciliar_transacoes`→motor único e `aplicar_conciliacao`→
   `fin_confirmar_conciliacao` (F3, transacional, com baixa `pendente→pago` e
