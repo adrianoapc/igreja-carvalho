@@ -719,6 +719,17 @@ p_score_minimo, p_contexto)`.
   filial selecionada (`isAllFiliais ? null : filialId`). Sem isso, o
   `SECURITY DEFINER` resolvia a filial pelo default do JWT, ignorando a tela.
   (P1/P2 da 3ª rodada.)
+- **"Todas" preserva o escopo amplo**: quem tem papel de igreja
+  (`admin`/`admin_igreja`/`super_admin`) e escolhe "Todas" (`p_filial_id` NULL)
+  vê **todas** as filiais mesmo tendo filial default no JWT; usuário restrito a
+  uma filial nunca amplia passando NULL. Com filial concreta, os candidatos
+  **não** incluem linhas de `filial_id IS NULL` (a tela filtra por
+  `.eq('filial_id')` e a auto-conciliação aplica direto — não pode mutar
+  registro da igreja fora da visão da filial). **Pendentes entram no score**
+  (casando por `data_vencimento` quando `data_pagamento` é nulo): a heurística
+  client-side antiga sugeria pendentes e `fin_confirmar_conciliacao` faz a baixa
+  `pendente→pago` — sem isso a substituição do motor regrediria o fluxo.
+  (3 × P2 da 4ª rodada.)
 - **Frontend migrado**: `ConciliacaoManual` e `DashboardConciliacao` trocam
   `reconciliar_transacoes`→motor único e `aplicar_conciliacao`→
   `fin_confirmar_conciliacao` (F3, transacional, com baixa `pendente→pago` e

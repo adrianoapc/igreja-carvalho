@@ -65,6 +65,7 @@ DECLARE
   v_igreja uuid;
   v_filial uuid;
   v_scope uuid;
+  v_pode_todas boolean;
   v_ini date;
   v_fim date;
   v_corte numeric;
@@ -75,15 +76,27 @@ BEGIN
   v_igreja := (v_ctx ->> 'igreja_id')::uuid;
   v_filial := NULLIF(v_ctx ->> 'filial_id', '')::uuid;
 
-  -- Escopo efetivo de filial: o seletor da UI (p_filial_id) refina DENTRO do
-  -- teto do usuário (v_filial). p_filial_id explícito é validado por
-  -- has_filial_access; "Todas" (p_filial_id NULL) cai no teto do usuário —
-  -- assim um tesoureiro de filial nunca amplia o escopo passando NULL, e um
-  -- admin vê a filial escolhida na tela em vez do default do JWT (padrão F2.5).
-  IF p_filial_id IS NOT NULL AND NOT public.has_filial_access(v_igreja, p_filial_id) THEN
-    RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial informada';
+  -- Escopo efetivo de filial (padrão F2.5), conciliando dois requisitos:
+  --  (a) usuário restrito a uma filial NUNCA amplia o escopo passando NULL;
+  --  (b) usuário com acesso amplo à igreja (admin/admin_igreja/super_admin) vê
+  --      TODAS as filiais quando escolhe "Todas" (p_filial_id NULL), mesmo tendo
+  --      uma filial default no JWT — não pode ser estreitado ao default.
+  -- p_filial_id explícito é sempre validado por has_filial_access.
+  v_pode_todas := auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.user_roles ur
+     WHERE ur.user_id = auth.uid()
+       AND ur.role::text IN ('admin', 'admin_igreja', 'super_admin')
+  );
+  IF p_filial_id IS NOT NULL THEN
+    IF NOT public.has_filial_access(v_igreja, p_filial_id) THEN
+      RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial informada';
+    END IF;
+    v_scope := p_filial_id;          -- filial escolhida na tela
+  ELSIF v_pode_todas THEN
+    v_scope := NULL;                 -- "Todas" para quem enxerga a igreja toda
+  ELSE
+    v_scope := v_filial;             -- restrito à própria filial
   END IF;
-  v_scope := COALESCE(p_filial_id, v_filial);
 
   v_ini := COALESCE(p_periodo_inicio, date_trunc('month', CURRENT_DATE)::date);
   v_fim := COALESCE(p_periodo_fim, (date_trunc('month', CURRENT_DATE) + interval '1 month - 1 day')::date);
@@ -117,9 +130,9 @@ BEGIN
           ELSE 0.4 * (1.0 - (ABS(e.valor - t.valor) / GREATEST(ABS(e.valor), ABS(t.valor))))
         END +
         CASE
-          WHEN ABS(e.data_transacao - t.data_pagamento) = 0 THEN 0.3
-          WHEN ABS(e.data_transacao - t.data_pagamento) <= 3 THEN 0.24
-          WHEN ABS(e.data_transacao - t.data_pagamento) <= 7 THEN 0.15
+          WHEN ABS(e.data_transacao - td.dref) = 0 THEN 0.3
+          WHEN ABS(e.data_transacao - td.dref) <= 3 THEN 0.24
+          WHEN ABS(e.data_transacao - td.dref) <= 7 THEN 0.15
           ELSE 0.06
         END +
         CASE
@@ -143,26 +156,34 @@ BEGIN
         'extrato_valor', e.valor,
         'transacao_valor', t.valor,
         'diferenca_valor', ABS(e.valor - t.valor),
-        'diferenca_dias', ABS(e.data_transacao - t.data_pagamento),
+        'diferenca_dias', ABS(e.data_transacao - td.dref),
         'match_tipo', (e.tipo = 'credito' AND t.tipo = 'entrada') OR (e.tipo = 'debito' AND t.tipo = 'saida'),
-        'categoria_id', t.categoria_id
+        'categoria_id', t.categoria_id,
+        'status', t.status
       ) AS features
     FROM extratos_bancarios e
     INNER JOIN transacoes_financeiras t ON
       e.igreja_id = t.igreja_id
       AND e.conta_id = t.conta_id
       AND (e.filial_id = t.filial_id OR e.filial_id IS NULL OR t.filial_id IS NULL)
+    -- data de referência: pagamento (pago) ou vencimento (pendente)
+    CROSS JOIN LATERAL (SELECT COALESCE(t.data_pagamento, t.data_vencimento) AS dref) td
     WHERE
       e.igreja_id = v_igreja
       -- Reimpõe o escopo de filial (SECURITY DEFINER bypassa RLS): treasurer de
-      -- uma filial não pode receber candidatos de outra. v_scope NULL = acesso
-      -- amplo (admin/igreja); filial_id NULL na linha = registro da igreja.
-      AND (v_scope IS NULL OR e.filial_id = v_scope OR e.filial_id IS NULL)
-      AND (v_scope IS NULL OR t.filial_id = v_scope OR t.filial_id IS NULL)
+      -- uma filial não recebe candidatos de outra. Com filial concreta (v_scope
+      -- não nulo) NÃO inclui linhas de filial NULL (a tela filtra por
+      -- .eq('filial_id', ...) e a auto-conciliação aplica direto — não pode
+      -- mutar registros da igreja que não aparecem na visão da filial). v_scope
+      -- NULL = acesso amplo → todas as filiais (inclui as de filial NULL).
+      AND (v_scope IS NULL OR e.filial_id = v_scope)
+      AND (v_scope IS NULL OR t.filial_id = v_scope)
       AND (p_conta_id IS NULL OR e.conta_id = p_conta_id)
       AND e.reconciliado = false
       AND e.transacao_vinculada_id IS NULL
-      AND t.status = 'pago'
+      -- Inclui pendentes: fin_confirmar_conciliacao baixa pendente→pago na
+      -- conciliação; pendente casa pela data_vencimento (td.dref).
+      AND t.status IN ('pendente', 'pago')
       -- Direção OBRIGATÓRIA (crédito↔entrada, débito↔saída): sem isso um saque
       -- concilia com uma receita quando valor+data batem (score 0.7 ≥ corte). A
       -- legada reconciliar_transacoes exigia; os fluxos auto-aplicam, então é
@@ -173,8 +194,8 @@ BEGIN
       -- linhas direto e não podem sobrescrever uma conciliação já existente.
       AND COALESCE(t.conciliacao_status, 'nao_conciliado') = 'nao_conciliado'
       AND e.data_transacao BETWEEN v_ini AND v_fim
-      AND t.data_pagamento BETWEEN v_ini - INTERVAL '30 days' AND v_fim + INTERVAL '30 days'
-      AND ABS(e.data_transacao - t.data_pagamento) <= 30
+      AND td.dref BETWEEN v_ini - INTERVAL '30 days' AND v_fim + INTERVAL '30 days'
+      AND ABS(e.data_transacao - td.dref) <= 30
       AND NOT EXISTS (
         SELECT 1 FROM conciliacoes_lote cl WHERE cl.transacao_id = t.id
       )
@@ -182,13 +203,13 @@ BEGIN
   candidatos_1xN AS (
     SELECT
       e.id AS extrato_id,
-      array_agg(t.id ORDER BY t.data_pagamento) AS transacao_ids,
+      array_agg(t.id ORDER BY td.dref) AS transacao_ids,
       '1:N'::text AS tipo_match,
       (
         CASE WHEN ABS(e.valor - SUM(t.valor)) < 0.01 THEN 0.8 ELSE 0.0 END +
         CASE
-          WHEN AVG(ABS(e.data_transacao - t.data_pagamento)) <= 3 THEN 0.2
-          WHEN AVG(ABS(e.data_transacao - t.data_pagamento)) <= 7 THEN 0.1
+          WHEN AVG(ABS(e.data_transacao - td.dref)) <= 3 THEN 0.2
+          WHEN AVG(ABS(e.data_transacao - td.dref)) <= 7 THEN 0.1
           ELSE 0.05
         END
       )::numeric(5,4) AS score,
@@ -196,25 +217,26 @@ BEGIN
         'extrato_valor', e.valor,
         'transacao_valor_total', SUM(t.valor),
         'qtd_transacoes', COUNT(t.id),
-        'diferenca_dias_media', AVG(ABS(e.data_transacao - t.data_pagamento))::integer
+        'diferenca_dias_media', AVG(ABS(e.data_transacao - td.dref))::integer
       ) AS features
     FROM extratos_bancarios e
     INNER JOIN transacoes_financeiras t ON
       e.igreja_id = t.igreja_id
       AND e.conta_id = t.conta_id
       AND (e.filial_id = t.filial_id OR e.filial_id IS NULL OR t.filial_id IS NULL)
+    CROSS JOIN LATERAL (SELECT COALESCE(t.data_pagamento, t.data_vencimento) AS dref) td
     WHERE
       e.igreja_id = v_igreja
-      AND (v_scope IS NULL OR e.filial_id = v_scope OR e.filial_id IS NULL)
-      AND (v_scope IS NULL OR t.filial_id = v_scope OR t.filial_id IS NULL)
+      AND (v_scope IS NULL OR e.filial_id = v_scope)
+      AND (v_scope IS NULL OR t.filial_id = v_scope)
       AND (p_conta_id IS NULL OR e.conta_id = p_conta_id)
       AND e.reconciliado = false
       AND e.transacao_vinculada_id IS NULL
-      AND t.status = 'pago'
+      AND t.status IN ('pendente', 'pago')
       AND ((e.tipo = 'credito' AND t.tipo = 'entrada') OR (e.tipo = 'debito' AND t.tipo = 'saida'))
       AND COALESCE(t.conciliacao_status, 'nao_conciliado') = 'nao_conciliado'
       AND e.data_transacao BETWEEN v_ini AND v_fim
-      AND t.data_pagamento BETWEEN e.data_transacao - INTERVAL '7 days' AND e.data_transacao + INTERVAL '7 days'
+      AND td.dref BETWEEN e.data_transacao - INTERVAL '7 days' AND e.data_transacao + INTERVAL '7 days'
       AND NOT EXISTS (
         SELECT 1 FROM conciliacoes_lote cl WHERE cl.transacao_id = t.id
       )
