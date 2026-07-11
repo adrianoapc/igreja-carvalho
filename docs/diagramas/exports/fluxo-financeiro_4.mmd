@@ -1,0 +1,52 @@
+flowchart TD
+    subgraph FE["Frontend — features/financeiro"]
+        TP["TransacoesPage única (entrada|saida)\nEntradas/Saidas = cascas de rota"]
+        TD2[TransacaoDialog]
+        AM[TransacaoActionsMenu]
+        CP[ConfirmarPagamentoDialog]
+        AS[AjusteSaldoDialog]
+        TF[TransferenciaDialog / Estorno]
+        RO[RelatorioOferta]
+        RE[Reembolsos]
+        QC[QuickCreateTransacaoDialog]
+    end
+
+    subgraph API["core/api (único ponto com supabase.rpc)"]
+        LAPI[lancamentos.api]
+        TAPI[transferencias.api]
+        CAPI[contas.api]
+        OAPI[ofertas.api]
+        RAPI[reembolsos.api]
+    end
+
+    BOT["chatbot-financeiro\n(x-webhook-secret + shim\n_shared/financeiro-core.ts)"]
+
+    subgraph RPC["CORE Postgres — RPCs fin_* (SECURITY DEFINER)"]
+        CTX[fin_resolver_contexto\nJWT × service role + flags bot]
+        W1[fin_criar_lancamento\nmaterializa parcelas D6]
+        W2[fin_atualizar_lancamento\nbloqueia conciliado D4]
+        W3[fin_alterar_status_lancamento]
+        W4[fin_excluir_lancamento]
+        W5[fin_criar_transferencia + estorno\nsaldo atômico]
+        W6[fin_ajustar_saldo\nlançamento auditável]
+        W7[fin_lancar_sessao\nofertas em lote + finaliza sessão]
+        W8[fin_pagar_reembolso\nD9 admin OU tesoureiro + notificação]
+        JOB[fin_materializar_recorrencias\npg_cron diário D6]
+        AUD[(fin_audit_log)]
+    end
+
+    subgraph READ["Leitura agregada (F2.5)"]
+        R1[fin_resumo_periodo]
+        R2[fin_ofertas_periodo\nfiltro estrutural]
+        R3[fin_projecao_mensal]
+        R4[get_dre_anual p_regime]
+    end
+
+    TD2 & AM & CP & AS & TF & RO & RE & QC --> API
+    TP --> API
+    API --> RPC
+    BOT --> RPC
+    RPC --> AUD
+    RPC --> T[(transacoes_financeiras\ntransferencias_contas)]
+    T -->|trigger saldo| SALDO[contas.saldo_atual]
+    READ -.consumido por.-> DASH[Dashboard, DashboardOfertas,\nProjeção, DRE, RelatorioCobertura]
