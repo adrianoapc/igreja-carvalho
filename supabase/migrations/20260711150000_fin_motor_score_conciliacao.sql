@@ -92,7 +92,19 @@ BEGIN
        AND (ur.igreja_id = v_igreja OR ur.igreja_id IS NULL)
   );
   IF p_filial_id IS NOT NULL THEN
-    IF NOT public.has_filial_access(v_igreja, p_filial_id) THEN
+    -- Validação recortada por igreja — NÃO usa has_filial_access, cujo atalho
+    -- global has_role('admin') é satisfeito por admin_igreja/admin_filial de
+    -- QUALQUER igreja (vazaria filial de outra igreja no cenário multi-igreja).
+    -- (a) a filial precisa pertencer à igreja resolvida;
+    IF NOT EXISTS (
+      SELECT 1 FROM public.filiais f
+       WHERE f.id = p_filial_id AND f.igreja_id = v_igreja
+    ) THEN
+      RAISE EXCEPTION 'FIN_TENANT: filial fora do tenant';
+    END IF;
+    -- (b) papel amplo NESTA igreja pode ver qualquer filial; caso contrário só
+    --     a própria filial do usuário.
+    IF NOT (v_pode_todas OR p_filial_id = v_filial) THEN
       RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial informada';
     END IF;
     v_scope := p_filial_id;          -- filial escolhida na tela

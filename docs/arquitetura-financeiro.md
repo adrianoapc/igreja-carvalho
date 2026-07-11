@@ -736,6 +736,12 @@ p_score_minimo, p_contexto)`.
   `DashboardConciliacao` deriva a janela de candidatos dos extratos pendentes
   visíveis (a lista não tem corte de data) em vez de fixar 90 dias, senão um
   extrato antigo nunca receberia sugestão. (P1/P2 da 5ª rodada.)
+- **Validação de filial não usa `has_filial_access`**: aquele helper tem atalho
+  global `has_role('admin')` (satisfeito por `admin_igreja`/`admin_filial` de
+  qualquer igreja). O `p_filial_id` explícito é validado por lógica recortada:
+  a filial precisa pertencer a `v_igreja` **e** o usuário ter papel amplo nesta
+  igreja (`v_pode_todas`) ou ser a própria filial — fecha o mesmo vazamento
+  multi-igreja pelo caminho do parâmetro explícito. (P1 da 6ª rodada.)
 - **Frontend migrado**: `ConciliacaoManual` e `DashboardConciliacao` trocam
   `reconciliar_transacoes`→motor único e `aplicar_conciliacao`→
   `fin_confirmar_conciliacao` (F3, transacional, com baixa `pendente→pago` e
