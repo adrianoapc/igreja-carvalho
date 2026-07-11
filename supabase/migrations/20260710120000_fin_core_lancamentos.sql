@@ -1101,6 +1101,7 @@ BEGIN
        AND (data_fim_recorrencia IS NULL OR data_fim_recorrencia >= CURRENT_DATE)
   LOOP
     v_intervalo := CASE lower(COALESCE(v_cabeca.recorrencia, 'mensal'))
+      WHEN 'diaria'     THEN interval '1 day'
       WHEN 'semanal'    THEN interval '7 days'
       WHEN 'quinzenal'  THEN interval '15 days'
       WHEN 'mensal'     THEN interval '1 month'

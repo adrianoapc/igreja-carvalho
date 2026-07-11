@@ -624,7 +624,11 @@ reembolso = admin OU tesoureiro; trigger atualizado).
 tenant/ator: JWT deriva igreja/filial do token e exige admin|tesoureiro;
 service role exige `p_contexto {igreja_id, ator_profile_id, canal}` validado
 contra `profiles` (canal `bot` checa `autorizado_bot_financeiro` + flag da
-operação). Toda RPC grava em `fin_audit_log` (quem/quando/canal/payload).
+operação). As RPCs de leitura agregada reimpõem o requisito da RLS
+(admin OU tesoureiro + acesso à filial) via `fin_exigir_leitura_financeira`
+— `SECURITY DEFINER` não pode ampliar quem lê os agregados; `get_dre_anual`
+ganhou o mesmo guarda (antes qualquer authenticated lia o DRE). Toda RPC de
+escrita grava em `fin_audit_log` (quem/quando/canal/payload).
 `chatbot-financeiro` valida `x-webhook-secret` timing-safe quando
 `MAKE_WEBHOOK_SECRET` estiver configurado (rollout sem quebrar o Make).
 

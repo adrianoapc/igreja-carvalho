@@ -13,7 +13,43 @@
 --
 -- Todas SECURITY DEFINER com tenant via JWT (get_current_user_igreja_id) —
 -- mesmo padrão de get_dre_anual. Leitura apenas; sem p_contexto.
+--
+-- Permissão: SECURITY DEFINER bypassa a RLS de transacoes_financeiras
+-- (admin OR tesoureiro + has_filial_access), então cada função reimpõe o
+-- mesmo requisito via fin_exigir_leitura_financeira — sem isso, qualquer
+-- authenticated leria os agregados financeiros.
 -- ============================================================================
+
+-- ─── 0. Guarda de leitura financeira ────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.fin_exigir_leitura_financeira(
+  p_filial_id uuid DEFAULT NULL
+)
+RETURNS uuid
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_igreja uuid := public.get_current_user_igreja_id();
+BEGIN
+  IF v_igreja IS NULL THEN
+    RAISE EXCEPTION 'FIN_TENANT: igreja não resolvida a partir do JWT';
+  END IF;
+  IF NOT (has_role(auth.uid(), 'admin'::app_role)
+          OR has_role(auth.uid(), 'tesoureiro'::app_role)) THEN
+    RAISE EXCEPTION 'FIN_SEM_PERMISSAO: requer papel admin ou tesoureiro';
+  END IF;
+  IF p_filial_id IS NOT NULL
+     AND NOT public.has_filial_access(v_igreja, p_filial_id) THEN
+    RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial informada';
+  END IF;
+  RETURN v_igreja;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.fin_exigir_leitura_financeira(uuid) FROM anon;
 
 -- ─── 1. fin_resumo_periodo ──────────────────────────────────────────────────
 
@@ -29,12 +65,8 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_igreja uuid := public.get_current_user_igreja_id();
+  v_igreja uuid := public.fin_exigir_leitura_financeira(p_filial_id);
 BEGIN
-  IF v_igreja IS NULL THEN
-    RAISE EXCEPTION 'FIN_TENANT: igreja não resolvida a partir do JWT';
-  END IF;
-
   RETURN QUERY
   SELECT t.tipo, t.status,
          COALESCE(SUM(t.valor), 0) AS total,
@@ -71,12 +103,8 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_igreja uuid := public.get_current_user_igreja_id();
+  v_igreja uuid := public.fin_exigir_leitura_financeira(p_filial_id);
 BEGIN
-  IF v_igreja IS NULL THEN
-    RAISE EXCEPTION 'FIN_TENANT: igreja não resolvida a partir do JWT';
-  END IF;
-
   RETURN QUERY
   SELECT t.data_vencimento AS dia,
          t.forma_pagamento AS forma_pagamento_id,
@@ -119,16 +147,12 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_igreja uuid := public.get_current_user_igreja_id();
+  v_igreja uuid := public.fin_exigir_leitura_financeira(p_filial_id);
   v_inicio date := date_trunc('month', CURRENT_DATE)::date
                    - make_interval(months => p_meses_historico);
   v_fim date := date_trunc('month', CURRENT_DATE)::date
                 + make_interval(months => p_meses_futuro + 1) - interval '1 day';
 BEGIN
-  IF v_igreja IS NULL THEN
-    RAISE EXCEPTION 'FIN_TENANT: igreja não resolvida a partir do JWT';
-  END IF;
-
   RETURN QUERY
   WITH realizado AS (
     SELECT date_trunc('month', t.data_pagamento)::date AS m, t.tipo AS tp,
@@ -183,6 +207,13 @@ DECLARE
 BEGIN
   IF p_regime NOT IN ('caixa', 'competencia') THEN
     RAISE EXCEPTION 'FIN_VALIDACAO: regime deve ser caixa|competencia';
+  END IF;
+
+  -- Mesmo requisito da RLS de transacoes_financeiras (a versão anterior
+  -- expunha o agregado a qualquer authenticated).
+  IF NOT (has_role(auth.uid(), 'admin'::app_role)
+          OR has_role(auth.uid(), 'tesoureiro'::app_role)) THEN
+    RAISE EXCEPTION 'FIN_SEM_PERMISSAO: requer papel admin ou tesoureiro';
   END IF;
 
   v_igreja_id := public.get_jwt_igreja_id();
