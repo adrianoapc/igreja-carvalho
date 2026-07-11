@@ -3,6 +3,8 @@ import { useMemo } from "react";
 export interface Transacao {
   id: string;
   descricao: string;
+  valor: number | string;
+  data_vencimento: string;
   conta_id?: string;
   categoria_id?: string;
   fornecedor_id?: string;

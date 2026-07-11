@@ -18,3 +18,5 @@ export * from "./api/transferencias.api";
 export * from "./api/contas.api";
 export * from "./api/ofertas.api";
 export * from "./api/reembolsos.api";
+export * from "./hooks/useLancamentos";
+export * from "./hooks/useDadosApoio";
