@@ -1,6 +1,8 @@
 # ADR-029 — Camada Canônica de Lançamentos no Banco (RPCs `fin_*`)
 
-**Status:** Aceito  
+**Status:** Aceito — implementado (F1/F1.5/F2/F2.5 em 2026-07-10; migrations
+`20260710120000`, `20260710123000`, `20260710130000`; notas em
+`docs/arquitetura-financeiro.md` §9.1)  
 **Data:** 2026-07-10  
 **Decisores:** Produto, Tecnologia  
 **Contexto:** Sistema Financeiro / Transações / Bot / Ofertas / Integrações  

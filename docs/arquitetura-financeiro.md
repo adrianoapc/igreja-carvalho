@@ -586,11 +586,11 @@ Cada fase é deployável isolada; legado convive com o novo.
 
 | Fase | Escopo | Observações |
 |---|---|---|
-| **F0 Fundações** | Este doc + ADR-029/030; extrair helpers puros (moeda, status, agrupamento) para `features/financeiro/core`; convenção `fin_*` e padrão `p_contexto` | Refactor sem mudança de comportamento |
-| **F1 RPC de lançamento + bot** | Migrations `fin_criar/atualizar/status/excluir_lancamento` + `fin_criar_transferencia` + `fin_ajustar_saldo`; **bot troca inserts por RPC primeiro** (menos variação de payload, onde o drift dói mais) + `x-webhook-secret`; depois `TransacaoDialog`/`ActionsMenu`/`AjusteSaldoDialog` | **Maior ROI.** Gate de saída: nenhum canal insere direto |
-| **F1.5 Ofertas e reembolso no CORE** | `fin_lancar_sessao` (substitui os 3 inserts do `RelatorioOferta`) + correção do CHECK de `sessoes_contagem` + unificação de `open_sessao_contagem`; `fin_pagar_reembolso` (notificação igual para UI e bot; alinhar trigger×UI, decisão D9) | Depende de F1; RelatorioOferta continua com a UI atual |
-| **F2 Unificação Entradas/Saídas** | `useLancamentos` + `TransacoesPage` por tipo; páginas viram re-exports; decomposição do `TransacaoDialog`; **UX: tap único + skeletons padronizados** | Só frontend; paralelo a F1 |
-| **F2.5 Leitura agregada no servidor** | RPCs/views modelo `get_dre_anual` (`fin_resumo_periodo`, `fin_ofertas_periodo`, `fin_projecao_mensal`); DashboardOfertas troca `ilike '%oferta%'` por filtro estrutural; RelatorioCobertura consome `view_reconciliacao_cobertura`; DRE parametriza regime caixa×competência | Independente; resolve truncamento de 1000 linhas |
+| **F0 Fundações** ✅ | Este doc + ADR-029/030; extrair helpers puros (moeda, status, agrupamento) para `features/financeiro/core`; convenção `fin_*` e padrão `p_contexto` | Concluída (PR #43) |
+| **F1 RPC de lançamento + bot** ✅ | Migration `20260710120000`: `fin_criar/atualizar/status/excluir_lancamento`, `fin_criar/estornar_transferencia`, `fin_ajustar_saldo`, `fin_recalcular_saldo_conta`, `fin_materializar_recorrencias` (job pg_cron diário, D6), `fin_audit_log`, `fin_resolver_contexto`; bot via shim `_shared/financeiro-core.ts` + `x-webhook-secret` (enforça quando `MAKE_WEBHOOK_SECRET` estiver setado); `TransacaoDialog`/`ActionsMenu`/`ConfirmarPagamento`/`AjusteSaldo`/`TransferenciaDialog`/`Transferencias`/`QuickCreate` via `core/api` | Concluída (jul/2026). Ver §9.1 para semântica de saldo e drifts corrigidos |
+| **F1.5 Ofertas e reembolso no CORE** ✅ | Migration `20260710123000`: `fin_lancar_sessao` (os 2 pontos do `RelatorioOferta`; fluxo de aprovação passou a vincular `sessao_id`) e `fin_pagar_reembolso` (D9: trigger alinhado a admin OU tesoureiro; notificação de pagamento ao solicitante em UI e bot) | CHECK de `sessoes_contagem` e unificação de `open_sessao_contagem` já haviam sido resolvidos pelas migrations `20260209*` |
+| **F2 Unificação Entradas/Saídas** ✅ | `useLancamentos`/`useDadosFiltros`/`useConciliacaoMap` + `TransacoesPage` única em `features/financeiro/lancamentos`; páginas viram cascas de rota; **tap único** substitui double-click; `LancamentosSkeleton` padronizado; `TransacaoDialog` decomposto parcialmente (`useDadosApoio` no core; escrita via RPC) — decomposição do JSX restante fica para F7 | Concluída (jul/2026) |
+| **F2.5 Leitura agregada no servidor** ✅ | Migration `20260710130000`: `fin_resumo_periodo`, `fin_ofertas_periodo` (filtro estrutural `sessao_id`/categoria no lugar de `ilike descricao`), `fin_projecao_mensal`; `get_dre_anual(p_ano, p_regime)` caixa×competência com seletor no DRE; RelatorioCobertura consome `view_reconciliacao_cobertura`; Dashboard (comparativo) e Projeção nos agregados | Concluída (jul/2026); Insights e demais queries do Dashboard ficam para evolução |
 | **F3 Conciliação transacional** | `fin_confirmar_conciliacao` + `fin_desconciliar` (porta a lógica de `ConciliacaoInteligente.tsx:421-703`); reclassificação passa a bloquear/alertar transação conciliada | Depende de F1 (status via RPC) |
 | **F4 Motor único de score** | Estabilizar `fin_gerar_candidatos_conciliacao`; remover score client-side; deprecar RPCs legadas; validar via ModoABToggle e removê-lo | Depende de F3 |
 | **F5 Pipeline de ingestão** | `fin_ingerir_extratos`; ordem: manual → pix → santander → getnet; gancho pós-ingestão (ADR-028) | Independente após F0 |
@@ -598,6 +598,46 @@ Cada fase é deployável isolada; legado convive com o novo.
 | **F7 Endurecimento + UX conciliação** | Revogar escrita direta do role `authenticated`; decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll); Finanças no bottom-nav; DRE mobile em cards; limpeza de código morto | Fecha o ciclo |
 
 ---
+
+### 9.1 Notas de implementação F1-F2.5 (jul/2026)
+
+**Semântica de saldo (paridade e unificação):**
+- INSERT com `status='pago'` continua **não** movendo `contas.saldo_atual`
+  (o trigger é `AFTER UPDATE OF status`) — paridade com produção mantida.
+- Transferência passou a mover saldo na criação (semântica do bot, adotada
+  como canônica; a UI não movia). O estorno via `fin_estornar_transferencia`
+  cancela as pernas por UPDATE e deixa o trigger reverter **uma** vez —
+  o fluxo antigo da UI revertia em dobro (trigger + ajuste manual).
+- `fin_ajustar_saldo` cria lançamento auditável (categoria "Ajuste de
+  Saldo") e move o saldo pelo trigger — o UPDATE direto sem trilha acabou.
+- `fin_recalcular_saldo_conta(conta, aplicar)` diagnostica/corrige drift
+  histórico (`saldo_inicial + Σ pagos`).
+
+**Decisões aplicadas:** D4 (conciliado bloqueia editar/excluir/status);
+D6 (parcelado materializa tudo na criação com `lancamento_pai_id`;
+recorrente via `fin_materializar_recorrencias` agendado no pg_cron diário,
+horizonte 60 dias); D8 (padrão TEXT+CHECK mantido e documentado — enum
+nativo descartado por custo de migração); D9 (aprovar/pagar/rejeitar
+reembolso = admin OU tesoureiro; trigger atualizado).
+
+**Segurança:** `fin_resolver_contexto` é o único ponto de resolução de
+tenant/ator: JWT deriva igreja/filial do token e exige admin|tesoureiro;
+service role exige `p_contexto {igreja_id, ator_profile_id, canal}` validado
+contra `profiles` (canal `bot` checa `autorizado_bot_financeiro` + flag da
+operação). Toda RPC grava em `fin_audit_log` (quem/quando/canal/payload).
+`chatbot-financeiro` valida `x-webhook-secret` timing-safe quando
+`MAKE_WEBHOOK_SECRET` estiver configurado (rollout sem quebrar o Make).
+
+**Deploy:** as migrations `20260710*` e as edges alteradas ainda dependem
+do workflow manual `supabase-deploy.yml` (não há
+`SUPABASE_ACCESS_TOKEN`/`SUPABASE_DB_PASSWORD` local — ver comentário no
+workflow). Após o deploy, regenerar `src/integrations/supabase/types.ts`
+(`supabase gen types`) para remover os casts do `core/api/finRpc.ts`.
+
+**Validação:** harness docker (postgres 15 + stubs de `auth.*`, helpers de
+tenant, triggers reais e tabelas geradas do baseline `types.ts`) exercitou
+as três migrations — 25+ cenários, incluindo paridade de saldo, bloqueios
+D4, flags do bot e regimes do DRE.
 
 ## 10. Decisões em aberto (bater o martelo)
 
