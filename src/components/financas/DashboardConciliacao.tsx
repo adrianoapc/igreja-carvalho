@@ -98,6 +98,7 @@ async function fetchSugestoes1x1(
   contaIds: string[],
   periodoInicio: string,
   periodoFim: string,
+  filialId: string | null,
 ): Promise<SugestaoMatch[]> {
   const out: SugestaoMatch[] = [];
   for (const contaId of contaIds) {
@@ -106,6 +107,7 @@ async function fetchSugestoes1x1(
         contaId,
         periodoInicio,
         periodoFim,
+        filialId,
       });
       for (const r of rows) {
         if (r.tipo_match === "1:1" && r.transacao_ids.length === 1) {
@@ -313,7 +315,7 @@ export function DashboardConciliacao() {
 
       const periodoInicio = format(subDays(new Date(), 90), "yyyy-MM-dd");
       const periodoFim = format(new Date(), "yyyy-MM-dd");
-      const allSugestoes = await fetchSugestoes1x1(contaIds, periodoInicio, periodoFim);
+      const allSugestoes = await fetchSugestoes1x1(contaIds, periodoInicio, periodoFim, isAllFiliais ? null : filialId);
 
       // Create map with best suggestion per extrato
       const sugestaoMap = new Map<string, SugestaoMatch>();
@@ -346,7 +348,7 @@ export function DashboardConciliacao() {
       // Candidatos 1:1 pelo motor único (F4).
       const periodoInicio = format(subDays(new Date(), 90), "yyyy-MM-dd");
       const periodoFim = format(new Date(), "yyyy-MM-dd");
-      const allMatches = await fetchSugestoes1x1(contaIds, periodoInicio, periodoFim);
+      const allMatches = await fetchSugestoes1x1(contaIds, periodoInicio, periodoFim, isAllFiliais ? null : filialId);
 
       if (allMatches.length === 0) {
         toast.info("Nenhuma correspondência encontrada automaticamente");

@@ -708,6 +708,17 @@ p_score_minimo, p_contexto)`.
   tesoureiro de uma filial receberia candidatos de outra. O corte por igreja faz
   **fallback filial → igreja** (linha `filial_id IS NULL`), ignorando linhas com
   score nulo. (P1/P2 do review Codex.)
+- **Direção obrigatória**: o 1:1 (e o 1:N) exige `crédito↔entrada`/
+  `débito↔saída` como **filtro rígido** (não só o peso 0.1) — sem isso um saque
+  concilia com receita quando valor+data coincidem (0.4+0.3 = 0.7 ≥ corte) e os
+  fluxos auto-aplicam. Restaura a garantia da legada `reconciliar_transacoes`.
+- **Filial da UI**: `fin_gerar_candidatos_conciliacao` ganhou `p_filial_id`
+  (padrão F2.5). O escopo efetivo é `COALESCE(p_filial_id, v_filial)` — o
+  seletor da tela refina **dentro** do teto do usuário (validado por
+  `has_filial_access`); "Todas" cai no teto. Os wrappers do frontend passam a
+  filial selecionada (`isAllFiliais ? null : filialId`). Sem isso, o
+  `SECURITY DEFINER` resolvia a filial pelo default do JWT, ignorando a tela.
+  (P1/P2 da 3ª rodada.)
 - **Frontend migrado**: `ConciliacaoManual` e `DashboardConciliacao` trocam
   `reconciliar_transacoes`→motor único e `aplicar_conciliacao`→
   `fin_confirmar_conciliacao` (F3, transacional, com baixa `pendente→pago` e

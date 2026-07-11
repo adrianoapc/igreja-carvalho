@@ -24,6 +24,11 @@ export interface CandidatosParams {
   periodoFim?: string | null;
   /** Corte de score 0..1; default resolvido no banco (config por igreja → 0.6). */
   scoreMinimo?: number | null;
+  /**
+   * Filial selecionada na UI. `null`/omitido = "Todas" (cai no teto do usuário
+   * no banco). Refina DENTRO do escopo permitido; validado por has_filial_access.
+   */
+  filialId?: string | null;
 }
 
 /**
@@ -44,6 +49,7 @@ export async function gerarCandidatosConciliacao(
       p_periodo_inicio: params.periodoInicio ?? null,
       p_periodo_fim: params.periodoFim ?? null,
       p_score_minimo: params.scoreMinimo ?? null,
+      p_filial_id: params.filialId ?? null,
     },
   );
   if (error) throw error;

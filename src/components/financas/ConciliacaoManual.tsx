@@ -405,6 +405,7 @@ export function ConciliacaoManual() {
             contaId,
             periodoInicio: dataInicio,
             periodoFim: dataFim,
+            filialId: isAllFiliais ? null : filialId,
           });
           for (const r of rows) {
             if (r.tipo_match === "1:1" && r.transacao_ids.length === 1) {

@@ -46,6 +46,7 @@ CREATE OR REPLACE FUNCTION public.fin_gerar_candidatos_conciliacao(
   p_periodo_inicio date DEFAULT NULL,
   p_periodo_fim date DEFAULT NULL,
   p_score_minimo numeric DEFAULT NULL,
+  p_filial_id uuid DEFAULT NULL,
   p_contexto jsonb DEFAULT NULL
 )
 RETURNS TABLE(
@@ -63,6 +64,7 @@ DECLARE
   v_ctx jsonb;
   v_igreja uuid;
   v_filial uuid;
+  v_scope uuid;
   v_ini date;
   v_fim date;
   v_corte numeric;
@@ -73,19 +75,29 @@ BEGIN
   v_igreja := (v_ctx ->> 'igreja_id')::uuid;
   v_filial := NULLIF(v_ctx ->> 'filial_id', '')::uuid;
 
+  -- Escopo efetivo de filial: o seletor da UI (p_filial_id) refina DENTRO do
+  -- teto do usuário (v_filial). p_filial_id explícito é validado por
+  -- has_filial_access; "Todas" (p_filial_id NULL) cai no teto do usuário —
+  -- assim um tesoureiro de filial nunca amplia o escopo passando NULL, e um
+  -- admin vê a filial escolhida na tela em vez do default do JWT (padrão F2.5).
+  IF p_filial_id IS NOT NULL AND NOT public.has_filial_access(v_igreja, p_filial_id) THEN
+    RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial informada';
+  END IF;
+  v_scope := COALESCE(p_filial_id, v_filial);
+
   v_ini := COALESCE(p_periodo_inicio, date_trunc('month', CURRENT_DATE)::date);
   v_fim := COALESCE(p_periodo_fim, (date_trunc('month', CURRENT_DATE) + interval '1 month - 1 day')::date);
 
-  -- Corte: parâmetro explícito › config da filial › config da igreja (filial_id
-  -- NULL) › default 0.6. A linha específica da filial tem prioridade sobre a
-  -- linha global da igreja (ORDER BY filial_id NULLS LAST = não-nulo primeiro);
+  -- Corte: parâmetro explícito › config da filial (escopo) › config da igreja
+  -- (filial_id NULL) › default 0.6. A linha específica da filial tem prioridade
+  -- sobre a linha global (ORDER BY filial_id NULLS LAST = não-nulo primeiro);
   -- ignora linhas com score nulo para não mascarar um fallback válido.
   v_corte := COALESCE(
     p_score_minimo,
     (SELECT fc.conciliacao_score_minimo
        FROM public.financeiro_config fc
       WHERE fc.igreja_id = v_igreja
-        AND (fc.filial_id = v_filial OR fc.filial_id IS NULL)
+        AND (fc.filial_id = v_scope OR fc.filial_id IS NULL)
         AND fc.conciliacao_score_minimo IS NOT NULL
       ORDER BY fc.filial_id NULLS LAST
       LIMIT 1),
@@ -143,14 +155,19 @@ BEGIN
     WHERE
       e.igreja_id = v_igreja
       -- Reimpõe o escopo de filial (SECURITY DEFINER bypassa RLS): treasurer de
-      -- uma filial não pode receber candidatos de outra. v_filial NULL = acesso
+      -- uma filial não pode receber candidatos de outra. v_scope NULL = acesso
       -- amplo (admin/igreja); filial_id NULL na linha = registro da igreja.
-      AND (v_filial IS NULL OR e.filial_id = v_filial OR e.filial_id IS NULL)
-      AND (v_filial IS NULL OR t.filial_id = v_filial OR t.filial_id IS NULL)
+      AND (v_scope IS NULL OR e.filial_id = v_scope OR e.filial_id IS NULL)
+      AND (v_scope IS NULL OR t.filial_id = v_scope OR t.filial_id IS NULL)
       AND (p_conta_id IS NULL OR e.conta_id = p_conta_id)
       AND e.reconciliado = false
       AND e.transacao_vinculada_id IS NULL
       AND t.status = 'pago'
+      -- Direção OBRIGATÓRIA (crédito↔entrada, débito↔saída): sem isso um saque
+      -- concilia com uma receita quando valor+data batem (score 0.7 ≥ corte). A
+      -- legada reconciliar_transacoes exigia; os fluxos auto-aplicam, então é
+      -- filtro rígido, não só peso de 0.1 no score.
+      AND ((e.tipo = 'credito' AND t.tipo = 'entrada') OR (e.tipo = 'debito' AND t.tipo = 'saida'))
       -- Apenas transações não conciliadas por NENHUM meio (extrato, bot ou
       -- manual/conferência de caixa) — os fluxos automáticos aplicam estas
       -- linhas direto e não podem sobrescrever uma conciliação já existente.
@@ -188,12 +205,13 @@ BEGIN
       AND (e.filial_id = t.filial_id OR e.filial_id IS NULL OR t.filial_id IS NULL)
     WHERE
       e.igreja_id = v_igreja
-      AND (v_filial IS NULL OR e.filial_id = v_filial OR e.filial_id IS NULL)
-      AND (v_filial IS NULL OR t.filial_id = v_filial OR t.filial_id IS NULL)
+      AND (v_scope IS NULL OR e.filial_id = v_scope OR e.filial_id IS NULL)
+      AND (v_scope IS NULL OR t.filial_id = v_scope OR t.filial_id IS NULL)
       AND (p_conta_id IS NULL OR e.conta_id = p_conta_id)
       AND e.reconciliado = false
       AND e.transacao_vinculada_id IS NULL
       AND t.status = 'pago'
+      AND ((e.tipo = 'credito' AND t.tipo = 'entrada') OR (e.tipo = 'debito' AND t.tipo = 'saida'))
       AND COALESCE(t.conciliacao_status, 'nao_conciliado') = 'nao_conciliado'
       AND e.data_transacao BETWEEN v_ini AND v_fim
       AND t.data_pagamento BETWEEN e.data_transacao - INTERVAL '7 days' AND e.data_transacao + INTERVAL '7 days'
@@ -216,7 +234,7 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.fin_gerar_candidatos_conciliacao(uuid, date, date, numeric, jsonb) IS
+COMMENT ON FUNCTION public.fin_gerar_candidatos_conciliacao(uuid, date, date, numeric, uuid, jsonb) IS
   'Motor ÚNICO de candidatos de conciliação (ADR-030 F4). Score 0..1 (valor 0.4/data 0.3/descrição 0.2/tipo 0.1), formatos 1:1 e 1:N. Tenant/ator via fin_resolver_contexto; corte por igreja em financeiro_config.conciliacao_score_minimo. Confirmação via fin_confirmar_conciliacao.';
 
 -- ─── 3. Deprecação dos motores/aplicadores legados (sem DROP — F7) ──────────
@@ -237,5 +255,5 @@ BEGIN
 END $$;
 
 -- ─── 4. Grants ──────────────────────────────────────────────────────────────
-GRANT EXECUTE ON FUNCTION public.fin_gerar_candidatos_conciliacao(uuid, date, date, numeric, jsonb) TO authenticated, service_role;
-REVOKE ALL ON FUNCTION public.fin_gerar_candidatos_conciliacao(uuid, date, date, numeric, jsonb) FROM anon;
+GRANT EXECUTE ON FUNCTION public.fin_gerar_candidatos_conciliacao(uuid, date, date, numeric, uuid, jsonb) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.fin_gerar_candidatos_conciliacao(uuid, date, date, numeric, uuid, jsonb) FROM anon;

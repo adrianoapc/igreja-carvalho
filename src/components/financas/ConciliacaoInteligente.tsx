@@ -306,6 +306,8 @@ export function ConciliacaoInteligente() {
     queryKey: [
       "candidatos-motor-inteligente",
       igrejaId,
+      filialId,
+      isAllFiliais,
       contaFiltro,
       mesExtratos,
       extratosCustomRange,
@@ -322,6 +324,7 @@ export function ConciliacaoInteligente() {
         contaId: contaFiltro !== "all" ? contaFiltro : null,
         periodoInicio: formatLocalDate(inicio),
         periodoFim: formatLocalDate(fim),
+        filialId: isAllFiliais ? null : filialId,
       });
       const mapa = new Map<string, Map<string, number>>();
       for (const r of rows) {
