@@ -591,7 +591,7 @@ Cada fase é deployável isolada; legado convive com o novo.
 | **F1.5 Ofertas e reembolso no CORE** ✅ | Migration `20260710123000`: `fin_lancar_sessao` (os 2 pontos do `RelatorioOferta`; fluxo de aprovação passou a vincular `sessao_id`) e `fin_pagar_reembolso` (D9: trigger alinhado a admin OU tesoureiro; notificação de pagamento ao solicitante em UI e bot) | CHECK de `sessoes_contagem` e unificação de `open_sessao_contagem` já haviam sido resolvidos pelas migrations `20260209*` |
 | **F2 Unificação Entradas/Saídas** ✅ | `useLancamentos`/`useDadosFiltros`/`useConciliacaoMap` + `TransacoesPage` única em `features/financeiro/lancamentos`; páginas viram cascas de rota; **tap único** substitui double-click; `LancamentosSkeleton` padronizado; `TransacaoDialog` decomposto parcialmente (`useDadosApoio` no core; escrita via RPC) — decomposição do JSX restante fica para F7 | Concluída (jul/2026) |
 | **F2.5 Leitura agregada no servidor** ✅ | Migration `20260710130000`: `fin_resumo_periodo`, `fin_ofertas_periodo` (filtro estrutural `sessao_id`/categoria no lugar de `ilike descricao`), `fin_projecao_mensal`; `get_dre_anual(p_ano, p_regime)` caixa×competência com seletor no DRE; RelatorioCobertura consome `view_reconciliacao_cobertura`; Dashboard (comparativo) e Projeção nos agregados | Concluída (jul/2026); Insights e demais queries do Dashboard ficam para evolução |
-| **F3 Conciliação transacional** | `fin_confirmar_conciliacao` + `fin_desconciliar` (porta a lógica de `ConciliacaoInteligente.tsx:421-703`); reclassificação passa a bloquear/alertar transação conciliada | Depende de F1 (status via RPC) |
+| **F3 Conciliação transacional** ✅ | Migration `20260711140000`: `fin_confirmar_conciliacao(p_vinculo)` (1:1/N:1/1:N inferidos por cardinalidade, numa transação) + `fin_desconciliar`. Frontend: `ConciliacaoInteligente`, `DividirExtratoDialog`, `useConciliacaoLote` e `DesconciliarDialog` via `core/api/conciliacao.api`. Ver §9.2 | Concluída (jul/2026). `ConciliacaoManual`/`DashboardConciliacao` (motor legado) e o bloqueio da reclassificação ficam para a F4 |
 | **F4 Motor único de score** | Estabilizar `fin_gerar_candidatos_conciliacao`; remover score client-side; deprecar RPCs legadas; validar via ModoABToggle e removê-lo | Depende de F3 |
 | **F5 Pipeline de ingestão** | `fin_ingerir_extratos`; ordem: manual → pix → santander → getnet; gancho pós-ingestão (ADR-028) | Independente após F0 |
 | **F6 Getnet tipo 5** | Após decisão D5; novos períodos apenas; backfill opcional | Depende de F5 |
@@ -642,6 +642,43 @@ workflow). Após o deploy, regenerar `src/integrations/supabase/types.ts`
 tenant, triggers reais e tabelas geradas do baseline `types.ts`) exercitou
 as três migrations — 25+ cenários, incluindo paridade de saldo, bloqueios
 D4, flags do bot e regimes do DRE.
+
+### 9.2 Notas de implementação F3 — conciliação transacional (jul/2026)
+
+`fin_confirmar_conciliacao(p_vinculo jsonb, p_contexto)` é a porta única de
+confirmação. O formato é **inferido pela cardinalidade** de
+`extrato_ids × transacao_ids`:
+
+- **1:1** (1 extrato, 1 transação) → `extratos_bancarios.transacao_vinculada_id`;
+- **N:1** (N extratos, 1 transação) → `conciliacoes_lote` + `_extratos`; o
+  status do lote (`conciliada` × `discrepancia`) é derivado no banco pela
+  diferença entre a soma dos extratos e o valor da transação (com warning);
+- **1:N** (1 extrato, N transações) → `conciliacoes_divisao` + `_transacoes`,
+  usando `p_vinculo.divisoes = [{transacao_id, valor}]`.
+
+Tudo numa transação: vínculo → `reconciliado=true` → `conciliacao_status=
+conciliado_extrato` → **baixa `pendente→pago`** com `data_pagamento` = data do
+extrato (o trigger move o saldo) → **perna irmã da transferência** acompanha →
+auditoria tripla (`reconciliacao_audit_logs` por par + `conciliacao_ml_feedback`
++ `fin_audit_log`). Rejeita extrato já reconciliado ou transação já conciliada.
+
+`fin_desconciliar(p_transacao_id, p_contexto)` limpa os **três** mecanismos de
+vínculo (evolução transacional de `desconciliar_transacao`) e registra trilha.
+**Decisão consciente:** NÃO reverte `pago→pendente` — dinheiro que caiu
+permanece pago; reconciliar de novo é no-op de saldo (o trigger só age em
+`pendente→pago`). Reverter poderia derrubar o saldo indevidamente.
+
+**Escopo:** a F3 migrou os quatro fluxos com **DML sequencial não
+transacional** que o ADR-030 mira (`ConciliacaoInteligente.confirmarConciliacao`
+— ~280 linhas viram uma chamada —, `DividirExtratoDialog`, `useConciliacaoLote`,
+`DesconciliarDialog`). `ConciliacaoManual`/`DashboardConciliacao` usam o **motor
+de score legado** (`reconciliar_transacoes`/`aplicar_conciliacao`, já atômico
+por par) e são reescritos na **F4** junto com o motor único de score; o bloqueio
+de reclassificação sobre transação conciliada (TODO em
+`reclass-transacoes/index.ts:324`) também fica para depois.
+
+**Validação:** harness docker — 10 cenários (1:1/N:1/1:N e seus inversos,
+discrepância de lote, auditoria tripla, guarda admin|tesoureiro).
 
 ## 10. Decisões em aberto (bater o martelo)
 
