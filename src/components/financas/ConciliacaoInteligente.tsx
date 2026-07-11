@@ -325,15 +325,19 @@ export function ConciliacaoInteligente() {
       });
       const mapa = new Map<string, Map<string, number>>();
       for (const r of rows) {
+        // Só 1:1 vira "sugestão" para seleção individual. Candidatos 1:N
+        // (divisão) têm fluxo próprio (DividirExtratoDialog) e NÃO podem ser
+        // marcados como 1:1 — senão selecionar um único item da divisão
+        // confirmaria uma conciliação 1:1 de valor parcial.
+        if (r.tipo_match !== "1:1" || r.transacao_ids.length !== 1) continue;
+        const tid = r.transacao_ids[0];
         let inner = mapa.get(r.extrato_id);
         if (!inner) {
           inner = new Map<string, number>();
           mapa.set(r.extrato_id, inner);
         }
-        for (const tid of r.transacao_ids) {
-          const prev = inner.get(tid) ?? 0;
-          if (r.score > prev) inner.set(tid, r.score);
-        }
+        const prev = inner.get(tid) ?? 0;
+        if (r.score > prev) inner.set(tid, r.score);
       }
       return mapa;
     },

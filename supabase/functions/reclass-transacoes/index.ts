@@ -325,10 +325,12 @@ Deno.serve(async (req) => {
     // pode mudar categoria/competência/conta — alterar isso após a conciliação
     // bancária quebraria a trilha extrato↔transação e o DRE já fechado. O
     // caminho correto é fin_desconciliar antes de reclassificar.
+    // Allow-list: só 'nao_conciliado' (ou nulo) e não conferido em caixa passam —
+    // cobre conciliado_extrato/bot/manual e o conferido_manual (dinheiro em espécie).
     const conciliadas = transacoes.filter(
       (t) =>
-        t.conciliacao_status === "conciliado_extrato" ||
-        t.conciliacao_status === "conciliado_bot",
+        (t.conciliacao_status ?? "nao_conciliado") !== "nao_conciliado" ||
+        t.conferido_manual === true,
     );
     if (conciliadas.length > 0) {
       return new Response(
