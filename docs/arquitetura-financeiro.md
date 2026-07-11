@@ -592,7 +592,7 @@ Cada fase é deployável isolada; legado convive com o novo.
 | **F2 Unificação Entradas/Saídas** ✅ | `useLancamentos`/`useDadosFiltros`/`useConciliacaoMap` + `TransacoesPage` única em `features/financeiro/lancamentos`; páginas viram cascas de rota; **tap único** substitui double-click; `LancamentosSkeleton` padronizado; `TransacaoDialog` decomposto parcialmente (`useDadosApoio` no core; escrita via RPC) — decomposição do JSX restante fica para F7 | Concluída (jul/2026) |
 | **F2.5 Leitura agregada no servidor** ✅ | Migration `20260710130000`: `fin_resumo_periodo`, `fin_ofertas_periodo` (filtro estrutural `sessao_id`/categoria no lugar de `ilike descricao`), `fin_projecao_mensal`; `get_dre_anual(p_ano, p_regime)` caixa×competência com seletor no DRE; RelatorioCobertura consome `view_reconciliacao_cobertura`; Dashboard (comparativo) e Projeção nos agregados | Concluída (jul/2026); Insights e demais queries do Dashboard ficam para evolução |
 | **F3 Conciliação transacional** ✅ | Migration `20260711140000`: `fin_confirmar_conciliacao(p_vinculo)` (1:1/N:1/1:N inferidos por cardinalidade, numa transação) + `fin_desconciliar`. Frontend: `ConciliacaoInteligente`, `DividirExtratoDialog`, `useConciliacaoLote` e `DesconciliarDialog` via `core/api/conciliacao.api`. Ver §9.2 | Concluída (jul/2026). `ConciliacaoManual`/`DashboardConciliacao` (motor legado) e o bloqueio da reclassificação ficam para a F4 |
-| **F4 Motor único de score** | Estabilizar `fin_gerar_candidatos_conciliacao`; remover score client-side; deprecar RPCs legadas; validar via ModoABToggle e removê-lo | Depende de F3 |
+| **F4 Motor único de score** ✅ | Migration `20260711150000`: `fin_gerar_candidatos_conciliacao` (score 0..1, 1:1 e 1:N, corte por igreja em `financeiro_config.conciliacao_score_minimo`). `ConciliacaoManual`/`DashboardConciliacao`/`ConciliacaoInteligente` migrados ao motor único + `fin_confirmar_conciliacao`; `reconciliar_transacoes`/`aplicar_conciliacao`/`gerar_candidatos_conciliacao` deprecadas (DROP na F7); `ModoABToggle` (código morto) removido; `reclass-transacoes` recusa transação conciliada. Ver §9.3 | Concluída (jul/2026) |
 | **F5 Pipeline de ingestão** | `fin_ingerir_extratos`; ordem: manual → pix → santander → getnet; gancho pós-ingestão (ADR-028) | Independente após F0 |
 | **F6 Getnet tipo 5** | Após decisão D5; novos períodos apenas; backfill opcional | Depende de F5 |
 | **F7 Endurecimento + UX conciliação** | Revogar escrita direta do role `authenticated`; decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll); Finanças no bottom-nav; DRE mobile em cards; limpeza de código morto | Fecha o ciclo |
@@ -679,6 +679,50 @@ de reclassificação sobre transação conciliada (TODO em
 
 **Validação:** harness docker — 10 cenários (1:1/N:1/1:N e seus inversos,
 discrepância de lote, auditoria tripla, guarda admin|tesoureiro).
+
+### 9.3 Notas de implementação F4 — motor único de score (jul/2026)
+
+Migration `20260711150000`. Passa a existir **um** motor de candidatos:
+`fin_gerar_candidatos_conciliacao(p_conta_id, p_periodo_inicio, p_periodo_fim,
+p_score_minimo, p_contexto)`.
+
+- **Motor eleito**: a versão contínua `gerar_candidatos_conciliacao` (score
+  0..1; pesos valor 0.4 / data 0.3 / descrição 0.2 / tipo 0.1; formatos 1:1 e
+  1:N) — não a legada `reconciliar_transacoes` (score inteiro 50-100, só 1:1,
+  faixas discretas). A fórmula de pesos foi **preservada intacta** (motor
+  provado em produção); o que muda é a moldura canônica.
+- **Tenant/ator**: resolvido por `fin_resolver_contexto` (guarda
+  admin|tesoureiro no JWT; service role via `p_contexto` validado). A igreja
+  **não** vem mais como `p_igreja_id` cru — a pública aceitava qualquer igreja
+  sob `SECURITY DEFINER` sem checar o chamador.
+- **Corte por igreja**: `p_score_minimo` explícito › `financeiro_config.
+  conciliacao_score_minimo` (coluna nova, nullable) › default 0.6. Satisfaz o
+  "pesos/limiar parametrizáveis por igreja" do ADR-030 §8.1 sem reescrever a
+  fórmula (tuning fino de pesos fica como evolução).
+- **Correção de escopo**: o motor agora também exclui transações já
+  conciliadas 1:1 (`conciliacao_status` in `conciliado_extrato`/`conciliado_bot`),
+  não só as em `conciliacoes_lote` — evita propor uma transação já baixada.
+- **Frontend migrado**: `ConciliacaoManual` e `DashboardConciliacao` trocam
+  `reconciliar_transacoes`→motor único e `aplicar_conciliacao`→
+  `fin_confirmar_conciliacao` (F3, transacional, com baixa `pendente→pago` e
+  perna irmã — o que a legada não fazia). `ConciliacaoInteligente` deixa de
+  calcular score heurístico no cliente e passa a ranquear pelos candidatos do
+  motor. Wrapper `gerarCandidatosConciliacao` em `core/api/conciliacao.api`.
+  Score exibido converte 0..1 → 0-100; ao aplicar, volta a 0..1 no
+  `conciliacao_ml_feedback`.
+- **Deprecação sem DROP**: `reconciliar_transacoes`, `aplicar_conciliacao` e
+  `gerar_candidatos_conciliacao` ganham `COMMENT` de DEPRECADA. O DROP fica
+  para a **F7**, após garantir que nenhum canal fora do frontend as chama (a
+  edge `gerar-sugestoes-ml` ainda usa a pública; migra na F5/F7).
+- **`ModoABToggle`**: era código morto (nenhum import) — removido. Não havia
+  "motor A × motor B" real a validar; o toggle era só de apresentação de
+  sugestão ML.
+- **Imutabilidade (reclass)**: `reclass-transacoes` fecha o TODO histórico —
+  recusa (HTTP 409 `TRANSACAO_CONCILIADA`) qualquer job cujo alvo contenha
+  transação conciliada. Reclassificar exige `fin_desconciliar` antes.
+- **Validação**: harness docker — 7 cenários (score 1:1/1:N, corte explícito,
+  corte por igreja via config, exclusão de conciliado, isolamento de tenant,
+  guarda admin|tesoureiro).
 
 ## 10. Decisões em aberto (bater o martelo)
 

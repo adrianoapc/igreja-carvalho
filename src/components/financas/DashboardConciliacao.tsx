@@ -24,6 +24,10 @@ import { DividirExtratoDialog } from "./DividirExtratoDialog";
 import { ResultadoReconciliacaoDialog, MatchResult } from "./ResultadoReconciliacaoDialog";
 import { anonymizePixDescription } from "@/utils/anonymization";
 import {
+  gerarCandidatosConciliacao,
+  confirmarConciliacao,
+} from "@/features/financeiro/core/api/conciliacao.api";
+import {
   RefreshCw,
   FileCheck,
   Clock,
@@ -82,7 +86,41 @@ interface AuditLog {
 interface SugestaoMatch {
   extrato_id: string;
   transacao_id: string;
+  /** Escala 0-100 para exibição (o motor devolve 0..1). */
   score: number;
+}
+
+/**
+ * Sugestões 1:1 pelo motor ÚNICO de score (F4), substituindo a RPC legada
+ * `reconciliar_transacoes`. Converte o score 0..1 para 0-100 (exibição).
+ */
+async function fetchSugestoes1x1(
+  contaIds: string[],
+  periodoInicio: string,
+  periodoFim: string,
+): Promise<SugestaoMatch[]> {
+  const out: SugestaoMatch[] = [];
+  for (const contaId of contaIds) {
+    try {
+      const rows = await gerarCandidatosConciliacao({
+        contaId,
+        periodoInicio,
+        periodoFim,
+      });
+      for (const r of rows) {
+        if (r.tipo_match === "1:1" && r.transacao_ids.length === 1) {
+          out.push({
+            extrato_id: r.extrato_id,
+            transacao_id: r.transacao_ids[0],
+            score: Math.round(r.score * 100),
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao gerar candidatos:", err);
+    }
+  }
+  return out;
 }
 
 export function DashboardConciliacao() {
@@ -273,16 +311,9 @@ export function DashboardConciliacao() {
         ? [selectedContaId]
         : [...new Set(extratosPendentes.map((e) => e.conta_id))];
 
-      const allSugestoes: SugestaoMatch[] = [];
-
-      for (const contaId of contaIds) {
-        const { data } = await supabase.rpc("reconciliar_transacoes", {
-          p_conta_id: contaId,
-        });
-        if (data) {
-          allSugestoes.push(...data);
-        }
-      }
+      const periodoInicio = format(subDays(new Date(), 90), "yyyy-MM-dd");
+      const periodoFim = format(new Date(), "yyyy-MM-dd");
+      const allSugestoes = await fetchSugestoes1x1(contaIds, periodoInicio, periodoFim);
 
       // Create map with best suggestion per extrato
       const sugestaoMap = new Map<string, SugestaoMatch>();
@@ -312,15 +343,10 @@ export function DashboardConciliacao() {
     const allResults: MatchResult[] = [];
 
     try {
-      const allMatches: SugestaoMatch[] = [];
-
-      for (const contaId of contaIds) {
-        const { data, error } = await supabase.rpc("reconciliar_transacoes", {
-          p_conta_id: contaId,
-        });
-        if (error) continue;
-        if (data) allMatches.push(...data);
-      }
+      // Candidatos 1:1 pelo motor único (F4).
+      const periodoInicio = format(subDays(new Date(), 90), "yyyy-MM-dd");
+      const periodoFim = format(new Date(), "yyyy-MM-dd");
+      const allMatches = await fetchSugestoes1x1(contaIds, periodoInicio, periodoFim);
 
       if (allMatches.length === 0) {
         toast.info("Nenhuma correspondência encontrada automaticamente");
@@ -328,30 +354,29 @@ export function DashboardConciliacao() {
         return;
       }
 
-      // Deduplicate
+      // Um extrato só concilia uma transação — e vice-versa.
       const processedExtratos = new Set<string>();
+      const processedTransacoes = new Set<string>();
       const uniqueMatches = allMatches
         .sort((a, b) => b.score - a.score)
         .filter((match) => {
           if (processedExtratos.has(match.extrato_id)) return false;
+          if (processedTransacoes.has(match.transacao_id)) return false;
           processedExtratos.add(match.extrato_id);
+          processedTransacoes.add(match.transacao_id);
           return true;
         });
 
-      // Apply each match
+      // Aplica cada match pela porta transacional fin_confirmar_conciliacao (F3).
       for (const match of uniqueMatches) {
+        const extratoData = extratosPendentes.find((e) => e.id === match.extrato_id);
+        const transacaoData = transacoes?.find((t) => t.id === match.transacao_id);
         try {
-          const { data: applied, error: applyError } = await supabase.rpc(
-            "aplicar_conciliacao",
-            {
-              p_extrato_id: match.extrato_id,
-              p_transacao_id: match.transacao_id,
-            }
-          );
-
-          const extratoData = extratosPendentes.find((e) => e.id === match.extrato_id);
-          const transacaoData = transacoes?.find((t) => t.id === match.transacao_id);
-
+          await confirmarConciliacao({
+            extrato_ids: [match.extrato_id],
+            transacao_ids: [match.transacao_id],
+            score: match.score / 100,
+          });
           allResults.push({
             extratoId: match.extrato_id,
             transacaoId: match.transacao_id,
@@ -360,11 +385,20 @@ export function DashboardConciliacao() {
             extratoValor: extratoData?.valor || 0,
             transacaoDescricao: transacaoData?.descricao || "Transação",
             transacaoValor: Number(transacaoData?.valor) || 0,
-            applied: applied && !applyError,
-            error: applyError?.message,
+            applied: true,
           });
-        } catch (err) {
-          console.error("Erro ao aplicar match:", err);
+        } catch (applyError) {
+          allResults.push({
+            extratoId: match.extrato_id,
+            transacaoId: match.transacao_id,
+            score: match.score,
+            extratoDescricao: extratoData?.descricao || "Extrato",
+            extratoValor: extratoData?.valor || 0,
+            transacaoDescricao: transacaoData?.descricao || "Transação",
+            transacaoValor: Number(transacaoData?.valor) || 0,
+            applied: false,
+            error: (applyError as Error)?.message,
+          });
         }
       }
 
@@ -394,20 +428,17 @@ export function DashboardConciliacao() {
   // Handle accept suggestion
   const handleAceitarSugestao = async (extrato: ExtratoItem, sugestao: SugestaoMatch) => {
     try {
-      const { data: applied, error } = await supabase.rpc("aplicar_conciliacao", {
-        p_extrato_id: sugestao.extrato_id,
-        p_transacao_id: sugestao.transacao_id,
+      await confirmarConciliacao({
+        extrato_ids: [sugestao.extrato_id],
+        transacao_ids: [sugestao.transacao_id],
+        score: sugestao.score / 100,
       });
 
-      if (error) throw error;
-
-      if (applied) {
-        toast.success("Conciliação aplicada com sucesso");
-        refetchExtratos();
-        refetchStats();
-        queryClient.invalidateQueries({ queryKey: ["audit-logs-recent"] });
-        queryClient.invalidateQueries({ queryKey: ["sugestoes-match"] });
-      }
+      toast.success("Conciliação aplicada com sucesso");
+      refetchExtratos();
+      refetchStats();
+      queryClient.invalidateQueries({ queryKey: ["audit-logs-recent"] });
+      queryClient.invalidateQueries({ queryKey: ["sugestoes-match"] });
     } catch (err) {
       console.error("Erro ao aceitar sugestão:", err);
       toast.error("Erro ao aplicar conciliação");

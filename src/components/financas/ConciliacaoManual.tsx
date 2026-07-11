@@ -36,6 +36,10 @@ import { DividirExtratoDialog } from "./DividirExtratoDialog";
 import { ResultadoReconciliacaoDialog, MatchResult } from "./ResultadoReconciliacaoDialog";
 import { anonymizePixDescription } from "@/utils/anonymization";
 import {
+  gerarCandidatosConciliacao,
+  confirmarConciliacao,
+} from "@/features/financeiro/core/api/conciliacao.api";
+import {
   Search,
   Link2,
   X,
@@ -387,7 +391,8 @@ export function ConciliacaoManual() {
     const allResults: MatchResult[] = [];
 
     try {
-      // Step 1: Get all matches from all accounts
+      // Passo 1: candidatos pelo motor ÚNICO de score (F4). A reconciliação
+      // automática opera apenas em 1:1 (paridade com o fluxo legado).
       const allMatches: Array<{
         extrato_id: string;
         transacao_id: string;
@@ -395,16 +400,23 @@ export function ConciliacaoManual() {
       }> = [];
 
       for (const contaId of contaIds) {
-        const { data, error } = await supabase.rpc("reconciliar_transacoes", {
-          p_conta_id: contaId,
-        });
-
-        if (error) {
-          console.error("Erro na reconciliação automática:", error);
-          continue;
-        }
-        if (data) {
-          allMatches.push(...data);
+        try {
+          const rows = await gerarCandidatosConciliacao({
+            contaId,
+            periodoInicio: dataInicio,
+            periodoFim: dataFim,
+          });
+          for (const r of rows) {
+            if (r.tipo_match === "1:1" && r.transacao_ids.length === 1) {
+              allMatches.push({
+                extrato_id: r.extrato_id,
+                transacao_id: r.transacao_ids[0],
+                score: r.score,
+              });
+            }
+          }
+        } catch (err) {
+          console.error("Erro ao gerar candidatos:", err);
         }
       }
 
@@ -414,46 +426,54 @@ export function ConciliacaoManual() {
         return;
       }
 
-      // Step 2: Deduplicate - one extrato can only match one transacao
+      // Passo 2: um extrato só concilia uma transação — e vice-versa (evita
+      // FIN_CONCILIADO ao aplicar duas vezes a mesma transação no lote).
       const processedExtratos = new Set<string>();
+      const processedTransacoes = new Set<string>();
       const uniqueMatches = allMatches
         .sort((a, b) => b.score - a.score)
         .filter((match) => {
-          if (processedExtratos.has(match.extrato_id)) {
-            return false;
-          }
+          if (processedExtratos.has(match.extrato_id)) return false;
+          if (processedTransacoes.has(match.transacao_id)) return false;
           processedExtratos.add(match.extrato_id);
+          processedTransacoes.add(match.transacao_id);
           return true;
         });
 
-      // Step 3: Apply each match using aplicar_conciliacao RPC
+      // Passo 3: aplica cada match pela porta transacional fin_confirmar_conciliacao
+      // (F3) — baixa pendente→pago, trata irmã de transferência e audita.
       for (const match of uniqueMatches) {
+        const scorePct = Math.round(match.score * 100);
+        const extratoData = extratos.find((e) => e.id === match.extrato_id);
+        const transacaoData = transacoes?.find((t) => t.id === match.transacao_id);
         try {
-          const { data: applied, error: applyError } = await supabase.rpc(
-            "aplicar_conciliacao",
-            {
-              p_extrato_id: match.extrato_id,
-              p_transacao_id: match.transacao_id,
-            }
-          );
-
-          // Fetch details for the result
-          const extratoData = extratos.find((e) => e.id === match.extrato_id);
-          const transacaoData = transacoes?.find((t) => t.id === match.transacao_id);
-
+          await confirmarConciliacao({
+            extrato_ids: [match.extrato_id],
+            transacao_ids: [match.transacao_id],
+            score: match.score,
+          });
           allResults.push({
             extratoId: match.extrato_id,
             transacaoId: match.transacao_id,
-            score: match.score,
+            score: scorePct,
             extratoDescricao: extratoData?.descricao || "Extrato",
             extratoValor: extratoData?.valor || 0,
             transacaoDescricao: transacaoData?.descricao || "Transação",
             transacaoValor: Number(transacaoData?.valor) || 0,
-            applied: applied && !applyError,
-            error: applyError?.message,
+            applied: true,
           });
-        } catch (err) {
-          console.error("Erro ao aplicar match:", err);
+        } catch (applyError) {
+          allResults.push({
+            extratoId: match.extrato_id,
+            transacaoId: match.transacao_id,
+            score: scorePct,
+            extratoDescricao: extratoData?.descricao || "Extrato",
+            extratoValor: extratoData?.valor || 0,
+            transacaoDescricao: transacaoData?.descricao || "Transação",
+            transacaoValor: Number(transacaoData?.valor) || 0,
+            applied: false,
+            error: (applyError as Error)?.message,
+          });
         }
       }
 

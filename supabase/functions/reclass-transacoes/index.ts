@@ -321,7 +321,31 @@ Deno.serve(async (req) => {
       );
     }
 
-    // TODO: se houver campo de conciliacao, bloquear aqui (não presente no schema atual)
+    // Bloqueia reclassificar transação conciliada (ADR-030 F4): a reclassificação
+    // pode mudar categoria/competência/conta — alterar isso após a conciliação
+    // bancária quebraria a trilha extrato↔transação e o DRE já fechado. O
+    // caminho correto é fin_desconciliar antes de reclassificar.
+    const conciliadas = transacoes.filter(
+      (t) =>
+        t.conciliacao_status === "conciliado_extrato" ||
+        t.conciliacao_status === "conciliado_bot",
+    );
+    if (conciliadas.length > 0) {
+      return new Response(
+        JSON.stringify({
+          error: "TRANSACAO_CONCILIADA",
+          message:
+            `${conciliadas.length} transação(ões) selecionada(s) já estão conciliadas e não podem ser reclassificadas. ` +
+            "Desfaça a conciliação (desconciliar) antes de reclassificar.",
+          total_conciliadas: conciliadas.length,
+          ids_conciliadas: conciliadas.map((t) => t.id),
+        }),
+        {
+          status: 409,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        },
+      );
+    }
 
     const alvoIds = transacoes.map((t) => t.id);
 

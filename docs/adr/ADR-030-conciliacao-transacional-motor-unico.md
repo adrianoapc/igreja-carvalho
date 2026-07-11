@@ -80,6 +80,25 @@ critérios de sugestão e padronizar a entrada de extratos, sem big-bang?
   via audit log.
 - Ordem de migração da ingestão (F5): manual → pix → santander → getnet.
 
+## ✅ Status de implementação
+
+- **F3 (jul/2026, migration `20260711140000`)**: confirmação transacional
+  (`fin_confirmar_conciliacao`/`fin_desconciliar`) entregue. Ver
+  `arquitetura-financeiro.md §9.2`.
+- **F4 (jul/2026, migration `20260711150000`)**: **motor único de score**
+  entregue. `fin_gerar_candidatos_conciliacao` (score 0..1, formatos 1:1 e
+  1:N) é o único gerador de candidatos; tenant/ator via `fin_resolver_contexto`;
+  corte parametrizável por igreja em `financeiro_config.conciliacao_score_minimo`
+  (default 0.6). `ConciliacaoManual`, `DashboardConciliacao` e
+  `ConciliacaoInteligente` migrados ao motor único + `fin_confirmar_conciliacao`.
+  As legadas `reconciliar_transacoes`, `aplicar_conciliacao` e
+  `gerar_candidatos_conciliacao` ficam **deprecadas** (`COMMENT`); o `DROP`
+  fica para a F7, após migrar a edge `gerar-sugestoes-ml`. O score
+  client-side de `ConciliacaoInteligente` e o `ModoABToggle` (código morto)
+  foram removidos. `reclass-transacoes` passou a **recusar** (HTTP 409) job
+  sobre transação conciliada, fechando o TODO de imutabilidade. Detalhes em
+  `arquitetura-financeiro.md §9.3`.
+
 ## 🔗 Relacionados
 
 ADR-022 (importação de extratos), ADR-024 (PIX webhook), ADR-028
