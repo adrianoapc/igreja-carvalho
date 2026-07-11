@@ -165,6 +165,8 @@ flowchart TD
 
 1. **Espelhamento Getnet parte do tipo 1 (RV LQ = previsto)**, não do tipo 5
    (`getnet_financeiro_resumo` = dinheiro que efetivamente movimentou).
+   O modelo alvo (D5, adendo jul/2026) usa **os dois**: previsto e realizado
+   como pernas ligadas — ver §8 ponto 4.
 2. **Três regras de score** com pesos e limiares distintos.
 3. **Confirmação multi-tabela roda no frontend** — falha no meio dos ~6
    updates deixa estado inconsistente (extrato conciliado sem transação paga,
@@ -572,11 +574,29 @@ flowchart TD
 3. **Pipeline comum de ingestão**: contrato `ExtratoItem` + `origem` fixa por
    fonte; dedupe e auditoria num lugar só; viabiliza `undo-import` genérico
    e o gatilho automático de geração de candidatos (ADR-028).
-4. **Getnet tipo 1 vs tipo 5**: recomendação técnica — espelhar extrato a
-   partir do **tipo 5** (dinheiro real; análogo ao extrato bancário),
-   mantendo tipo 1 como analítico/drill-down. Muda números já conciliados →
-   decisão de produto (D5); transição apenas para novos períodos
-   (`origem='getnet_sftp_tipo5'`), sem reprocessar histórico.
+4. **Getnet tipo 1 (previsto) vs tipo 5 (realizado)** — modelo de **duas
+   pernas ligadas** (D5, adendo jul/2026; corrige a leitura anterior de que o
+   tipo 1 seria só analítico). É o padrão fato-gerador × caixa (ADR-001)
+   aplicado ao adquirente: a venda gera um **recebível** (a Getnet deve o
+   dinheiro na data prevista) e o crédito na conta o **liquida** depois.
+   Fluxo alvo:
+   1. O lançamento interno (venda/oferta) nasce em `transacoes_financeiras`
+      com `status pendente` e **sem `data_pagamento`** — é o "a receber".
+   2. Na ingestão, o **tipo 1 (RV previsto)** é o previsto que **concilia**
+      com esse lançamento: identifica o lançamento e casa com o previsto.
+   3. Quando chega o **tipo 5 (dinheiro real na conta)**, ele **dá baixa** no
+      movimento — marca `pago`, `data_pagamento` = data real do crédito, com o
+      valor líquido efetivo (taxas de adquirência, ajustes e antecipação
+      aparecem aqui, não no previsto).
+   - **Exceção (débito e afins):** a Getnet às vezes **não manda as duas
+     pernas** — entrega direto um evento **já liquidado**. Nesses casos o
+     lançamento é criado/baixado num passo só (pendente→pago imediato), sem
+     esperar a segunda perna.
+   - O **tipo 5 continua a verdade do dinheiro** (é ele que baixa/concilia);
+     o tipo 1 deixa de ser descartado e vira o lançamento previsto. A baixa é
+     `fin_confirmar_conciliacao` → **F6 depende da F3**, não só da F5.
+     Transição só para novos períodos (`origem='getnet_sftp_tipo5'`), sem
+     reprocessar histórico já conciliado (decisão de produto do D5).
 
 ---
 
@@ -594,7 +614,7 @@ Cada fase é deployável isolada; legado convive com o novo.
 | **F3 Conciliação transacional** | `fin_confirmar_conciliacao` + `fin_desconciliar` (porta a lógica de `ConciliacaoInteligente.tsx:421-703`); reclassificação passa a bloquear/alertar transação conciliada | Depende de F1 (status via RPC) |
 | **F4 Motor único de score** | Estabilizar `fin_gerar_candidatos_conciliacao`; remover score client-side; deprecar RPCs legadas; validar via ModoABToggle e removê-lo | Depende de F3 |
 | **F5 Pipeline de ingestão** | `fin_ingerir_extratos`; ordem: manual → pix → santander → getnet; gancho pós-ingestão (ADR-028) | Independente após F0 |
-| **F6 Getnet tipo 5** | Após decisão D5; novos períodos apenas; backfill opcional | Depende de F5 |
+| **F6 Getnet previsto→realizado** | Modelo de duas pernas (§8 ponto 4): previsto (tipo 1) concilia o lançamento pendente; realizado (tipo 5) dá baixa; débito entra já liquidado num passo só. Novos períodos apenas; backfill opcional | Depende de F5 **e F3** (a baixa é `fin_confirmar_conciliacao`) |
 | **F7 Endurecimento + UX conciliação** | Revogar escrita direta do role `authenticated`; decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll); Finanças no bottom-nav; DRE mobile em cards; limpeza de código morto | Fecha o ciclo |
 
 ---
@@ -651,7 +671,7 @@ D4, flags do bot e regimes do DRE.
 | D2 | Padrão `features/` no frontend | Financeiro inaugura; demais domínios depois |
 | D3 | Modelo de vínculo de conciliação | (a) manter 3 estruturas via RPC agora; (b) modelo único N:M `conciliacoes`+`conciliacao_itens` como evolução. FK física em `transacao_vinculada_id` após saneamento |
 | D4 | Imutabilidade | Editar/excluir lançamento conciliado? Parcela do meio? A RPC precisa de resposta |
-| D5 | Getnet tipo 1 vs tipo 5 | Tipo 5 como verdade do espelho, só novos períodos |
+| D5 | Getnet tipo 1 vs tipo 5 | **Duas pernas ligadas (adendo jul/2026):** tipo 1 = previsto (recebível, lançamento pendente), tipo 5 = realizado (dá baixa). Débito pode vir já liquidado num passo. Tipo 5 é a verdade do dinheiro; só novos períodos. Detalhe em §8 ponto 4 |
 | D6 | Recorrência/parcelamento | Materializar tudo na criação (parcelado); job mensal (recorrente) |
 | D7 | Efeitos colaterais (alertas) | Fila no banco lida por edge — bot e front geram os mesmos alertas |
 | D8 | Status ENUM vs TEXT+CHECK | Padronizar na F1 (barato agora, caro depois) — inclui sanear os status de `sessoes_contagem` (CHECK × `finalizado` × StatusBadge) |

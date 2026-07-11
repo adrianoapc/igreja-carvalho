@@ -54,10 +54,17 @@ critérios de sugestão e padronizar a entrada de extratos, sem big-bang?
    fixa por fonte; adaptadores fazem parse/fetch e TODOS persistem via
    `fin_ingerir_extratos` (dedupe `(conta_id, external_id)`, auditoria e
    gancho pós-ingestão que dispara geração de candidatos — ADR-028).
-4. **Getnet (decisão D5 aprovada)**: o espelho no extrato passa a nascer do
-   **tipo 5** (`getnet_financeiro_resumo`, dinheiro real) para novos períodos
-   (`origem='getnet_sftp_tipo5'`), mantendo o tipo 1 como analítico.
-   Histórico não é reprocessado.
+4. **Getnet (decisão D5 aprovada; adendo jul/2026 — duas pernas ligadas)**:
+   previsto e realizado são pernas ligadas (fato-gerador × caixa do ADR-001
+   aplicado ao adquirente). O **tipo 1 (RV previsto)** concilia o lançamento
+   interno, que nasce `pendente`/sem `data_pagamento` (recebível a receber);
+   o **tipo 5** (`getnet_financeiro_resumo`, dinheiro real) **dá baixa**
+   (marca `pago`, com data e valor líquido efetivos). Débito e afins podem
+   vir **já liquidados** num único evento (lançamento criado/baixado num
+   passo, sem segunda perna). O tipo 5 segue como verdade do dinheiro, para
+   novos períodos (`origem='getnet_sftp_tipo5'`), sem reprocessar histórico
+   — corrige a leitura anterior de que o tipo 1 seria só analítico. Detalhe
+   em `docs/arquitetura-financeiro.md` §8 ponto 4.
 5. **Modelo de vínculo (decisão D3 aprovada)**: as 3 estruturas atuais são
    mantidas, escritas somente via RPC; modelo único N:M fica como evolução
    posterior. FK física em `transacao_vinculada_id` após saneamento de
