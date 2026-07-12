@@ -15,6 +15,10 @@ on:
       - "supabase/migrations/**"
       - "supabase/functions/**"
       - "supabase/config.toml"
+      # Inclui o próprio workflow: o merge que REATIVA este gatilho (cutover
+      # Lovable→Supabase real) só toca este arquivo — sem isso, o primeiro
+      # deploy completo das 57 functions não dispararia sozinho.
+      - ".github/workflows/supabase-deploy.yml"
   workflow_dispatch:
 
 # Serializa os deploys: se dois merges caírem próximos, o run mais novo cancela o
