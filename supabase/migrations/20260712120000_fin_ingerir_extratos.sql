@@ -257,7 +257,19 @@ BEGIN
   IF v_job.id IS NULL THEN
     RAISE EXCEPTION 'FIN_NAO_ENCONTRADO: job % fora do tenant ou inexistente', p_job_id;
   END IF;
-  IF NOT v_pode_todas AND v_filial IS NOT NULL AND v_job.filial_id IS NOT NULL AND v_job.filial_id IS DISTINCT FROM v_filial THEN
+  -- Mesmo modelo de acesso da ingestão: papel amplo, filial própria, job da
+  -- igreja (filial NULL) ou grant explícito em user_filial_access — senão um
+  -- usuário com grant explícito conseguiria importar mas não desfazer.
+  IF NOT (
+       v_pode_todas
+       OR v_job.filial_id IS NULL
+       OR v_job.filial_id IS NOT DISTINCT FROM v_filial
+       OR (auth.uid() IS NOT NULL AND EXISTS (
+             SELECT 1 FROM public.user_filial_access ufa
+              WHERE ufa.user_id = auth.uid()
+                AND ufa.filial_id = v_job.filial_id
+                AND ufa.can_view = true))
+     ) THEN
     RAISE EXCEPTION 'FIN_TENANT: job fora da filial do usuário';
   END IF;
 

@@ -126,9 +126,26 @@ Deno.serve(async (req) => {
 
     const filialId = profile?.filial_id || null
 
-    // Limpar sugestões antigas pendentes dessa igreja/conta
+    // Papel amplo NESTA igreja (mesma lógica de v_pode_todas em
+    // fin_gerar_candidatos_conciliacao): só esses usuários enxergam "Todas as
+    // filiais" na RPC (p_filial_id null vira NULL == sem restrição). Um usuário
+    // restrito, mesmo com p_filial_id null, tem os candidatos limitados à
+    // própria filial pela RPC — a limpeza/insert precisam do MESMO escopo,
+    // senão um tesoureiro de filial A apaga as sugestões pendentes de outras
+    // filiais sem substituí-las (a RPC só devolveu candidatos de A).
+    const { data: rolesAmplos } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .or(`igreja_id.eq.${igreja_id},igreja_id.is.null`)
+      .in('role', ['admin', 'admin_igreja', 'super_admin'])
+
+    const podeTodas = (rolesAmplos?.length ?? 0) > 0
+    const filialEscopo = podeTodas ? null : filialId
+
+    // Limpar sugestões antigas pendentes dessa igreja/conta/filial
     console.log('[gerar-sugestoes-ml] Limpando sugestões antigas...')
-    
+
     const deleteQuery = supabase
       .from('conciliacao_ml_sugestoes')
       .delete()
@@ -137,6 +154,9 @@ Deno.serve(async (req) => {
 
     if (conta_id) {
       deleteQuery.eq('conta_id', conta_id)
+    }
+    if (filialEscopo) {
+      deleteQuery.eq('filial_id', filialEscopo)
     }
 
     const { error: deleteError } = await deleteQuery
