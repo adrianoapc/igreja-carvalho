@@ -43,6 +43,8 @@ DECLARE
   v_tipo text;
   v_desc text;
   v_novo boolean;
+  v_invalidos int := 0;
+  v_warnings text[] := '{}';
   v_origens text[] := ARRAY['manual','arquivo_ofx','arquivo_csv','arquivo_xlsx',
                             'api_santander','getnet_sftp','getnet_sftp_txt',
                             'getnet_sftp_tipo5','pix'];
@@ -88,12 +90,26 @@ BEGIN
   IF v_conta.id IS NULL OR v_conta.igreja_id IS DISTINCT FROM v_igreja THEN
     RAISE EXCEPTION 'FIN_FK: conta inexistente ou fora do tenant';
   END IF;
-  IF NOT v_pode_todas
-     AND v_filial IS NOT NULL
-     AND v_conta.filial_id IS NOT NULL
-     AND v_conta.filial_id IS DISTINCT FROM v_filial THEN
-    RAISE EXCEPTION 'FIN_TENANT: conta fora da filial do usuário';
+  -- Acesso à filial da conta: papel amplo na igreja (ou integração), filial
+  -- própria, conta da igreja (filial NULL) ou grant explícito em
+  -- user_filial_access — mesmo modelo da RLS, recortado por igreja (sem o atalho
+  -- global de admin de has_filial_access). Honra o acesso multi-filial.
+  IF NOT (
+       v_pode_todas
+       OR v_conta.filial_id IS NULL
+       OR v_conta.filial_id IS NOT DISTINCT FROM v_filial
+       OR (auth.uid() IS NOT NULL AND EXISTS (
+             SELECT 1 FROM public.user_filial_access ufa
+              WHERE ufa.user_id = auth.uid()
+                AND ufa.filial_id = v_conta.filial_id
+                AND ufa.can_view = true))
+     ) THEN
+    RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial da conta';
   END IF;
+
+  -- Auditoria/job refletem a filial da CONTA (não o default do contexto), senão
+  -- um extrato de filial X geraria audit com filial NULL, visível a outras filiais.
+  v_ctx := v_ctx || jsonb_build_object('filial_id', v_conta.filial_id);
 
   v_total := COALESCE(jsonb_array_length(p_itens), 0);
   IF v_total = 0 THEN
@@ -109,37 +125,45 @@ BEGIN
 
   FOR v_item IN SELECT * FROM jsonb_array_elements(p_itens)
   LOOP
-    IF NULLIF(v_item ->> 'data_transacao','') IS NULL OR NULLIF(v_item ->> 'valor','') IS NULL THEN
-      RAISE EXCEPTION 'FIN_VALIDACAO: item sem data_transacao/valor';
-    END IF;
-    v_tipo := v_item ->> 'tipo';
-    IF v_tipo NOT IN ('credito','debito') THEN
-      RAISE EXCEPTION 'FIN_VALIDACAO: tipo % inválido', COALESCE(v_tipo,'(nulo)');
-    END IF;
+    -- Isola cada item numa subtransação: um item inválido é ignorado com aviso,
+    -- sem derrubar o lote — os válidos persistem (crítico para os adaptadores,
+    -- onde uma linha malformada do banco não pode anular o sync inteiro).
+    BEGIN
+      IF NULLIF(v_item ->> 'data_transacao','') IS NULL OR NULLIF(v_item ->> 'valor','') IS NULL THEN
+        RAISE EXCEPTION 'item sem data_transacao/valor';
+      END IF;
+      v_tipo := v_item ->> 'tipo';
+      IF v_tipo NOT IN ('credito','debito') THEN
+        RAISE EXCEPTION 'tipo % inválido', COALESCE(v_tipo,'(nulo)');
+      END IF;
 
-    v_data  := (v_item ->> 'data_transacao')::date;
-    v_valor := abs((v_item ->> 'valor')::numeric);  -- D-F5: ABS canônico
-    v_desc  := COALESCE(v_item ->> 'descricao', '');
+      v_data  := (v_item ->> 'data_transacao')::date;
+      v_valor := abs((v_item ->> 'valor')::numeric);  -- D-F5: ABS canônico
+      v_desc  := COALESCE(v_item ->> 'descricao', '');
 
-    v_ext_id := COALESCE(
-      NULLIF(v_item ->> 'external_id', ''),
-      'auto:' || md5(p_conta_id::text || '|' || v_data::text || '|' ||
-                     v_valor::text || '|' || v_tipo || '|' || v_desc)
-    );
+      v_ext_id := COALESCE(
+        NULLIF(v_item ->> 'external_id', ''),
+        'auto:' || md5(p_conta_id::text || '|' || v_data::text || '|' ||
+                       v_valor::text || '|' || v_tipo || '|' || v_desc)
+      );
 
-    INSERT INTO public.extratos_bancarios
-      (conta_id, igreja_id, filial_id, data_transacao, descricao, valor, saldo,
-       numero_documento, tipo, reconciliado, origem, external_id, import_job_id)
-    VALUES
-      (p_conta_id, v_igreja, v_conta.filial_id, v_data, v_desc, v_valor,
-       NULLIF(v_item ->> 'saldo','')::numeric,
-       NULLIF(v_item ->> 'numero_documento',''), v_tipo, false, p_origem,
-       v_ext_id, v_job_id)
-    ON CONFLICT (conta_id, external_id) DO NOTHING;
+      INSERT INTO public.extratos_bancarios
+        (conta_id, igreja_id, filial_id, data_transacao, descricao, valor, saldo,
+         numero_documento, tipo, reconciliado, origem, external_id, import_job_id)
+      VALUES
+        (p_conta_id, v_igreja, v_conta.filial_id, v_data, v_desc, v_valor,
+         NULLIF(v_item ->> 'saldo','')::numeric,
+         NULLIF(v_item ->> 'numero_documento',''), v_tipo, false, p_origem,
+         v_ext_id, v_job_id)
+      ON CONFLICT (conta_id, external_id) DO NOTHING;
 
-    GET DIAGNOSTICS v_novo = ROW_COUNT;
-    IF v_novo THEN v_inseridos := v_inseridos + 1;
-    ELSE v_duplicados := v_duplicados + 1; END IF;
+      GET DIAGNOSTICS v_novo = ROW_COUNT;
+      IF v_novo THEN v_inseridos := v_inseridos + 1;
+      ELSE v_duplicados := v_duplicados + 1; END IF;
+    EXCEPTION WHEN OTHERS THEN
+      v_invalidos := v_invalidos + 1;
+      v_warnings := v_warnings || left(SQLERRM, 120);
+    END;
   END LOOP;
 
   UPDATE public.fin_extrato_ingestao_jobs
@@ -149,11 +173,12 @@ BEGIN
   PERFORM public.fin_registrar_auditoria(
     v_ctx, 'fin_ingerir_extratos', 'extratos_bancarios', v_job_id,
     jsonb_build_object('origem', p_origem, 'conta_id', p_conta_id, 'total', v_total),
-    jsonb_build_object('job_id', v_job_id, 'inseridos', v_inseridos, 'duplicados', v_duplicados));
+    jsonb_build_object('job_id', v_job_id, 'inseridos', v_inseridos,
+                       'duplicados', v_duplicados, 'invalidos', v_invalidos));
 
   RETURN jsonb_build_object('ok', true, 'job_id', v_job_id, 'total', v_total,
                             'inseridos', v_inseridos, 'duplicados', v_duplicados,
-                            'warnings', '[]'::jsonb);
+                            'invalidos', v_invalidos, 'warnings', to_jsonb(v_warnings));
 END;
 $$;
 
