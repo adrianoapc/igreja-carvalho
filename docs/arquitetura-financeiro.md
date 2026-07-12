@@ -593,7 +593,7 @@ Cada fase é deployável isolada; legado convive com o novo.
 | **F2.5 Leitura agregada no servidor** ✅ | Migration `20260710130000`: `fin_resumo_periodo`, `fin_ofertas_periodo` (filtro estrutural `sessao_id`/categoria no lugar de `ilike descricao`), `fin_projecao_mensal`; `get_dre_anual(p_ano, p_regime)` caixa×competência com seletor no DRE; RelatorioCobertura consome `view_reconciliacao_cobertura`; Dashboard (comparativo) e Projeção nos agregados | Concluída (jul/2026); Insights e demais queries do Dashboard ficam para evolução |
 | **F3 Conciliação transacional** ✅ | Migration `20260711140000`: `fin_confirmar_conciliacao(p_vinculo)` (1:1/N:1/1:N inferidos por cardinalidade, numa transação) + `fin_desconciliar`. Frontend: `ConciliacaoInteligente`, `DividirExtratoDialog`, `useConciliacaoLote` e `DesconciliarDialog` via `core/api/conciliacao.api`. Ver §9.2 | Concluída (jul/2026). `ConciliacaoManual`/`DashboardConciliacao` (motor legado) e o bloqueio da reclassificação ficam para a F4 |
 | **F4 Motor único de score** ✅ | Migration `20260711150000`: `fin_gerar_candidatos_conciliacao` (score 0..1, 1:1 e 1:N, corte por igreja em `financeiro_config.conciliacao_score_minimo`). `ConciliacaoManual`/`DashboardConciliacao`/`ConciliacaoInteligente` migrados ao motor único + `fin_confirmar_conciliacao`; `reconciliar_transacoes`/`aplicar_conciliacao`/`gerar_candidatos_conciliacao` deprecadas (DROP na F7); `ModoABToggle` (código morto) removido; `reclass-transacoes` recusa transação conciliada. Ver §9.3 | Concluída (jul/2026) |
-| **F5 Pipeline de ingestão** | `fin_ingerir_extratos`; ordem: manual → pix → santander → getnet; gancho pós-ingestão (ADR-028) | Independente após F0 |
+| **F5 Pipeline de ingestão** (parcial) | Migration `20260712120000`: `fin_ingerir_extratos` (contrato ExtratoItem, valor ABS, dedupe por `(conta_id, external_id)` com id determinístico, job + auditoria) + `fin_desfazer_ingestao`; canal **manual** (OFX/CSV/XLSX) via `core/api/extratos.api`; edge `gerar-sugestoes-ml` migrada ao motor único F4. Ver §9.4 | Fatia 1 concluída (jul/2026); Santander/Getnet/PIX na fatia 2 |
 | **F6 Getnet tipo 5** | Após decisão D5; novos períodos apenas; backfill opcional | Depende de F5 |
 | **F7 Endurecimento + UX conciliação** | Revogar escrita direta do role `authenticated`; decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll); Finanças no bottom-nav; DRE mobile em cards; limpeza de código morto | Fecha o ciclo |
 
@@ -770,6 +770,43 @@ p_score_minimo, p_contexto)`.
 - **Validação**: harness docker — 7 cenários (score 1:1/1:N, corte explícito,
   corte por igreja via config, exclusão de conciliado, isolamento de tenant,
   guarda admin|tesoureiro).
+
+### 9.4 Notas de implementação F5 — ingestão de extratos (fatia 1, jul/2026)
+
+Migration `20260712120000`. Porta única `fin_ingerir_extratos(p_conta_id,
+p_origem, p_itens jsonb, p_contexto)` — contrato `ExtratoItem = {data_transacao,
+valor, tipo, descricao, external_id?, numero_documento?, saldo?}`.
+
+- **Escopo desta fatia**: só o canal **manual** (OFX/CSV/XLSX — `ImportarExtratosTab`)
+  passou pela porta; Santander (`santander-api`), Getnet (`getnet-sftp`) e o
+  PIX (novo) migram na fatia 2 (Getnet amarra com a decisão tipo-5 da F6). O
+  legado convive: os edges ainda escrevem direto até migrarem.
+- **Valor canônico (D-F5)**: a porta grava `valor = abs(valor)`; a direção fica
+  em `tipo` (credito/debito). Alinha com `santander-api` e com o motor F4 (que
+  compara `e.valor = t.valor`). Só governa nova ingestão; linhas históricas
+  assinadas permanecem.
+- **Dedupe que fecha o bug do manual**: o canal manual gravava `external_id`
+  NULL → reimportar duplicava. Agora o front manda `external_id` = FITID do OFX
+  quando há, senão uma chave determinística com **índice de ocorrência**
+  (`file:...#n`) — reimportar deduplica, mas dois lançamentos idênticos no mesmo
+  arquivo não são descartados. Se o item chega sem `external_id`, a RPC gera
+  `auto:md5(...)`. `ON CONFLICT (conta_id, external_id) DO NOTHING` conta
+  inseridos × duplicados.
+- **Job + undo (padrão reclass)**: `fin_extrato_ingestao_jobs` (1 linha por lote)
+  + `extratos_bancarios.import_job_id` (antes nunca populado). `fin_desfazer_
+  ingestao(p_job_id)` remove os extratos **não conciliados** do job e **preserva**
+  os já conciliados (dinheiro vinculado não some), marcando `desfeito_em`.
+- **Segurança**: `SECURITY DEFINER` + `fin_resolver_contexto` (admin|tesoureiro);
+  a conta é validada no tenant e no escopo de filial do ator (conta de outra
+  filial → `FIN_TENANT`); RLS de leitura no job (admin|tesoureiro + filial);
+  escrita só via RPC. Toda ingestão/undo grava em `fin_audit_log`.
+- **Edge `gerar-sugestoes-ml`**: trocou `gerar_candidatos_conciliacao` (legada)
+  por `fin_gerar_candidatos_conciliacao` (motor único F4). Roda sob o JWT do
+  usuário (não service role) → igreja deixa de ser parâmetro. Pré-requisito para
+  o DROP das legadas na F7.
+- **Validação**: harness docker — 9 cenários (ABS, dedupe por reimport, dedupe
+  no lote, origem/tipo inválidos, conta fora do tenant/filial, undo preservando
+  conciliado, guarda admin|tesoureiro).
 
 ## 10. Decisões em aberto (bater o martelo)
 

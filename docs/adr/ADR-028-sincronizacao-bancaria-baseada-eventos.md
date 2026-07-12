@@ -180,5 +180,21 @@ O período (manhã/noite) é inferido automaticamente:
 
 ---
 
-**Última Atualização**: 2026-02-09  
+## Atualização F5 (jul/2026) — porta única de ingestão
+
+A camada canônica `fin_*` (ADR-029) passou a cobrir a ingestão de extratos:
+`fin_ingerir_extratos` (migration `20260712120000`) é a porta única que recebe o
+contrato `ExtratoItem`, valida tenant/filial, normaliza valor (ABS + direção em
+`tipo`), deduplica por `(conta_id, external_id)` — gerando `external_id`
+determinístico quando o provedor não fornece — e registra job + auditoria;
+`fin_desfazer_ingestao` faz o undo preservando extratos já conciliados. Nesta
+fatia migrou o canal **manual** (OFX/CSV/XLSX); os adaptadores por evento deste
+ADR (PIX/Santander) e o Getnet passam a chamar a mesma porta na fatia 2, quando
+o "gancho pós-ingestão" (geração automática de candidatos) será conectado ao
+motor único `fin_gerar_candidatos_conciliacao`. Detalhes em
+`docs/arquitetura-financeiro.md §9.4`.
+
+---
+
+**Última Atualização**: 2026-07-12  
 **Próxima Revisão**: Após 3 meses de uso em produção

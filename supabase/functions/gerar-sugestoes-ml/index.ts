@@ -77,21 +77,23 @@ Deno.serve(async (req) => {
       score_minimo 
     })
 
-    // Chamar RPC para gerar candidatos
-    console.log('[gerar-sugestoes-ml] Chamando RPC com params:', {
-      p_igreja_id: igreja_id,
+    // Motor ÚNICO F4: fin_gerar_candidatos_conciliacao. A edge roda sob o JWT do
+    // usuário (anon key + Authorization repassado), então a RPC resolve
+    // tenant/ator via fin_resolver_contexto — igreja NÃO é mais parâmetro (era
+    // aceita crua pela legada). p_filial_id NULL: escopo pelo JWT do usuário.
+    console.log('[gerar-sugestoes-ml] Chamando fin_gerar_candidatos_conciliacao:', {
       p_conta_id: conta_id || null,
-      p_mes_inicio: dataInicio,
-      p_mes_fim: dataFim,
+      p_periodo_inicio: dataInicio,
+      p_periodo_fim: dataFim,
       p_score_minimo: score_minimo,
     })
 
-    const { data: candidatos, error: rpcError } = await supabase.rpc('gerar_candidatos_conciliacao', {
-      p_igreja_id: igreja_id,
+    const { data: candidatos, error: rpcError } = await supabase.rpc('fin_gerar_candidatos_conciliacao', {
       p_conta_id: conta_id || null,
-      p_mes_inicio: dataInicio,
-      p_mes_fim: dataFim,
+      p_periodo_inicio: dataInicio,
+      p_periodo_fim: dataFim,
       p_score_minimo: score_minimo,
+      p_filial_id: null,
     })
 
     if (rpcError) {

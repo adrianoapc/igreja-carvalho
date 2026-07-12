@@ -13,6 +13,10 @@ import { toast } from "sonner";
 import { useFilialId } from "@/hooks/useFilialId";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  ingerirExtratos,
+  type OrigemExtrato,
+} from "@/features/financeiro/core/api/extratos.api";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { read, utils, WorkBook } from "xlsx";
 import {
@@ -405,28 +409,47 @@ export function ImportarExtratosTab() {
         return;
       }
 
-      const chunkSize = 200;
-      for (let start = 0; start < extratos.length; start += chunkSize) {
-        const chunk = extratos.slice(start, start + chunkSize).map((e) => ({
-          conta_id: contaId,
-          igreja_id: igrejaId,
-          filial_id: isAllFiliais ? null : filialId,
-          data_transacao: e.data_transacao,
-          descricao: e.descricao,
-          valor: e.valor,
-          saldo: e.saldo,
-          numero_documento: e.numero_documento,
-          tipo: e.tipo,
-          reconciliado: false,
-        }));
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (supabase as any)
-          .from("extratos_bancarios")
-          .insert(chunk);
-        if (error) throw error;
-      }
+      const origem: OrigemExtrato = (() => {
+        const ext = fileName.toLowerCase().split(".").pop();
+        if (ext === "ofx") return "arquivo_ofx";
+        if (ext === "csv") return "arquivo_csv";
+        return "arquivo_xlsx";
+      })();
 
-      toast.success(`${extratos.length} linhas importadas para extratos`);
+      // external_id: FITID do OFX quando houver; senão chave determinística com
+      // índice de ocorrência — reimportar deduplica, mas dois lançamentos
+      // idênticos no mesmo arquivo não são descartados.
+      const ocorrencias = new Map<string, number>();
+      const itens = extratos.map((e) => {
+        const fitid =
+          origem === "arquivo_ofx" ? (e.numero_documento || "").trim() : "";
+        let external_id: string;
+        if (fitid) {
+          external_id = `ofx:${fitid}`;
+        } else {
+          const chave = `${e.data_transacao}|${Math.abs(e.valor)}|${e.tipo}|${e.descricao}`;
+          const occ = ocorrencias.get(chave) ?? 0;
+          ocorrencias.set(chave, occ + 1);
+          external_id = `file:${chave}#${occ}`;
+        }
+        return {
+          data_transacao: e.data_transacao,
+          valor: Math.abs(e.valor),
+          tipo: e.tipo as "credito" | "debito",
+          descricao: e.descricao,
+          numero_documento: e.numero_documento,
+          saldo: e.saldo,
+          external_id,
+        };
+      });
+
+      const res = await ingerirExtratos(contaId, origem, itens);
+      const inseridos = Number(res.inseridos ?? 0);
+      const duplicados = Number(res.duplicados ?? 0);
+      toast.success(
+        `${inseridos} extrato(s) importado(s)` +
+          (duplicados > 0 ? ` · ${duplicados} duplicado(s) ignorado(s)` : ""),
+      );
       setValidationIssues([]);
       setExcluded({});
       setRows([]);
