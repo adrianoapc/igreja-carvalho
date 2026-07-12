@@ -49,7 +49,8 @@ DROP POLICY IF EXISTS "fin_ingestao_jobs_select" ON public.fin_extrato_ingestao_
 CREATE POLICY "fin_ingestao_jobs_select" ON public.fin_extrato_ingestao_jobs
   FOR SELECT TO authenticated
   USING (
-    (has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'tesoureiro'::app_role))
+    (has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'tesoureiro'::app_role)
+     OR has_role(auth.uid(), 'super_admin'::app_role))
     AND public.has_filial_access(igreja_id, filial_id)
   );
 -- Escrita apenas via RPCs SECURITY DEFINER (nenhuma policy de INSERT/UPDATE).
@@ -272,6 +273,11 @@ BEGIN
      ) THEN
     RAISE EXCEPTION 'FIN_TENANT: job fora da filial do usuário';
   END IF;
+
+  -- Auditoria reflete a filial do JOB (não o default do contexto do ator) —
+  -- mesmo ajuste feito na ingestão: um admin/super_admin com filial default A
+  -- desfazendo job da filial B não pode gravar a trilha em A.
+  v_ctx := v_ctx || jsonb_build_object('filial_id', v_job.filial_id);
 
   -- Preserva conciliados (reconciliado ou vinculado a transação).
   SELECT count(*) INTO v_mantidos
