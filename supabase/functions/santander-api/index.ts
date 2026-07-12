@@ -790,6 +790,16 @@ async function syncExtrato(
       })
       result.inseridos = Number(res.inseridos ?? 0)
       result.ignorados = Number(res.duplicados ?? 0)
+      // A RPC isola itens inválidos (data/valor/tipo malformados) por
+      // subtransação — não lança, retorna em invalidos/warnings. Sem repassar
+      // isso, um extrato com linha malformada apareceria como sync 100% ok.
+      const invalidos = Number(res.invalidos ?? 0)
+      if (invalidos > 0) {
+        const avisos = Array.isArray(res.warnings) ? (res.warnings as string[]) : []
+        result.erros.push(
+          `${invalidos} transação(ões) rejeitada(s) pela ingestão: ${avisos.join('; ')}`,
+        )
+      }
     } catch (err) {
       result.erros.push(`Falha na ingestão de extratos: ${err instanceof Error ? err.message : String(err)}`)
     }
