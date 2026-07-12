@@ -1,0 +1,31 @@
+flowchart TD
+    subgraph UI["Frontend de conciliação (F4)"]
+        CI["ConciliacaoInteligente\n(ranqueia candidatos do motor)"]
+        MAN["ConciliacaoManual (Modo Clássico)"]
+        DASH["DashboardConciliacao"]
+    end
+
+    CAPI["core/api/conciliacao.api\ngerarCandidatosConciliacao · confirmarConciliacao"]
+
+    CI --> CAPI
+    MAN --> CAPI
+    DASH --> CAPI
+
+    subgraph MOTOR["Motor ÚNICO (SECURITY DEFINER + fin_resolver_contexto)"]
+        GEN["fin_gerar_candidatos_conciliacao\nscore 0..1 · 1:1 e 1:N\ncorte por igreja (financeiro_config)"]
+    end
+    CAPI -->|gera candidatos| GEN
+    GEN --> RANK["candidatos ranqueados\n(ordenados por score)"]
+    RANK --> CAPI
+    CAPI -->|aplica| CONF["fin_confirmar_conciliacao (F3)\numa transação · baixa pendente→pago"]
+
+    subgraph DEP["Deprecados (DROP na F7)"]
+        L1[reconciliar_transacoes]
+        L2[aplicar_conciliacao]
+        L3[gerar_candidatos_conciliacao]
+    end
+    GEN -.substitui.-> L1
+    GEN -.substitui.-> L3
+    CONF -.substitui.-> L2
+
+    RECLASS["reclass-transacoes\nrecusa transação conciliada (409)"]
