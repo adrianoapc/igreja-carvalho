@@ -1,21 +1,32 @@
-# Workflow de deploy automatico do backend Supabase (migrations + edge
-# functions). Atualmente disponivel apenas via execucao manual
-# (workflow_dispatch): o gatilho automatico em push para `main` foi removido
-# porque este projeto roda no Supabase gerenciado pelo Lovable, e ainda nao
-# ha confirmacao de que existe um SUPABASE_ACCESS_TOKEN/SUPABASE_DB_PASSWORD
-# com acesso a esse projeto para configurar como secret aqui. Ver
-# docs/01-Arquitetura/01-arquitetura-geral.MD (secao "CI/CD: Deploy do
-# Supabase") para detalhes. Se/quando esse acesso existir, basta reativar o
-# gatilho de push abaixo.
+# Workflow de deploy do backend Supabase (migrations + edge functions).
+# Reativado ao migrar do Supabase gerenciado pelo Lovable para o Supabase real
+# (projeto ugnrumtngcskbfpwynsr). Roda no push para `main` quando migrations ou
+# functions mudam, e por execucao manual. Requer os secrets do repo
+# SUPABASE_ACCESS_TOKEN e SUPABASE_DB_PASSWORD. Os secrets de RUNTIME das
+# functions (SANTANDER_*, WHATSAPP_*, MAKE_WEBHOOK_SECRET, etc.) sao
+# configurados no proprio projeto Supabase (supabase secrets set / dashboard),
+# nao aqui. Ver docs/01-Arquitetura/01-arquitetura-geral.MD.
 name: Deploy Supabase
 
 on:
-  # push:
-  #   branches: [main]
-  #   paths:
-  #     - "supabase/migrations/**"
-  #     - "supabase/functions/**"
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/functions/**"
+      - "supabase/config.toml"
+      # Inclui o próprio workflow: o merge que REATIVA este gatilho (cutover
+      # Lovable→Supabase real) só toca este arquivo — sem isso, o primeiro
+      # deploy completo das 57 functions não dispararia sozinho.
+      - ".github/workflows/supabase-deploy.yml"
   workflow_dispatch:
+
+# Serializa os deploys: se dois merges caírem próximos, o run mais novo cancela o
+# em andamento — evita que um run antigo (checkout velho) termine DEPOIS do novo
+# e redeploye todas as functions de um código já superado (rollback silencioso).
+concurrency:
+  group: supabase-deploy
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -51,23 +62,34 @@ jobs:
       - name: List edge functions
         id: functions
         run: |
-          # Como esta execucao e manual (workflow_dispatch), nao ha como
-          # saber de forma confiavel qual foi a ultima revisao realmente
-          # deployada (pode haver varios commits acumulados desde entao).
-          # Por isso, deployamos todas as functions a cada execucao manual,
-          # garantindo que nada fique desatualizado em relacao as migrations
-          # recem aplicadas.
+          # Deploya TODAS as functions (exceto _shared, que e biblioteca
+          # importada, nao uma function). Garante que nada fique desatualizado
+          # em relacao as migrations recem aplicadas.
           find supabase/functions -mindepth 1 -maxdepth 1 -type d ! -name '_shared' -printf '%f\n' \
             | sort > /tmp/functions.txt
-          echo "Functions a deployar:"
+          echo "Functions a deployar: $(wc -l < /tmp/functions.txt)"
           cat /tmp/functions.txt
 
       - name: Deploy edge functions
         run: |
+          # Resiliente: tenta TODAS mesmo se uma falhar; falha o job no fim se
+          # houver qualquer erro (mas as demais ja terao sido deployadas).
+          failed=""
           while IFS= read -r fn; do
             [ -z "$fn" ] && continue
-            echo "Deploying function: $fn"
-            supabase functions deploy "$fn" --project-ref "${{ steps.project.outputs.ref }}"
+            echo "::group::Deploying $fn"
+            if supabase functions deploy "$fn" --project-ref "${{ steps.project.outputs.ref }}"; then
+              echo "OK: $fn"
+            else
+              echo "::error::Falha ao deployar $fn"
+              failed="$failed $fn"
+            fi
+            echo "::endgroup::"
           done < /tmp/functions.txt
+          if [ -n "$failed" ]; then
+            echo "::error::Functions com falha:$failed"
+            exit 1
+          fi
+          echo "Todas as functions deployadas com sucesso."
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
