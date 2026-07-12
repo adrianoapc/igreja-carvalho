@@ -819,7 +819,20 @@ migrar a importação (antes RLS explicitamente checava `super_admin`) para
 has_role(super_admin)`), sem alterar mais nada da função. Regressão validada: os
 harness F3/F4 completos continuam verdes com a função ampliada.
 
-## 10. Decisões em aberto (bater o martelo)
+**RLS de `fin_extrato_ingestao_jobs` reescrita sem `has_filial_access`**: a
+policy original usava `has_role('admin') AND has_filial_access(...)` — mas
+ambos têm o mesmo atalho global (`has_role('admin')` é satisfeito por
+`admin_igreja`/`admin_filial` de **qualquer** igreja, sem checar `igreja_id`),
+o mesmo vazamento cross-tenant já corrigido em `v_pode_todas` nas RPCs `fin_*`
+(checklist [[feedback-fin-rpc-security-checklist]]). A policy passou a replicar
+a mesma lógica: papel amplo recortado por igreja (`admin`/`admin_igreja`/
+`super_admin`, igual a `v_pode_todas`) OU papel restrito à filial (`tesoureiro`/
+`admin_filial`) da mesma igreja + escopo de filial (própria, job de igreja, ou
+grant explícito). **Validação real de RLS** (não só por inspeção): harness
+troca para a role `authenticated` via `SET ROLE` (não-superuser, RLS
+efetivamente aplicado) — T14 prova que um `admin_igreja` de outra igreja lê
+zero jobs desta igreja (vazamento fechado); T14b é o controle positivo (admin
+legítimo continua enxergando).
 
 | # | Decisão | Recomendação |
 |---|---|---|

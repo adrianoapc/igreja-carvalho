@@ -46,12 +46,40 @@ CREATE INDEX IF NOT EXISTS idx_fin_ingestao_jobs_conta
 ALTER TABLE public.fin_extrato_ingestao_jobs ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "fin_ingestao_jobs_select" ON public.fin_extrato_ingestao_jobs;
+-- NÃO usa has_role('admin')/has_filial_access: ambos têm atalho global
+-- satisfeito por admin_igreja/admin_filial de QUALQUER igreja (sem checar
+-- igreja_id), o mesmo vazamento cross-tenant já corrigido em v_pode_todas nas
+-- RPCs fin_*. A policy replica exatamente essa lógica: papel amplo recortado
+-- por igreja (mesma lista de v_pode_todas) OU papel restrito à filial
+-- (tesoureiro/admin_filial) da mesma igreja + escopo de filial (própria, job
+-- de igreja, ou grant explícito em user_filial_access).
 CREATE POLICY "fin_ingestao_jobs_select" ON public.fin_extrato_ingestao_jobs
   FOR SELECT TO authenticated
   USING (
-    (has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'tesoureiro'::app_role)
-     OR has_role(auth.uid(), 'super_admin'::app_role))
-    AND public.has_filial_access(igreja_id, filial_id)
+    EXISTS (
+      SELECT 1 FROM public.user_roles ur
+       WHERE ur.user_id = auth.uid()
+         AND ur.role::text IN ('admin', 'admin_igreja', 'super_admin')
+         AND (ur.igreja_id = fin_extrato_ingestao_jobs.igreja_id OR ur.igreja_id IS NULL)
+    )
+    OR (
+      EXISTS (
+        SELECT 1 FROM public.user_roles ur
+         WHERE ur.user_id = auth.uid()
+           AND ur.role::text IN ('tesoureiro', 'admin_filial')
+           AND ur.igreja_id = fin_extrato_ingestao_jobs.igreja_id
+      )
+      AND (
+        fin_extrato_ingestao_jobs.filial_id IS NULL
+        OR fin_extrato_ingestao_jobs.filial_id = public.get_current_user_filial_id()
+        OR EXISTS (
+          SELECT 1 FROM public.user_filial_access ufa
+           WHERE ufa.user_id = auth.uid()
+             AND ufa.filial_id = fin_extrato_ingestao_jobs.filial_id
+             AND ufa.can_view = true
+        )
+      )
+    )
   );
 -- Escrita apenas via RPCs SECURITY DEFINER (nenhuma policy de INSERT/UPDATE).
 
