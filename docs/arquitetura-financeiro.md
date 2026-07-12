@@ -808,6 +808,17 @@ valor, tipo, descricao, external_id?, numero_documento?, saldo?}`.
   no lote, origem/tipo inválidos, conta fora do tenant/filial, undo preservando
   conciliado, guarda admin|tesoureiro).
 
+**Fix transversal (migration `20260712121000`)**: `fin_resolver_contexto` (F1,
+compartilhada por **todas** as RPCs `fin_*`) bloqueava um usuário `super_admin`
+puro — seu gate JWT exigia `has_role(admin) OR has_role(tesoureiro)`, e
+`has_role('admin')` cobre `admin_igreja`/`admin_filial` mas **não** `super_admin`
+(convenção do resto do código, que sempre checa `super_admin` à parte). Passou
+despercebido enquanto nenhuma RPC `fin_*` era porta única; a F5 expôs o gap ao
+migrar a importação (antes RLS explicitamente checava `super_admin`) para
+`fin_ingerir_extratos`. `CREATE OR REPLACE` amplia o gate (`OR
+has_role(super_admin)`), sem alterar mais nada da função. Regressão validada: os
+harness F3/F4 completos continuam verdes com a função ampliada.
+
 ## 10. Decisões em aberto (bater o martelo)
 
 | # | Decisão | Recomendação |
