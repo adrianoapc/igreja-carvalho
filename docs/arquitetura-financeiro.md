@@ -593,7 +593,7 @@ Cada fase é deployável isolada; legado convive com o novo.
 | **F2.5 Leitura agregada no servidor** ✅ | Migration `20260710130000`: `fin_resumo_periodo`, `fin_ofertas_periodo` (filtro estrutural `sessao_id`/categoria no lugar de `ilike descricao`), `fin_projecao_mensal`; `get_dre_anual(p_ano, p_regime)` caixa×competência com seletor no DRE; RelatorioCobertura consome `view_reconciliacao_cobertura`; Dashboard (comparativo) e Projeção nos agregados | Concluída (jul/2026); Insights e demais queries do Dashboard ficam para evolução |
 | **F3 Conciliação transacional** ✅ | Migration `20260711140000`: `fin_confirmar_conciliacao(p_vinculo)` (1:1/N:1/1:N inferidos por cardinalidade, numa transação) + `fin_desconciliar`. Frontend: `ConciliacaoInteligente`, `DividirExtratoDialog`, `useConciliacaoLote` e `DesconciliarDialog` via `core/api/conciliacao.api`. Ver §9.2 | Concluída (jul/2026). `ConciliacaoManual`/`DashboardConciliacao` (motor legado) e o bloqueio da reclassificação ficam para a F4 |
 | **F4 Motor único de score** ✅ | Migration `20260711150000`: `fin_gerar_candidatos_conciliacao` (score 0..1, 1:1 e 1:N, corte por igreja em `financeiro_config.conciliacao_score_minimo`). `ConciliacaoManual`/`DashboardConciliacao`/`ConciliacaoInteligente` migrados ao motor único + `fin_confirmar_conciliacao`; `reconciliar_transacoes`/`aplicar_conciliacao`/`gerar_candidatos_conciliacao` deprecadas (DROP na F7); `ModoABToggle` (código morto) removido; `reclass-transacoes` recusa transação conciliada. Ver §9.3 | Concluída (jul/2026) |
-| **F5 Pipeline de ingestão** (parcial) | Migration `20260712120000`: `fin_ingerir_extratos` (contrato ExtratoItem, valor ABS, dedupe por `(conta_id, external_id)` com id determinístico, job + auditoria) + `fin_desfazer_ingestao`; canal **manual** (OFX/CSV/XLSX) via `core/api/extratos.api`; edge `gerar-sugestoes-ml` migrada ao motor único F4. Ver §9.4 | Fatia 1 concluída (jul/2026); Santander/Getnet/PIX na fatia 2 |
+| **F5 Pipeline de ingestão** (parcial) | Migration `20260712120000`: `fin_ingerir_extratos` (contrato ExtratoItem, valor ABS, dedupe por `(conta_id, external_id)` com id determinístico, job + auditoria) + `fin_desfazer_ingestao`; canal **manual** (OFX/CSV/XLSX) via `core/api/extratos.api`; edge `gerar-sugestoes-ml` migrada ao motor único F4. Ver §9.4 | Fatia 1 + adaptador `santander-api` (`20260712130000`, caminho service-role D-F5.2) concluídos; Getnet (F6 tipo-5) e PIX (novo) pendentes |
 | **F6 Getnet tipo 5** | Após decisão D5; novos períodos apenas; backfill opcional | Depende de F5 |
 | **F7 Endurecimento + UX conciliação** | Revogar escrita direta do role `authenticated`; decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll); Finanças no bottom-nav; DRE mobile em cards; limpeza de código morto | Fecha o ciclo |
 
@@ -807,6 +807,21 @@ valor, tipo, descricao, external_id?, numero_documento?, saldo?}`.
 - **Validação**: harness docker — 9 cenários (ABS, dedupe por reimport, dedupe
   no lote, origem/tipo inválidos, conta fora do tenant/filial, undo preservando
   conciliado, guarda admin|tesoureiro).
+
+**Fatia 2 (jul/2026, migration `20260712130000`)**: caminho service-role para
+adaptadores. Edges autônomas (getnet/pix/santander em service role) não têm ator
+humano — **decisão D-F5.2**: `fin_ingerir_extratos` aceita service-role com
+`canal='integracao'` **sem `ator_profile_id`**, validando só que a igreja existe
+(ingestão é import de dados, não move dinheiro; a autz do canal é da própria edge
+via secret/cert); a auditoria registra `canal` + ator NULL. Os caminhos JWT
+(usuário) e service-role **com** ator seguem pelo `fin_resolver_contexto` estrito.
+O shim `_shared/financeiro-core.ts` ganhou `ingerirExtratos`; **`santander-api`**
+migrou o write de extrato para a porta (coleta em lote → `fin_ingerir_extratos`,
+`external_id` preservado = providerId/SHA-256; dedupe/preservação de conciliados
+a cargo do `ON CONFLICT DO NOTHING`). `getnet-sftp` (amarra F6 tipo-5),
+`santander-extrato` (sem caller na UI) e o PIX (novo) ficam para depois. Harness
+F5b: 5 cenários (integração sem ator, igreja inexistente, service estrito sem
+ator bloqueado, conta fora do tenant, regressão do caminho JWT).
 
 **Fix transversal (migration `20260712121000`)**: `fin_resolver_contexto` (F1,
 compartilhada por **todas** as RPCs `fin_*`) bloqueava um usuário `super_admin`

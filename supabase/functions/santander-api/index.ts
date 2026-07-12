@@ -31,6 +31,7 @@
  */
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { ingerirExtratos, type ExtratoItemInput } from '../_shared/financeiro-core.ts'
 import nacl from 'npm:tweetnacl@1.0.3'
 import forge from 'npm:node-forge@1.3.1'
 
@@ -668,6 +669,7 @@ async function syncExtrato(
     ignorados: 0,
     erros: []
   }
+  const itens: ExtratoItemInput[] = []
 
   for (const tx of transacoes) {
     try {
@@ -760,63 +762,46 @@ async function syncExtrato(
         continue
       }
 
-      // Verificar se o registro já existe
-      const { data: existente } = await supabaseAdmin
-        .from('extratos_bancarios')
-        .select('id, reconciliado, transacao_vinculada_id')
-        .eq('conta_id', contaId)
-        .eq('external_id', externalId)
-        .maybeSingle()
-
-      // Se já existe e está reconciliado, não sobrescrever
-      if (existente && existente.reconciliado) {
-        result.ignorados++
-        continue
-      }
-
-      // Upsert com dedupe por external_id
-      const { error: upsertError } = await supabaseAdmin
-        .from('extratos_bancarios')
-        .upsert(
-          {
-            conta_id: contaId,
-            igreja_id: igrejaId,
-            filial_id: filialId,
-            external_id: externalId,
-            data_transacao: dataTransacao,
-            descricao,
-            valor,
-            tipo,
-            saldo,
-            numero_documento: numeroDocumento,
-            origem: 'api_santander',
-            // Preservar reconciliação se já existe
-            reconciliado: existente?.reconciliado ?? false,
-            transacao_vinculada_id: existente?.transacao_vinculada_id ?? null
-          },
-          {
-            onConflict: 'conta_id,external_id',
-            ignoreDuplicates: false
-          }
-        )
-
-      if (upsertError) {
-        // Se for erro de duplicata, conta como ignorado
-        if (upsertError.code === '23505') {
-          result.ignorados++
-        } else {
-          result.erros.push(`Erro ao inserir transação ${externalId}: ${upsertError.message}`)
-        }
-      } else {
-        // Contar como atualizado se já existia, inserido se novo
-        if (existente) {
-          result.atualizados++
-        } else {
-          result.inseridos++
-        }
-      }
+      // Coleta para ingestão em lote pela porta única (F5). O dedupe por
+      // (conta_id, external_id) e a preservação de conciliados ficam a cargo
+      // de fin_ingerir_extratos (ON CONFLICT DO NOTHING não sobrescreve).
+      itens.push({
+        data_transacao: dataTransacao,
+        valor,
+        tipo,
+        descricao,
+        external_id: externalId,
+        numero_documento: numeroDocumento,
+        saldo,
+      })
     } catch (err) {
       result.erros.push(`Erro processando transação: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  // Ingestão em lote pela porta única (F5): service role, canal 'integracao'
+  // sem ator humano (D-F5.2). external_id preservado (providerId/SHA-256).
+  if (itens.length > 0) {
+    try {
+      const res = await ingerirExtratos(supabaseAdmin, contaId, 'api_santander', itens, {
+        igreja_id: igrejaId,
+        filial_id: filialId,
+        canal: 'integracao',
+      })
+      result.inseridos = Number(res.inseridos ?? 0)
+      result.ignorados = Number(res.duplicados ?? 0)
+      // A RPC isola itens inválidos (data/valor/tipo malformados) por
+      // subtransação — não lança, retorna em invalidos/warnings. Sem repassar
+      // isso, um extrato com linha malformada apareceria como sync 100% ok.
+      const invalidos = Number(res.invalidos ?? 0)
+      if (invalidos > 0) {
+        const avisos = Array.isArray(res.warnings) ? (res.warnings as string[]) : []
+        result.erros.push(
+          `${invalidos} transação(ões) rejeitada(s) pela ingestão: ${avisos.join('; ')}`,
+        )
+      }
+    } catch (err) {
+      result.erros.push(`Falha na ingestão de extratos: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 

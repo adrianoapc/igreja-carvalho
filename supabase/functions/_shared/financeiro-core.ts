@@ -16,8 +16,12 @@ type SupabaseClientAny = any;
 export interface FinContexto {
   igreja_id: string;
   filial_id?: string | null;
-  /** profiles.id do ator humano em nome de quem a operação é feita */
-  ator_profile_id: string;
+  /**
+   * profiles.id do ator humano. Opcional apenas para ingestão de extratos por
+   * canal 'integracao' (edges autônomas getnet/pix/santander — D-F5.2); as RPCs
+   * de escrita financeira continuam exigindo ator.
+   */
+  ator_profile_id?: string;
   canal: "bot" | "edge" | "integracao";
 }
 
@@ -147,6 +151,42 @@ export function lancarSessao(
     p_sessao_id: sessaoId,
     p_itens: itens,
     p_finalizar: finalizar,
+    p_contexto: contexto,
+  });
+}
+
+// ─── Ingestão de extratos (F5) ──────────────────────────────────────────────
+
+export interface ExtratoItemInput {
+  /** Data da transação em ISO (yyyy-mm-dd). */
+  data_transacao: string;
+  /** Valor bruto; a RPC normaliza para ABS (direção fica em `tipo`). */
+  valor: number;
+  tipo: "credito" | "debito";
+  descricao: string;
+  /** ID do provedor (FITID/transactionId); se ausente, a RPC gera determinístico. */
+  external_id?: string;
+  numero_documento?: string | null;
+  saldo?: number | null;
+}
+
+/**
+ * Porta única de ingestão de extratos (fin_ingerir_extratos). Para edges
+ * autônomas (getnet/pix/santander em service role), use
+ * `contexto = { igreja_id, filial_id?, canal: "integracao" }` sem
+ * `ator_profile_id` (D-F5.2).
+ */
+export function ingerirExtratos(
+  supabase: SupabaseClientAny,
+  contaId: string,
+  origem: string,
+  itens: ExtratoItemInput[],
+  contexto: FinContexto,
+): Promise<FinResultado> {
+  return chamarRpc(supabase, "fin_ingerir_extratos", {
+    p_conta_id: contaId,
+    p_origem: origem,
+    p_itens: itens,
     p_contexto: contexto,
   });
 }
