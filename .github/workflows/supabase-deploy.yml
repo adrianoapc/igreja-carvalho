@@ -17,6 +17,13 @@ on:
       - "supabase/config.toml"
   workflow_dispatch:
 
+# Serializa os deploys: se dois merges caírem próximos, o run mais novo cancela o
+# em andamento — evita que um run antigo (checkout velho) termine DEPOIS do novo
+# e redeploye todas as functions de um código já superado (rollback silencioso).
+concurrency:
+  group: supabase-deploy
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
