@@ -73,7 +73,9 @@ interface Transacao {
   descricao: string;
   valor: number;
   tipo: string;
-  data_pagamento: string;
+  data_pagamento: string | null;
+  data_vencimento?: string | null;
+  status?: string | null;
   conciliacao_status?: string | null;
   categorias_financeiras?: { nome: string } | null;
   conta_id?: string | null;
@@ -208,13 +210,17 @@ export function ConciliacaoManual() {
       let query = supabase
         .from("transacoes_financeiras")
         .select(
-          "id, descricao, valor, tipo, data_pagamento, conciliacao_status, conta_id, origem_registro, contas:conta_id(nome), categorias_financeiras(nome)"
+          "id, descricao, valor, tipo, data_pagamento, data_vencimento, status, conciliacao_status, conta_id, origem_registro, contas:conta_id(nome), categorias_financeiras(nome)"
         )
         .eq("igreja_id", igrejaId)
-        .eq("status", "pago")
-        .gte("data_pagamento", dataInicio)
-        .lte("data_pagamento", dataFim)
-        .order("data_pagamento", { ascending: false })
+        // Inclui PENDENTES (casadas por data_vencimento): o motor F4 e
+        // fin_confirmar_conciliacao baixam pendente→pago na conciliação, então a
+        // lista/rotulagem precisa enxergá-las — pago casa por data_pagamento.
+        .or(
+          `and(status.eq.pago,data_pagamento.gte.${dataInicio},data_pagamento.lte.${dataFim}),` +
+            `and(status.eq.pendente,data_vencimento.gte.${dataInicio},data_vencimento.lte.${dataFim})`,
+        )
+        .order("data_pagamento", { ascending: false, nullsFirst: false })
         .limit(500);
 
       if (!isAllFiliais && filialId) {

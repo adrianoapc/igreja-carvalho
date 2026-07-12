@@ -13,7 +13,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { format, parseISO, subDays, formatDistanceToNow } from "date-fns";
+import { format, parseISO, subDays, addDays, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useHideValues } from "@/hooks/useHideValues";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
@@ -64,7 +64,9 @@ interface Transacao {
   descricao: string;
   valor: number;
   tipo: string;
-  data_pagamento: string;
+  data_pagamento: string | null;
+  data_vencimento?: string | null;
+  status?: string | null;
   categorias_financeiras?: { nome: string } | null;
   conta_id?: string | null;
 }
@@ -266,17 +268,26 @@ export function DashboardConciliacao() {
 
   // Fetch transactions for matching
   const { data: transacoes } = useQuery({
-    queryKey: ["transacoes-dashboard", igrejaId, filialId, isAllFiliais],
+    queryKey: ["transacoes-dashboard", igrejaId, filialId, isAllFiliais, extratosPendentes?.length],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const dataInicio = format(subDays(new Date(), 90), "yyyy-MM-dd");
+      // Janela alinhada aos candidatos: período dos extratos pendentes visíveis,
+      // com folga de ±31 dias (o motor casa transação até ±30 dias do extrato).
+      // Inclui PENDENTES (por data_vencimento) — o motor F4 pontua pendentes e
+      // fin_confirmar_conciliacao faz a baixa; sem isso, o rótulo do resultado e
+      // a sugestão exibida ficariam sem os dados da transação.
+      const janela = periodoDosExtratos(extratosPendentes ?? []);
+      const inicio = format(subDays(parseISO(janela.inicio), 31), "yyyy-MM-dd");
+      const fim = format(addDays(parseISO(janela.fim), 31), "yyyy-MM-dd");
       let query = supabase
         .from("transacoes_financeiras")
-        .select("id, descricao, valor, tipo, data_pagamento, conta_id, categorias_financeiras(nome)")
+        .select("id, descricao, valor, tipo, data_pagamento, data_vencimento, status, conta_id, categorias_financeiras(nome)")
         .eq("igreja_id", igrejaId)
-        .eq("status", "pago")
-        .gte("data_pagamento", dataInicio)
-        .order("data_pagamento", { ascending: false })
+        .or(
+          `and(status.eq.pago,data_pagamento.gte.${inicio},data_pagamento.lte.${fim}),` +
+            `and(status.eq.pendente,data_vencimento.gte.${inicio},data_vencimento.lte.${fim})`,
+        )
+        .order("data_pagamento", { ascending: false, nullsFirst: false })
         .limit(500);
 
       if (!isAllFiliais && filialId) {

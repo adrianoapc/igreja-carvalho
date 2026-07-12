@@ -742,6 +742,13 @@ p_score_minimo, p_contexto)`.
   a filial precisa pertencer a `v_igreja` **e** o usuário ter papel amplo nesta
   igreja (`v_pode_todas`) ou ser a própria filial — fecha o mesmo vazamento
   multi-igreja pelo caminho do parâmetro explícito. (P1 da 6ª rodada.)
+- **Listas/rótulos alinhados ao motor**: como o motor passou a incluir
+  pendentes e casar por janela derivada dos extratos, as queries de transações
+  de `ConciliacaoManual` (lista do Modo Clássico) e `DashboardConciliacao`
+  (rótulo do resultado + sugestão exibida) passaram a carregar `pendente`+`pago`
+  (pago por `data_pagamento`, pendente por `data_vencimento`) na mesma janela dos
+  candidatos — antes eram `pago`/90 dias fixos e um candidato pendente/antigo
+  aparecia sem descrição/valor.
 - **Frontend migrado**: `ConciliacaoManual` e `DashboardConciliacao` trocam
   `reconciliar_transacoes`→motor único e `aplicar_conciliacao`→
   `fin_confirmar_conciliacao` (F3, transacional, com baixa `pendente→pago` e
