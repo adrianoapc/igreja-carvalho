@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format, differenceInDays, isWithinInterval } from "date-fns";
+import { format, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   parseLocalDate,
@@ -48,6 +48,7 @@ import {
   Settings,
   CheckCircle2,
 } from "lucide-react";
+import { gerarCandidatosConciliacao } from "@/features/financeiro/core/api/conciliacao.api";
 import { QuickCreateTransacaoDialog } from "./QuickCreateTransacaoDialog";
 import { TransacaoDetalheDrawer } from "./TransacaoDetalheDrawer";
 import { ExtratoSugestaoMLA } from "./ExtratoSugestaoMLA";
@@ -299,6 +300,54 @@ export function ConciliacaoInteligente() {
     refetchOnWindowFocus: true,
   });
 
+  // Candidatos do motor ÚNICO de score (F4) — substitui o score heurístico
+  // client-side. Mapa: extrato_id → (transacao_id → score 0..1).
+  const { data: candidatosScore } = useQuery({
+    queryKey: [
+      "candidatos-motor-inteligente",
+      igrejaId,
+      filialId,
+      isAllFiliais,
+      contaFiltro,
+      mesExtratos,
+      extratosCustomRange,
+    ],
+    queryFn: async (): Promise<Map<string, Map<string, number>>> => {
+      if (!igrejaId) return new Map();
+      const inicio = extratosCustomRange?.from
+        ? extratosCustomRange.from
+        : startOfMonthLocal(mesExtratos);
+      const fim = extratosCustomRange?.to
+        ? extratosCustomRange.to
+        : endOfMonthLocal(mesExtratos);
+      const rows = await gerarCandidatosConciliacao({
+        contaId: contaFiltro !== "all" ? contaFiltro : null,
+        periodoInicio: formatLocalDate(inicio),
+        periodoFim: formatLocalDate(fim),
+        filialId: isAllFiliais ? null : filialId,
+      });
+      const mapa = new Map<string, Map<string, number>>();
+      for (const r of rows) {
+        // Só 1:1 vira "sugestão" para seleção individual. Candidatos 1:N
+        // (divisão) têm fluxo próprio (DividirExtratoDialog) e NÃO podem ser
+        // marcados como 1:1 — senão selecionar um único item da divisão
+        // confirmaria uma conciliação 1:1 de valor parcial.
+        if (r.tipo_match !== "1:1" || r.transacao_ids.length !== 1) continue;
+        const tid = r.transacao_ids[0];
+        let inner = mapa.get(r.extrato_id);
+        if (!inner) {
+          inner = new Map<string, number>();
+          mapa.set(r.extrato_id, inner);
+        }
+        const prev = inner.get(tid) ?? 0;
+        if (r.score > prev) inner.set(tid, r.score);
+      }
+      return mapa;
+    },
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+    staleTime: 0,
+  });
+
   // Filter extratos
   const extratosFiltrados = useMemo(() => {
     if (!extratos) return [];
@@ -351,49 +400,26 @@ export function ConciliacaoInteligente() {
 
   const sortedTransacoes = useMemo(() => {
     if (!transacoesFiltradas) return [];
+    // Sugestão de transações candidatas só quando exatamente 1 extrato está
+    // selecionado; o score vem do motor único (F4), não mais de heurística local.
     if (selectedExtratos.length !== 1) {
-      return transacoesFiltradas.map((t) => ({ ...t, isSuggestion: false }));
+      return transacoesFiltradas.map((t) => ({ ...t, isSuggestion: false, score: 0 }));
     }
 
-    const singleExtrato = extratosFiltrados?.find(
-      (e) => e.id === selectedExtratos[0],
-    );
-    if (!singleExtrato) {
-      return transacoesFiltradas.map((t) => ({ ...t, isSuggestion: false }));
+    const scores = candidatosScore?.get(selectedExtratos[0]);
+    if (!scores || scores.size === 0) {
+      return transacoesFiltradas.map((t) => ({ ...t, isSuggestion: false, score: 0 }));
     }
-
-    const extratoDate = parseLocalDate(singleExtrato.data_transacao);
-    if (!extratoDate) {
-      return transacoesFiltradas.map((t) => ({ ...t, isSuggestion: false }));
-    }
-    const extratoValue = singleExtrato.valor;
-    const extratoTipo = singleExtrato.tipo === "credito" ? "entrada" : "saida";
 
     return [...transacoesFiltradas]
       .map((transacao) => {
-        const transacaoDate = parseLocalDate(
-          transacao.status === "pendente"
-            ? transacao.data_vencimento!
-            : transacao.data_pagamento!,
-        );
-        if (!transacaoDate)
-          return { ...transacao, isSuggestion: false, score: 0 };
-        const dateDiff = Math.abs(differenceInDays(extratoDate, transacaoDate));
-        const valueDiff = Math.abs(extratoValue - transacao.valor);
-        const typeMatch = extratoTipo === transacao.tipo;
-
-        let score = 0;
-        if (typeMatch) {
-          if (dateDiff <= 3) score += 50;
-          else if (dateDiff <= 30) score += 25;
-          if (valueDiff === 0) score += 50;
-          else if (valueDiff < 50) score += 20;
-        }
-
-        return { ...transacao, score, isSuggestion: score > 40 };
+        const raw = scores.get(transacao.id);
+        // Candidatos já vêm acima do corte do motor → todos são sugestões.
+        const score = raw != null ? Math.round(raw * 100) : 0;
+        return { ...transacao, score, isSuggestion: score > 0 };
       })
       .sort((a, b) => b.score - a.score);
-  }, [transacoesFiltradas, selectedExtratos, extratosFiltrados]);
+  }, [transacoesFiltradas, selectedExtratos, candidatosScore]);
 
   const handleSelectExtrato = (id: string) => {
     setSelectedExtratos((prev) =>

@@ -311,3 +311,53 @@ flowchart TD
     LEG["Motor de score legado\nreconciliar_transacoes · aplicar_conciliacao\n(ConciliacaoManual, DashboardConciliacao)"]
     LEG -.reescrito na F4.-> RPC
 ```
+
+## Motor único de score — Fase F4 (ADR-030)
+
+Implementado em jul/2026 (migration `20260711150000`). Elege um único motor de
+candidatos de conciliação: a heurística client-side de `ConciliacaoInteligente`
+e a RPC legada `reconciliar_transacoes` (score inteiro 50-100, só 1:1) saem de
+cena; entra `fin_gerar_candidatos_conciliacao` (score contínuo 0..1, formatos
+1:1 e 1:N, pesos valor 0.4 / data 0.3 / descrição 0.2 / tipo 0.1). O corte de
+score passa a ser parametrizável por igreja em
+`financeiro_config.conciliacao_score_minimo` (default 0.6). A aplicação usa a
+porta transacional `fin_confirmar_conciliacao` da F3 (não mais
+`aplicar_conciliacao`, que não dava baixa `pendente→pago`). As três funções
+legadas (`reconciliar_transacoes`, `aplicar_conciliacao`,
+`gerar_candidatos_conciliacao`) ficam **deprecadas** (sem `DROP` — removidas na
+F7). A reclassificação (`reclass-transacoes`) passa a **recusar** transação já
+conciliada (fechando o TODO de imutabilidade).
+
+```mermaid
+flowchart TD
+    subgraph UI["Frontend de conciliação (F4)"]
+        CI["ConciliacaoInteligente\n(ranqueia candidatos do motor)"]
+        MAN["ConciliacaoManual (Modo Clássico)"]
+        DASH["DashboardConciliacao"]
+    end
+
+    CAPI["core/api/conciliacao.api\ngerarCandidatosConciliacao · confirmarConciliacao"]
+
+    CI --> CAPI
+    MAN --> CAPI
+    DASH --> CAPI
+
+    subgraph MOTOR["Motor ÚNICO (SECURITY DEFINER + fin_resolver_contexto)"]
+        GEN["fin_gerar_candidatos_conciliacao\nscore 0..1 · 1:1 e 1:N\ncorte por igreja (financeiro_config)"]
+    end
+    CAPI -->|gera candidatos| GEN
+    GEN --> RANK["candidatos ranqueados\n(ordenados por score)"]
+    RANK --> CAPI
+    CAPI -->|aplica| CONF["fin_confirmar_conciliacao (F3)\numa transação · baixa pendente→pago"]
+
+    subgraph DEP["Deprecados (DROP na F7)"]
+        L1[reconciliar_transacoes]
+        L2[aplicar_conciliacao]
+        L3[gerar_candidatos_conciliacao]
+    end
+    GEN -.substitui.-> L1
+    GEN -.substitui.-> L3
+    CONF -.substitui.-> L2
+
+    RECLASS["reclass-transacoes\nrecusa transação conciliada (409)"]
+```

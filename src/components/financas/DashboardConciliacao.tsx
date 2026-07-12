@@ -13,7 +13,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { format, parseISO, subDays, formatDistanceToNow } from "date-fns";
+import { format, parseISO, subDays, addDays, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useHideValues } from "@/hooks/useHideValues";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
@@ -23,6 +23,10 @@ import { ConciliacaoLoteDialog } from "./ConciliacaoLoteDialog";
 import { DividirExtratoDialog } from "./DividirExtratoDialog";
 import { ResultadoReconciliacaoDialog, MatchResult } from "./ResultadoReconciliacaoDialog";
 import { anonymizePixDescription } from "@/utils/anonymization";
+import {
+  gerarCandidatosConciliacao,
+  confirmarConciliacao,
+} from "@/features/financeiro/core/api/conciliacao.api";
 import {
   RefreshCw,
   FileCheck,
@@ -60,7 +64,9 @@ interface Transacao {
   descricao: string;
   valor: number;
   tipo: string;
-  data_pagamento: string;
+  data_pagamento: string | null;
+  data_vencimento?: string | null;
+  status?: string | null;
   categorias_financeiras?: { nome: string } | null;
   conta_id?: string | null;
 }
@@ -82,7 +88,63 @@ interface AuditLog {
 interface SugestaoMatch {
   extrato_id: string;
   transacao_id: string;
+  /** Escala 0-100 para exibição (o motor devolve 0..1). */
   score: number;
+}
+
+/**
+ * Sugestões 1:1 pelo motor ÚNICO de score (F4), substituindo a RPC legada
+ * `reconciliar_transacoes`. Converte o score 0..1 para 0-100 (exibição).
+ */
+async function fetchSugestoes1x1(
+  contaIds: string[],
+  periodoInicio: string,
+  periodoFim: string,
+  filialId: string | null,
+): Promise<SugestaoMatch[]> {
+  const out: SugestaoMatch[] = [];
+  for (const contaId of contaIds) {
+    try {
+      const rows = await gerarCandidatosConciliacao({
+        contaId,
+        periodoInicio,
+        periodoFim,
+        filialId,
+      });
+      for (const r of rows) {
+        if (r.tipo_match === "1:1" && r.transacao_ids.length === 1) {
+          out.push({
+            extrato_id: r.extrato_id,
+            transacao_id: r.transacao_ids[0],
+            score: Math.round(r.score * 100),
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao gerar candidatos:", err);
+    }
+  }
+  return out;
+}
+
+/**
+ * Janela de candidatos derivada dos extratos pendentes VISÍVEIS (a lista do
+ * dashboard não tem corte de data). Sem isso, um extrato mais antigo que a
+ * janela fixa nunca receberia sugestão nem seria auto-conciliado.
+ */
+function periodoDosExtratos(
+  extratos: Array<{ data_transacao?: string | null }>,
+): { inicio: string; fim: string } {
+  const hoje = format(new Date(), "yyyy-MM-dd");
+  const datas = extratos
+    .map((e) => e.data_transacao)
+    .filter((d): d is string => !!d)
+    .sort();
+  if (datas.length === 0) {
+    return { inicio: format(subDays(new Date(), 90), "yyyy-MM-dd"), fim: hoje };
+  }
+  const maxData = datas[datas.length - 1];
+  return { inicio: datas[0], fim: maxData > hoje ? maxData : hoje };
 }
 
 export function DashboardConciliacao() {
@@ -206,17 +268,26 @@ export function DashboardConciliacao() {
 
   // Fetch transactions for matching
   const { data: transacoes } = useQuery({
-    queryKey: ["transacoes-dashboard", igrejaId, filialId, isAllFiliais],
+    queryKey: ["transacoes-dashboard", igrejaId, filialId, isAllFiliais, extratosPendentes?.length],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const dataInicio = format(subDays(new Date(), 90), "yyyy-MM-dd");
+      // Janela alinhada aos candidatos: período dos extratos pendentes visíveis,
+      // com folga de ±31 dias (o motor casa transação até ±30 dias do extrato).
+      // Inclui PENDENTES (por data_vencimento) — o motor F4 pontua pendentes e
+      // fin_confirmar_conciliacao faz a baixa; sem isso, o rótulo do resultado e
+      // a sugestão exibida ficariam sem os dados da transação.
+      const janela = periodoDosExtratos(extratosPendentes ?? []);
+      const inicio = format(subDays(parseISO(janela.inicio), 31), "yyyy-MM-dd");
+      const fim = format(addDays(parseISO(janela.fim), 31), "yyyy-MM-dd");
       let query = supabase
         .from("transacoes_financeiras")
-        .select("id, descricao, valor, tipo, data_pagamento, conta_id, categorias_financeiras(nome)")
+        .select("id, descricao, valor, tipo, data_pagamento, data_vencimento, status, conta_id, categorias_financeiras(nome)")
         .eq("igreja_id", igrejaId)
-        .eq("status", "pago")
-        .gte("data_pagamento", dataInicio)
-        .order("data_pagamento", { ascending: false })
+        .or(
+          `and(status.eq.pago,data_pagamento.gte.${inicio},data_pagamento.lte.${fim}),` +
+            `and(status.eq.pendente,data_vencimento.gte.${inicio},data_vencimento.lte.${fim})`,
+        )
+        .order("data_pagamento", { ascending: false, nullsFirst: false })
         .limit(500);
 
       if (!isAllFiliais && filialId) {
@@ -273,16 +344,8 @@ export function DashboardConciliacao() {
         ? [selectedContaId]
         : [...new Set(extratosPendentes.map((e) => e.conta_id))];
 
-      const allSugestoes: SugestaoMatch[] = [];
-
-      for (const contaId of contaIds) {
-        const { data } = await supabase.rpc("reconciliar_transacoes", {
-          p_conta_id: contaId,
-        });
-        if (data) {
-          allSugestoes.push(...data);
-        }
-      }
+      const { inicio: periodoInicio, fim: periodoFim } = periodoDosExtratos(extratosPendentes);
+      const allSugestoes = await fetchSugestoes1x1(contaIds, periodoInicio, periodoFim, isAllFiliais ? null : filialId);
 
       // Create map with best suggestion per extrato
       const sugestaoMap = new Map<string, SugestaoMatch>();
@@ -312,15 +375,9 @@ export function DashboardConciliacao() {
     const allResults: MatchResult[] = [];
 
     try {
-      const allMatches: SugestaoMatch[] = [];
-
-      for (const contaId of contaIds) {
-        const { data, error } = await supabase.rpc("reconciliar_transacoes", {
-          p_conta_id: contaId,
-        });
-        if (error) continue;
-        if (data) allMatches.push(...data);
-      }
+      // Candidatos 1:1 pelo motor único (F4).
+      const { inicio: periodoInicio, fim: periodoFim } = periodoDosExtratos(extratosPendentes);
+      const allMatches = await fetchSugestoes1x1(contaIds, periodoInicio, periodoFim, isAllFiliais ? null : filialId);
 
       if (allMatches.length === 0) {
         toast.info("Nenhuma correspondência encontrada automaticamente");
@@ -328,30 +385,29 @@ export function DashboardConciliacao() {
         return;
       }
 
-      // Deduplicate
+      // Um extrato só concilia uma transação — e vice-versa.
       const processedExtratos = new Set<string>();
+      const processedTransacoes = new Set<string>();
       const uniqueMatches = allMatches
         .sort((a, b) => b.score - a.score)
         .filter((match) => {
           if (processedExtratos.has(match.extrato_id)) return false;
+          if (processedTransacoes.has(match.transacao_id)) return false;
           processedExtratos.add(match.extrato_id);
+          processedTransacoes.add(match.transacao_id);
           return true;
         });
 
-      // Apply each match
+      // Aplica cada match pela porta transacional fin_confirmar_conciliacao (F3).
       for (const match of uniqueMatches) {
+        const extratoData = extratosPendentes.find((e) => e.id === match.extrato_id);
+        const transacaoData = transacoes?.find((t) => t.id === match.transacao_id);
         try {
-          const { data: applied, error: applyError } = await supabase.rpc(
-            "aplicar_conciliacao",
-            {
-              p_extrato_id: match.extrato_id,
-              p_transacao_id: match.transacao_id,
-            }
-          );
-
-          const extratoData = extratosPendentes.find((e) => e.id === match.extrato_id);
-          const transacaoData = transacoes?.find((t) => t.id === match.transacao_id);
-
+          await confirmarConciliacao({
+            extrato_ids: [match.extrato_id],
+            transacao_ids: [match.transacao_id],
+            score: match.score / 100,
+          });
           allResults.push({
             extratoId: match.extrato_id,
             transacaoId: match.transacao_id,
@@ -360,11 +416,20 @@ export function DashboardConciliacao() {
             extratoValor: extratoData?.valor || 0,
             transacaoDescricao: transacaoData?.descricao || "Transação",
             transacaoValor: Number(transacaoData?.valor) || 0,
-            applied: applied && !applyError,
-            error: applyError?.message,
+            applied: true,
           });
-        } catch (err) {
-          console.error("Erro ao aplicar match:", err);
+        } catch (applyError) {
+          allResults.push({
+            extratoId: match.extrato_id,
+            transacaoId: match.transacao_id,
+            score: match.score,
+            extratoDescricao: extratoData?.descricao || "Extrato",
+            extratoValor: extratoData?.valor || 0,
+            transacaoDescricao: transacaoData?.descricao || "Transação",
+            transacaoValor: Number(transacaoData?.valor) || 0,
+            applied: false,
+            error: (applyError as Error)?.message,
+          });
         }
       }
 
@@ -394,20 +459,17 @@ export function DashboardConciliacao() {
   // Handle accept suggestion
   const handleAceitarSugestao = async (extrato: ExtratoItem, sugestao: SugestaoMatch) => {
     try {
-      const { data: applied, error } = await supabase.rpc("aplicar_conciliacao", {
-        p_extrato_id: sugestao.extrato_id,
-        p_transacao_id: sugestao.transacao_id,
+      await confirmarConciliacao({
+        extrato_ids: [sugestao.extrato_id],
+        transacao_ids: [sugestao.transacao_id],
+        score: sugestao.score / 100,
       });
 
-      if (error) throw error;
-
-      if (applied) {
-        toast.success("Conciliação aplicada com sucesso");
-        refetchExtratos();
-        refetchStats();
-        queryClient.invalidateQueries({ queryKey: ["audit-logs-recent"] });
-        queryClient.invalidateQueries({ queryKey: ["sugestoes-match"] });
-      }
+      toast.success("Conciliação aplicada com sucesso");
+      refetchExtratos();
+      refetchStats();
+      queryClient.invalidateQueries({ queryKey: ["audit-logs-recent"] });
+      queryClient.invalidateQueries({ queryKey: ["sugestoes-match"] });
     } catch (err) {
       console.error("Erro ao aceitar sugestão:", err);
       toast.error("Erro ao aplicar conciliação");
