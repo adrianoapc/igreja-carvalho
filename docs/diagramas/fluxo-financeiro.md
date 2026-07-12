@@ -361,3 +361,37 @@ flowchart TD
 
     RECLASS["reclass-transacoes\nrecusa transação conciliada (409)"]
 ```
+
+## Ingestão de extratos — Fase F5 (fatia 1, ADR-022/028)
+
+Implementado em jul/2026 (migration `20260712120000`). Porta única
+`fin_ingerir_extratos` (contrato `ExtratoItem`) substitui os INSERTs diretos em
+`extratos_bancarios` — nesta fatia, só o canal **manual** (OFX/CSV/XLSX). Valor
+normalizado para ABS, dedupe por `(conta_id, external_id)` com id determinístico,
+job + undo. Santander/Getnet/PIX migram na fatia 2.
+
+```mermaid
+flowchart TD
+    subgraph SRC["Fontes"]
+        OFX["ImportarExtratosTab\nOFX/CSV/XLSX (parse client-side)"]
+        SAN["santander-api / getnet-sftp / pix\n(fatia 2 — ainda escrevem direto)"]
+    end
+
+    EAPI["core/api/extratos.api\ningerirExtratos · desfazerIngestao"]
+    OFX -->|"ExtratoItem[] + external_id\n(FITID | file:key#occ)"| EAPI
+
+    subgraph RPC["Porta única (SECURITY DEFINER + fin_resolver_contexto)"]
+        ING["fin_ingerir_extratos\nvalida tenant/filial · valor ABS ·\ndedupe (conta_id, external_id) ·\nexternal_id auto:md5 se ausente"]
+        UNDO["fin_desfazer_ingestao\nremove não conciliados · preserva conciliado"]
+    end
+    EAPI --> ING
+    EAPI --> UNDO
+
+    ING --> JOB[(fin_extrato_ingestao_jobs\n+ import_job_id no extrato)]
+    ING -->|ON CONFLICT DO NOTHING| EXT[(extratos_bancarios)]
+    ING --> AUD[(fin_audit_log)]
+    UNDO --> EXT
+
+    SAN -.->|fatia 2: mesma porta| ING
+    EXT -->|gancho pós-ingestão ADR-028| SCORE["fin_gerar_candidatos_conciliacao\n(edge gerar-sugestoes-ml migrada na F5)"]
+```

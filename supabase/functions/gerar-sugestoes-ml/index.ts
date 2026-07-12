@@ -77,21 +77,23 @@ Deno.serve(async (req) => {
       score_minimo 
     })
 
-    // Chamar RPC para gerar candidatos
-    console.log('[gerar-sugestoes-ml] Chamando RPC com params:', {
-      p_igreja_id: igreja_id,
+    // Motor ÚNICO F4: fin_gerar_candidatos_conciliacao. A edge roda sob o JWT do
+    // usuário (anon key + Authorization repassado), então a RPC resolve
+    // tenant/ator via fin_resolver_contexto — igreja NÃO é mais parâmetro (era
+    // aceita crua pela legada). p_filial_id NULL: escopo pelo JWT do usuário.
+    console.log('[gerar-sugestoes-ml] Chamando fin_gerar_candidatos_conciliacao:', {
       p_conta_id: conta_id || null,
-      p_mes_inicio: dataInicio,
-      p_mes_fim: dataFim,
+      p_periodo_inicio: dataInicio,
+      p_periodo_fim: dataFim,
       p_score_minimo: score_minimo,
     })
 
-    const { data: candidatos, error: rpcError } = await supabase.rpc('gerar_candidatos_conciliacao', {
-      p_igreja_id: igreja_id,
+    const { data: candidatos, error: rpcError } = await supabase.rpc('fin_gerar_candidatos_conciliacao', {
       p_conta_id: conta_id || null,
-      p_mes_inicio: dataInicio,
-      p_mes_fim: dataFim,
+      p_periodo_inicio: dataInicio,
+      p_periodo_fim: dataFim,
       p_score_minimo: score_minimo,
+      p_filial_id: null,
     })
 
     if (rpcError) {
@@ -124,9 +126,26 @@ Deno.serve(async (req) => {
 
     const filialId = profile?.filial_id || null
 
-    // Limpar sugestões antigas pendentes dessa igreja/conta
+    // Papel amplo NESTA igreja (mesma lógica de v_pode_todas em
+    // fin_gerar_candidatos_conciliacao): só esses usuários enxergam "Todas as
+    // filiais" na RPC (p_filial_id null vira NULL == sem restrição). Um usuário
+    // restrito, mesmo com p_filial_id null, tem os candidatos limitados à
+    // própria filial pela RPC — a limpeza/insert precisam do MESMO escopo,
+    // senão um tesoureiro de filial A apaga as sugestões pendentes de outras
+    // filiais sem substituí-las (a RPC só devolveu candidatos de A).
+    const { data: rolesAmplos } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .or(`igreja_id.eq.${igreja_id},igreja_id.is.null`)
+      .in('role', ['admin', 'admin_igreja', 'super_admin'])
+
+    const podeTodas = (rolesAmplos?.length ?? 0) > 0
+    const filialEscopo = podeTodas ? null : filialId
+
+    // Limpar sugestões antigas pendentes dessa igreja/conta/filial
     console.log('[gerar-sugestoes-ml] Limpando sugestões antigas...')
-    
+
     const deleteQuery = supabase
       .from('conciliacao_ml_sugestoes')
       .delete()
@@ -135,6 +154,9 @@ Deno.serve(async (req) => {
 
     if (conta_id) {
       deleteQuery.eq('conta_id', conta_id)
+    }
+    if (filialEscopo) {
+      deleteQuery.eq('filial_id', filialEscopo)
     }
 
     const { error: deleteError } = await deleteQuery
