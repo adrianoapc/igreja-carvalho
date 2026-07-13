@@ -1,6 +1,7 @@
 # Fluxo Getnet SFTP — Importação de Extrato Eletrônico V10.1
 
 > **Atualizado em 2026-06-19**: adicionado fluxo de `sync` automático (action: sync) disparado por cron e pelo botão "Sincronizar" na UI.
+> **Atualizado em 2026-07 (F6/D5)**: o espelho em `extratos_bancarios` agora pode nascer do tipo 5 (`PG`, dinheiro real) em vez do tipo 1 (`LQ`), por integração, via `config.espelho_tipo5_desde` — ver seção "Espelho: tipo 1 (LQ) vs tipo 5 (PG)" abaixo.
 
 ## Objetivo
 
@@ -96,7 +97,7 @@ sequenceDiagram
 
     loop Para cada arquivo pendente
         Fn->>Fn: Chama runExtratoEletronicoV10(arquivo_nome)
-        Note over Fn: Upserta getnet_resumo, getnet_analitico,<br/>getnet_ajustes, getnet_fin_resumo,<br/>getnet_fin_detalhe, extratos_bancarios
+        Note over Fn: Upserta getnet_resumo, getnet_analitico,<br/>getnet_ajustes, getnet_fin_resumo,<br/>getnet_fin_detalhe, extratos_bancarios<br/>(espelho: tipo 1/LQ ou tipo 5/PG, conforme corte)
         alt Todos os upserts OK
             Fn->>DB: Upsert getnet_arquivos (marca como importado)
         else Qualquer upsert falhou
@@ -115,6 +116,51 @@ O mesmo RV pode aparecer duas vezes no tipo 1, diferenciado pelo campo `indicado
 - **LQ** (Liquidação): confirmação do pagamento efetivo
 
 O constraint `UNIQUE(integracao_id, rv, data_rv, indicador_tipo_pagamento)` garante que cada linha seja única e permite reimportações idempotentes.
+
+## Espelho: tipo 1 (LQ) vs tipo 5 (PG) — F6/D5
+
+O espelho em `extratos_bancarios` (usado pela conciliação) pode nascer de
+duas fontes distintas, escolhida por integração:
+
+```mermaid
+flowchart LR
+    Config{"config.espelho_tipo5_desde\nsetado E data_referencia\n>= corte?"}
+    T1[Tipo 1: RV com\nindicador_tipo_pagamento='LQ']
+    T5[Tipo 5: PG\ntipo_operacao='PG']
+    Extrato[(extratos_bancarios\norigem='getnet_sftp_txt'\nou 'getnet_sftp_tipo5')]
+
+    Config -->|não| T1
+    Config -->|sim| T5
+    T1 --> Extrato
+    T5 --> Extrato
+```
+
+Regra geral #10 do manual técnico da Getnet (V10.1/V6.2024): só
+`tipo_operacao='PG'` no registro tipo 5 é dinheiro NOVO creditado na conta —
+os demais tipos (CS/CF/AC/CL/GL/GF/AL) são liquidação contábil de valores já
+adiantados em contrato numa data anterior. Por isso o tipo 5/PG é a fonte
+mais precisa: o tipo 1/LQ mistura esse dinheiro real com os ajustes
+contratuais (`AJUSTE 18`, `AJUSTE 20` etc. nos registros 1/3).
+
+Sem `config.espelho_tipo5_desde` setado na integração, o comportamento é o
+legado (tipo 1). Função pura `selecionarEspelhoTipo5` em
+`getnetExtratoParser.ts` filtra as linhas PG e constrói o `external_id` de
+dedupe **só com campos de conteúdo/provedor da linha** — `chave_ur` (ou
+`numero_operacao` como fallback) + data + código de arranjo + valor — nunca
+com o nome do arquivo nem com `integracao_id` (2 rodadas de fix P2, review
+PR #52): se a Getnet reenviar o mesmo dia sob outro nome de arquivo,
+`getnet_arquivos` trata como arquivo novo; se a integração SFTP for
+excluída/recriada pra mesma conta bancária, `integracao.id` muda mas
+`conta_id` (o que o dedupe realmente escopa) não. Em ambos os casos, um
+`external_id` amarrado a esses IDs deixaria o mesmo crédito passar 2x pelo
+dedupe — igual ao path tipo 1 legado, que nunca dependeu de nenhum dos dois.
+
+**A origem trava por arquivo** (`getnet_arquivos.espelho_origem`, migration
+`20260713140000`): reprocessar manualmente um arquivo já importado não pode
+trocar de origem, mesmo que o corte mude depois cobrindo retroativamente
+aquela data — senão o `external_id` muda de forma e o dedupe
+`(conta_id, external_id)` não reconhece as duas linhas como o mesmo crédito,
+duplicando o valor. Função pura `resolverUsoTipo5`.
 
 ## Diagrama de Sequência — Importação de Arquivo
 

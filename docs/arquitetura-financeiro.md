@@ -594,7 +594,7 @@ Cada fase é deployável isolada; legado convive com o novo.
 | **F3 Conciliação transacional** ✅ | Migration `20260711140000`: `fin_confirmar_conciliacao(p_vinculo)` (1:1/N:1/1:N inferidos por cardinalidade, numa transação) + `fin_desconciliar`. Frontend: `ConciliacaoInteligente`, `DividirExtratoDialog`, `useConciliacaoLote` e `DesconciliarDialog` via `core/api/conciliacao.api`. Ver §9.2 | Concluída (jul/2026). `ConciliacaoManual`/`DashboardConciliacao` (motor legado) e o bloqueio da reclassificação ficam para a F4 |
 | **F4 Motor único de score** ✅ | Migration `20260711150000`: `fin_gerar_candidatos_conciliacao` (score 0..1, 1:1 e 1:N, corte por igreja em `financeiro_config.conciliacao_score_minimo`). `ConciliacaoManual`/`DashboardConciliacao`/`ConciliacaoInteligente` migrados ao motor único + `fin_confirmar_conciliacao`; `reconciliar_transacoes`/`aplicar_conciliacao`/`gerar_candidatos_conciliacao` deprecadas (DROP na F7); `ModoABToggle` (código morto) removido; `reclass-transacoes` recusa transação conciliada. Ver §9.3 | Concluída (jul/2026) |
 | **F5 Pipeline de ingestão** ✅ | Migration `20260712120000`: `fin_ingerir_extratos` (contrato ExtratoItem, valor ABS, dedupe por `(conta_id, external_id)` com id determinístico, job + auditoria) + `fin_desfazer_ingestao`; canal **manual** (OFX/CSV/XLSX) via `core/api/extratos.api`; edge `gerar-sugestoes-ml` migrada ao motor único F4. Caminho service-role de integração (`20260712130000`, D-F5.2) + adaptadores **santander-api**, **getnet-sftp** (2 pontos: settlement_v1 e extrato_eletronico_v10/LQ) e **PIX** (3 pontos: pix-webhook, buscar-pix-recebidos, santander-api/buscar_pix — resolve conta via `cob_pix.conta_id`/`contas.cnpj_banco`, novo helper `ingerirExtratoPix`). Ver §9.4/§9.5 | Concluída (jul/2026); Getnet tipo-1→tipo-5 fica para a F6 (D5), sem relação com a porta de ingestão |
-| **F6 Getnet tipo 5** | Após decisão D5; novos períodos apenas; backfill opcional | Depende de F5 |
+| **F6 Getnet tipo 5** ✅ | Espelho em `extratos_bancarios` passa a nascer do tipo 5 (`getnet_financeiro_resumo`, `tipo_operacao='PG'`) em vez do tipo 1 (LQ) — opt-in por integração via `config.espelho_tipo5_desde`; tipo 1 vira puramente analítico. Ver §9.6 | Concluída (jul/2026); sem backfill (opcional, não feito nesta fase) |
 | **F7 Endurecimento + UX conciliação** | Revogar escrita direta do role `authenticated`; decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll); Finanças no bottom-nav; DRE mobile em cards; limpeza de código morto | Fecha o ciclo |
 
 ---
@@ -938,6 +938,87 @@ para `DashboardOfertas`).
   `.filter()`/`.map()` no getnet; `todas.filter()` sem tipo inferível na
   resolução de conta do PIX).
 
+### 9.6 Notas de implementação F6 — Getnet tipo 5 (jul/2026)
+
+Sem migration nova — `origem='getnet_sftp_tipo5'` já estava na allow-list de
+`fin_ingerir_extratos` desde a F5, e `config` de `integracoes_financeiras` é
+JSONB livre.
+
+- **Regra de negócio**: lida diretamente no Manual Técnico da Getnet
+  (`docs/Manual Extrato Eletronico_V10.1_V6.2024.pdf`, Regra Geral #10,
+  pg. 56) — "No Registro Tipo 5 onde houver no tipo de operação 'PG', o valor
+  informado no campo valor líquido da operação refere-se a somatória de
+  valores livres creditado na conta do estabelecimento." Ou seja: só
+  `tipo_operacao === 'PG'` (Pagamento de Agenda Livre) é dinheiro NOVO
+  batendo na conta; os demais tipos (CS/CF/AC/CL/GL/GF/AL) são liquidação
+  contábil de dinheiro já adiantado numa data anterior (contratos de
+  cessão/antecipação/gravame). Confirmado por exemplo numérico do próprio
+  manual (pg. 44-45): tipo 1 LQ do dia soma 2000-900-500=600; tipo 5 do
+  mesmo dia mostra CL 900 + AL 500 + PG 600, onde só o PG bate com o líquido
+  real do dia. Mirar em PG é estritamente mais preciso que o LQ anterior, que
+  misturava dinheiro real com ajustes contratuais.
+- **Dedupe (2 rodadas de fix P2, review PR #52)**: o manual (pg. 38) afirma
+  que "Para Tipo de operação PG, não há Número da Operação" —
+  `numero_operacao` pode vir vazio para PG. A 1ª versão usava
+  `arquivoNome:linhaNum` como chave — **rodada 1**: isso amarra o dedupe ao
+  nome do arquivo de transporte; se a Getnet reenviar/reprocessar o mesmo
+  dia sob outro nome, `getnet_arquivos` (chave `arquivo_nome`) trata como
+  arquivo novo e o crédito passa batido pelo
+  `ON CONFLICT (conta_id, external_id)`. Trocado por `integracaoId` +
+  campos de conteúdo — mas **rodada 2**: `integracao_id` também é frágil
+  (excluir/recriar a integração SFTP para a MESMA conta bancária muda
+  `integracao.id` sem mudar `conta_id`, que é o que o dedupe realmente
+  escopa). Versão final usa **só** campos de conteúdo/provedor da linha —
+  `getnet_fin5:${data}:${codigoArranjo}:${chaveUr}:${valor}` — com fallback
+  de `chaveUr` para `numeroOperacao` se vier vazia. `chave_ur` é preenchida
+  para PG (o manual só confirma que `numero_operacao` não é) e já é ela
+  mesma um composto determinístico (Regra Geral #11: data de liquidação +
+  código de arranjo + CNPJ/CPF) — mesmo padrão do path tipo 1 legado
+  (`getnet_rv:${rv}:${dataRv}:LQ`), que nunca dependeu de arquivo nem de
+  integração. Função pura `selecionarEspelhoTipo5` em
+  `getnetExtratoParser.ts`, testada em `getnetExtratoParser.test.ts` (mesmo
+  padrão do `resolverContaPix` da F5), incluindo os dois cenários de
+  reenvio (nome de arquivo diferente, integração recriada).
+- **Opt-in por integração**: chave `espelho_tipo5_desde` (data) no nível raiz
+  de `integracoes_financeiras.config` (irmã de `sftp`, não aninhada nele —
+  sobrevive ao merge raso da edge `integracoes-config`). Sem essa data, a
+  integração mantém o tipo 1 (LQ) — zero regressão. Com a data setada,
+  arquivos com `data_referencia >= espelho_tipo5_desde` passam a espelhar do
+  tipo 5 (PG); arquivos anteriores ao corte continuam no tipo 1. Campo de UI
+  em `IntegracoesCriarDialog.tsx`, visível só quando o layout SFTP é
+  `extrato_eletronico_v10` (o `settlement_v1` legado não emite registro
+  tipo 5). Sem backfill nesta fase (roadmap já previa como opcional).
+- `getnet_resumo`/`getnet_analitico`/`getnet_ajustes`/`getnet_financeiro_resumo`/
+  `getnet_financeiro_detalhe` (tabelas cruas) continuam sendo gravadas
+  exatamente como antes — só a FONTE do espelho em `extratos_bancarios` muda;
+  tipo 1 vira puramente analítico/drill-down, como já prescrito pela D5.
+- **Origem do espelho trava por arquivo (fix P1, review PR #52)**: como a
+  decisão tipo1×tipo5 compara `data_referencia` do arquivo contra
+  `espelho_tipo5_desde`, um arquivo já importado (espelho tipo 1,
+  `external_id` `getnet_rv:...`) reprocessado manualmente (`import_extrato`
+  com `arquivo_nome`) DEPOIS de o operador setar/mudar um corte retroativo
+  passaria a gerar `external_id` `getnet_fin5:...` — o dedupe
+  `(conta_id, external_id)` não reconhece os dois como o mesmo crédito e
+  duplicaria o valor. Migration `20260713140000` adiciona
+  `getnet_arquivos.espelho_origem` (nullable); a origem usada na 1ª
+  importação de um arquivo trava para sempre nos reprocessamentos seguintes,
+  ignorando a config atual. `NULL` (arquivo importado antes desta coluna
+  existir, ou seja, antes da F6) conta como tipo 1. Função pura
+  `resolverUsoTipo5` em `getnetExtratoParser.ts` (3 estados: nunca
+  importado → decide pela config; travado em tipo1 [incl. `NULL` legado];
+  travado em tipo5).
+- **Validação**: `deno check` + `deno test` em `getnetExtratoParser.ts`/
+  `index.ts` (14 casos: 9 de `selecionarEspelhoTipo5` — PG sem
+  numero_operacao, duas linhas PG com chave/valor distintos, todas as
+  operações não-PG filtradas fora, reimportação gera external_id idêntico,
+  **mesmo PG sob nome de arquivo diferente gera external_id idêntico (fix
+  P2 rodada 1)**, **assinatura não aceita integracao_id (fix P2 rodada 2)**,
+  fallback de `chaveUr` para `numeroOperacao`, fallback de data, linha sem
+  nenhuma data descartada — + 5 de `resolverUsoTipo5`, incluindo o cenário
+  exato do P1: arquivo legado com `espelho_origem NULL` trava em tipo 1
+  mesmo com corte retroativo cobrindo a data). `npx tsc` mantém os 62
+  erros pré-existentes catalogados desde a F5, zero novos.
+
 ## 10. Decisões em aberto (bater o martelo)
 
 | # | Decisão | Recomendação |
@@ -946,7 +1027,7 @@ para `DashboardOfertas`).
 | D2 | Padrão `features/` no frontend | Financeiro inaugura; demais domínios depois |
 | D3 | Modelo de vínculo de conciliação | (a) manter 3 estruturas via RPC agora; (b) modelo único N:M `conciliacoes`+`conciliacao_itens` como evolução. FK física em `transacao_vinculada_id` após saneamento |
 | D4 | Imutabilidade | Editar/excluir lançamento conciliado? Parcela do meio? A RPC precisa de resposta |
-| D5 | Getnet tipo 1 vs tipo 5 | Tipo 5 como verdade do espelho, só novos períodos |
+| D5 | Getnet tipo 1 vs tipo 5 | Tipo 5 como verdade do espelho, só novos períodos — ✅ implementado na F6 (opt-in via `config.espelho_tipo5_desde`) |
 | D6 | Recorrência/parcelamento | Materializar tudo na criação (parcelado); job mensal (recorrente) |
 | D7 | Efeitos colaterais (alertas) | Fila no banco lida por edge — bot e front geram os mesmos alertas |
 | D8 | Status ENUM vs TEXT+CHECK | Padronizar na F1 (barato agora, caro depois) — inclui sanear os status de `sessoes_contagem` (CHECK × `finalizado` × StatusBadge) |

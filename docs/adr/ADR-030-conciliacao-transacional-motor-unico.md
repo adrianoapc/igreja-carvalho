@@ -62,6 +62,13 @@ critérios de sugestão e padronizar a entrada de extratos, sem big-bang?
    **tipo 5** (`getnet_financeiro_resumo`, dinheiro real) para novos períodos
    (`origem='getnet_sftp_tipo5'`), mantendo o tipo 1 como analítico.
    Histórico não é reprocessado.
+   **Implementado na F6** (jul/2026): dentro do tipo 5, só linhas com
+   `tipo_operacao='PG'` (Pagamento de Agenda Livre) são espelhadas — é o
+   único tipo que representa dinheiro novo creditado na conta, por regra
+   geral do próprio manual técnico da Getnet; os demais (CS/CF/AC/CL/GL/GF/
+   AL) são liquidação contábil de valores já adiantados antes. Opt-in por
+   integração via `integracoes_financeiras.config.espelho_tipo5_desde` — sem
+   essa data, mantém tipo 1. Ver `arquitetura-financeiro.md` §9.6.
 5. **Modelo de vínculo (decisão D3 aprovada)**: as 3 estruturas atuais são
    mantidas, escritas somente via RPC; modelo único N:M fica como evolução
    posterior. FK física em `transacao_vinculada_id` após saneamento de
@@ -98,6 +105,12 @@ critérios de sugestão e padronizar a entrada de extratos, sem big-bang?
   foram removidos. `reclass-transacoes` passou a **recusar** (HTTP 409) job
   sobre transação conciliada, fechando o TODO de imutabilidade. Detalhes em
   `arquitetura-financeiro.md §9.3`.
+- **F5 (jul/2026, migrations `20260712120000`/`20260712130000`)**: pipeline
+  comum de ingestão (`fin_ingerir_extratos`/`fin_desfazer_ingestao`) entregue
+  para os canais manual, santander, getnet e PIX. Detalhes em
+  `arquitetura-financeiro.md §9.4/§9.5`.
+- **F6 (jul/2026)**: decisão D5 (Getnet tipo 1 vs tipo 5) implementada — ver
+  item 4 da Decisão acima e `arquitetura-financeiro.md §9.6`.
 
 ## 🔗 Relacionados
 
