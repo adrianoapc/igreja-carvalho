@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { marcarExtratoIgnorado } from "@/features/financeiro/core/api/extratos.api";
+import { desconciliar } from "@/features/financeiro/core/api/conciliacao.api";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { useHideValues } from "@/hooks/useHideValues";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -384,12 +386,7 @@ export function HistoricoExtratos() {
   const handleIgnorar = async (extrato: ExtratoItem) => {
     setActionLoading(extrato.id);
     try {
-      const { error } = await supabase
-        .from("extratos_bancarios")
-        .update({ reconciliado: true })
-        .eq("id", extrato.id);
-
-      if (error) throw error;
+      await marcarExtratoIgnorado(extrato.id, true);
 
       toast.success("Extrato marcado como ignorado");
       queryClient.invalidateQueries({ queryKey: ["extratos-historico"] });
@@ -404,12 +401,7 @@ export function HistoricoExtratos() {
   const handleReativar = async (extrato: ExtratoItem) => {
     setActionLoading(extrato.id);
     try {
-      const { error } = await supabase
-        .from("extratos_bancarios")
-        .update({ reconciliado: false })
-        .eq("id", extrato.id);
-
-      if (error) throw error;
+      await marcarExtratoIgnorado(extrato.id, false);
 
       toast.success("Extrato reativado para conciliação");
       queryClient.invalidateQueries({ queryKey: ["extratos-historico"] });
@@ -424,19 +416,14 @@ export function HistoricoExtratos() {
   const handleDesvincular = async (extrato: ExtratoItem) => {
     setActionLoading(extrato.id);
     try {
-      // Se tem transação vinculada, usar a RPC para desconciliar atomicamente
+      // Se tem transação vinculada, usar a RPC para desconciliar atomicamente;
+      // senão (extrato ignorado/sem vínculo real) só reativa (fin_marcar_
+      // extrato_ignorado recusa qualquer extrato realmente vinculado via
+      // lote/divisão, evitando o estado dangling do fallback antigo).
       if (extrato.transacao_vinculada_id) {
-        const { error } = await supabase.rpc("desconciliar_transacao", {
-          p_transacao_id: extrato.transacao_vinculada_id,
-        });
-        if (error) throw error;
+        await desconciliar(extrato.transacao_vinculada_id);
       } else {
-        // Fallback: limpar apenas o extrato
-        const { error } = await supabase
-          .from("extratos_bancarios")
-          .update({ transacao_vinculada_id: null, reconciliado: false })
-          .eq("id", extrato.id);
-        if (error) throw error;
+        await marcarExtratoIgnorado(extrato.id, false);
       }
 
       toast.success("Vínculo removido com sucesso");
