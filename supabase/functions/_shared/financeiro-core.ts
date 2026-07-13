@@ -248,8 +248,12 @@ export interface PixExtratoResultado {
  *    à filial da integração quando `input.integracao_id` for conhecido. Falha
  *    (sem ingerir) se não achar nenhuma ou achar mais de uma, em vez de
  *    adivinhar a conta errada.
+ * `export`ada (não só interna) para ser testada diretamente em
+ * `financeiro-core.test.ts` — esta função já teve 3 rodadas de bug de
+ * precisão em review; um teste automatizado é mais confiável que reler o
+ * código de novo.
  */
-async function resolverContaPix(
+export async function resolverContaPix(
   supabase: SupabaseClientAny,
   input: PixExtratoInput,
 ): Promise<{ contaId: string; filialId: string | null } | PixExtratoResultado> {
@@ -279,16 +283,27 @@ async function resolverContaPix(
   }
   const todas = (contasSantander ?? []) as Array<{ id: string; filial_id: string | null }>;
 
-  // Conta específica da filial da integração tem prioridade sobre a conta de
-  // nível-igreja (filial_id NULL) — mesmo padrão filial > igreja usado em
-  // financeiro_config.conciliacao_score_minimo (F4). Só cai para a
-  // igreja-level quando não há conta específica da filial conhecida.
-  const daFilial = filialConhecida
-    ? todas.filter((c: { filial_id: string | null }) => c.filial_id === filialConhecida)
-    : [];
-  const candidatas = daFilial.length > 0
-    ? daFilial
-    : todas.filter((c: { filial_id: string | null }) => !c.filial_id);
+  // Quando a filial É conhecida (ex.: polling com integracao_id): conta
+  // específica da filial tem prioridade sobre a de nível-igreja (filial_id
+  // NULL) — mesmo padrão filial > igreja de
+  // financeiro_config.conciliacao_score_minimo (F4); só cai para
+  // nível-igreja se não houver conta específica da filial conhecida (nunca
+  // usa a conta de OUTRA filial).
+  //
+  // Quando a filial NÃO é conhecida (ex.: pix-webhook, que resolve só
+  // igreja_id via CNPJ — nunca sabe integracao_id): considera TODAS as
+  // contas Santander ativas da igreja, de qualquer filial ou nível-igreja —
+  // só falha se houver mais de uma no total. Restringir a filial_id NULL
+  // neste caso descartaria silenciosamente a única conta Santander da
+  // igreja sempre que ela estiver associada a uma filial (comum: a UI cria
+  // contas escopadas a uma filial específica fora de "Todas as Filiais").
+  let candidatas: Array<{ id: string; filial_id: string | null }>;
+  if (filialConhecida) {
+    const daFilial = todas.filter((c: { filial_id: string | null }) => c.filial_id === filialConhecida);
+    candidatas = daFilial.length > 0 ? daFilial : todas.filter((c: { filial_id: string | null }) => !c.filial_id);
+  } else {
+    candidatas = todas;
+  }
 
   if (candidatas.length === 0) {
     return { ingerido: false, motivo: "conta_santander_nao_encontrada" };

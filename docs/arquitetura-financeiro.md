@@ -886,15 +886,26 @@ para `DashboardOfertas`).
   conta na ordem de precisão que o chamador já tem disponível — **(1)**
   `conta_id` explícito (`cob_pix.conta_id` de uma cobrança vinculada por
   `txid` — um PIX de cobrança pode ter conta diferente da conta Santander
-  default); **(2)** fallback: conta(s) da igreja com `cnpj_banco` do
-  Santander, restrito à filial da integração quando `integracao_id` for
-  conhecido (conta específica da filial tem prioridade sobre a de
-  nível-igreja — mesmo padrão filial > igreja de
-  `financeiro_config.conciliacao_score_minimo` na F4). Em qualquer nível, se
-  a conta não puder ser resolvida (nenhuma ou mais de uma), **não ingere e
-  não lança** — o registro do PIX em `pix_webhook_temp`/`cob_pix` continua
-  funcionando exatamente como antes, só o espelho em `extratos_bancarios` fica
-  pendente. Zero regressão no fluxo atual.
+  default); **(2)** fallback: conta(s) ativas (`ativo=true`) da igreja com
+  `cnpj_banco` do Santander. Quando a filial é conhecida (`integracao_id`
+  informado, ex.: polling), a conta específica dessa filial tem prioridade
+  sobre a de nível-igreja — mesmo padrão filial > igreja de
+  `financeiro_config.conciliacao_score_minimo` na F4 — sem nunca usar a conta
+  de OUTRA filial. **Quando a filial é desconhecida** (ex.: `pix-webhook`, que
+  só resolve `igreja_id` via CNPJ e nunca sabe `integracao_id`), considera
+  **todas** as contas Santander ativas da igreja, de qualquer filial ou
+  nível-igreja — restringir a filial_id NULL neste caso descartaria
+  silenciosamente a única conta Santander da igreja sempre que ela estiver
+  escopada a uma filial (comum: a UI cria contas por filial fora de "Todas as
+  Filiais"). Em qualquer nível, se a conta não puder ser resolvida (nenhuma ou
+  mais de uma), **não ingere e não lança** — o registro do PIX em
+  `pix_webhook_temp`/`cob_pix` continua funcionando exatamente como antes, só
+  o espelho em `extratos_bancarios` fica pendente. Zero regressão no fluxo
+  atual. **Validado por teste automatizado real**
+  (`financeiro-core.test.ts`, `deno test`) — essa lógica já teve 3 rodadas de
+  bug de precisão em review; os 9 casos (incl. o exato cenário do 3º bug)
+  travam o comportamento em vez de depender de releitura manual a cada
+  rodada.
 - Ligado nos **3 pontos** que hoje escrevem em `pix_webhook_temp` (webhook
   push, polling `buscar-pix-recebidos`, polling `buscar_pix` dentro de
   `santander-api` usado pelo cron `buscar-pix-cron`) — os três precisavam ser
