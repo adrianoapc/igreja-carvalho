@@ -193,9 +193,10 @@ adaptadores por evento deste ADR: **santander-api**, **getnet-sftp** (2 pontos:
 settlement_v1 + extrato_eletrônico_v10/LQ) e **PIX** (webhook + os 2 caminhos de
 polling — `buscar-pix-recebidos` e `buscar_pix` dentro de `santander-api`, usado
 pelo `buscar-pix-cron` que este ADR já documentava como fallback). PIX resolve
-`conta_id` via `integracoes_financeiras.config.conta_id` (helper
-`ingerirExtratoPix`) — não existia nenhuma tabela com esse vínculo pronto; ver
-`docs/arquitetura-financeiro.md §9.5`. F5 está **concluída**; falta só conectar
+`conta_id` (helper `ingerirExtratoPix`) por `cob_pix.conta_id` quando a cobrança
+é conhecida, senão por `contas.cnpj_banco` casando com o CNPJ do Santander
+(mesma lógica de `Contas.tsx`/"Testar") — não existia nenhum vínculo pronto
+para isso; ver `docs/arquitetura-financeiro.md §9.5`. F5 está **concluída**; falta só conectar
 o "gancho pós-ingestão" (geração automática de candidatos ao motor único
 `fin_gerar_candidatos_conciliacao`) como evolução futura.
 

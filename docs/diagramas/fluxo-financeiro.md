@@ -371,9 +371,9 @@ os INSERTs/upserts diretos em `extratos_bancarios` — canal **manual**
 (settlement_v1 + extrato_eletrônico_v10/LQ) e **PIX** (webhook + 2 caminhos de
 polling). Valor normalizado para ABS, dedupe por `(conta_id, external_id)` com
 id determinístico, job + undo. Adaptadores service-role usam `canal='integracao'`
-sem ator humano (D-F5.2). PIX resolve `conta_id` via
-`integracoes_financeiras.config.conta_id` (mesmo mecanismo já usado pelo
-Getnet) através do novo helper `ingerirExtratoPix`.
+sem ator humano (D-F5.2). PIX resolve `conta_id` (helper `ingerirExtratoPix`)
+por `cob_pix.conta_id` (cobrança conhecida) ou por `contas.cnpj_banco` casando
+com o CNPJ do Santander (mesma lógica já usada em `Contas.tsx`/"Testar").
 
 ```mermaid
 flowchart TD
@@ -389,7 +389,7 @@ flowchart TD
     OFX -->|"ExtratoItem[] + external_id\n(FITID | file:key#occ)"| EAPI
     SAN --> SHIM
     GET --> SHIM
-    PIX -->|"resolve conta_id via\nintegracoes_financeiras.config"| SHIM
+    PIX -->|"resolve conta_id via\ncob_pix.conta_id ou contas.cnpj_banco"| SHIM
 
     subgraph RPC["Porta única (SECURITY DEFINER + fin_resolver_contexto)"]
         ING["fin_ingerir_extratos\nvalida tenant/filial · valor ABS ·\ndedupe (conta_id, external_id) ·\nexternal_id auto:md5 se ausente ·\ncanal integracao sem ator (D-F5.2)"]

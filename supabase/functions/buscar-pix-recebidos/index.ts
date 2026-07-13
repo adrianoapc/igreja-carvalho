@@ -408,10 +408,11 @@ serve(async (req) => {
           }
 
           // Espelha em extratos_bancarios (F5 fatia 2): usa a conta da cobrança
-          // vinculada (cob_pix.conta_id) quando existir; senão, a integração já
-          // conhecida (body.integracao_id — evita o fallback por igreja, que
-          // falha em igrejas com integração por filial). Não bloqueia o registro
-          // do PIX se a conta não puder ser resolvida.
+          // vinculada (cob_pix.conta_id) quando existir; senão, a conta
+          // Santander ativa da igreja (contas.cnpj_banco), restrita à filial
+          // da integração conhecida (body.integracao_id) quando houver mais de
+          // uma. Não bloqueia o registro do PIX se a conta não puder ser
+          // resolvida.
           if (igrejaId) {
             const pixResult = await ingerirExtratoPix(supabaseAdmin, {
               igreja_id: igrejaId,

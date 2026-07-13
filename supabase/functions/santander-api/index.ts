@@ -1331,9 +1331,9 @@ Deno.serve(async (req) => {
 
             // Espelha em extratos_bancarios (F5 fatia 2): usa a conta da
             // cobrança vinculada (cob_pix.conta_id) quando existir; senão, a
-            // integração já conhecida (integracao_id do payload — evita o
-            // fallback por igreja, que falha em igrejas com integração por
-            // filial). Não bloqueia o registro do PIX.
+            // conta Santander ativa da igreja (contas.cnpj_banco), restrita à
+            // filial da integração conhecida (integracao_id) quando houver
+            // mais de uma. Não bloqueia o registro do PIX.
             if (igrejaIdFinal) {
               const pixResult = await ingerirExtratoPix(supabaseAdmin, {
                 igreja_id: igrejaIdFinal,

@@ -274,8 +274,8 @@ serve(async (req) => {
 
           // Espelha em extratos_bancarios (F5 fatia 2) — só quando a igreja foi
           // resolvida e a conta puder ser determinada (cob_pix.conta_id da
-          // cobrança vinculada, ou a integração Santander única da igreja com
-          // config.conta_id). Não bloqueia o registro do PIX se a conta não
+          // cobrança vinculada, ou a conta Santander ativa da igreja via
+          // contas.cnpj_banco). Não bloqueia o registro do PIX se a conta não
           // puder ser resolvida (log apenas).
           if (igrejaId) {
             const pixResult = await ingerirExtratoPix(supabase, {

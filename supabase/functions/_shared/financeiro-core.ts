@@ -271,7 +271,8 @@ async function resolverContaPix(
     .from("contas")
     .select("id, filial_id")
     .eq("igreja_id", input.igreja_id)
-    .eq("cnpj_banco", SANTANDER_CNPJ);
+    .eq("cnpj_banco", SANTANDER_CNPJ)
+    .eq("ativo", true);
 
   if (error) {
     return { ingerido: false, motivo: "conta_santander_nao_encontrada", detalhe: error.message };
