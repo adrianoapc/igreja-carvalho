@@ -6,6 +6,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import nacl from "npm:tweetnacl@1.0.3";
 import forge from "npm:node-forge@1.3.1";
+import { ingerirExtratoPix } from "../_shared/financeiro-core.ts";
 
 const SANTANDER_PIX_TOKEN_URL = "https://trust-pix.santander.com.br/oauth/token";
 const SANTANDER_PIX_BASE_URL = "https://trust-pix.santander.com.br/api/v1";
@@ -329,6 +330,25 @@ serve(async (req) => {
         const endToEndId = pixItem.endToEndId;
         const valor = parseFloat(pixItem.valor);
 
+        // Vincular cobrança se txid existir — feito ANTES da checagem de
+        // duplicata: mesmo um PIX já registrado (ex.: pelo webhook, sem
+        // conta resolvível) precisa dessa info para a retentativa de espelho
+        // abaixo, já que este polling conhece integracao_id/conta que o
+        // webhook não conhece.
+        let cobPixId: string | null = null;
+        let cobPixContaId: string | null = null;
+        if (pixItem.txid) {
+          const { data: cobranca } = await supabaseAdmin
+            .from("cob_pix")
+            .select("id, conta_id")
+            .eq("txid", pixItem.txid)
+            .maybeSingle();
+          if (cobranca) {
+            cobPixId = cobranca.id;
+            cobPixContaId = cobranca.conta_id ?? null;
+          }
+        }
+
         // Deduplicação
         const { data: existente } = await supabaseAdmin
           .from("pix_webhook_temp")
@@ -338,18 +358,27 @@ serve(async (req) => {
 
         if (existente) {
           duplicados++;
+          // Retentativa de espelho (F5): se o webhook chegou primeiro numa
+          // igreja com integração por filial, ele não conseguiu resolver a
+          // conta (multiplas_integracoes) — este polling sabe o
+          // integracao_id, então tenta de novo. fin_ingerir_extratos dedupe
+          // por (conta_id, external_id): reingestão de um sucesso anterior é
+          // no-op.
+          if (igrejaId) {
+            const pixResult = await ingerirExtratoPix(supabaseAdmin, {
+              igreja_id: igrejaId,
+              pix_id: endToEndId,
+              valor,
+              data_pix: new Date(pixItem.horario).toISOString(),
+              descricao: "PIX Recebido (polling)",
+              conta_id: cobPixContaId,
+              integracao_id: body.integracao_id,
+            });
+            if (!pixResult.ingerido) {
+              console.log(`[buscar-pix] PIX ${endToEndId} (duplicado) não espelhado em extratos_bancarios: ${pixResult.motivo}`);
+            }
+          }
           continue;
-        }
-
-        // Vincular cobrança se txid existir
-        let cobPixId: string | null = null;
-        if (pixItem.txid) {
-          const { data: cobranca } = await supabaseAdmin
-            .from("cob_pix")
-            .select("id")
-            .eq("txid", pixItem.txid)
-            .maybeSingle();
-          if (cobranca) cobPixId = cobranca.id;
         }
 
         const { error: insertError } = await supabaseAdmin
@@ -376,6 +405,27 @@ serve(async (req) => {
               .from("cob_pix")
               .update({ status: "CONCLUIDA", data_conclusao: new Date(pixItem.horario).toISOString() })
               .eq("id", cobPixId);
+          }
+
+          // Espelha em extratos_bancarios (F5 fatia 2): usa a conta da cobrança
+          // vinculada (cob_pix.conta_id) quando existir; senão, a conta
+          // Santander ativa da igreja (contas.cnpj_banco), restrita à filial
+          // da integração conhecida (body.integracao_id) quando houver mais de
+          // uma. Não bloqueia o registro do PIX se a conta não puder ser
+          // resolvida.
+          if (igrejaId) {
+            const pixResult = await ingerirExtratoPix(supabaseAdmin, {
+              igreja_id: igrejaId,
+              pix_id: endToEndId,
+              valor,
+              data_pix: new Date(pixItem.horario).toISOString(),
+              descricao: "PIX Recebido (polling)",
+              conta_id: cobPixContaId,
+              integracao_id: body.integracao_id,
+            });
+            if (!pixResult.ingerido) {
+              console.log(`[buscar-pix] PIX ${endToEndId} não espelhado em extratos_bancarios: ${pixResult.motivo}`);
+            }
           }
         }
       } catch (itemError) {

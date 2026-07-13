@@ -362,36 +362,47 @@ flowchart TD
     RECLASS["reclass-transacoes\nrecusa transação conciliada (409)"]
 ```
 
-## Ingestão de extratos — Fase F5 (fatia 1, ADR-022/028)
+## Ingestão de extratos — Fase F5 completa (ADR-022/028)
 
-Implementado em jul/2026 (migration `20260712120000`). Porta única
-`fin_ingerir_extratos` (contrato `ExtratoItem`) substitui os INSERTs diretos em
-`extratos_bancarios` — nesta fatia, só o canal **manual** (OFX/CSV/XLSX). Valor
-normalizado para ABS, dedupe por `(conta_id, external_id)` com id determinístico,
-job + undo. Santander/Getnet/PIX migram na fatia 2.
+Implementado em jul/2026 (migrations `20260712120000` + `20260712130000`).
+Porta única `fin_ingerir_extratos` (contrato `ExtratoItem`) substitui **todos**
+os INSERTs/upserts diretos em `extratos_bancarios` — canal **manual**
+(OFX/CSV/XLSX), **santander-api** (sync Open Banking), **getnet-sftp**
+(settlement_v1 + extrato_eletrônico_v10/LQ) e **PIX** (webhook + 2 caminhos de
+polling). Valor normalizado para ABS, dedupe por `(conta_id, external_id)` com
+id determinístico, job + undo. Adaptadores service-role usam `canal='integracao'`
+sem ator humano (D-F5.2). PIX resolve `conta_id` (helper `ingerirExtratoPix`)
+por `cob_pix.conta_id` (cobrança conhecida) ou por `contas.cnpj_banco` casando
+com o CNPJ do Santander (mesma lógica já usada em `Contas.tsx`/"Testar").
 
 ```mermaid
 flowchart TD
     subgraph SRC["Fontes"]
         OFX["ImportarExtratosTab\nOFX/CSV/XLSX (parse client-side)"]
-        SAN["santander-api / getnet-sftp / pix\n(fatia 2 — ainda escrevem direto)"]
+        SAN["santander-api\n(sync Open Banking)"]
+        GET["getnet-sftp\nsettlement_v1 + extrato_eletrônico_v10 (LQ)"]
+        PIX["pix-webhook · buscar-pix-recebidos ·\nsantander-api/buscar_pix"]
     end
 
     EAPI["core/api/extratos.api\ningerirExtratos · desfazerIngestao"]
+    SHIM["_shared/financeiro-core.ts\ningerirExtratos · ingerirExtratoPix"]
     OFX -->|"ExtratoItem[] + external_id\n(FITID | file:key#occ)"| EAPI
+    SAN --> SHIM
+    GET --> SHIM
+    PIX -->|"resolve conta_id via\ncob_pix.conta_id ou contas.cnpj_banco"| SHIM
 
     subgraph RPC["Porta única (SECURITY DEFINER + fin_resolver_contexto)"]
-        ING["fin_ingerir_extratos\nvalida tenant/filial · valor ABS ·\ndedupe (conta_id, external_id) ·\nexternal_id auto:md5 se ausente"]
+        ING["fin_ingerir_extratos\nvalida tenant/filial · valor ABS ·\ndedupe (conta_id, external_id) ·\nexternal_id auto:md5 se ausente ·\ncanal integracao sem ator (D-F5.2)"]
         UNDO["fin_desfazer_ingestao\nremove não conciliados · preserva conciliado"]
     end
     EAPI --> ING
     EAPI --> UNDO
+    SHIM --> ING
 
     ING --> JOB[(fin_extrato_ingestao_jobs\n+ import_job_id no extrato)]
     ING -->|ON CONFLICT DO NOTHING| EXT[(extratos_bancarios)]
     ING --> AUD[(fin_audit_log)]
     UNDO --> EXT
 
-    SAN -.->|fatia 2: mesma porta| ING
     EXT -->|gancho pós-ingestão ADR-028| SCORE["fin_gerar_candidatos_conciliacao\n(edge gerar-sugestoes-ml migrada na F5)"]
 ```
