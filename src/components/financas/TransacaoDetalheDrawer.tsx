@@ -14,7 +14,7 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Calculator, Save, ExternalLink, Copy, Check } from 'lucide-react'
 import { toast } from 'sonner'
-import { supabase } from '@/integrations/supabase/client'
+import { atualizarLancamento } from '@/features/financeiro/core/api/lancamentos.api'
 
 interface TransacaoDetalheDrawerProps {
   open: boolean
@@ -91,19 +91,14 @@ export function TransacaoDetalheDrawer({
   const handleSave = async () => {
     setSaving(true)
     try {
-      const { error } = await supabase
-        .from('transacoes_financeiras')
-        .update({
-          valor: parseDecimal(valorBruto),
-          taxas_administrativas: parseDecimal(taxas),
-          juros: parseDecimal(juros),
-          multas: parseDecimal(multas),
-          desconto: parseDecimal(desconto),
-          valor_liquido: parseDecimal(valorLiquido),
-        })
-        .eq('id', transacao.id)
-
-      if (error) throw error
+      await atualizarLancamento(transacao.id, {
+        valor: parseDecimal(valorBruto),
+        taxas_administrativas: parseDecimal(taxas),
+        juros: parseDecimal(juros),
+        multas: parseDecimal(multas),
+        desconto: parseDecimal(desconto),
+        valor_liquido: parseDecimal(valorLiquido),
+      })
 
       toast.success('Valores atualizados com sucesso')
       onUpdated?.()

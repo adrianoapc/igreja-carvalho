@@ -44,6 +44,7 @@ import { ConfirmarPagamentoDialog } from "./ConfirmarPagamentoDialog";
 import { DesconciliarDialog } from "./DesconciliarDialog";
 import {
   alterarStatusLancamento,
+  alternarConferenciaManual,
   excluirLancamento,
 } from "@/features/financeiro/core";
 
@@ -252,43 +253,9 @@ export function TransacaoActionsMenu({
 
   const handleToggleConferidoManual = async () => {
     try {
-      // Atualiza a transação atual
-      const { data: entradaAtual, error: fetchError } = await supabase
-        .from("transacoes_financeiras")
-        .select("id, transferencia_id, tipo")
-        .eq("id", transacaoId)
-        .single();
-      if (fetchError) throw fetchError;
-
-      const novoStatus = conferidoManual
-        ? "nao_conciliado"
-        : "conciliado_manual";
-
-      // Atualiza a entrada
-      const { error } = await supabase
-        .from("transacoes_financeiras")
-        .update({
-          conferido_manual: !conferidoManual,
-          conciliacao_status: novoStatus,
-        })
-        .eq("id", transacaoId);
-      if (error) throw error;
-
-      // Se for uma transferência (entrada com transferencia_id), concilia a saída correspondente
-      if (
-        entradaAtual &&
-        entradaAtual.transferencia_id &&
-        entradaAtual.tipo === "entrada"
-      ) {
-        await supabase
-          .from("transacoes_financeiras")
-          .update({
-            conciliacao_status: novoStatus,
-            conferido_manual: !conferidoManual,
-          })
-          .eq("transferencia_id", entradaAtual.transferencia_id)
-          .eq("tipo", "saida");
-      }
+      // fin_alternar_conferencia_manual cuida do toggle + sincronismo da
+      // perna irmã de transferência atomicamente (F7).
+      await alternarConferenciaManual(transacaoId, !conferidoManual);
 
       toast.success(
         conferidoManual
