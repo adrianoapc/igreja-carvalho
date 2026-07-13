@@ -238,10 +238,14 @@ export function IntegracaoCriarDialog({
 
     const result: Record<string, unknown> = {};
     if (Object.keys(sftp).length) result.sftp = sftp;
-    // Só faz sentido no layout que emite registro tipo 5 (settlement_v1 não tem).
-    if (sftpLayout === "extrato_eletronico_v10" && espelhoTipo5Desde) {
-      result.espelho_tipo5_desde = espelhoTipo5Desde;
-    }
+    // Sempre envia (mesmo vazio) — o update de integracoes-config faz merge
+    // RASO do config (`{...currentConfig, ...payload.config}`), então omitir
+    // a chave quando o campo é limpo (ou o layout muda pra settlement_v1, que
+    // não tem registro tipo 5) deixaria uma data antiga presa para sempre,
+    // sem forma de desativar o opt-in pela UI. String vazia é o valor que
+    // runExtratoEletronicoV10 já trata como "sem corte" (comportamento tipo 1).
+    result.espelho_tipo5_desde =
+      sftpLayout === "extrato_eletronico_v10" ? espelhoTipo5Desde : "";
     return Object.keys(result).length ? result : undefined;
   };
 
