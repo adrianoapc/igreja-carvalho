@@ -15,7 +15,7 @@ sequenceDiagram
 
     loop Para cada arquivo pendente
         Fn->>Fn: Chama runExtratoEletronicoV10(arquivo_nome)
-        Note over Fn: Upserta getnet_resumo, getnet_analitico,<br/>getnet_ajustes, getnet_fin_resumo,<br/>getnet_fin_detalhe, extratos_bancarios
+        Note over Fn: Upserta getnet_resumo, getnet_analitico,<br/>getnet_ajustes, getnet_fin_resumo,<br/>getnet_fin_detalhe, extratos_bancarios<br/>(espelho: tipo 1/LQ ou tipo 5/PG, conforme corte)
         alt Todos os upserts OK
             Fn->>DB: Upsert getnet_arquivos (marca como importado)
         else Qualquer upsert falhou
