@@ -396,14 +396,18 @@ flowchart TD
     EXT -->|gancho pós-ingestão ADR-028| SCORE["fin_gerar_candidatos_conciliacao\n(edge gerar-sugestoes-ml migrada na F5)"]
 ```
 
-## Endurecimento — Fase F7 (sub-frente 1/5, jul/2026)
+## Endurecimento — Fase F7 (sub-frente 1/5 ✅ COMPLETA, jul/2026)
 
-Migration `20260713140000`. Fecha a "regra de ouro" do §7.1 do
-`arquitetura-financeiro.md` com enforcement de banco (`REVOKE`), não só
-convenção de código — nas tabelas confirmadas 100% migradas para as RPCs
-`fin_*`. `transacoes_financeiras`/`extratos_bancarios` ficaram de fora (ainda
-têm escrita direta viva no frontend fora do CORE — ver §9.6). As 3 RPCs legadas
-de conciliação deprecadas na F4 (+ 1 achado bônus, órfã) foram `DROP`adas.
+Migrations `20260713140000` + `20260713150000` + `20260713160000`. Fecha a
+"regra de ouro" do §7.1 do `arquitetura-financeiro.md` com enforcement de
+banco (`REVOKE`), não só convenção de código — **as 7 tabelas do domínio**
+agora revogadas para `authenticated`/`anon`. A 1ª migration revogou as 5 já
+100% migradas; a auditoria daquela rodada achou 13 call-sites de escrita
+direta ainda vivos em `transacoes_financeiras`/`extratos_bancarios` — foram
+migrados para RPCs `fin_*` (2 novas: `fin_alternar_conferencia_manual`,
+`fin_marcar_extrato_ignorado`) antes da 3ª migration estender o `REVOKE` a
+essas duas (ver §9.6). As 3 RPCs legadas de conciliação deprecadas na F4
+(+ 1 achado bônus, órfã) foram `DROP`adas na 1ª migration.
 
 ```mermaid
 flowchart TD
@@ -411,28 +415,23 @@ flowchart TD
         FE["Frontend SPA"]
     end
 
-    subgraph REVOGADO["REVOKE INSERT/UPDATE/DELETE (authenticated, anon)"]
+    subgraph REVOGADO["REVOKE INSERT/UPDATE/DELETE (authenticated, anon) — as 7 tabelas do domínio"]
         T1[(transferencias_contas)]
         T2[(conciliacoes_lote)]
         T3[(conciliacoes_lote_extratos)]
         T4[(conciliacoes_divisao)]
         T5[(conciliacoes_divisao_transacoes)]
-    end
-
-    subgraph FORA["Fora do REVOKE nesta fatia (call-site direto ainda vivo)"]
         T6[(transacoes_financeiras)]
         T7[(extratos_bancarios)]
     end
 
     FE -.->|"INSERT/UPDATE/DELETE direto\n→ permission denied"| REVOGADO
-    FE -->|"escrita ainda direta\n(migra na próxima fatia F7)"| FORA
 
     subgraph CORE["RPCs fin_* (SECURITY DEFINER, dono com grant pleno)"]
-        RPC["fin_criar_lancamento · fin_criar_transferencia ·\nfin_confirmar_conciliacao · fin_desconciliar ·\nfin_ingerir_extratos · fin_desfazer_ingestao · ..."]
+        RPC["fin_criar_lancamento · fin_atualizar_lancamento ·\nfin_criar_transferencia · fin_confirmar_conciliacao ·\nfin_desconciliar · fin_ingerir_extratos ·\nfin_desfazer_ingestao · fin_alternar_conferencia_manual ·\nfin_marcar_extrato_ignorado · ..."]
     end
     FE -->|EXECUTE| RPC
     RPC -->|"escreve com o privilégio do DONO\n(não do chamador)"| REVOGADO
-    RPC --> FORA
 
     subgraph DROP["DROP FUNCTION (zero call-site vivo)"]
         L1[reconciliar_transacoes]
@@ -441,5 +440,5 @@ flowchart TD
         L4["aplicar_sugestao_conciliacao\n(achado bônus — SugestoesML.tsx órfão)"]
     end
 
-    SR["service_role (edges: getnet-sftp, santander-extrato,\nreclass-transacoes, undo-reclass, undo-import)"] -->|"não afetado\n(SUPABASE_SERVICE_ROLE_KEY, não JWT)"| FORA
+    SR["service_role (edges: getnet-sftp, santander-extrato,\nreclass-transacoes, undo-reclass, undo-import)"] -->|"não afetado\n(SUPABASE_SERVICE_ROLE_KEY, não JWT)"| REVOGADO
 ```
