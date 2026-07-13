@@ -877,10 +877,16 @@ slug — usar `ilike '%pix%'` repetiria o anti-padrão já criticado em §5.3 pa
 `DashboardOfertas`).
 
 - Novo helper `ingerirExtratoPix` (`_shared/financeiro-core.ts`): resolve a
-  única `integracoes_financeiras` ativa (`provedor='santander'`) da igreja,
-  lê `config.conta_id`; se a integração não existir, for ambígua (mais de uma)
-  ou não tiver `conta_id` configurado, **não ingere e não lança** — o registro
-  do PIX em `pix_webhook_temp`/`cob_pix` continua funcionando exatamente como
+  conta na ordem de precisão que o chamador já tem disponível — **(1)**
+  `conta_id` explícito (`cob_pix.conta_id` de uma cobrança vinculada por
+  `txid` — um PIX de cobrança pode ter conta diferente do default da
+  integração); **(2)** `integracao_id` explícito (o polling já sabe qual
+  integração está consultando — evita cair no fallback por igreja em igrejas
+  com integração por filial); **(3)** fallback: única `integracoes_financeiras`
+  ativa (`provedor='santander'`) da igreja, lendo `config.conta_id`. Em
+  qualquer nível, se a conta não puder ser resolvida (integração
+  ausente/ambígua/sem `conta_id`), **não ingere e não lança** — o registro do
+  PIX em `pix_webhook_temp`/`cob_pix` continua funcionando exatamente como
   antes, só o espelho em `extratos_bancarios` fica pendente até a config
   existir. Zero regressão no fluxo atual.
 - Ligado nos **3 pontos** que hoje escrevem em `pix_webhook_temp` (webhook

@@ -344,13 +344,17 @@ serve(async (req) => {
 
         // Vincular cobrança se txid existir
         let cobPixId: string | null = null;
+        let cobPixContaId: string | null = null;
         if (pixItem.txid) {
           const { data: cobranca } = await supabaseAdmin
             .from("cob_pix")
-            .select("id")
+            .select("id, conta_id")
             .eq("txid", pixItem.txid)
             .maybeSingle();
-          if (cobranca) cobPixId = cobranca.id;
+          if (cobranca) {
+            cobPixId = cobranca.id;
+            cobPixContaId = cobranca.conta_id ?? null;
+          }
         }
 
         const { error: insertError } = await supabaseAdmin
@@ -379,9 +383,11 @@ serve(async (req) => {
               .eq("id", cobPixId);
           }
 
-          // Espelha em extratos_bancarios (F5 fatia 2) — mesma regra do
-          // pix-webhook: só quando a igreja foi resolvida e sua integração
-          // Santander tem conta_id configurado. Não bloqueia o registro do PIX.
+          // Espelha em extratos_bancarios (F5 fatia 2): usa a conta da cobrança
+          // vinculada (cob_pix.conta_id) quando existir; senão, a integração já
+          // conhecida (body.integracao_id — evita o fallback por igreja, que
+          // falha em igrejas com integração por filial). Não bloqueia o registro
+          // do PIX se a conta não puder ser resolvida.
           if (igrejaId) {
             const pixResult = await ingerirExtratoPix(supabaseAdmin, {
               igreja_id: igrejaId,
@@ -389,6 +395,8 @@ serve(async (req) => {
               valor,
               data_pix: new Date(pixItem.horario).toISOString(),
               descricao: "PIX Recebido (polling)",
+              conta_id: cobPixContaId,
+              integracao_id: body.integracao_id,
             });
             if (!pixResult.ingerido) {
               console.log(`[buscar-pix] PIX ${endToEndId} não espelhado em extratos_bancarios: ${pixResult.motivo}`);

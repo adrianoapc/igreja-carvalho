@@ -1265,13 +1265,17 @@ Deno.serve(async (req) => {
           }
 
           let cobPixId: string | null = null
+          let cobPixContaId: string | null = null
           if (pixItem.txid) {
             const { data: cobranca } = await supabaseAdmin
               .from('cob_pix')
-              .select('id')
+              .select('id, conta_id')
               .eq('txid', pixItem.txid)
               .maybeSingle()
-            if (cobranca) cobPixId = cobranca.id
+            if (cobranca) {
+              cobPixId = cobranca.id
+              cobPixContaId = cobranca.conta_id ?? null
+            }
           }
 
           const { error: insertError } = await supabaseAdmin
@@ -1300,8 +1304,11 @@ Deno.serve(async (req) => {
                 .eq('id', cobPixId)
             }
 
-            // Espelha em extratos_bancarios (F5 fatia 2) — mesma regra dos
-            // demais pontos de entrada PIX. Não bloqueia o registro do PIX.
+            // Espelha em extratos_bancarios (F5 fatia 2): usa a conta da
+            // cobrança vinculada (cob_pix.conta_id) quando existir; senão, a
+            // integração já conhecida (integracao_id do payload — evita o
+            // fallback por igreja, que falha em igrejas com integração por
+            // filial). Não bloqueia o registro do PIX.
             if (igrejaIdFinal) {
               const pixResult = await ingerirExtratoPix(supabaseAdmin, {
                 igreja_id: igrejaIdFinal,
@@ -1309,6 +1316,8 @@ Deno.serve(async (req) => {
                 valor: valorPix,
                 data_pix: new Date(pixItem.horario).toISOString(),
                 descricao: 'PIX Recebido (polling)',
+                conta_id: cobPixContaId,
+                integracao_id,
               })
               if (!pixResult.ingerido) {
                 console.log(`[santander-api] PIX ${endToEndId} não espelhado em extratos_bancarios: ${pixResult.motivo}`)

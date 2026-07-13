@@ -208,6 +208,18 @@ export interface PixExtratoInput {
   /** Data/hora do PIX (ISO); só a parte de data é usada. */
   data_pix: string;
   descricao: string;
+  /**
+   * Conta já conhecida pelo chamador (ex.: `cob_pix.conta_id` de uma cobrança
+   * vinculada por txid) — maior precedência: um PIX de cobrança pode ter conta
+   * diferente do default da integração.
+   */
+  conta_id?: string | null;
+  /**
+   * Integração já conhecida pelo chamador (ex.: `integracao_id` do polling) —
+   * 2ª precedência. Evita o fallback por igreja, que falha com
+   * `multiplas_integracoes` em igrejas com integração por filial.
+   */
+  integracao_id?: string | null;
 }
 
 export interface PixExtratoResultado {
@@ -220,13 +232,44 @@ export interface PixExtratoResultado {
   detalhe?: string;
 }
 
-export async function ingerirExtratoPix(
+/**
+ * Resolve a conta bancária do PIX na ordem de precisão disponível ao chamador:
+ * 1) `input.conta_id` explícito (ex.: `cob_pix.conta_id` de uma cobrança);
+ * 2) `input.integracao_id` explícito (ex.: polling já sabe qual integração);
+ * 3) fallback: única integração Santander ativa da igreja (`config.conta_id`).
+ * O fallback por igreja só entra quando o chamador não tem fonte mais precisa
+ * — e falha (sem ingerir) se houver mais de uma integração, em vez de
+ * adivinhar a conta errada.
+ */
+async function resolverContaPix(
   supabase: SupabaseClientAny,
   input: PixExtratoInput,
-): Promise<PixExtratoResultado> {
+): Promise<{ contaId: string; filialId: string | null } | PixExtratoResultado> {
+  if (input.conta_id) {
+    return { contaId: input.conta_id, filialId: null };
+  }
+
+  if (input.integracao_id) {
+    const { data: integracao, error } = await supabase
+      .from("integracoes_financeiras")
+      .select("filial_id, config")
+      .eq("id", input.integracao_id)
+      .maybeSingle();
+    if (error || !integracao) {
+      return { ingerido: false, motivo: "integracao_nao_encontrada", detalhe: error?.message };
+    }
+    const contaId = (integracao.config as Record<string, unknown> | null)?.conta_id as
+      | string
+      | undefined;
+    if (!contaId) {
+      return { ingerido: false, motivo: "conta_id_nao_configurado" };
+    }
+    return { contaId, filialId: integracao.filial_id ?? null };
+  }
+
   const { data: integracoes, error: integError } = await supabase
     .from("integracoes_financeiras")
-    .select("id, filial_id, config")
+    .select("filial_id, config")
     .eq("igreja_id", input.igreja_id)
     .eq("provedor", "santander")
     .eq("status", "ativo");
@@ -245,6 +288,17 @@ export async function ingerirExtratoPix(
   if (!contaId) {
     return { ingerido: false, motivo: "conta_id_nao_configurado" };
   }
+  return { contaId, filialId: integracao.filial_id ?? null };
+}
+
+export async function ingerirExtratoPix(
+  supabase: SupabaseClientAny,
+  input: PixExtratoInput,
+): Promise<PixExtratoResultado> {
+  const resolved = await resolverContaPix(supabase, input);
+  if ("ingerido" in resolved) {
+    return resolved;
+  }
 
   const item: ExtratoItemInput = {
     data_transacao: input.data_pix.slice(0, 10),
@@ -255,9 +309,9 @@ export async function ingerirExtratoPix(
   };
 
   try {
-    await ingerirExtratos(supabase, contaId, "pix", [item], {
+    await ingerirExtratos(supabase, resolved.contaId, "pix", [item], {
       igreja_id: input.igreja_id,
-      filial_id: integracao.filial_id ?? null,
+      filial_id: resolved.filialId,
       canal: "integracao",
     });
     return { ingerido: true };
