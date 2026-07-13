@@ -14,6 +14,10 @@ import { toast } from "sonner";
 import { useFilialId } from "@/hooks/useFilialId";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  criarLancamento,
+  alterarStatusLancamento,
+} from "@/features/financeiro/core/api/lancamentos.api";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { read, utils, WorkBook } from "xlsx";
 import {
@@ -752,36 +756,84 @@ export function ImportarTab() {
 
       for (let start = 0; start < transacoes.length; start += chunkSize) {
         const chunk = transacoes.slice(start, start + chunkSize);
-        const { data: insertedData, error } = await supabase
-          .from("transacoes_financeiras")
-          .insert(chunk)
-          .select("id");
+        const successItems: Array<{
+          job_id: string;
+          transacao_id: string;
+          row_index: number;
+          status: "imported";
+        }> = [];
+        const failedItems: Array<{
+          job_id: string;
+          row_index: number;
+          status: "rejected";
+          error_reason: string;
+        }> = [];
 
-        if (error) {
-          chunk.forEach((_, idx) => {
-            errs.push({
-              index: start + idx,
-              reason: String(error.message || error),
+        // Um fin_criar_lancamento por linha (em vez de INSERT em lote direto,
+        // F7): isola o erro por linha — uma linha ruim não derruba o chunk
+        // inteiro, como acontecia com o INSERT único. status "cancelado" não
+        // é aceito na criação pela RPC (só pendente|pago); cria como
+        // pendente e transiciona via fin_alterar_status_lancamento.
+        for (let idx = 0; idx < chunk.length; idx++) {
+          const t = chunk[idx];
+          const rowIndex = start + idx;
+          try {
+            const statusInicial: "pendente" | "pago" =
+              t.status === "pago" ? "pago" : "pendente";
+            const resultado = await criarLancamento({
+              tipo: t.tipo,
+              valor: t.valor,
+              data_vencimento: t.data_vencimento,
+              conta_id: t.conta_id,
+              descricao: t.descricao,
+              categoria_id: t.categoria_id,
+              extras: {
+                tipo_lancamento: "unico",
+                status: statusInicial,
+                data_competencia: t.data_competencia ?? undefined,
+                data_pagamento: t.data_pagamento ?? undefined,
+                subcategoria_id: t.subcategoria_id,
+                fornecedor_id: t.fornecedor_id,
+                base_ministerial_id: t.base_ministerial_id,
+                centro_custo_id: t.centro_custo_id,
+                desconto: t.desconto,
+                juros: t.juros,
+                multas: t.multas,
+                taxas_administrativas: t.taxas_administrativas,
+                observacoes: t.observacoes ?? undefined,
+                filial_id: t.filial_id,
+              },
             });
-          });
-          // Create job items for failed insertions
-          const failedItems = chunk.map((_, idx) => ({
-            job_id: jobId,
-            row_index: start + idx,
-            status: "rejected" as const,
-            error_reason: String(error.message || error),
-          }));
-          await supabase.from("import_job_items").insert(failedItems);
-        } else if (insertedData) {
-          importedIds.push(...insertedData.map((t) => t.id));
-          // Create job items for successful insertions
-          const successItems = insertedData.map((t, idx) => ({
-            job_id: jobId,
-            transacao_id: t.id,
-            row_index: start + idx,
-            status: "imported" as const,
-          }));
+            if (!resultado.id)
+              throw new Error("Lançamento criado sem id retornado.");
+            if (t.status === "cancelado") {
+              await alterarStatusLancamento(resultado.id, "cancelado");
+            }
+            importedIds.push(resultado.id);
+            successItems.push({
+              job_id: jobId,
+              transacao_id: resultado.id,
+              row_index: rowIndex,
+              status: "imported",
+            });
+          } catch (rowError) {
+            const reason =
+              rowError instanceof Error ? rowError.message : String(rowError);
+            errs.push({ index: rowIndex, reason });
+            failedItems.push({
+              job_id: jobId,
+              row_index: rowIndex,
+              status: "rejected",
+              error_reason: reason,
+            });
+          }
+        }
+
+        if (successItems.length) {
           await supabase.from("import_job_items").insert(successItems);
+        }
+        if (failedItems.length) {
+          await supabase.from("import_job_items").insert(failedItems);
         }
 
         setChunkProgress((p) => ({
