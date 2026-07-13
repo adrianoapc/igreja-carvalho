@@ -192,13 +192,23 @@ export function ingerirExtratos(
 }
 
 // ─── Ingestão de PIX (F5 fatia 2) ────────────────────────────────────────────
-// Diferente de Getnet/Santander, PIX não tem hoje uma conta bancária resolvível
-// automaticamente (pix_webhook_temp só carrega igreja_id). Reaproveita o mesmo
-// mecanismo do Getnet: `integracoes_financeiras.config.conta_id`, uma conta
-// bancária fixa por integração (várias chaves PIX apontam para a mesma conta).
-// Se a integração não existir/estiver ambígua ou sem conta_id configurado,
-// NÃO ingere e NÃO lança — o fluxo de registro do PIX (pix_webhook_temp/cob_pix)
-// continua funcionando como hoje; só o espelho em extratos_bancarios é pulado.
+// PIX não tem hoje uma conta bancária resolvível automaticamente
+// (pix_webhook_temp só carrega igreja_id). A ideia original desta porta era
+// reaproveitar `integracoes_financeiras.config.conta_id` — mas isso NUNCA é
+// gravado para Santander: o formulário de integração só grava algo em
+// `config` quando `tipo_auth === 'sftp'` (`IntegracoesCriarDialog.tsx`), e
+// Santander é sempre forçado a `tipo_auth = 'token'`. Esse caminho está morto
+// para PIX/Santander (só existe para o modo SFTP do Getnet).
+//
+// Reaproveita em vez disso o mecanismo REAL já usado em produção para achar
+// "a conta do Santander": `contas.cnpj_banco` casando com o CNPJ do banco
+// (mesma lógica de `src/pages/financas/Contas.tsx`, botão "Testar"). Se a
+// conta não existir/estiver ambígua, NÃO ingere e NÃO lança — o fluxo de
+// registro do PIX (pix_webhook_temp/cob_pix) continua funcionando como hoje;
+// só o espelho em extratos_bancarios é pulado.
+
+/** CNPJ do Santander usado para identificar a conta bancária (mesmo valor de Contas.tsx). */
+const SANTANDER_CNPJ = "90400888000142";
 
 export interface PixExtratoInput {
   igreja_id: string;
@@ -211,13 +221,13 @@ export interface PixExtratoInput {
   /**
    * Conta já conhecida pelo chamador (ex.: `cob_pix.conta_id` de uma cobrança
    * vinculada por txid) — maior precedência: um PIX de cobrança pode ter conta
-   * diferente do default da integração.
+   * diferente da conta Santander default da igreja/filial.
    */
   conta_id?: string | null;
   /**
    * Integração já conhecida pelo chamador (ex.: `integracao_id` do polling) —
-   * 2ª precedência. Evita o fallback por igreja, que falha com
-   * `multiplas_integracoes` em igrejas com integração por filial.
+   * usada só para restringir a busca de conta à mesma filial da integração,
+   * quando ela tiver uma.
    */
   integracao_id?: string | null;
 }
@@ -225,9 +235,8 @@ export interface PixExtratoInput {
 export interface PixExtratoResultado {
   ingerido: boolean;
   motivo?:
-    | "integracao_nao_encontrada"
-    | "multiplas_integracoes"
-    | "conta_id_nao_configurado"
+    | "conta_santander_nao_encontrada"
+    | "multiplas_contas_santander"
     | "erro_ingestao";
   detalhe?: string;
 }
@@ -235,11 +244,10 @@ export interface PixExtratoResultado {
 /**
  * Resolve a conta bancária do PIX na ordem de precisão disponível ao chamador:
  * 1) `input.conta_id` explícito (ex.: `cob_pix.conta_id` de uma cobrança);
- * 2) `input.integracao_id` explícito (ex.: polling já sabe qual integração);
- * 3) fallback: única integração Santander ativa da igreja (`config.conta_id`).
- * O fallback por igreja só entra quando o chamador não tem fonte mais precisa
- * — e falha (sem ingerir) se houver mais de uma integração, em vez de
- * adivinhar a conta errada.
+ * 2) fallback: conta(s) da igreja com `cnpj_banco = SANTANDER_CNPJ`, restrito
+ *    à filial da integração quando `input.integracao_id` for conhecido. Falha
+ *    (sem ingerir) se não achar nenhuma ou achar mais de uma, em vez de
+ *    adivinhar a conta errada.
  */
 async function resolverContaPix(
   supabase: SupabaseClientAny,
@@ -249,46 +257,47 @@ async function resolverContaPix(
     return { contaId: input.conta_id, filialId: null };
   }
 
+  let filialConhecida: string | null = null;
   if (input.integracao_id) {
-    const { data: integracao, error } = await supabase
+    const { data: integracao } = await supabase
       .from("integracoes_financeiras")
-      .select("filial_id, config")
+      .select("filial_id")
       .eq("id", input.integracao_id)
       .maybeSingle();
-    if (error || !integracao) {
-      return { ingerido: false, motivo: "integracao_nao_encontrada", detalhe: error?.message };
-    }
-    const contaId = (integracao.config as Record<string, unknown> | null)?.conta_id as
-      | string
-      | undefined;
-    if (!contaId) {
-      return { ingerido: false, motivo: "conta_id_nao_configurado" };
-    }
-    return { contaId, filialId: integracao.filial_id ?? null };
+    filialConhecida = integracao?.filial_id ?? null;
   }
 
-  const { data: integracoes, error: integError } = await supabase
-    .from("integracoes_financeiras")
-    .select("filial_id, config")
+  const { data: contasSantander, error } = await supabase
+    .from("contas")
+    .select("id, filial_id")
     .eq("igreja_id", input.igreja_id)
-    .eq("provedor", "santander")
-    .eq("status", "ativo");
+    .eq("cnpj_banco", SANTANDER_CNPJ);
 
-  if (integError || !integracoes || integracoes.length === 0) {
-    return { ingerido: false, motivo: "integracao_nao_encontrada", detalhe: integError?.message };
+  if (error) {
+    return { ingerido: false, motivo: "conta_santander_nao_encontrada", detalhe: error.message };
   }
-  if (integracoes.length > 1) {
-    return { ingerido: false, motivo: "multiplas_integracoes" };
+  const todas = (contasSantander ?? []) as Array<{ id: string; filial_id: string | null }>;
+
+  // Conta específica da filial da integração tem prioridade sobre a conta de
+  // nível-igreja (filial_id NULL) — mesmo padrão filial > igreja usado em
+  // financeiro_config.conciliacao_score_minimo (F4). Só cai para a
+  // igreja-level quando não há conta específica da filial conhecida.
+  const daFilial = filialConhecida
+    ? todas.filter((c: { filial_id: string | null }) => c.filial_id === filialConhecida)
+    : [];
+  const candidatas = daFilial.length > 0
+    ? daFilial
+    : todas.filter((c: { filial_id: string | null }) => !c.filial_id);
+
+  if (candidatas.length === 0) {
+    return { ingerido: false, motivo: "conta_santander_nao_encontrada" };
+  }
+  if (candidatas.length > 1) {
+    return { ingerido: false, motivo: "multiplas_contas_santander" };
   }
 
-  const integracao = integracoes[0];
-  const contaId = (integracao.config as Record<string, unknown> | null)?.conta_id as
-    | string
-    | undefined;
-  if (!contaId) {
-    return { ingerido: false, motivo: "conta_id_nao_configurado" };
-  }
-  return { contaId, filialId: integracao.filial_id ?? null };
+  const conta = candidatas[0];
+  return { contaId: conta.id, filialId: conta.filial_id ?? null };
 }
 
 export async function ingerirExtratoPix(
@@ -300,12 +309,29 @@ export async function ingerirExtratoPix(
     return resolved;
   }
 
+  const externalId = `pix:${input.pix_id}`;
+
+  // Já espelhado: não chama a RPC. fin_ingerir_extratos cria 1 job +
+  // 1 fin_audit_log por chamada ANTES do dedupe por item — sem este check,
+  // todo polling (chamado de novo para PIX antigos já dentro do
+  // pix_webhook_temp, incluindo os já espelhados com sucesso) acumularia um
+  // job/audit por PIX antigo a cada execução, mesmo sem nada novo a inserir.
+  const { data: existente } = await supabase
+    .from("extratos_bancarios")
+    .select("id")
+    .eq("conta_id", resolved.contaId)
+    .eq("external_id", externalId)
+    .maybeSingle();
+  if (existente) {
+    return { ingerido: true };
+  }
+
   const item: ExtratoItemInput = {
     data_transacao: input.data_pix.slice(0, 10),
     valor: input.valor,
     tipo: "credito",
     descricao: input.descricao,
-    external_id: `pix:${input.pix_id}`,
+    external_id: externalId,
   };
 
   try {

@@ -869,26 +869,32 @@ persistência passou do upsert direto para a RPC.
 **PIX — funcionalidade nova, não um port**: nenhuma tabela PIX tinha
 `conta_id` resolvível (`pix_webhook_temp` só carrega `igreja_id`;
 `pix_recebimentos`, que tem o FK para `contas`, está órfã/sem nenhum
-call-site). Resolvido reaproveitando o **mesmo mecanismo do Getnet**
-(`integracoes_financeiras.config.conta_id`, um valor por integração — várias
-chaves PIX apontam para a mesma conta bancária) em vez de inventar uma tabela
-nova ou uma heurística de texto (`formas_pagamento.nome` é texto livre, sem
-slug — usar `ilike '%pix%'` repetiria o anti-padrão já criticado em §5.3 para
-`DashboardOfertas`).
+call-site). A primeira versão tentou reaproveitar o mecanismo do Getnet
+(`integracoes_financeiras.config.conta_id`) — **descoberto incorreto por
+review**: esse campo **nunca é gravado** para Santander, porque
+`IntegracoesCriarDialog.tsx` só monta `config` quando `tipo_auth === 'sftp'`,
+e Santander é sempre forçado a `tipo_auth = 'token'` (mTLS). O caminho
+`config.conta_id` está morto para PIX/Santander — só existe de fato para o
+modo SFTP do Getnet. Corrigido para reaproveitar o mecanismo **real** já usado
+em produção para achar "a conta do Santander": `contas.cnpj_banco` casando com
+o CNPJ do banco (mesma lógica de `Contas.tsx`, botão "Testar") — em vez de
+inventar uma tabela nova ou uma heurística de texto (`formas_pagamento.nome` é
+livre, sem slug — `ilike '%pix%'` repetiria o anti-padrão já criticado em §5.3
+para `DashboardOfertas`).
 
 - Novo helper `ingerirExtratoPix` (`_shared/financeiro-core.ts`): resolve a
   conta na ordem de precisão que o chamador já tem disponível — **(1)**
   `conta_id` explícito (`cob_pix.conta_id` de uma cobrança vinculada por
-  `txid` — um PIX de cobrança pode ter conta diferente do default da
-  integração); **(2)** `integracao_id` explícito (o polling já sabe qual
-  integração está consultando — evita cair no fallback por igreja em igrejas
-  com integração por filial); **(3)** fallback: única `integracoes_financeiras`
-  ativa (`provedor='santander'`) da igreja, lendo `config.conta_id`. Em
-  qualquer nível, se a conta não puder ser resolvida (integração
-  ausente/ambígua/sem `conta_id`), **não ingere e não lança** — o registro do
-  PIX em `pix_webhook_temp`/`cob_pix` continua funcionando exatamente como
-  antes, só o espelho em `extratos_bancarios` fica pendente até a config
-  existir. Zero regressão no fluxo atual.
+  `txid` — um PIX de cobrança pode ter conta diferente da conta Santander
+  default); **(2)** fallback: conta(s) da igreja com `cnpj_banco` do
+  Santander, restrito à filial da integração quando `integracao_id` for
+  conhecido (conta específica da filial tem prioridade sobre a de
+  nível-igreja — mesmo padrão filial > igreja de
+  `financeiro_config.conciliacao_score_minimo` na F4). Em qualquer nível, se
+  a conta não puder ser resolvida (nenhuma ou mais de uma), **não ingere e
+  não lança** — o registro do PIX em `pix_webhook_temp`/`cob_pix` continua
+  funcionando exatamente como antes, só o espelho em `extratos_bancarios` fica
+  pendente. Zero regressão no fluxo atual.
 - Ligado nos **3 pontos** que hoje escrevem em `pix_webhook_temp` (webhook
   push, polling `buscar-pix-recebidos`, polling `buscar_pix` dentro de
   `santander-api` usado pelo cron `buscar-pix-cron`) — os três precisavam ser
@@ -896,23 +902,30 @@ slug — usar `ilike '%pix%'` repetiria o anti-padrão já criticado em §5.3 pa
   recebido via polling (fallback documentado no ADR-028 para quando o webhook
   falha) não apareceria, uma inconsistência dependente do caminho de entrega.
 - **Retentativa em duplicata (polling)**: se o `pix-webhook` chega primeiro
-  numa igreja com integração por filial, ele não resolve a conta
-  (`multiplas_integracoes`, sem `integracao_id`) e o PIX fica sem espelho. O
-  polling que roda depois (`buscar-pix-recebidos`/`santander-api buscar_pix`)
-  via de regra trata esse PIX como duplicata em `pix_webhook_temp` e pulava a
-  tentativa — mas é justamente esse polling que **sabe** o `integracao_id`.
-  Os dois caminhos de polling agora tentam `ingerirExtratoPix` também no ramo
-  de duplicata (a busca de `cob_pix` foi movida para antes da checagem de
-  duplicata); `fin_ingerir_extratos` já dedupa por `(conta_id, external_id)`,
-  então reingestão de um sucesso anterior é no-op.
-- **Pré-requisito operacional**: para o espelho funcionar, a integração
-  Santander de cada igreja precisa ter `config.conta_id` preenchido — mesma
-  configuração manual que o Getnet já exige hoje em `config.sftp.conta_id`.
-- **Validação**: `deno check` real (não só o app tsc) nos 5 arquivos tocados —
-  limpo em 3 (`financeiro-core.ts`, `pix-webhook`, `santander-api`) e só com
-  erros pré-existentes/não-relacionados nos outros 2 (`getnet-sftp`,
-  `buscar-pix-recebidos`); achou e corrigiu 1 bug real (narrowing de tipo
-  `string | null` perdido entre `.filter()` e `.map()` no getnet).
+  numa igreja com integração por filial, ele não resolve a conta (ambígua
+  entre filiais, sem `integracao_id`) e o PIX fica sem espelho. O polling que
+  roda depois (`buscar-pix-recebidos`/`santander-api buscar_pix`) via de regra
+  trata esse PIX como duplicata em `pix_webhook_temp` e pulava a tentativa —
+  mas é justamente esse polling que **sabe** o `integracao_id`. Os dois
+  caminhos de polling agora tentam `ingerirExtratoPix` também no ramo de
+  duplicata (a busca de `cob_pix` foi movida para antes da checagem de
+  duplicata).
+- **Sem spam de job/auditoria em duplicata**: a retentativa acima chamaria
+  `fin_ingerir_extratos` de novo a cada polling para o MESMO PIX antigo já
+  espelhado — e a RPC cria 1 `fin_extrato_ingestao_jobs` + 1 `fin_audit_log`
+  por chamada **antes** do dedupe por item (`ON CONFLICT DO NOTHING`), então
+  isso acumularia um job/audit por PIX antigo a cada execução do cron.
+  `ingerirExtratoPix` agora checa `extratos_bancarios` por
+  `(conta_id, external_id)` **antes** de chamar a RPC — se já espelhado,
+  retorna sem chamar nada.
+- **Pré-requisito operacional**: para o espelho funcionar, a conta bancária do
+  Santander precisa ter `cnpj_banco` preenchido (`90400888000142`) — mesmo
+  campo que a tela de Contas já exige para habilitar o botão "Testar".
+- **Validação**: `deno check` real (não só o app tsc) em todos os arquivos
+  tocados nas 3 rodadas de review — limpo em todos após as correções; achou e
+  corrigiu 2 bugs reais de tipo (narrowing `string | null` perdido entre
+  `.filter()`/`.map()` no getnet; `todas.filter()` sem tipo inferível na
+  resolução de conta do PIX).
 
 ## 10. Decisões em aberto (bater o martelo)
 
