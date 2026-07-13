@@ -324,28 +324,37 @@ export interface ItemEspelhoGetnet {
  * (contrato de cessão/antecipação/gravame), não crédito novo — confirmado
  * pelo exemplo numérico do manual (pg. 44-45).
  *
- * `external_id` usa `arquivoNome:linhaNum` em vez de `numeroOperacao` (o
- * manual, pg. 38, afirma explicitamente que PG não tem número de operação)
- * ou `chaveUr` (preenchida para PG, mas pode consolidar múltiplas URs
- * liquidadas numa única linha — não é garantida 1:1). `linhaNum` é sempre
- * presente e estável entre reimportações do mesmo arquivo, o que é o que o
- * dedupe `(conta_id, external_id)` de `fin_ingerir_extratos` precisa.
+ * `external_id` é construído SÓ com campos do conteúdo da linha (chave UR +
+ * data + arranjo + valor) — nunca com `arquivoNome`/`linhaNum` (fix P2,
+ * review PR #52): se a Getnet reenviar/reprocessar o mesmo dia sob um nome
+ * de arquivo diferente, `getnet_arquivos` (chave `arquivo_nome`) trata isso
+ * como arquivo novo, e um `external_id` amarrado ao nome do arquivo deixaria
+ * o mesmo crédito passar batido pelo dedupe `(conta_id, external_id)` e ser
+ * inserido de novo. `chaveUr` é preenchida para PG (o manual, pg. 38, só
+ * confirma que `numeroOperacao` não é) e já é ela mesma um composto
+ * determinístico (data de liquidação + código de arranjo + CNPJ/CPF — Regra
+ * Geral #11); ainda assim inclui `codigoArranjo`/data/valor como reforço,
+ * com fallback pra `numeroOperacao` se `chaveUr` vier vazia num caso
+ * inesperado.
  */
 export function selecionarEspelhoTipo5(
   financeirosResumo: Array<FinResumoRecord & { linhaNum: number; rawLine: string }>,
   integracaoId: string,
-  arquivoNome: string,
 ): ItemEspelhoGetnet[] {
   return financeirosResumo
     .filter((f) => f.tipoOperacao === "PG" && (f.dataCreditoOperacao || f.dataOperacao))
-    .map((f) => ({
-      data_transacao: (f.dataCreditoOperacao || f.dataOperacao) as string,
-      valor: f.valorLiquidoOperacao,
-      tipo: "credito" as const,
-      descricao: `Getnet PG ${f.chaveUr || f.numeroOperacao || f.linhaNum}`,
-      numero_documento: f.numeroOperacao || null,
-      external_id: `getnet_fin5:${integracaoId}:${arquivoNome}:${f.linhaNum}`,
-    }));
+    .map((f) => {
+      const data = (f.dataCreditoOperacao || f.dataOperacao) as string;
+      const chave = f.chaveUr || f.numeroOperacao || "sem-chave";
+      return {
+        data_transacao: data,
+        valor: f.valorLiquidoOperacao,
+        tipo: "credito" as const,
+        descricao: `Getnet PG ${chave}`,
+        numero_documento: f.numeroOperacao || null,
+        external_id: `getnet_fin5:${integracaoId}:${data}:${f.codigoArranjo || "na"}:${chave}:${f.valorLiquidoOperacao}`,
+      };
+    });
 }
 
 export interface FinDetalheRecord {

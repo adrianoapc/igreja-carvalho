@@ -1150,7 +1150,7 @@ async function runExtratoEletronicoV10(args: {
       let extratosInseridos = 0;
       let extratosIgnorados = 0;
       const itensExtrato: ExtratoItemInput[] = usarTipo5ParaEsteArquivo
-        ? selecionarEspelhoTipo5(financeirosResumo, integracao.id, arq.nome)
+        ? selecionarEspelhoTipo5(financeirosResumo, integracao.id)
         : resumos
             .filter((r) => r.indicadorTipoPagamento === "LQ" && r.dataRv)
             .map((r) => ({

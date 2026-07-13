@@ -957,14 +957,22 @@ JSONB livre.
   mesmo dia mostra CL 900 + AL 500 + PG 600, onde só o PG bate com o líquido
   real do dia. Mirar em PG é estritamente mais preciso que o LQ anterior, que
   misturava dinheiro real com ajustes contratuais.
-- **Dedupe**: o manual (pg. 38) afirma que "Para Tipo de operação PG, não há
-  Número da Operação" — `numero_operacao` pode vir vazio para PG, e
-  `chave_ur` (também preenchida para PG) não é garantidamente 1:1 por linha.
-  `external_id` do espelho usa `linhaNum` (sempre presente, sempre distinto
-  por linha, estável entre reimportações do mesmo arquivo) em vez de
-  qualquer um dos dois: `getnet_fin5:${integracaoId}:${arquivoNome}:${linhaNum}`.
-  Função pura `selecionarEspelhoTipo5` em `getnetExtratoParser.ts`, testada em
-  `getnetExtratoParser.test.ts` (mesmo padrão do `resolverContaPix` da F5).
+- **Dedupe (fix P2, review PR #52)**: o manual (pg. 38) afirma que "Para Tipo
+  de operação PG, não há Número da Operação" — `numero_operacao` pode vir
+  vazio para PG. A 1ª versão usava `arquivoNome:linhaNum` como chave, mas
+  isso amarra o dedupe ao nome do arquivo de transporte: se a Getnet
+  reenviar/reprocessar o mesmo dia sob outro nome de arquivo,
+  `getnet_arquivos` (chave `arquivo_nome`) trata como arquivo novo, e o
+  mesmo crédito passaria batido pelo `ON CONFLICT (conta_id, external_id)`.
+  Corrigido para uma chave baseada só no CONTEÚDO da linha —
+  `getnet_fin5:${integracaoId}:${data}:${codigoArranjo}:${chaveUr}:${valor}`
+  — com fallback de `chaveUr` para `numeroOperacao` se vier vazia.
+  `chave_ur` é preenchida para PG (o manual só confirma que `numero_operacao`
+  não é) e já é ela mesma um composto determinístico (Regra Geral #11: data
+  de liquidação + código de arranjo + CNPJ/CPF). Função pura
+  `selecionarEspelhoTipo5` em `getnetExtratoParser.ts`, testada em
+  `getnetExtratoParser.test.ts` (mesmo padrão do `resolverContaPix` da F5),
+  incluindo o caso do reenvio sob nome de arquivo diferente.
 - **Opt-in por integração**: chave `espelho_tipo5_desde` (data) no nível raiz
   de `integracoes_financeiras.config` (irmã de `sftp`, não aninhada nele —
   sobrevive ao merge raso da edge `integracoes-config`). Sem essa data, a
@@ -994,13 +1002,15 @@ JSONB livre.
   importado → decide pela config; travado em tipo1 [incl. `NULL` legado];
   travado em tipo5).
 - **Validação**: `deno check` + `deno test` em `getnetExtratoParser.ts`/
-  `index.ts` (11 casos: 6 de `selecionarEspelhoTipo5` — PG sem
-  numero_operacao, duas linhas PG no mesmo arquivo, todas as operações
-  não-PG filtradas fora, reimportação gera external_id idêntico, fallback de
-  data, linha sem nenhuma data descartada — + 5 de `resolverUsoTipo5`,
-  incluindo o cenário exato do P1: arquivo legado com `espelho_origem NULL`
-  trava em tipo 1 mesmo com corte retroativo cobrindo a data). `npx tsc`
-  mantém os 62 erros pré-existentes catalogados desde a F5, zero novos.
+  `index.ts` (13 casos: 8 de `selecionarEspelhoTipo5` — PG sem
+  numero_operacao, duas linhas PG com chave/valor distintos, todas as
+  operações não-PG filtradas fora, reimportação gera external_id idêntico,
+  **mesmo PG sob nome de arquivo diferente gera external_id idêntico (fix
+  P2)**, fallback de `chaveUr` para `numeroOperacao`, fallback de data,
+  linha sem nenhuma data descartada — + 5 de `resolverUsoTipo5`, incluindo o
+  cenário exato do P1: arquivo legado com `espelho_origem NULL` trava em
+  tipo 1 mesmo com corte retroativo cobrindo a data). `npx tsc` mantém os 62
+  erros pré-existentes catalogados desde a F5, zero novos.
 
 ## 10. Decisões em aberto (bater o martelo)
 

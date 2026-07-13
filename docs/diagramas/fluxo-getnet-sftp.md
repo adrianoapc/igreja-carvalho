@@ -145,9 +145,12 @@ contratuais (`AJUSTE 18`, `AJUSTE 20` etc. nos registros 1/3).
 Sem `config.espelho_tipo5_desde` setado na integração, o comportamento é o
 legado (tipo 1). Função pura `selecionarEspelhoTipo5` em
 `getnetExtratoParser.ts` filtra as linhas PG e constrói o `external_id` de
-dedupe a partir de `linhaNum` (não de `numero_operacao`, que o manual
-confirma vir vazio para PG, nem de `chave_ur`, que pode não ser 1:1 por
-linha).
+dedupe **só com campos do conteúdo da linha** — `chave_ur` (ou
+`numero_operacao` como fallback) + data + código de arranjo + valor — nunca
+com o nome do arquivo (fix P2, review PR #52: se a Getnet reenviar o mesmo
+dia sob outro nome de arquivo, `getnet_arquivos` trata como arquivo novo, e
+um `external_id` amarrado ao nome do arquivo deixaria o mesmo crédito passar
+2x pelo dedupe).
 
 **A origem trava por arquivo** (`getnet_arquivos.espelho_origem`, migration
 `20260713140000`): reprocessar manualmente um arquivo já importado não pode
