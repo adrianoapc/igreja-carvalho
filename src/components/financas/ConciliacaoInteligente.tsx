@@ -8,6 +8,7 @@ import { useGerarSuggestoesConciliacao } from "@/hooks/useGerarSuggestoesConcili
 import { useSuggestoesMLMapeadas } from "@/hooks/useSuggestoesMLMapeadas";
 import {
   confirmarConciliacao as confirmarConciliacaoRpc,
+  alternarConferenciaManual,
   type VinculoConciliacao,
 } from "@/features/financeiro/core";
 import {
@@ -965,12 +966,7 @@ export function ConciliacaoInteligente() {
                       onClick={async (e) => {
                         e.stopPropagation();
                         try {
-                          const { error } = await supabase
-                            .from("transacoes_financeiras")
-                            .update({ conciliacao_status: "conciliado_manual" })
-                            .eq("id", item.id);
-
-                          if (error) throw error;
+                          await alternarConferenciaManual(item.id, true);
 
                           toast.success(
                             "Transação marcada como conciliada manualmente",

@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { confirmarConciliacao } from "@/features/financeiro/core/api/conciliacao.api";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format, parseISO, differenceInDays, subDays, addDays } from "date-fns";
@@ -214,51 +215,13 @@ export function VincularTransacaoDialog({
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("extratos_bancarios")
-        .update({
-          transacao_vinculada_id: selectedTransacaoId,
-          reconciliado: true,
-        })
-        .eq("id", extrato.id);
-
-      if (error) {
-        console.error("Erro ao vincular:", error);
-        toast.error("Erro ao vincular transação");
-        return;
-      }
-
-      const { data: transacao, error: transacaoFetchError } = await supabase
-        .from("transacoes_financeiras")
-        .select("*")
-        .eq("id", selectedTransacaoId)
-        .single();
-
-      if (transacaoFetchError) {
-        console.error("Erro ao buscar transação:", transacaoFetchError);
-        toast.error("Erro ao atualizar conciliação da transação");
-        return;
-      }
-
-      const { error: transacaoError } = await supabase
-        .from("transacoes_financeiras")
-        .update({ conciliacao_status: "conciliado_extrato" })
-        .eq("id", selectedTransacaoId);
-
-      if (transacaoError) {
-        console.error("Erro ao marcar conciliação:", transacaoError);
-        toast.error("Erro ao atualizar conciliação da transação");
-        return;
-      }
-
-      // Sincronizar transferência: se entrada com transferencia_id, conciliar saída correspondente
-      if (transacao?.transferencia_id && transacao?.tipo === "entrada") {
-        await supabase
-          .from("transacoes_financeiras")
-          .update({ conciliacao_status: "conciliado_extrato" })
-          .eq("transferencia_id", transacao.transferencia_id)
-          .eq("tipo", "saida");
-      }
+      // fin_confirmar_conciliacao cobre o vínculo 1:1 numa única transação:
+      // flags do extrato, conciliacao_status + baixa pendente->pago da
+      // transação e sincronismo da perna irmã de transferência (F3/F7).
+      await confirmarConciliacao({
+        extrato_ids: [extrato.id],
+        transacao_ids: [selectedTransacaoId],
+      });
 
       toast.success("Transação vinculada com sucesso!");
       onVinculado();
