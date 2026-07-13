@@ -895,6 +895,16 @@ slug — usar `ilike '%pix%'` repetiria o anti-padrão já criticado em §5.3 pa
   cobertos, senão PIX recebido via webhook apareceria na conciliação e PIX
   recebido via polling (fallback documentado no ADR-028 para quando o webhook
   falha) não apareceria, uma inconsistência dependente do caminho de entrega.
+- **Retentativa em duplicata (polling)**: se o `pix-webhook` chega primeiro
+  numa igreja com integração por filial, ele não resolve a conta
+  (`multiplas_integracoes`, sem `integracao_id`) e o PIX fica sem espelho. O
+  polling que roda depois (`buscar-pix-recebidos`/`santander-api buscar_pix`)
+  via de regra trata esse PIX como duplicata em `pix_webhook_temp` e pulava a
+  tentativa — mas é justamente esse polling que **sabe** o `integracao_id`.
+  Os dois caminhos de polling agora tentam `ingerirExtratoPix` também no ramo
+  de duplicata (a busca de `cob_pix` foi movida para antes da checagem de
+  duplicata); `fin_ingerir_extratos` já dedupa por `(conta_id, external_id)`,
+  então reingestão de um sucesso anterior é no-op.
 - **Pré-requisito operacional**: para o espelho funcionar, a integração
   Santander de cada igreja precisa ter `config.conta_id` preenchido — mesma
   configuração manual que o Getnet já exige hoje em `config.sftp.conta_id`.

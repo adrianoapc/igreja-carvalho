@@ -1253,17 +1253,11 @@ Deno.serve(async (req) => {
           const endToEndId = pixItem.endToEndId
           const valorPix = parseFloat(pixItem.valor)
 
-          const { data: existente } = await supabaseAdmin
-            .from('pix_webhook_temp')
-            .select('id')
-            .eq('pix_id', endToEndId)
-            .maybeSingle()
-
-          if (existente) {
-            duplicados++
-            continue
-          }
-
+          // Vincular cobrança se txid existir — feito ANTES da checagem de
+          // duplicata: mesmo um PIX já registrado (ex.: pelo webhook, sem
+          // conta resolvível) precisa dessa info para a retentativa de
+          // espelho abaixo, já que este polling conhece integracao_id/conta
+          // que o webhook não conhece.
           let cobPixId: string | null = null
           let cobPixContaId: string | null = null
           if (pixItem.txid) {
@@ -1276,6 +1270,37 @@ Deno.serve(async (req) => {
               cobPixId = cobranca.id
               cobPixContaId = cobranca.conta_id ?? null
             }
+          }
+
+          const { data: existente } = await supabaseAdmin
+            .from('pix_webhook_temp')
+            .select('id')
+            .eq('pix_id', endToEndId)
+            .maybeSingle()
+
+          if (existente) {
+            duplicados++
+            // Retentativa de espelho (F5): se o webhook chegou primeiro numa
+            // igreja com integração por filial, ele não conseguiu resolver a
+            // conta (multiplas_integracoes) — este polling sabe o
+            // integracao_id, então tenta de novo. fin_ingerir_extratos
+            // dedupe por (conta_id, external_id): reingestão de um sucesso
+            // anterior é no-op.
+            if (igrejaIdFinal) {
+              const pixResult = await ingerirExtratoPix(supabaseAdmin, {
+                igreja_id: igrejaIdFinal,
+                pix_id: endToEndId,
+                valor: valorPix,
+                data_pix: new Date(pixItem.horario).toISOString(),
+                descricao: 'PIX Recebido (polling)',
+                conta_id: cobPixContaId,
+                integracao_id,
+              })
+              if (!pixResult.ingerido) {
+                console.log(`[santander-api] PIX ${endToEndId} (duplicado) não espelhado em extratos_bancarios: ${pixResult.motivo}`)
+              }
+            }
+            continue
           }
 
           const { error: insertError } = await supabaseAdmin
