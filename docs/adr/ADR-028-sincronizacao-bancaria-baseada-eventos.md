@@ -187,14 +187,19 @@ A camada canônica `fin_*` (ADR-029) passou a cobrir a ingestão de extratos:
 contrato `ExtratoItem`, valida tenant/filial, normaliza valor (ABS + direção em
 `tipo`), deduplica por `(conta_id, external_id)` — gerando `external_id`
 determinístico quando o provedor não fornece — e registra job + auditoria;
-`fin_desfazer_ingestao` faz o undo preservando extratos já conciliados. Nesta
-fatia migrou o canal **manual** (OFX/CSV/XLSX); os adaptadores por evento deste
-ADR (PIX/Santander) e o Getnet passam a chamar a mesma porta na fatia 2, quando
-o "gancho pós-ingestão" (geração automática de candidatos) será conectado ao
-motor único `fin_gerar_candidatos_conciliacao`. Detalhes em
-`docs/arquitetura-financeiro.md §9.4`.
+`fin_desfazer_ingestao` faz o undo preservando extratos já conciliados. Migrou
+primeiro o canal **manual** (OFX/CSV/XLSX), depois (`20260712130000`, D-F5.2) os
+adaptadores por evento deste ADR: **santander-api**, **getnet-sftp** (2 pontos:
+settlement_v1 + extrato_eletrônico_v10/LQ) e **PIX** (webhook + os 2 caminhos de
+polling — `buscar-pix-recebidos` e `buscar_pix` dentro de `santander-api`, usado
+pelo `buscar-pix-cron` que este ADR já documentava como fallback). PIX resolve
+`conta_id` via `integracoes_financeiras.config.conta_id` (helper
+`ingerirExtratoPix`) — não existia nenhuma tabela com esse vínculo pronto; ver
+`docs/arquitetura-financeiro.md §9.5`. F5 está **concluída**; falta só conectar
+o "gancho pós-ingestão" (geração automática de candidatos ao motor único
+`fin_gerar_candidatos_conciliacao`) como evolução futura.
 
 ---
 
-**Última Atualização**: 2026-07-12  
+**Última Atualização**: 2026-07-13  
 **Próxima Revisão**: Após 3 meses de uso em produção

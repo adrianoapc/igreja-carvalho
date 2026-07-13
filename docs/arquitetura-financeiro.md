@@ -593,7 +593,7 @@ Cada fase é deployável isolada; legado convive com o novo.
 | **F2.5 Leitura agregada no servidor** ✅ | Migration `20260710130000`: `fin_resumo_periodo`, `fin_ofertas_periodo` (filtro estrutural `sessao_id`/categoria no lugar de `ilike descricao`), `fin_projecao_mensal`; `get_dre_anual(p_ano, p_regime)` caixa×competência com seletor no DRE; RelatorioCobertura consome `view_reconciliacao_cobertura`; Dashboard (comparativo) e Projeção nos agregados | Concluída (jul/2026); Insights e demais queries do Dashboard ficam para evolução |
 | **F3 Conciliação transacional** ✅ | Migration `20260711140000`: `fin_confirmar_conciliacao(p_vinculo)` (1:1/N:1/1:N inferidos por cardinalidade, numa transação) + `fin_desconciliar`. Frontend: `ConciliacaoInteligente`, `DividirExtratoDialog`, `useConciliacaoLote` e `DesconciliarDialog` via `core/api/conciliacao.api`. Ver §9.2 | Concluída (jul/2026). `ConciliacaoManual`/`DashboardConciliacao` (motor legado) e o bloqueio da reclassificação ficam para a F4 |
 | **F4 Motor único de score** ✅ | Migration `20260711150000`: `fin_gerar_candidatos_conciliacao` (score 0..1, 1:1 e 1:N, corte por igreja em `financeiro_config.conciliacao_score_minimo`). `ConciliacaoManual`/`DashboardConciliacao`/`ConciliacaoInteligente` migrados ao motor único + `fin_confirmar_conciliacao`; `reconciliar_transacoes`/`aplicar_conciliacao`/`gerar_candidatos_conciliacao` deprecadas (DROP na F7); `ModoABToggle` (código morto) removido; `reclass-transacoes` recusa transação conciliada. Ver §9.3 | Concluída (jul/2026) |
-| **F5 Pipeline de ingestão** (parcial) | Migration `20260712120000`: `fin_ingerir_extratos` (contrato ExtratoItem, valor ABS, dedupe por `(conta_id, external_id)` com id determinístico, job + auditoria) + `fin_desfazer_ingestao`; canal **manual** (OFX/CSV/XLSX) via `core/api/extratos.api`; edge `gerar-sugestoes-ml` migrada ao motor único F4. Ver §9.4 | Fatia 1 + adaptador `santander-api` (`20260712130000`, caminho service-role D-F5.2) concluídos; Getnet (F6 tipo-5) e PIX (novo) pendentes |
+| **F5 Pipeline de ingestão** ✅ | Migration `20260712120000`: `fin_ingerir_extratos` (contrato ExtratoItem, valor ABS, dedupe por `(conta_id, external_id)` com id determinístico, job + auditoria) + `fin_desfazer_ingestao`; canal **manual** (OFX/CSV/XLSX) via `core/api/extratos.api`; edge `gerar-sugestoes-ml` migrada ao motor único F4. Caminho service-role de integração (`20260712130000`, D-F5.2) + adaptadores **santander-api**, **getnet-sftp** (2 pontos: settlement_v1 e extrato_eletronico_v10/LQ) e **PIX** (3 pontos: pix-webhook, buscar-pix-recebidos, santander-api/buscar_pix — via `integracoes_financeiras.config.conta_id`, novo helper `ingerirExtratoPix`). Ver §9.4/§9.5 | Concluída (jul/2026); Getnet tipo-1→tipo-5 fica para a F6 (D5), sem relação com a porta de ingestão |
 | **F6 Getnet tipo 5** | Após decisão D5; novos períodos apenas; backfill opcional | Depende de F5 |
 | **F7 Endurecimento + UX conciliação** | Revogar escrita direta do role `authenticated`; decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll); Finanças no bottom-nav; DRE mobile em cards; limpeza de código morto | Fecha o ciclo |
 
@@ -848,6 +848,57 @@ troca para a role `authenticated` via `SET ROLE` (não-superuser, RLS
 efetivamente aplicado) — T14 prova que um `admin_igreja` de outra igreja lê
 zero jobs desta igreja (vazamento fechado); T14b é o controle positivo (admin
 legítimo continua enxergando).
+
+### 9.5 Notas de implementação F5 — Getnet e PIX (jul/2026, fecha a F5)
+
+Sem migration nova — `fin_ingerir_extratos` já cobre `canal='integracao'` sem
+ator (D-F5.2) e já tem `getnet_sftp`/`getnet_sftp_txt`/`pix` na allow-list de
+`origem` desde a fatia 1/2.
+
+**`getnet-sftp`**: porta mecânica dos dois pontos que escreviam direto em
+`extratos_bancarios` — `runSettlementV1` (layout CSV legado, upsert único por
+arquivo) e `runExtratoEletronicoV10` (espelha RVs liquidados/LQ do Extrato
+Eletrônico v10, um upsert por arquivo dentro do loop multi-arquivo de
+`sync`/`import_extrato`). `conta_id` continua vindo de
+`integracoes_financeiras.config.sftp.conta_id` (estático por integração, sem
+mudança). Client já é service-role em toda a function (`supabaseAdmin`),
+então `canal='integracao'` se aplica sem condicional. Comportamento e contrato
+de dedupe idênticos ao anterior (`ON CONFLICT (conta_id, external_id)`); só a
+persistência passou do upsert direto para a RPC.
+
+**PIX — funcionalidade nova, não um port**: nenhuma tabela PIX tinha
+`conta_id` resolvível (`pix_webhook_temp` só carrega `igreja_id`;
+`pix_recebimentos`, que tem o FK para `contas`, está órfã/sem nenhum
+call-site). Resolvido reaproveitando o **mesmo mecanismo do Getnet**
+(`integracoes_financeiras.config.conta_id`, um valor por integração — várias
+chaves PIX apontam para a mesma conta bancária) em vez de inventar uma tabela
+nova ou uma heurística de texto (`formas_pagamento.nome` é texto livre, sem
+slug — usar `ilike '%pix%'` repetiria o anti-padrão já criticado em §5.3 para
+`DashboardOfertas`).
+
+- Novo helper `ingerirExtratoPix` (`_shared/financeiro-core.ts`): resolve a
+  única `integracoes_financeiras` ativa (`provedor='santander'`) da igreja,
+  lê `config.conta_id`; se a integração não existir, for ambígua (mais de uma)
+  ou não tiver `conta_id` configurado, **não ingere e não lança** — o registro
+  do PIX em `pix_webhook_temp`/`cob_pix` continua funcionando exatamente como
+  antes, só o espelho em `extratos_bancarios` fica pendente até a config
+  existir. Zero regressão no fluxo atual.
+- Ligado nos **3 pontos** que hoje escrevem em `pix_webhook_temp` (webhook
+  push, polling `buscar-pix-recebidos`, polling `buscar_pix` dentro de
+  `santander-api` usado pelo cron `buscar-pix-cron`) — os três precisavam ser
+  cobertos, senão PIX recebido via webhook apareceria na conciliação e PIX
+  recebido via polling (fallback documentado no ADR-028 para quando o webhook
+  falha) não apareceria, uma inconsistência dependente do caminho de entrega.
+- **Pré-requisito operacional**: para o espelho funcionar, a integração
+  Santander de cada igreja precisa ter `config.conta_id` preenchido — mesma
+  configuração manual que o Getnet já exige hoje em `config.sftp.conta_id`.
+- **Validação**: `deno check` real (não só o app tsc) nos 5 arquivos tocados —
+  limpo em 3 (`financeiro-core.ts`, `pix-webhook`, `santander-api`) e só com
+  erros pré-existentes/não-relacionados nos outros 2 (`getnet-sftp`,
+  `buscar-pix-recebidos`); achou e corrigiu 1 bug real (narrowing de tipo
+  `string | null` perdido entre `.filter()` e `.map()` no getnet).
+
+## 10. Decisões em aberto (bater o martelo)
 
 | # | Decisão | Recomendação |
 |---|---|---|

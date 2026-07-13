@@ -31,7 +31,7 @@
  */
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { ingerirExtratos, type ExtratoItemInput } from '../_shared/financeiro-core.ts'
+import { ingerirExtratos, ingerirExtratoPix, type ExtratoItemInput } from '../_shared/financeiro-core.ts'
 import nacl from 'npm:tweetnacl@1.0.3'
 import forge from 'npm:node-forge@1.3.1'
 
@@ -1298,6 +1298,21 @@ Deno.serve(async (req) => {
                 .from('cob_pix')
                 .update({ status: 'CONCLUIDA', data_conclusao: new Date(pixItem.horario).toISOString() })
                 .eq('id', cobPixId)
+            }
+
+            // Espelha em extratos_bancarios (F5 fatia 2) — mesma regra dos
+            // demais pontos de entrada PIX. Não bloqueia o registro do PIX.
+            if (igrejaIdFinal) {
+              const pixResult = await ingerirExtratoPix(supabaseAdmin, {
+                igreja_id: igrejaIdFinal,
+                pix_id: endToEndId,
+                valor: valorPix,
+                data_pix: new Date(pixItem.horario).toISOString(),
+                descricao: 'PIX Recebido (polling)',
+              })
+              if (!pixResult.ingerido) {
+                console.log(`[santander-api] PIX ${endToEndId} não espelhado em extratos_bancarios: ${pixResult.motivo}`)
+              }
             }
           }
         } catch (itemError) {

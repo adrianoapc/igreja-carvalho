@@ -57,3 +57,13 @@ Adotar um conector por provedor com ingestao **polling** inicial (fallback unive
   - Definir store de secrets (Supabase secrets vs vault) e playbook de rotacao.
   - Implementar dedupe com chave unica por conector (staging ou upsert direto).
   - Adicionar metricas/alertas conforme seções de observabilidade.
+
+## Atualização F5 (jul/2026) — dedupe/idempotência via porta única
+
+O dedupe/idempotência por conector previsto aqui foi resolvido pela porta
+única `fin_ingerir_extratos` (ADR-029, F5): `santander-api` e `getnet-sftp`
+passaram a chamar essa RPC em vez de fazer upsert direto em
+`extratos_bancarios`; o dedupe continua sendo `(conta_id, external_id)`, agora
+centralizado num só lugar (antes cada conector reimplementava a própria
+lógica de upsert/`onConflict`). Detalhes em
+`docs/arquitetura-financeiro.md §9.4/§9.5`.

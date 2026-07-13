@@ -6,6 +6,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import nacl from "npm:tweetnacl@1.0.3";
 import forge from "npm:node-forge@1.3.1";
+import { ingerirExtratoPix } from "../_shared/financeiro-core.ts";
 
 const SANTANDER_PIX_TOKEN_URL = "https://trust-pix.santander.com.br/oauth/token";
 const SANTANDER_PIX_BASE_URL = "https://trust-pix.santander.com.br/api/v1";
@@ -376,6 +377,22 @@ serve(async (req) => {
               .from("cob_pix")
               .update({ status: "CONCLUIDA", data_conclusao: new Date(pixItem.horario).toISOString() })
               .eq("id", cobPixId);
+          }
+
+          // Espelha em extratos_bancarios (F5 fatia 2) — mesma regra do
+          // pix-webhook: só quando a igreja foi resolvida e sua integração
+          // Santander tem conta_id configurado. Não bloqueia o registro do PIX.
+          if (igrejaId) {
+            const pixResult = await ingerirExtratoPix(supabaseAdmin, {
+              igreja_id: igrejaId,
+              pix_id: endToEndId,
+              valor,
+              data_pix: new Date(pixItem.horario).toISOString(),
+              descricao: "PIX Recebido (polling)",
+            });
+            if (!pixResult.ingerido) {
+              console.log(`[buscar-pix] PIX ${endToEndId} não espelhado em extratos_bancarios: ${pixResult.motivo}`);
+            }
           }
         }
       } catch (itemError) {

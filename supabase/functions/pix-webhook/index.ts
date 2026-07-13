@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { ingerirExtratoPix } from "../_shared/financeiro-core.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") || "",
@@ -268,6 +269,23 @@ serve(async (req) => {
         } else {
           console.log(`[pix-webhook] PIX ${pixId} inserido com sucesso`);
           resultados.push({ pixId, valor, status: 'recebido' });
+
+          // Espelha em extratos_bancarios (F5 fatia 2) — só quando a igreja foi
+          // resolvida e sua integração Santander tem conta_id configurado
+          // (integracoes_financeiras.config.conta_id). Não bloqueia o registro
+          // do PIX se a conta não puder ser resolvida (log apenas).
+          if (igrejaId) {
+            const pixResult = await ingerirExtratoPix(supabase, {
+              igreja_id: igrejaId,
+              pix_id: pixId,
+              valor,
+              data_pix: dadosInserir.data_pix,
+              descricao: dadosInserir.descricao,
+            });
+            if (!pixResult.ingerido) {
+              console.log(`[pix-webhook] PIX ${pixId} não espelhado em extratos_bancarios: ${pixResult.motivo}`);
+            }
+          }
         }
       } catch (itemErr) {
         console.error(`[pix-webhook] Exceção ao processar item:`, itemErr);

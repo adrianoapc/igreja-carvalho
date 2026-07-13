@@ -190,3 +190,82 @@ export function ingerirExtratos(
     p_contexto: contexto,
   });
 }
+
+// ─── Ingestão de PIX (F5 fatia 2) ────────────────────────────────────────────
+// Diferente de Getnet/Santander, PIX não tem hoje uma conta bancária resolvível
+// automaticamente (pix_webhook_temp só carrega igreja_id). Reaproveita o mesmo
+// mecanismo do Getnet: `integracoes_financeiras.config.conta_id`, uma conta
+// bancária fixa por integração (várias chaves PIX apontam para a mesma conta).
+// Se a integração não existir/estiver ambígua ou sem conta_id configurado,
+// NÃO ingere e NÃO lança — o fluxo de registro do PIX (pix_webhook_temp/cob_pix)
+// continua funcionando como hoje; só o espelho em extratos_bancarios é pulado.
+
+export interface PixExtratoInput {
+  igreja_id: string;
+  /** ID da transação PIX no provedor — vira o external_id do extrato. */
+  pix_id: string;
+  valor: number;
+  /** Data/hora do PIX (ISO); só a parte de data é usada. */
+  data_pix: string;
+  descricao: string;
+}
+
+export interface PixExtratoResultado {
+  ingerido: boolean;
+  motivo?:
+    | "integracao_nao_encontrada"
+    | "multiplas_integracoes"
+    | "conta_id_nao_configurado"
+    | "erro_ingestao";
+  detalhe?: string;
+}
+
+export async function ingerirExtratoPix(
+  supabase: SupabaseClientAny,
+  input: PixExtratoInput,
+): Promise<PixExtratoResultado> {
+  const { data: integracoes, error: integError } = await supabase
+    .from("integracoes_financeiras")
+    .select("id, filial_id, config")
+    .eq("igreja_id", input.igreja_id)
+    .eq("provedor", "santander")
+    .eq("status", "ativo");
+
+  if (integError || !integracoes || integracoes.length === 0) {
+    return { ingerido: false, motivo: "integracao_nao_encontrada", detalhe: integError?.message };
+  }
+  if (integracoes.length > 1) {
+    return { ingerido: false, motivo: "multiplas_integracoes" };
+  }
+
+  const integracao = integracoes[0];
+  const contaId = (integracao.config as Record<string, unknown> | null)?.conta_id as
+    | string
+    | undefined;
+  if (!contaId) {
+    return { ingerido: false, motivo: "conta_id_nao_configurado" };
+  }
+
+  const item: ExtratoItemInput = {
+    data_transacao: input.data_pix.slice(0, 10),
+    valor: input.valor,
+    tipo: "credito",
+    descricao: input.descricao,
+    external_id: `pix:${input.pix_id}`,
+  };
+
+  try {
+    await ingerirExtratos(supabase, contaId, "pix", [item], {
+      igreja_id: input.igreja_id,
+      filial_id: integracao.filial_id ?? null,
+      canal: "integracao",
+    });
+    return { ingerido: true };
+  } catch (err) {
+    return {
+      ingerido: false,
+      motivo: "erro_ingestao",
+      detalhe: err instanceof Error ? err.message : String(err),
+    };
+  }
+}

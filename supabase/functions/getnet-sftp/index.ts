@@ -24,6 +24,7 @@ import nacl from "npm:tweetnacl@1.0.3";
 import SftpClient from "npm:ssh2-sftp-client@10.0.3";
 import Papa from "npm:papaparse@5.4.1";
 import { parseExtrato } from "./getnetExtratoParser.ts";
+import { ingerirExtratos, type ExtratoItemInput } from "../_shared/financeiro-core.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -711,33 +712,33 @@ async function runSettlementV1(args: {
     let inserted = 0;
     let ignored = 0;
     if (parsed.length > 0) {
-      const inserts = parsed.map((p) => ({
-        conta_id: contaId,
-        igreja_id: integracao.igreja_id,
-        filial_id: integracao.filial_id ?? null,
+      const itens: ExtratoItemInput[] = parsed.map((p) => ({
         data_transacao: p.data_transacao,
-        descricao: p.descricao,
         valor: p.valor,
-        numero_documento: p.numero_documento,
         tipo: p.tipo,
+        descricao: p.descricao,
+        numero_documento: p.numero_documento,
         external_id: p.external_id,
-        origem: "getnet_sftp",
-        reconciliado: false,
       }));
-      const { data: up, error: upErr } = await supabaseAdmin
-        .from("extratos_bancarios")
-        .upsert(inserts, { onConflict: "conta_id,external_id", ignoreDuplicates: true })
-        .select("id");
-      if (upErr) {
+      try {
+        // Porta única de ingestão (F5): canal 'integracao' sem ator humano
+        // (D-F5.2) — condizente com o client service-role usado em toda a function.
+        const res = await ingerirExtratos(supabaseAdmin, contaId, "getnet_sftp", itens, {
+          igreja_id: integracao.igreja_id,
+          filial_id: integracao.filial_id ?? null,
+          canal: "integracao",
+        });
+        inserted = Number(res.inseridos ?? 0);
+        ignored = Number(res.duplicados ?? 0);
+      } catch (upErr) {
+        const message = upErr instanceof Error ? upErr.message : String(upErr);
         await finishLog(supabaseAdmin, logId, startedAt, {
           status: "error",
           arquivo_nome: target.name,
-          erro_mensagem: `Erro ao inserir extratos: ${upErr.message}`,
+          erro_mensagem: `Erro ao inserir extratos: ${message}`,
         });
-        return json(200, { success: false, error: upErr.message });
+        return json(200, { success: false, error: message });
       }
-      inserted = up?.length ?? 0;
-      ignored = parsed.length - inserted;
     }
 
     await finishLog(supabaseAdmin, logId, startedAt, {
@@ -1113,29 +1114,32 @@ async function runExtratoEletronicoV10(args: {
       }
 
       // ── Espelha RVs liquidados (LQ) em extratos_bancarios ──────────────
+      // Porta única de ingestão (F5): canal 'integracao' sem ator humano (D-F5.2).
       let extratosInseridos = 0;
       let extratosIgnorados = 0;
       const resumosLQ = resumos.filter((r) => r.indicadorTipoPagamento === "LQ" && r.dataRv);
       if (resumosLQ.length > 0) {
-        const extratosRows = resumosLQ.map((r) => ({
-          conta_id: contaId,
-          igreja_id: integracao.igreja_id,
-          filial_id: integracao.filial_id ?? null,
-          data_transacao: r.dataPagamentoRv || r.dataRv,
-          descricao: `Getnet RV ${r.rv}`,
+        const itensExtrato: ExtratoItemInput[] = resumosLQ.map((r) => ({
+          // r.dataRv truthy é garantido pelo filter acima (resumosLQ); o TS não
+          // propaga essa narrowing através do .map() seguinte.
+          data_transacao: (r.dataPagamentoRv || r.dataRv) as string,
           valor: r.sinal === "-" ? -Math.abs(r.valorLiquido) : r.valorLiquido,
-          numero_documento: r.rv,
           tipo: r.sinal === "-" ? "debito" : "credito",
+          descricao: `Getnet RV ${r.rv}`,
+          numero_documento: r.rv,
           external_id: `getnet_rv:${r.rv}:${r.dataRv}:LQ`,
-          origem: "getnet_sftp_txt",
-          reconciliado: false,
         }));
-        const exRes = await upsertChunks(
-          supabaseAdmin, "extratos_bancarios", extratosRows, "conta_id,external_id"
-        );
-        if (exRes.error) throw new Error(`extratos_bancarios: ${exRes.error}`);
-        extratosInseridos = exRes.inserted;
-        extratosIgnorados = exRes.ignored;
+        try {
+          const exRes = await ingerirExtratos(supabaseAdmin, contaId, "getnet_sftp_txt", itensExtrato, {
+            igreja_id: integracao.igreja_id,
+            filial_id: integracao.filial_id ?? null,
+            canal: "integracao",
+          });
+          extratosInseridos = Number(exRes.inseridos ?? 0);
+          extratosIgnorados = Number(exRes.duplicados ?? 0);
+        } catch (err) {
+          throw new Error(`extratos_bancarios: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
 
       // ── getnet_arquivos (controle por arquivo) — written only after all upserts succeed
