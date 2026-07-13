@@ -23,7 +23,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import nacl from "npm:tweetnacl@1.0.3";
 import SftpClient from "npm:ssh2-sftp-client@10.0.3";
 import Papa from "npm:papaparse@5.4.1";
-import { parseExtrato } from "./getnetExtratoParser.ts";
+import { parseExtrato, selecionarEspelhoTipo5 } from "./getnetExtratoParser.ts";
 import { ingerirExtratos, type ExtratoItemInput } from "../_shared/financeiro-core.ts";
 
 const corsHeaders = {
@@ -792,6 +792,18 @@ async function runExtratoEletronicoV10(args: {
     dataReferencia, requestedFile,
   } = args;
 
+  // F6/D5: espelho em extratos_bancarios nasce do tipo 5 (PG, dinheiro real)
+  // em vez do tipo 1 (LQ) para arquivos com data_referencia >= corte
+  // configurado por integração. Opt-in: sem `espelho_tipo5_desde`, mantém o
+  // comportamento legado (tipo 1). Fica no nível raiz de `config` (não em
+  // `config.sftp`) para sobreviver ao merge raso da edge integracoes-config.
+  const cfgIntegracao = (integracao.config ?? {}) as Record<string, unknown>;
+  const espelhoTipo5Desde =
+    typeof cfgIntegracao.espelho_tipo5_desde === "string" && cfgIntegracao.espelho_tipo5_desde
+      ? cfgIntegracao.espelho_tipo5_desde
+      : null;
+  const usarTipo5 = espelhoTipo5Desde !== null && dataReferencia >= espelhoTipo5Desde;
+
   // regex default: getnetextr_YYYYMMDD_XXXXXXXX_c101.txt
   const defaultRegex = "^getnetextr_(\\d{4})(\\d{2})(\\d{2})_.+\\.txt$";
   const regexStr = filePatternRegex || defaultRegex;
@@ -1113,28 +1125,40 @@ async function runExtratoEletronicoV10(args: {
         if (finDetRes.error) throw new Error(`getnet_financeiro_detalhe: ${finDetRes.error}`);
       }
 
-      // ── Espelha RVs liquidados (LQ) em extratos_bancarios ──────────────
+      // ── Espelha em extratos_bancarios ───────────────────────────────────
       // Porta única de ingestão (F5): canal 'integracao' sem ator humano (D-F5.2).
+      // F6/D5: fonte do espelho é tipo 5 (PG, dinheiro real) para arquivos
+      // pós-corte (`usarTipo5`); tipo 1 (RV liquidado/LQ) permanece o
+      // comportamento legado para integrações sem `espelho_tipo5_desde`.
       let extratosInseridos = 0;
       let extratosIgnorados = 0;
-      const resumosLQ = resumos.filter((r) => r.indicadorTipoPagamento === "LQ" && r.dataRv);
-      if (resumosLQ.length > 0) {
-        const itensExtrato: ExtratoItemInput[] = resumosLQ.map((r) => ({
-          // r.dataRv truthy é garantido pelo filter acima (resumosLQ); o TS não
-          // propaga essa narrowing através do .map() seguinte.
-          data_transacao: (r.dataPagamentoRv || r.dataRv) as string,
-          valor: r.sinal === "-" ? -Math.abs(r.valorLiquido) : r.valorLiquido,
-          tipo: r.sinal === "-" ? "debito" : "credito",
-          descricao: `Getnet RV ${r.rv}`,
-          numero_documento: r.rv,
-          external_id: `getnet_rv:${r.rv}:${r.dataRv}:LQ`,
-        }));
+      const itensExtrato: ExtratoItemInput[] = usarTipo5
+        ? selecionarEspelhoTipo5(financeirosResumo, integracao.id, arq.nome)
+        : resumos
+            .filter((r) => r.indicadorTipoPagamento === "LQ" && r.dataRv)
+            .map((r) => ({
+              // r.dataRv truthy é garantido pelo filter acima; o TS não
+              // propaga essa narrowing através do .map() seguinte.
+              data_transacao: (r.dataPagamentoRv || r.dataRv) as string,
+              valor: r.sinal === "-" ? -Math.abs(r.valorLiquido) : r.valorLiquido,
+              tipo: r.sinal === "-" ? "debito" : "credito",
+              descricao: `Getnet RV ${r.rv}`,
+              numero_documento: r.rv,
+              external_id: `getnet_rv:${r.rv}:${r.dataRv}:LQ`,
+            }));
+      if (itensExtrato.length > 0) {
         try {
-          const exRes = await ingerirExtratos(supabaseAdmin, contaId, "getnet_sftp_txt", itensExtrato, {
-            igreja_id: integracao.igreja_id,
-            filial_id: integracao.filial_id ?? null,
-            canal: "integracao",
-          });
+          const exRes = await ingerirExtratos(
+            supabaseAdmin,
+            contaId,
+            usarTipo5 ? "getnet_sftp_tipo5" : "getnet_sftp_txt",
+            itensExtrato,
+            {
+              igreja_id: integracao.igreja_id,
+              filial_id: integracao.filial_id ?? null,
+              canal: "integracao",
+            },
+          );
           extratosInseridos = Number(exRes.inseridos ?? 0);
           extratosIgnorados = Number(exRes.duplicados ?? 0);
         } catch (err) {

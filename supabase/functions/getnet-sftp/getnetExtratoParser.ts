@@ -275,6 +275,49 @@ export interface FinResumoRecord {
   codigoArranjo: string; chaveUr: string;
 }
 
+export interface ItemEspelhoGetnet {
+  data_transacao: string;
+  valor: number;
+  tipo: "credito" | "debito";
+  descricao: string;
+  numero_documento: string | null;
+  external_id: string;
+}
+
+/**
+ * Seleciona, dentre as linhas do registro tipo 5 (`getnet_financeiro_resumo`),
+ * as que representam dinheiro NOVO creditado na conta do lojista — Regra
+ * Geral #10 do Manual Extrato Eletrônico V10.1/V6.2024 (pg. 56): só
+ * `tipo_operacao === "PG"` (Pagamento de Agenda Livre) é "valores livres
+ * creditado na conta do estabelecimento". Os demais tipos (CS/CF/AC/CL/GL/
+ * GF/AL) são liquidação contábil de dinheiro já adiantado em data anterior
+ * (contrato de cessão/antecipação/gravame), não crédito novo — confirmado
+ * pelo exemplo numérico do manual (pg. 44-45).
+ *
+ * `external_id` usa `arquivoNome:linhaNum` em vez de `numeroOperacao` (o
+ * manual, pg. 38, afirma explicitamente que PG não tem número de operação)
+ * ou `chaveUr` (preenchida para PG, mas pode consolidar múltiplas URs
+ * liquidadas numa única linha — não é garantida 1:1). `linhaNum` é sempre
+ * presente e estável entre reimportações do mesmo arquivo, o que é o que o
+ * dedupe `(conta_id, external_id)` de `fin_ingerir_extratos` precisa.
+ */
+export function selecionarEspelhoTipo5(
+  financeirosResumo: Array<FinResumoRecord & { linhaNum: number; rawLine: string }>,
+  integracaoId: string,
+  arquivoNome: string,
+): ItemEspelhoGetnet[] {
+  return financeirosResumo
+    .filter((f) => f.tipoOperacao === "PG" && (f.dataCreditoOperacao || f.dataOperacao))
+    .map((f) => ({
+      data_transacao: (f.dataCreditoOperacao || f.dataOperacao) as string,
+      valor: f.valorLiquidoOperacao,
+      tipo: "credito" as const,
+      descricao: `Getnet PG ${f.chaveUr || f.numeroOperacao || f.linhaNum}`,
+      numero_documento: f.numeroOperacao || null,
+      external_id: `getnet_fin5:${integracaoId}:${arquivoNome}:${f.linhaNum}`,
+    }));
+}
+
 export interface FinDetalheRecord {
   tipoRegistro: string; codigoEstabelecimento: string; dataOperacao: string | null;
   numeroOperacao: string; tipoOperacao: string; codigoProduto: string;

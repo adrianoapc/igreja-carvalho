@@ -59,6 +59,10 @@ export function IntegracaoCriarDialog({
   const [sftpLayout, setSftpLayout] = useState("settlement_v1");
   const [sftpContaId, setSftpContaId] = useState<string>("");
   const [contas, setContas] = useState<Array<{ id: string; label: string }>>([]);
+  // F6/D5: data de corte por integração para espelhar o extrato a partir do
+  // tipo 5 (PG, dinheiro real) em vez do tipo 1 (LQ). Fica no nível raiz do
+  // config (irmã de `sftp`), não dentro dele.
+  const [espelhoTipo5Desde, setEspelhoTipo5Desde] = useState<string>("");
 
 
   const [ativo, setAtivo] = useState(true);
@@ -101,6 +105,11 @@ export function IntegracaoCriarDialog({
               if ((sftpCfg as any).file_pattern != null) setSftpFilePattern(String((sftpCfg as any).file_pattern));
               if ((sftpCfg as any).layout != null) setSftpLayout(String((sftpCfg as any).layout));
               if ((sftpCfg as any).conta_id != null) setSftpContaId(String((sftpCfg as any).conta_id));
+            }
+            // espelho_tipo5_desde fica no nível raiz do config (irmã de sftp)
+            const raizCfg = cfg as Record<string, unknown>;
+            if (typeof raizCfg.espelho_tipo5_desde === "string") {
+              setEspelhoTipo5Desde(raizCfg.espelho_tipo5_desde);
             }
           }
 
@@ -151,6 +160,7 @@ export function IntegracaoCriarDialog({
         setSftpFilePattern(".csv");
         setSftpLayout("settlement_v1");
         setSftpContaId("");
+        setEspelhoTipo5Desde("");
         setAtivo(true);
         setProvedor("santander");
         setTipoAuth("token");
@@ -225,7 +235,14 @@ export function IntegracaoCriarDialog({
     if (sftpFilePattern) sftp.file_pattern = sftpFilePattern;
     if (sftpLayout) sftp.layout = sftpLayout;
     if (sftpContaId) sftp.conta_id = sftpContaId;
-    return Object.keys(sftp).length ? { sftp } : undefined;
+
+    const result: Record<string, unknown> = {};
+    if (Object.keys(sftp).length) result.sftp = sftp;
+    // Só faz sentido no layout que emite registro tipo 5 (settlement_v1 não tem).
+    if (sftpLayout === "extrato_eletronico_v10" && espelhoTipo5Desde) {
+      result.espelho_tipo5_desde = espelhoTipo5Desde;
+    }
+    return Object.keys(result).length ? result : undefined;
   };
 
 
@@ -695,6 +712,28 @@ export function IntegracaoCriarDialog({
                   Os lançamentos importados via SFTP serão associados a esta conta.
                 </p>
               </div>
+
+              {sftpLayout === "extrato_eletronico_v10" && (
+                <div className="space-y-2">
+                  <Label htmlFor="espelhoTipo5Desde">
+                    Espelhar extrato a partir do tipo 5 (dinheiro real) desde
+                  </Label>
+                  <Input
+                    id="espelhoTipo5Desde"
+                    type="date"
+                    value={espelhoTipo5Desde}
+                    onChange={(e) => setEspelhoTipo5Desde(e.target.value)}
+                    disabled={loading}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Opcional. Sem essa data, o espelho continua vindo do tipo 1
+                    (RV liquidado/LQ) — comportamento atual. A partir da data
+                    escolhida, arquivos processados usam o tipo 5 (PG, dinheiro
+                    efetivamente creditado). Não reprocessa períodos já
+                    importados.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
