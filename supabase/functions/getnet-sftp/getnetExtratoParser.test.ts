@@ -9,7 +9,7 @@
 // Rodar: deno test supabase/functions/getnet-sftp/getnetExtratoParser.test.ts
 
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { selecionarEspelhoTipo5, type FinResumoRecord } from "./getnetExtratoParser.ts";
+import { selecionarEspelhoTipo5, resolverUsoTipo5, type FinResumoRecord } from "./getnetExtratoParser.ts";
 
 type Linha = FinResumoRecord & { linhaNum: number; rawLine: string };
 
@@ -83,4 +83,28 @@ Deno.test("selecionarEspelhoTipo5: descarta linha PG sem nenhuma data (dataCredi
   const linha = linhaFin5({ dataCreditoOperacao: null, dataOperacao: null });
   const itens = selecionarEspelhoTipo5([linha], "integ-1", "arquivo1.txt");
   assertEquals(itens.length, 0);
+});
+
+// resolverUsoTipo5 — fix P1 (review PR #52): trava a origem por arquivo em
+// reprocessamento, para não duplicar crédito se espelho_tipo5_desde mudar
+// depois de um arquivo já ter sido importado.
+
+Deno.test("resolverUsoTipo5: arquivo nunca importado (nenhuma linha) decide fresco pela config — true", () => {
+  assertEquals(resolverUsoTipo5(null, true), true);
+});
+
+Deno.test("resolverUsoTipo5: arquivo nunca importado (nenhuma linha) decide fresco pela config — false", () => {
+  assertEquals(resolverUsoTipo5(undefined, false), false);
+});
+
+Deno.test("resolverUsoTipo5: arquivo já importado ANTES da coluna existir (espelho_origem NULL) trava em tipo 1, mesmo com corte retroativo cobrindo a data (cenário exato do P1)", () => {
+  assertEquals(resolverUsoTipo5({ espelho_origem: null }, true), false);
+});
+
+Deno.test("resolverUsoTipo5: arquivo já importado como tipo5 trava em tipo5, mesmo se a config mudar depois", () => {
+  assertEquals(resolverUsoTipo5({ espelho_origem: "getnet_sftp_tipo5" }, false), true);
+});
+
+Deno.test("resolverUsoTipo5: arquivo já importado como tipo1 (explícito, pós-fix) trava em tipo1, mesmo com corte cobrindo a data", () => {
+  assertEquals(resolverUsoTipo5({ espelho_origem: "getnet_sftp_txt" }, true), false);
 });

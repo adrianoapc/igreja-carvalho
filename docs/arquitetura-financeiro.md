@@ -978,12 +978,29 @@ JSONB livre.
   `getnet_financeiro_detalhe` (tabelas cruas) continuam sendo gravadas
   exatamente como antes — só a FONTE do espelho em `extratos_bancarios` muda;
   tipo 1 vira puramente analítico/drill-down, como já prescrito pela D5.
+- **Origem do espelho trava por arquivo (fix P1, review PR #52)**: como a
+  decisão tipo1×tipo5 compara `data_referencia` do arquivo contra
+  `espelho_tipo5_desde`, um arquivo já importado (espelho tipo 1,
+  `external_id` `getnet_rv:...`) reprocessado manualmente (`import_extrato`
+  com `arquivo_nome`) DEPOIS de o operador setar/mudar um corte retroativo
+  passaria a gerar `external_id` `getnet_fin5:...` — o dedupe
+  `(conta_id, external_id)` não reconhece os dois como o mesmo crédito e
+  duplicaria o valor. Migration `20260713140000` adiciona
+  `getnet_arquivos.espelho_origem` (nullable); a origem usada na 1ª
+  importação de um arquivo trava para sempre nos reprocessamentos seguintes,
+  ignorando a config atual. `NULL` (arquivo importado antes desta coluna
+  existir, ou seja, antes da F6) conta como tipo 1. Função pura
+  `resolverUsoTipo5` em `getnetExtratoParser.ts` (3 estados: nunca
+  importado → decide pela config; travado em tipo1 [incl. `NULL` legado];
+  travado em tipo5).
 - **Validação**: `deno check` + `deno test` em `getnetExtratoParser.ts`/
-  `index.ts` (6 casos novos: PG sem numero_operacao, duas linhas PG no mesmo
-  arquivo, todas as operações não-PG filtradas fora, reimportação gera
-  external_id idêntico, fallback de data, linha sem nenhuma data descartada).
-  `npx tsc` mantém os 62 erros pré-existentes catalogados desde a F5, zero
-  novos.
+  `index.ts` (11 casos: 6 de `selecionarEspelhoTipo5` — PG sem
+  numero_operacao, duas linhas PG no mesmo arquivo, todas as operações
+  não-PG filtradas fora, reimportação gera external_id idêntico, fallback de
+  data, linha sem nenhuma data descartada — + 5 de `resolverUsoTipo5`,
+  incluindo o cenário exato do P1: arquivo legado com `espelho_origem NULL`
+  trava em tipo 1 mesmo com corte retroativo cobrindo a data). `npx tsc`
+  mantém os 62 erros pré-existentes catalogados desde a F5, zero novos.
 
 ## 10. Decisões em aberto (bater o martelo)
 

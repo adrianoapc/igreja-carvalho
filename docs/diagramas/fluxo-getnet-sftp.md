@@ -149,6 +149,13 @@ dedupe a partir de `linhaNum` (não de `numero_operacao`, que o manual
 confirma vir vazio para PG, nem de `chave_ur`, que pode não ser 1:1 por
 linha).
 
+**A origem trava por arquivo** (`getnet_arquivos.espelho_origem`, migration
+`20260713140000`): reprocessar manualmente um arquivo já importado não pode
+trocar de origem, mesmo que o corte mude depois cobrindo retroativamente
+aquela data — senão o `external_id` muda de forma e o dedupe
+`(conta_id, external_id)` não reconhece as duas linhas como o mesmo crédito,
+duplicando o valor. Função pura `resolverUsoTipo5`.
+
 ## Diagrama de Sequência — Importação de Arquivo
 
 ```mermaid

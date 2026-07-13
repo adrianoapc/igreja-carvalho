@@ -275,6 +275,36 @@ export interface FinResumoRecord {
   codigoArranjo: string; chaveUr: string;
 }
 
+/**
+ * Trava a origem do espelho por arquivo (fix P1, review PR #52): a origem
+ * usada na 1a importação de um arquivo NUNCA pode mudar em reprocessamentos
+ * posteriores, mesmo que `espelho_tipo5_desde` seja setado/alterado depois
+ * cobrindo retroativamente a data desse arquivo — senão o external_id muda
+ * (`getnet_rv:...` -> `getnet_fin5:...`), o dedupe `(conta_id, external_id)`
+ * não reconhece as duas linhas como o mesmo crédito, e o valor é duplicado
+ * em `extratos_bancarios`.
+ *
+ * `arquivoAnterior` vem de `getnet_arquivos` (SELECT espelho_origem WHERE
+ * integracao_id/arquivo_nome). Três estados, não dois — a distinção entre
+ * "nunca importado" e "importado antes da coluna existir" importa:
+ *  - `null`/`undefined` (nenhuma linha): 1a importação — decide fresco pela
+ *    config (`usarTipo5PorConfig`).
+ *  - `{ espelho_origem: null }` (linha existe, coluna vazia): arquivo
+ *    importado antes desta coluna existir, ou seja, antes da F6 — travado
+ *    em tipo 1, já que a origem tipo5 não existia antes.
+ *  - `{ espelho_origem: "getnet_sftp_tipo5" | "getnet_sftp_txt" }`: travado
+ *    no valor já registrado.
+ */
+export function resolverUsoTipo5(
+  arquivoAnterior: { espelho_origem: string | null } | null | undefined,
+  usarTipo5PorConfig: boolean,
+): boolean {
+  if (!arquivoAnterior) {
+    return usarTipo5PorConfig;
+  }
+  return arquivoAnterior.espelho_origem === "getnet_sftp_tipo5";
+}
+
 export interface ItemEspelhoGetnet {
   data_transacao: string;
   valor: number;

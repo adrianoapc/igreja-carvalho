@@ -23,7 +23,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import nacl from "npm:tweetnacl@1.0.3";
 import SftpClient from "npm:ssh2-sftp-client@10.0.3";
 import Papa from "npm:papaparse@5.4.1";
-import { parseExtrato, selecionarEspelhoTipo5 } from "./getnetExtratoParser.ts";
+import { parseExtrato, selecionarEspelhoTipo5, resolverUsoTipo5 } from "./getnetExtratoParser.ts";
 import { ingerirExtratos, type ExtratoItemInput } from "../_shared/financeiro-core.ts";
 
 const corsHeaders = {
@@ -1130,9 +1130,26 @@ async function runExtratoEletronicoV10(args: {
       // F6/D5: fonte do espelho é tipo 5 (PG, dinheiro real) para arquivos
       // pós-corte (`usarTipo5`); tipo 1 (RV liquidado/LQ) permanece o
       // comportamento legado para integrações sem `espelho_tipo5_desde`.
+      //
+      // P1 (review PR #52): a origem escolhida na 1a importação de um
+      // arquivo TRAVA — reprocessar o mesmo arquivo depois de mudar/setar
+      // `espelho_tipo5_desde` retroativamente não pode trocar de origem, ou
+      // o external_id muda (getnet_rv:... -> getnet_fin5:...) e o dedupe
+      // (conta_id, external_id) não vê os dois como o mesmo crédito,
+      // duplicando o valor em extratos_bancarios. NULL (arquivo importado
+      // antes desta coluna existir) conta como tipo 1, já que a origem tipo5
+      // não existia antes da F6.
+      const { data: arquivoJaProcessado } = await supabaseAdmin
+        .from("getnet_arquivos")
+        .select("espelho_origem")
+        .eq("integracao_id", integracao.id)
+        .eq("arquivo_nome", arq.nome)
+        .maybeSingle();
+      const usarTipo5ParaEsteArquivo = resolverUsoTipo5(arquivoJaProcessado, usarTipo5);
+
       let extratosInseridos = 0;
       let extratosIgnorados = 0;
-      const itensExtrato: ExtratoItemInput[] = usarTipo5
+      const itensExtrato: ExtratoItemInput[] = usarTipo5ParaEsteArquivo
         ? selecionarEspelhoTipo5(financeirosResumo, integracao.id, arq.nome)
         : resumos
             .filter((r) => r.indicadorTipoPagamento === "LQ" && r.dataRv)
@@ -1151,7 +1168,7 @@ async function runExtratoEletronicoV10(args: {
           const exRes = await ingerirExtratos(
             supabaseAdmin,
             contaId,
-            usarTipo5 ? "getnet_sftp_tipo5" : "getnet_sftp_txt",
+            usarTipo5ParaEsteArquivo ? "getnet_sftp_tipo5" : "getnet_sftp_txt",
             itensExtrato,
             {
               igreja_id: integracao.igreja_id,
@@ -1183,6 +1200,7 @@ async function runExtratoEletronicoV10(args: {
           erros_validacao: validacao.erros.length > 0 ? validacao.erros : null,
           codigo_estabelecimento: parsed.header?.codigoEstabelecimento ?? null,
           cnpj_adquirente: parsed.header?.cnpjAdquirente ?? null,
+          espelho_origem: usarTipo5ParaEsteArquivo ? "getnet_sftp_tipo5" : "getnet_sftp_txt",
         }, { onConflict: "integracao_id,arquivo_nome" });
 
       const totalLinhas = validacao.qtdRegistrosLidos;
