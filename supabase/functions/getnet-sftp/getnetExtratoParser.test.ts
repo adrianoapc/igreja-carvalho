@@ -41,10 +41,10 @@ function linhaFin5(overrides: Partial<Linha>): Linha {
 
 Deno.test("selecionarEspelhoTipo5: PG com numero_operacao vazio gera item sem quebrar", () => {
   const linha = linhaFin5({ numeroOperacao: "" });
-  const itens = selecionarEspelhoTipo5([linha], "integ-1");
+  const itens = selecionarEspelhoTipo5([linha]);
   assertEquals(itens.length, 1);
   assertEquals(itens[0].numero_documento, null);
-  assertEquals(itens[0].external_id, "getnet_fin5:integ-1:2026-07-10:01:20260710004XX6598YY000199:600");
+  assertEquals(itens[0].external_id, "getnet_fin5:2026-07-10:01:20260710004XX6598YY000199:600");
   assertEquals(itens[0].tipo, "credito");
   assertEquals(itens[0].valor, 600);
 });
@@ -52,7 +52,7 @@ Deno.test("selecionarEspelhoTipo5: PG com numero_operacao vazio gera item sem qu
 Deno.test("selecionarEspelhoTipo5: duas linhas PG com chave/valor diferentes geram external_id distintos", () => {
   const linha1 = linhaFin5({ linhaNum: 1, chaveUr: "20260710004XX6598YY000199", valorLiquidoOperacao: 600 });
   const linha2 = linhaFin5({ linhaNum: 2, chaveUr: "20260710004XX6598YY000200", valorLiquidoOperacao: 150 });
-  const itens = selecionarEspelhoTipo5([linha1, linha2], "integ-1");
+  const itens = selecionarEspelhoTipo5([linha1, linha2]);
   assertEquals(itens.length, 2);
   assertEquals(itens[0].external_id !== itens[1].external_id, true);
 });
@@ -60,14 +60,14 @@ Deno.test("selecionarEspelhoTipo5: duas linhas PG com chave/valor diferentes ger
 Deno.test("selecionarEspelhoTipo5: filtra fora operações que não são PG", () => {
   const tipos = ["CS", "CF", "AC", "CL", "GL", "GF", "AL"];
   const linhas = tipos.map((tipoOperacao, i) => linhaFin5({ tipoOperacao, linhaNum: i + 1 }));
-  const itens = selecionarEspelhoTipo5(linhas, "integ-1");
+  const itens = selecionarEspelhoTipo5(linhas);
   assertEquals(itens.length, 0);
 });
 
 Deno.test("selecionarEspelhoTipo5: reimportação do mesmo arquivo gera external_id idêntico", () => {
   const linha = linhaFin5({ linhaNum: 3 });
-  const primeira = selecionarEspelhoTipo5([linha], "integ-1");
-  const segunda = selecionarEspelhoTipo5([linha], "integ-1");
+  const primeira = selecionarEspelhoTipo5([linha]);
+  const segunda = selecionarEspelhoTipo5([linha]);
   assertEquals(primeira[0].external_id, segunda[0].external_id);
 });
 
@@ -78,28 +78,39 @@ Deno.test("selecionarEspelhoTipo5: mesmo PG sob nome de arquivo DIFERENTE gera e
   // dedupe (conta_id, external_id) deixaria o mesmo crédito passar 2x.
   const linhaArquivoA = linhaFin5({ linhaNum: 1 });
   const linhaArquivoB = linhaFin5({ linhaNum: 1 }); // mesmo conteúdo, "outro arquivo"
-  const itensA = selecionarEspelhoTipo5([linhaArquivoA], "integ-1");
-  const itensB = selecionarEspelhoTipo5([linhaArquivoB], "integ-1");
+  const itensA = selecionarEspelhoTipo5([linhaArquivoA]);
+  const itensB = selecionarEspelhoTipo5([linhaArquivoB]);
   assertEquals(itensA[0].external_id, itensB[0].external_id);
+});
+
+Deno.test("selecionarEspelhoTipo5: não recebe integracao_id (fix P2 — integração excluída/recriada pra mesma conta não pode duplicar crédito histórico)", () => {
+  // A função não aceita mais integracaoId como parâmetro (era o P2 anterior:
+  // conta_id não muda numa substituição de integração, mas integracao.id
+  // muda — incluí-lo na chave duplicaria o histórico reimportado sob a nova
+  // integração). O teste em si é a assinatura: chamar com só o array já
+  // prova que não há como variar a chave por integração.
+  const linha = linhaFin5({ linhaNum: 1 });
+  const itens = selecionarEspelhoTipo5([linha]);
+  assertEquals(itens[0].external_id.includes("integ-"), false);
 });
 
 Deno.test("selecionarEspelhoTipo5: chaveUr vazia cai pra numeroOperacao na composição do external_id", () => {
   const linha = linhaFin5({ chaveUr: "", numeroOperacao: "OP123" });
-  const itens = selecionarEspelhoTipo5([linha], "integ-1");
+  const itens = selecionarEspelhoTipo5([linha]);
   assertEquals(itens.length, 1);
-  assertEquals(itens[0].external_id, "getnet_fin5:integ-1:2026-07-10:01:OP123:600");
+  assertEquals(itens[0].external_id, "getnet_fin5:2026-07-10:01:OP123:600");
 });
 
 Deno.test("selecionarEspelhoTipo5: fallback de data usa dataOperacao quando dataCreditoOperacao é nula", () => {
   const linha = linhaFin5({ dataCreditoOperacao: null, dataOperacao: "2026-07-05" });
-  const itens = selecionarEspelhoTipo5([linha], "integ-1");
+  const itens = selecionarEspelhoTipo5([linha]);
   assertEquals(itens.length, 1);
   assertEquals(itens[0].data_transacao, "2026-07-05");
 });
 
 Deno.test("selecionarEspelhoTipo5: descarta linha PG sem nenhuma data (dataCreditoOperacao e dataOperacao nulas)", () => {
   const linha = linhaFin5({ dataCreditoOperacao: null, dataOperacao: null });
-  const itens = selecionarEspelhoTipo5([linha], "integ-1");
+  const itens = selecionarEspelhoTipo5([linha]);
   assertEquals(itens.length, 0);
 });
 

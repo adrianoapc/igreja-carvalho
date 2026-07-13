@@ -324,14 +324,20 @@ export interface ItemEspelhoGetnet {
  * (contrato de cessão/antecipação/gravame), não crédito novo — confirmado
  * pelo exemplo numérico do manual (pg. 44-45).
  *
- * `external_id` é construído SÓ com campos do conteúdo da linha (chave UR +
- * data + arranjo + valor) — nunca com `arquivoNome`/`linhaNum` (fix P2,
- * review PR #52): se a Getnet reenviar/reprocessar o mesmo dia sob um nome
- * de arquivo diferente, `getnet_arquivos` (chave `arquivo_nome`) trata isso
- * como arquivo novo, e um `external_id` amarrado ao nome do arquivo deixaria
- * o mesmo crédito passar batido pelo dedupe `(conta_id, external_id)` e ser
- * inserido de novo. `chaveUr` é preenchida para PG (o manual, pg. 38, só
- * confirma que `numeroOperacao` não é) e já é ela mesma um composto
+ * `external_id` é construído SÓ com campos do conteúdo/provedor da linha
+ * (chave UR + data + arranjo + valor) — nunca com `arquivoNome`/`linhaNum`
+ * (fix P2, review PR #52) nem com `integracao_id` (fix P2, mesma rodada de
+ * review): se a Getnet reenviar/reprocessar o mesmo dia sob um nome de
+ * arquivo diferente, `getnet_arquivos` (chave `arquivo_nome`) trata isso
+ * como arquivo novo; se a integração SFTP for excluída/recriada para a
+ * MESMA conta bancária (`conta_id` não muda, `integracao.id` muda), um
+ * histórico reimportado geraria uma chave diferente. Em ambos os casos, o
+ * dedupe `(conta_id, external_id)` de `fin_ingerir_extratos` não reconhece
+ * as duas linhas como o mesmo crédito e duplica o valor — o path tipo 1
+ * legado (`getnet_rv:${rv}:${dataRv}:LQ`) nunca teve esse problema porque só
+ * usa campos do provedor/conteúdo, nunca do transporte (arquivo) ou do
+ * cadastro (integração). `chaveUr` é preenchida para PG (o manual, pg. 38,
+ * só confirma que `numeroOperacao` não é) e já é ela mesma um composto
  * determinístico (data de liquidação + código de arranjo + CNPJ/CPF — Regra
  * Geral #11); ainda assim inclui `codigoArranjo`/data/valor como reforço,
  * com fallback pra `numeroOperacao` se `chaveUr` vier vazia num caso
@@ -339,7 +345,6 @@ export interface ItemEspelhoGetnet {
  */
 export function selecionarEspelhoTipo5(
   financeirosResumo: Array<FinResumoRecord & { linhaNum: number; rawLine: string }>,
-  integracaoId: string,
 ): ItemEspelhoGetnet[] {
   return financeirosResumo
     .filter((f) => f.tipoOperacao === "PG" && (f.dataCreditoOperacao || f.dataOperacao))
@@ -352,7 +357,7 @@ export function selecionarEspelhoTipo5(
         tipo: "credito" as const,
         descricao: `Getnet PG ${chave}`,
         numero_documento: f.numeroOperacao || null,
-        external_id: `getnet_fin5:${integracaoId}:${data}:${f.codigoArranjo || "na"}:${chave}:${f.valorLiquidoOperacao}`,
+        external_id: `getnet_fin5:${data}:${f.codigoArranjo || "na"}:${chave}:${f.valorLiquidoOperacao}`,
       };
     });
 }

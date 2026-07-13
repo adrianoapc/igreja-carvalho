@@ -145,12 +145,15 @@ contratuais (`AJUSTE 18`, `AJUSTE 20` etc. nos registros 1/3).
 Sem `config.espelho_tipo5_desde` setado na integração, o comportamento é o
 legado (tipo 1). Função pura `selecionarEspelhoTipo5` em
 `getnetExtratoParser.ts` filtra as linhas PG e constrói o `external_id` de
-dedupe **só com campos do conteúdo da linha** — `chave_ur` (ou
+dedupe **só com campos de conteúdo/provedor da linha** — `chave_ur` (ou
 `numero_operacao` como fallback) + data + código de arranjo + valor — nunca
-com o nome do arquivo (fix P2, review PR #52: se a Getnet reenviar o mesmo
-dia sob outro nome de arquivo, `getnet_arquivos` trata como arquivo novo, e
-um `external_id` amarrado ao nome do arquivo deixaria o mesmo crédito passar
-2x pelo dedupe).
+com o nome do arquivo nem com `integracao_id` (2 rodadas de fix P2, review
+PR #52): se a Getnet reenviar o mesmo dia sob outro nome de arquivo,
+`getnet_arquivos` trata como arquivo novo; se a integração SFTP for
+excluída/recriada pra mesma conta bancária, `integracao.id` muda mas
+`conta_id` (o que o dedupe realmente escopa) não. Em ambos os casos, um
+`external_id` amarrado a esses IDs deixaria o mesmo crédito passar 2x pelo
+dedupe — igual ao path tipo 1 legado, que nunca dependeu de nenhum dos dois.
 
 **A origem trava por arquivo** (`getnet_arquivos.espelho_origem`, migration
 `20260713140000`): reprocessar manualmente um arquivo já importado não pode
