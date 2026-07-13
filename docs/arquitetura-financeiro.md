@@ -595,7 +595,7 @@ Cada fase é deployável isolada; legado convive com o novo.
 | **F4 Motor único de score** ✅ | Migration `20260711150000`: `fin_gerar_candidatos_conciliacao` (score 0..1, 1:1 e 1:N, corte por igreja em `financeiro_config.conciliacao_score_minimo`). `ConciliacaoManual`/`DashboardConciliacao`/`ConciliacaoInteligente` migrados ao motor único + `fin_confirmar_conciliacao`; `reconciliar_transacoes`/`aplicar_conciliacao`/`gerar_candidatos_conciliacao` deprecadas (DROP na F7); `ModoABToggle` (código morto) removido; `reclass-transacoes` recusa transação conciliada. Ver §9.3 | Concluída (jul/2026) |
 | **F5 Pipeline de ingestão** (parcial) | Migration `20260712120000`: `fin_ingerir_extratos` (contrato ExtratoItem, valor ABS, dedupe por `(conta_id, external_id)` com id determinístico, job + auditoria) + `fin_desfazer_ingestao`; canal **manual** (OFX/CSV/XLSX) via `core/api/extratos.api`; edge `gerar-sugestoes-ml` migrada ao motor único F4. Ver §9.4 | Fatia 1 + adaptador `santander-api` (`20260712130000`, caminho service-role D-F5.2) concluídos; Getnet (F6 tipo-5) e PIX (novo) pendentes |
 | **F6 Getnet tipo 5** | Após decisão D5; novos períodos apenas; backfill opcional | Depende de F5 |
-| **F7 Endurecimento + UX conciliação** | Revogar escrita direta do role `authenticated`; decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll); Finanças no bottom-nav; DRE mobile em cards; limpeza de código morto | Fecha o ciclo |
+| **F7 Endurecimento + UX conciliação** (parcial — sub-frente 1/5) ✅⚠️ | (1) ✅ Revogar escrita direta do role `authenticated`; (2) decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll); (3) Finanças no bottom-nav; (4) DRE mobile em cards; (5) limpeza de código morto | Migration `20260713140000`. Ver §9.6. Sub-frentes (2)-(5) **continuam pendentes** — não tratadas nesta fatia |
 
 ---
 
@@ -848,6 +848,115 @@ troca para a role `authenticated` via `SET ROLE` (não-superuser, RLS
 efetivamente aplicado) — T14 prova que um `admin_igreja` de outra igreja lê
 zero jobs desta igreja (vazamento fechado); T14b é o controle positivo (admin
 legítimo continua enxergando).
+
+### 9.6 Notas de implementação F7 — revogação de escrita direta (jul/2026)
+
+Migration `20260713140000`. Fecha **só a sub-frente (1)** do roadmap F7 ("revogar
+escrita direta do role `authenticated`") — as outras 4 (decompor telas de
+conciliação, bottom-nav, DRE mobile, limpeza de código morto genérica)
+permanecem pendentes e não foram tocadas nesta fatia.
+
+**Auditoria (passo obrigatório antes de qualquer `REVOKE`)**: grep exaustivo por
+`.insert(`/`.update(`/`.delete(`/`.upsert(` encadeado em `.from(<tabela>)` nas 7
+tabelas do CORE (`transacoes_financeiras`, `transferencias_contas`,
+`extratos_bancarios`, `conciliacoes_lote`, `conciliacoes_lote_extratos`,
+`conciliacoes_divisao`, `conciliacoes_divisao_transacoes`), em `src/**` e
+`supabase/functions/**`, fora de `core/api/`. Resultado — **não** o que as notas
+das fases anteriores sugeriam por analogia; precisou ser confirmado call-site a
+call-site:
+
+- **100% migradas → `REVOKE INSERT, UPDATE, DELETE` de `authenticated, anon`
+  aplicado**: `transferencias_contas`, `conciliacoes_lote`,
+  `conciliacoes_lote_extratos`, `conciliacoes_divisao`,
+  `conciliacoes_divisao_transacoes`. Zero `.insert/.update/.delete` diretos
+  restantes fora das RPCs `fin_*` (confirmado em `src/` e
+  `supabase/functions/**`).
+- **AINDA NÃO migradas → REVOKE NÃO aplicado** (revogar quebraria produção):
+  `transacoes_financeiras` e `extratos_bancarios` continuam com escrita direta
+  viva no **frontend** (rodando como `authenticated` via PostgREST/JWT — não
+  `service_role`, que não é afetado por este `REVOKE`). Achados: gerenciamento
+  de conciliação manual fora do fluxo migrado nas fases anteriores
+  (`TransacaoActionsMenu.handleToggleConferidoManual`,
+  `TransacaoDetalheDrawer.handleSave`, `VincularTransacaoDialog.handleVincular`,
+  `QuickCreateTransacaoDialog`, `HistoricoExtratos.handleIgnorar/
+  handleReativar/handleDesvincular`, `ConciliacaoManual.handleIgnorar`,
+  `DashboardConciliacao.handleIgnorar`, marcação `conciliado_manual` em
+  `ConciliacaoInteligente`); e criação direta de lançamento fora do CORE
+  (`ImportarTab`/`ImportarFinancasPage` — insert em lote de lançamentos do
+  Excel/CSV, rota ainda viva em `/financas/gerenciar-dados` e
+  `/financas/importar`; `MeusCursos`, `InscricoesTabContent` e
+  `AdicionarInscricaoDialog` — criam a transação de pagamento de
+  inscrição/curso direto). Ficam para a próxima fatia da F7 (junto com a
+  decomposição das telas de conciliação) migrar esses call-sites para `fin_*`
+  antes de fechar o `REVOKE` nessas duas tabelas.
+- **`supabase/functions/**` não bloqueia o REVOKE em nenhuma tabela**: os únicos
+  edges que ainda escrevem direto nessas tabelas (`getnet-sftp` em
+  `extratos_bancarios`, `santander-extrato` em `extratos_bancarios`,
+  `reclass-transacoes`/`undo-reclass`/`undo-import` em `transacoes_financeiras`)
+  usam `SUPABASE_SERVICE_ROLE_KEY` para o client de escrita — rodam como
+  `service_role`, não como `authenticated`, e portanto não são afetados por este
+  `REVOKE` (mesmo continuando a violar a "regra de ouro" arquitetural — débito
+  já conhecido, fora de escopo desta fatia).
+
+**RPCs legadas (mesma migration)**: `reconciliar_transacoes`,
+`aplicar_conciliacao` e `gerar_candidatos_conciliacao` — deprecadas via
+`COMMENT` na F4 — tiveram seus call-sites reconfirmados: **zero** vivos em
+`src/**`/`supabase/functions/**` (a edge `gerar-sugestoes-ml` já chama
+`fin_gerar_candidatos_conciliacao`, o motor único, desde a F5 — confirmado lendo
+o corpo do arquivo, o comentário de cabeçalho é que ficou desatualizado). As 3
+foram **DROPadas**. Achado extra da mesma auditoria: `aplicar_sugestao_conciliacao`
+(mesma categoria de risco — `SECURITY DEFINER` escrevendo direto em
+`extratos_bancarios`/`transacoes_financeiras`/`conciliacoes_lote`) só tinha um
+call-site, em `src/components/financas/SugestoesML.tsx` — componente **órfão**
+(sem import em nenhuma rota/tela). Tratada junto, mesmo não estando nos 3 nomes
+originais do roadmap, por ser a mesma categoria de risco e ter zero uso real.
+`rejeitar_sugestao_conciliacao` **não** entrou — segue com call-site vivo em
+`ConciliacaoInteligente.tsx`.
+
+Descoberta relevante no histórico de migrations: `aplicar_conciliacao` teve
+**duas assinaturas** ao longo do tempo (`(uuid, uuid)` na criação original,
+`(uuid, uuid, text, integer, uuid)` a partir de 20260203172530) sem nenhum
+`DROP FUNCTION` explícito no meio — plausível que os dois overloads coexistissem
+no schema real. A migration não assume a assinatura; itera `pg_proc` por
+`proname` e faz `DROP FUNCTION` de **todo** overload encontrado, blindando
+contra o risco de drift schema real × migrations já registrado no §11.
+
+**Por que revogar de `authenticated` não quebra as RPCs `fin_*`**: todas são
+`SECURITY DEFINER`, de propriedade do role que roda as migrations (mesmo dono
+de todo o resto do schema, com privilégio pleno de escrita) — o corpo da
+função roda com o privilégio do **dono**, não do chamador. Confirmado (não
+assumido) lendo cada `CREATE OR REPLACE FUNCTION` das migrations
+`20260710120000`/`20260710123000`/`20260711140000`/`20260711150000`/
+`20260712120000`/`20260712130000`: todas `SECURITY DEFINER`, todas com `GRANT
+EXECUTE ... TO authenticated, service_role` explícito.
+
+**Validação — harness docker (postgres:15 real)**: réplica de todas as
+migrations `fin_*` (F1-F5) + stubs das 4 RPCs legadas (assinaturas reais) +
+simulação do bootstrap padrão Supabase (`GRANT ALL ON ALL TABLES` para
+`anon`/`authenticated`/`service_role`, já que hoje esse é o estado real em
+produção) + a migration desta fase. Diferente das fases anteriores, o teste
+usa `SET ROLE authenticated` (não apenas `postgres` superuser) nos dois lados:
+
+- **Ataque** (authenticated, escrita direta): `INSERT`/`UPDATE`/`DELETE` direto
+  em cada uma das 5 tabelas revogadas → `insufficient_privilege` (permission
+  denied) em todos os 5 casos; chamar cada uma das 4 RPCs legadas (incluindo os
+  2 overloads de `aplicar_conciliacao`) → `undefined_function` (não existem
+  mais) nos 5 casos.
+- **Controle positivo** (authenticated, via RPC): `fin_criar_lancamento`,
+  `fin_alterar_status_lancamento`, `fin_criar_transferencia`,
+  `fin_ingerir_extratos`, `fin_confirmar_conciliacao`, `fin_desconciliar`,
+  `fin_gerar_candidatos_conciliacao`, `fin_desfazer_ingestao` — todas chamadas
+  com `SET ROLE authenticated` de verdade (não como superuser) e todas
+  funcionando normalmente, incluindo gravar de fato na tabela revogada
+  (`fin_criar_transferencia` grava em `transferencias_contas` mesmo com
+  `authenticated` sem `INSERT` direto nela).
+- **Sanidade**: confirma que `transacoes_financeiras` continua com `INSERT`
+  direto aberto para `authenticated` (não foi tocada — como esperado).
+- **`service_role`**: `INSERT` direto em `transferencias_contas` (a mesma tabela
+  do teste de ataque) continua funcionando sem erro.
+
+Todos os cenários batidos. Typecheck: 0 erros novos (baseline de 62
+pré-existentes em Dashboard/Insights/outros, não relacionados).
 
 | # | Decisão | Recomendação |
 |---|---|---|
