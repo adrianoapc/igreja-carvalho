@@ -22,6 +22,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { marcarExtratoIgnorado } from "@/features/financeiro/core/api/extratos.api";
 import { toast } from "sonner";
 import { format, parseISO, subDays, subMonths } from "date-fns";
 import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
@@ -366,16 +367,7 @@ export function ConciliacaoManual() {
 
   const handleIgnorar = async (extratoId: string) => {
     try {
-      const { error } = await supabase
-        .from("extratos_bancarios")
-        .update({ reconciliado: true })
-        .eq("id", extratoId);
-
-      if (error) {
-        console.error("Erro ao ignorar:", error);
-        toast.error("Erro ao ignorar extrato");
-        return;
-      }
+      await marcarExtratoIgnorado(extratoId, true);
 
       toast.success("Extrato marcado como ignorado");
       refetchExtratos();

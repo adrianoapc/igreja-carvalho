@@ -27,6 +27,7 @@ import {
   gerarCandidatosConciliacao,
   confirmarConciliacao,
 } from "@/features/financeiro/core/api/conciliacao.api";
+import { marcarExtratoIgnorado } from "@/features/financeiro/core/api/extratos.api";
 import {
   RefreshCw,
   FileCheck,
@@ -478,12 +479,7 @@ export function DashboardConciliacao() {
 
   const handleIgnorar = async (extratoId: string) => {
     try {
-      const { error } = await supabase
-        .from("extratos_bancarios")
-        .update({ reconciliado: true })
-        .eq("id", extratoId);
-
-      if (error) throw error;
+      await marcarExtratoIgnorado(extratoId, true);
 
       toast.success("Extrato marcado como ignorado");
       refetchExtratos();
