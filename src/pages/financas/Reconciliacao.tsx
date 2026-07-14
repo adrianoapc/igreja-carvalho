@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { DashboardConciliacao } from "@/components/financas/DashboardConciliacao";
 import { ConciliacaoManual } from "@/components/financas/ConciliacaoManual";
-import { ConciliacaoInteligente } from "@/components/financas/ConciliacaoInteligente";
+import { ConciliacaoInteligente } from "@/features/financeiro/conciliacao/ConciliacaoInteligente";
 import { HistoricoExtratos } from "@/components/financas/HistoricoExtratos";
 import { RelatorioCobertura } from "@/components/financas/RelatorioCobertura";
 import { Button } from "@/components/ui/button";
@@ -35,12 +35,32 @@ export default function Reconciliacao() {
       </div>
 
       <Tabs defaultValue="inteligente" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 mb-4">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="inteligente">Modo Inteligente</TabsTrigger>
-          <TabsTrigger value="manual">Modo Clássico</TabsTrigger>
-          <TabsTrigger value="historico">Histórico</TabsTrigger>
-          <TabsTrigger value="relatorio">Relatório</TabsTrigger>
+        {/*
+          5 abas não cabem legíveis num TabsList `grid-cols-5` fixo abaixo de
+          ~640px (F7 §6.3/§6.5). Sem convenção existente no app para "muitas
+          abas" responsivas (grep não achou outro TabsList com scroll
+          horizontal) — optamos por scroll horizontal (`overflow-x-auto` +
+          `flex w-max` em vez de `grid`) por ser o padrão recomendado do
+          próprio Radix/shadcn para esse caso: preserva a semântica de Tabs
+          (teclado, ARIA) sem precisar sincronizar um <Select> controlado à
+          parte, que duplicaria estado por pouco ganho com só 5 itens.
+        */}
+        <TabsList className="mb-4 flex w-full justify-start gap-1 overflow-x-auto sm:grid sm:grid-cols-5">
+          <TabsTrigger value="dashboard" className="shrink-0 sm:shrink">
+            Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="inteligente" className="shrink-0 sm:shrink">
+            Modo Inteligente
+          </TabsTrigger>
+          <TabsTrigger value="manual" className="shrink-0 sm:shrink">
+            Modo Clássico
+          </TabsTrigger>
+          <TabsTrigger value="historico" className="shrink-0 sm:shrink">
+            Histórico
+          </TabsTrigger>
+          <TabsTrigger value="relatorio" className="shrink-0 sm:shrink">
+            Relatório
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="dashboard">
           <DashboardConciliacao />
