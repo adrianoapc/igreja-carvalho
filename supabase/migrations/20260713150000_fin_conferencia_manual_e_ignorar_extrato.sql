@@ -1,7 +1,7 @@
 -- F7 (sub-frente 1/5, continuação): duas RPCs novas para fechar os últimos
 -- call-sites de escrita direta em transacoes_financeiras/extratos_bancarios
--- que a migration 20260713140000 deixou de fora (ver docs/arquitetura-
--- financeiro.md §9.6). Nenhuma RPC existente cobria estas duas operações:
+-- que a migration 20260713141000 deixou de fora (ver docs/arquitetura-
+-- financeiro.md §9.7). Nenhuma RPC existente cobria estas duas operações:
 --
 -- 1) "Conferência manual" de um lançamento (marcar/desmarcar
 --    conferido_manual + conciliacao_status=conciliado_manual, sem extrato

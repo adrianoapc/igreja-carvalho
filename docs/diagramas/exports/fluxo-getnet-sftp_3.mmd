@@ -1,30 +1,10 @@
-sequenceDiagram
-    autonumber
-    participant Tesoureiro
-    participant UI as Integracoes.tsx
-    participant Fn as getnet-sftp (Edge Fn)
-    participant SFTP as SFTP Getnet
-    participant DB as Supabase DB
+flowchart LR
+    Config{"config.espelho_tipo5_desde\nsetado E data_referencia\n>= corte?"}
+    T1[Tipo 1: RV com\nindicador_tipo_pagamento='LQ']
+    T5[Tipo 5: PG\ntipo_operacao='PG']
+    Extrato[(extratos_bancarios\norigem='getnet_sftp_txt'\nou 'getnet_sftp_tipo5')]
 
-    Tesoureiro->>UI: Clica em "Listar Arquivos SFTP"
-    UI->>Fn: action=list_files, integracao_id
-    Fn->>SFTP: Conecta e lista diretório
-    SFTP-->>Fn: Lista de arquivos getnetextr_*
-    Fn-->>UI: [{ name, size, modified }]
-    UI->>Tesoureiro: Exibe GetnetListFilesDialog
-
-    Tesoureiro->>UI: Seleciona arquivo e clica Importar
-    UI->>Tesoureiro: Abre GetnetImportDialog (confirma data)
-    Tesoureiro->>UI: Confirma data de referência
-    UI->>Fn: action=import, data_referencia, arquivo_nome
-    Fn->>SFTP: Download do arquivo
-    SFTP-->>Fn: Conteúdo posicional (400 bytes/linha)
-    Fn->>Fn: Parser V10.1 processa cada linha
-    Fn->>DB: Upsert em getnet_arquivos (header/trailer)
-    Fn->>DB: Upsert em getnet_resumo (tipo 1)
-    Fn->>DB: Upsert em getnet_analitico (tipo 2)
-    Fn->>DB: Upsert em getnet_ajustes (tipo 3)
-    Fn->>DB: Upsert em getnet_financeiro_resumo (tipo 5)
-    Fn->>DB: Upsert em getnet_financeiro_detalhe (tipo 6)
-    Fn-->>UI: { success, total_recebido, total_inserido, total_ignorado }
-    UI->>Tesoureiro: Exibe resultado da importação
+    Config -->|não| T1
+    Config -->|sim| T5
+    T1 --> Extrato
+    T5 --> Extrato

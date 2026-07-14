@@ -1,10 +1,10 @@
 -- F7 (sub-frente 1/5): fecha a revogação de escrita direta do role
--- `authenticated` nas 2 tabelas que a migration 20260713140000 deixou de
+-- `authenticated` nas 2 tabelas que a migration 20260713141000 deixou de
 -- fora — transacoes_financeiras e extratos_bancarios. Naquela migration elas
 -- ficaram abertas porque a auditoria daquela rodada encontrou call-sites de
 -- escrita direta ainda vivos no frontend (fora de core/api/); esta migration
 -- só é segura porque esses call-sites foram migrados para RPCs `fin_*` nos
--- commits imediatamente anteriores (ver docs/arquitetura-financeiro.md §9.6):
+-- commits imediatamente anteriores (ver docs/arquitetura-financeiro.md §9.7):
 --
 --   TransacaoActionsMenu (handleToggleConferidoManual), TransacaoDetalheDrawer
 --   (handleSave), VincularTransacaoDialog (handleVincular),
@@ -36,7 +36,7 @@
 -- legada `desconciliar_transacao` (nome antigo, pré-fin_*) por
 -- `fin_desconciliar` — `desconciliar_transacao` fica sem nenhum call-site
 -- vivo a partir deste commit. Não é uma das RPCs nomeadas para DROP nesta
--- fatia (a de 20260713140000 tratou só as 3+1 do motor de conciliação
+-- fatia (a de 20260713141000 tratou só as 3+1 do motor de conciliação
 -- legado); fica para uma limpeza futura de código morto (frente 5/5).
 --
 -- SELECT não é tocado — RLS continua controlando leitura. As RPCs fin_* são

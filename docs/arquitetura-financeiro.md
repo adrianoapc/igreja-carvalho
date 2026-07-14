@@ -593,9 +593,9 @@ Cada fase é deployável isolada; legado convive com o novo.
 | **F2.5 Leitura agregada no servidor** ✅ | Migration `20260710130000`: `fin_resumo_periodo`, `fin_ofertas_periodo` (filtro estrutural `sessao_id`/categoria no lugar de `ilike descricao`), `fin_projecao_mensal`; `get_dre_anual(p_ano, p_regime)` caixa×competência com seletor no DRE; RelatorioCobertura consome `view_reconciliacao_cobertura`; Dashboard (comparativo) e Projeção nos agregados | Concluída (jul/2026); Insights e demais queries do Dashboard ficam para evolução |
 | **F3 Conciliação transacional** ✅ | Migration `20260711140000`: `fin_confirmar_conciliacao(p_vinculo)` (1:1/N:1/1:N inferidos por cardinalidade, numa transação) + `fin_desconciliar`. Frontend: `ConciliacaoInteligente`, `DividirExtratoDialog`, `useConciliacaoLote` e `DesconciliarDialog` via `core/api/conciliacao.api`. Ver §9.2 | Concluída (jul/2026). `ConciliacaoManual`/`DashboardConciliacao` (motor legado) e o bloqueio da reclassificação ficam para a F4 |
 | **F4 Motor único de score** ✅ | Migration `20260711150000`: `fin_gerar_candidatos_conciliacao` (score 0..1, 1:1 e 1:N, corte por igreja em `financeiro_config.conciliacao_score_minimo`). `ConciliacaoManual`/`DashboardConciliacao`/`ConciliacaoInteligente` migrados ao motor único + `fin_confirmar_conciliacao`; `reconciliar_transacoes`/`aplicar_conciliacao`/`gerar_candidatos_conciliacao` deprecadas (DROP na F7); `ModoABToggle` (código morto) removido; `reclass-transacoes` recusa transação conciliada. Ver §9.3 | Concluída (jul/2026) |
-| **F5 Pipeline de ingestão** (parcial) | Migration `20260712120000`: `fin_ingerir_extratos` (contrato ExtratoItem, valor ABS, dedupe por `(conta_id, external_id)` com id determinístico, job + auditoria) + `fin_desfazer_ingestao`; canal **manual** (OFX/CSV/XLSX) via `core/api/extratos.api`; edge `gerar-sugestoes-ml` migrada ao motor único F4. Ver §9.4 | Fatia 1 + adaptador `santander-api` (`20260712130000`, caminho service-role D-F5.2) concluídos; Getnet (F6 tipo-5) e PIX (novo) pendentes |
-| **F6 Getnet tipo 5** | Após decisão D5; novos períodos apenas; backfill opcional | Depende de F5 |
-| **F7 Endurecimento + UX conciliação** (parcial — sub-frente 1/5 ✅ COMPLETA) | (1) ✅ Revogar escrita direta do role `authenticated` — **completa: as 7 tabelas do domínio revogadas**; (2) decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll); (3) Finanças no bottom-nav; (4) DRE mobile em cards; (5) limpeza de código morto | Migrations `20260713140000`/`20260713150000`/`20260713160000`. Ver §9.6. Sub-frentes (2)-(5) **continuam pendentes** — não tratadas nesta fatia |
+| **F5 Pipeline de ingestão** ✅ | Migration `20260712120000`: `fin_ingerir_extratos` (contrato ExtratoItem, valor ABS, dedupe por `(conta_id, external_id)` com id determinístico, job + auditoria) + `fin_desfazer_ingestao`; canal **manual** (OFX/CSV/XLSX) via `core/api/extratos.api`; edge `gerar-sugestoes-ml` migrada ao motor único F4. Caminho service-role de integração (`20260712130000`, D-F5.2) + adaptadores **santander-api**, **getnet-sftp** (2 pontos: settlement_v1 e extrato_eletronico_v10/LQ) e **PIX** (3 pontos: pix-webhook, buscar-pix-recebidos, santander-api/buscar_pix — resolve conta via `cob_pix.conta_id`/`contas.cnpj_banco`, novo helper `ingerirExtratoPix`). Ver §9.4/§9.5 | Concluída (jul/2026); Getnet tipo-1→tipo-5 fica para a F6 (D5), sem relação com a porta de ingestão |
+| **F6 Getnet tipo 5** ✅ | Espelho em `extratos_bancarios` passa a nascer do tipo 5 (`getnet_financeiro_resumo`, `tipo_operacao='PG'`) em vez do tipo 1 (LQ) — opt-in por integração via `config.espelho_tipo5_desde`; tipo 1 vira puramente analítico. Ver §9.6 | Concluída (jul/2026); sem backfill (opcional, não feito nesta fase) |
+| **F7 Endurecimento + UX conciliação** (parcial — sub-frente 1/5 ✅ COMPLETA) | (1) ✅ Revogar escrita direta do role `authenticated` — **completa: as 7 tabelas do domínio revogadas**; (2) decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll); (3) Finanças no bottom-nav; (4) DRE mobile em cards; (5) limpeza de código morto | Migrations `20260713141000`/`20260713150000`/`20260713160000`. Ver §9.7. Sub-frentes (2)-(5) **continuam pendentes** — não tratadas nesta fatia |
 
 ---
 
@@ -849,16 +849,186 @@ efetivamente aplicado) — T14 prova que um `admin_igreja` de outra igreja lê
 zero jobs desta igreja (vazamento fechado); T14b é o controle positivo (admin
 legítimo continua enxergando).
 
-### 9.6 Notas de implementação F7 — revogação de escrita direta (jul/2026)
+### 9.5 Notas de implementação F5 — Getnet e PIX (jul/2026, fecha a F5)
 
-Três migrations (`20260713140000`, `20260713150000`, `20260713160000`, todas
+Sem migration nova — `fin_ingerir_extratos` já cobre `canal='integracao'` sem
+ator (D-F5.2) e já tem `getnet_sftp`/`getnet_sftp_txt`/`pix` na allow-list de
+`origem` desde a fatia 1/2.
+
+**`getnet-sftp`**: porta mecânica dos dois pontos que escreviam direto em
+`extratos_bancarios` — `runSettlementV1` (layout CSV legado, upsert único por
+arquivo) e `runExtratoEletronicoV10` (espelha RVs liquidados/LQ do Extrato
+Eletrônico v10, um upsert por arquivo dentro do loop multi-arquivo de
+`sync`/`import_extrato`). `conta_id` continua vindo de
+`integracoes_financeiras.config.sftp.conta_id` (estático por integração, sem
+mudança). Client já é service-role em toda a function (`supabaseAdmin`),
+então `canal='integracao'` se aplica sem condicional. Comportamento e contrato
+de dedupe idênticos ao anterior (`ON CONFLICT (conta_id, external_id)`); só a
+persistência passou do upsert direto para a RPC.
+
+**PIX — funcionalidade nova, não um port**: nenhuma tabela PIX tinha
+`conta_id` resolvível (`pix_webhook_temp` só carrega `igreja_id`;
+`pix_recebimentos`, que tem o FK para `contas`, está órfã/sem nenhum
+call-site). A primeira versão tentou reaproveitar o mecanismo do Getnet
+(`integracoes_financeiras.config.conta_id`) — **descoberto incorreto por
+review**: esse campo **nunca é gravado** para Santander, porque
+`IntegracoesCriarDialog.tsx` só monta `config` quando `tipo_auth === 'sftp'`,
+e Santander é sempre forçado a `tipo_auth = 'token'` (mTLS). O caminho
+`config.conta_id` está morto para PIX/Santander — só existe de fato para o
+modo SFTP do Getnet. Corrigido para reaproveitar o mecanismo **real** já usado
+em produção para achar "a conta do Santander": `contas.cnpj_banco` casando com
+o CNPJ do banco (mesma lógica de `Contas.tsx`, botão "Testar") — em vez de
+inventar uma tabela nova ou uma heurística de texto (`formas_pagamento.nome` é
+livre, sem slug — `ilike '%pix%'` repetiria o anti-padrão já criticado em §5.3
+para `DashboardOfertas`).
+
+- Novo helper `ingerirExtratoPix` (`_shared/financeiro-core.ts`): resolve a
+  conta na ordem de precisão que o chamador já tem disponível — **(1)**
+  `conta_id` explícito (`cob_pix.conta_id` de uma cobrança vinculada por
+  `txid` — um PIX de cobrança pode ter conta diferente da conta Santander
+  default); **(2)** fallback: conta(s) ativas (`ativo=true`) da igreja com
+  `cnpj_banco` do Santander. Quando a filial é conhecida (`integracao_id`
+  informado, ex.: polling), a conta específica dessa filial tem prioridade
+  sobre a de nível-igreja — mesmo padrão filial > igreja de
+  `financeiro_config.conciliacao_score_minimo` na F4 — sem nunca usar a conta
+  de OUTRA filial. **Quando a filial é desconhecida** (ex.: `pix-webhook`, que
+  só resolve `igreja_id` via CNPJ e nunca sabe `integracao_id`), considera
+  **todas** as contas Santander ativas da igreja, de qualquer filial ou
+  nível-igreja — restringir a filial_id NULL neste caso descartaria
+  silenciosamente a única conta Santander da igreja sempre que ela estiver
+  escopada a uma filial (comum: a UI cria contas por filial fora de "Todas as
+  Filiais"). Em qualquer nível, se a conta não puder ser resolvida (nenhuma ou
+  mais de uma), **não ingere e não lança** — o registro do PIX em
+  `pix_webhook_temp`/`cob_pix` continua funcionando exatamente como antes, só
+  o espelho em `extratos_bancarios` fica pendente. Zero regressão no fluxo
+  atual. **Validado por teste automatizado real**
+  (`financeiro-core.test.ts`, `deno test`) — essa lógica já teve 3 rodadas de
+  bug de precisão em review; os 9 casos (incl. o exato cenário do 3º bug)
+  travam o comportamento em vez de depender de releitura manual a cada
+  rodada.
+- Ligado nos **3 pontos** que hoje escrevem em `pix_webhook_temp` (webhook
+  push, polling `buscar-pix-recebidos`, polling `buscar_pix` dentro de
+  `santander-api` usado pelo cron `buscar-pix-cron`) — os três precisavam ser
+  cobertos, senão PIX recebido via webhook apareceria na conciliação e PIX
+  recebido via polling (fallback documentado no ADR-028 para quando o webhook
+  falha) não apareceria, uma inconsistência dependente do caminho de entrega.
+- **Retentativa em duplicata (polling)**: se o `pix-webhook` chega primeiro
+  numa igreja com integração por filial, ele não resolve a conta (ambígua
+  entre filiais, sem `integracao_id`) e o PIX fica sem espelho. O polling que
+  roda depois (`buscar-pix-recebidos`/`santander-api buscar_pix`) via de regra
+  trata esse PIX como duplicata em `pix_webhook_temp` e pulava a tentativa —
+  mas é justamente esse polling que **sabe** o `integracao_id`. Os dois
+  caminhos de polling agora tentam `ingerirExtratoPix` também no ramo de
+  duplicata (a busca de `cob_pix` foi movida para antes da checagem de
+  duplicata).
+- **Sem spam de job/auditoria em duplicata**: a retentativa acima chamaria
+  `fin_ingerir_extratos` de novo a cada polling para o MESMO PIX antigo já
+  espelhado — e a RPC cria 1 `fin_extrato_ingestao_jobs` + 1 `fin_audit_log`
+  por chamada **antes** do dedupe por item (`ON CONFLICT DO NOTHING`), então
+  isso acumularia um job/audit por PIX antigo a cada execução do cron.
+  `ingerirExtratoPix` agora checa `extratos_bancarios` por
+  `(conta_id, external_id)` **antes** de chamar a RPC — se já espelhado,
+  retorna sem chamar nada.
+- **Pré-requisito operacional**: para o espelho funcionar, a conta bancária do
+  Santander precisa ter `cnpj_banco` preenchido (`90400888000142`) — mesmo
+  campo que a tela de Contas já exige para habilitar o botão "Testar".
+- **Validação**: `deno check` real (não só o app tsc) em todos os arquivos
+  tocados nas 3 rodadas de review — limpo em todos após as correções; achou e
+  corrigiu 2 bugs reais de tipo (narrowing `string | null` perdido entre
+  `.filter()`/`.map()` no getnet; `todas.filter()` sem tipo inferível na
+  resolução de conta do PIX).
+
+### 9.6 Notas de implementação F6 — Getnet tipo 5 (jul/2026)
+
+Sem migration nova — `origem='getnet_sftp_tipo5'` já estava na allow-list de
+`fin_ingerir_extratos` desde a F5, e `config` de `integracoes_financeiras` é
+JSONB livre.
+
+- **Regra de negócio**: lida diretamente no Manual Técnico da Getnet
+  (`docs/Manual Extrato Eletronico_V10.1_V6.2024.pdf`, Regra Geral #10,
+  pg. 56) — "No Registro Tipo 5 onde houver no tipo de operação 'PG', o valor
+  informado no campo valor líquido da operação refere-se a somatória de
+  valores livres creditado na conta do estabelecimento." Ou seja: só
+  `tipo_operacao === 'PG'` (Pagamento de Agenda Livre) é dinheiro NOVO
+  batendo na conta; os demais tipos (CS/CF/AC/CL/GL/GF/AL) são liquidação
+  contábil de dinheiro já adiantado numa data anterior (contratos de
+  cessão/antecipação/gravame). Confirmado por exemplo numérico do próprio
+  manual (pg. 44-45): tipo 1 LQ do dia soma 2000-900-500=600; tipo 5 do
+  mesmo dia mostra CL 900 + AL 500 + PG 600, onde só o PG bate com o líquido
+  real do dia. Mirar em PG é estritamente mais preciso que o LQ anterior, que
+  misturava dinheiro real com ajustes contratuais.
+- **Dedupe (2 rodadas de fix P2, review PR #52)**: o manual (pg. 38) afirma
+  que "Para Tipo de operação PG, não há Número da Operação" —
+  `numero_operacao` pode vir vazio para PG. A 1ª versão usava
+  `arquivoNome:linhaNum` como chave — **rodada 1**: isso amarra o dedupe ao
+  nome do arquivo de transporte; se a Getnet reenviar/reprocessar o mesmo
+  dia sob outro nome, `getnet_arquivos` (chave `arquivo_nome`) trata como
+  arquivo novo e o crédito passa batido pelo
+  `ON CONFLICT (conta_id, external_id)`. Trocado por `integracaoId` +
+  campos de conteúdo — mas **rodada 2**: `integracao_id` também é frágil
+  (excluir/recriar a integração SFTP para a MESMA conta bancária muda
+  `integracao.id` sem mudar `conta_id`, que é o que o dedupe realmente
+  escopa). Versão final usa **só** campos de conteúdo/provedor da linha —
+  `getnet_fin5:${data}:${codigoArranjo}:${chaveUr}:${valor}` — com fallback
+  de `chaveUr` para `numeroOperacao` se vier vazia. `chave_ur` é preenchida
+  para PG (o manual só confirma que `numero_operacao` não é) e já é ela
+  mesma um composto determinístico (Regra Geral #11: data de liquidação +
+  código de arranjo + CNPJ/CPF) — mesmo padrão do path tipo 1 legado
+  (`getnet_rv:${rv}:${dataRv}:LQ`), que nunca dependeu de arquivo nem de
+  integração. Função pura `selecionarEspelhoTipo5` em
+  `getnetExtratoParser.ts`, testada em `getnetExtratoParser.test.ts` (mesmo
+  padrão do `resolverContaPix` da F5), incluindo os dois cenários de
+  reenvio (nome de arquivo diferente, integração recriada).
+- **Opt-in por integração**: chave `espelho_tipo5_desde` (data) no nível raiz
+  de `integracoes_financeiras.config` (irmã de `sftp`, não aninhada nele —
+  sobrevive ao merge raso da edge `integracoes-config`). Sem essa data, a
+  integração mantém o tipo 1 (LQ) — zero regressão. Com a data setada,
+  arquivos com `data_referencia >= espelho_tipo5_desde` passam a espelhar do
+  tipo 5 (PG); arquivos anteriores ao corte continuam no tipo 1. Campo de UI
+  em `IntegracoesCriarDialog.tsx`, visível só quando o layout SFTP é
+  `extrato_eletronico_v10` (o `settlement_v1` legado não emite registro
+  tipo 5). Sem backfill nesta fase (roadmap já previa como opcional).
+- `getnet_resumo`/`getnet_analitico`/`getnet_ajustes`/`getnet_financeiro_resumo`/
+  `getnet_financeiro_detalhe` (tabelas cruas) continuam sendo gravadas
+  exatamente como antes — só a FONTE do espelho em `extratos_bancarios` muda;
+  tipo 1 vira puramente analítico/drill-down, como já prescrito pela D5.
+- **Origem do espelho trava por arquivo (fix P1, review PR #52)**: como a
+  decisão tipo1×tipo5 compara `data_referencia` do arquivo contra
+  `espelho_tipo5_desde`, um arquivo já importado (espelho tipo 1,
+  `external_id` `getnet_rv:...`) reprocessado manualmente (`import_extrato`
+  com `arquivo_nome`) DEPOIS de o operador setar/mudar um corte retroativo
+  passaria a gerar `external_id` `getnet_fin5:...` — o dedupe
+  `(conta_id, external_id)` não reconhece os dois como o mesmo crédito e
+  duplicaria o valor. Migration `20260713140000` adiciona
+  `getnet_arquivos.espelho_origem` (nullable); a origem usada na 1ª
+  importação de um arquivo trava para sempre nos reprocessamentos seguintes,
+  ignorando a config atual. `NULL` (arquivo importado antes desta coluna
+  existir, ou seja, antes da F6) conta como tipo 1. Função pura
+  `resolverUsoTipo5` em `getnetExtratoParser.ts` (3 estados: nunca
+  importado → decide pela config; travado em tipo1 [incl. `NULL` legado];
+  travado em tipo5).
+- **Validação**: `deno check` + `deno test` em `getnetExtratoParser.ts`/
+  `index.ts` (14 casos: 9 de `selecionarEspelhoTipo5` — PG sem
+  numero_operacao, duas linhas PG com chave/valor distintos, todas as
+  operações não-PG filtradas fora, reimportação gera external_id idêntico,
+  **mesmo PG sob nome de arquivo diferente gera external_id idêntico (fix
+  P2 rodada 1)**, **assinatura não aceita integracao_id (fix P2 rodada 2)**,
+  fallback de `chaveUr` para `numeroOperacao`, fallback de data, linha sem
+  nenhuma data descartada — + 5 de `resolverUsoTipo5`, incluindo o cenário
+  exato do P1: arquivo legado com `espelho_origem NULL` trava em tipo 1
+  mesmo com corte retroativo cobrindo a data). `npx tsc` mantém os 62
+  erros pré-existentes catalogados desde a F5, zero novos.
+
+### 9.7 Notas de implementação F7 — revogação de escrita direta (jul/2026)
+
+Três migrations (`20260713141000`, `20260713150000`, `20260713160000`, todas
 jul/2026, mesma leva de trabalho). Fecham **só a sub-frente (1)** do roadmap F7
 ("revogar escrita direta do role `authenticated`") — **agora completa: as 7
 tabelas do domínio revogadas** — as outras 4 (decompor telas de conciliação,
 bottom-nav, DRE mobile, limpeza de código morto genérica) permanecem pendentes
 e não foram tocadas nesta fatia.
 
-A sub-frente foi entregue em duas rodadas: a 1ª (`20260713140000`) revogou as 5
+A sub-frente foi entregue em duas rodadas: a 1ª (`20260713141000`) revogou as 5
 tabelas já 100% migradas e tratou as RPCs legadas; a auditoria daquela rodada
 encontrou call-sites de escrita direta ainda vivos em
 `transacoes_financeiras`/`extratos_bancarios` e deixou as duas de fora do
@@ -1054,13 +1224,15 @@ Todos os cenários das duas rodadas (17 no total) batidos. Typecheck: 0 erros
 novos (baseline 62) — confirmado a cada commit incremental (migração feita
 call-site por call-site, não num único commit monolítico).
 
+## 10. Decisões em aberto (bater o martelo)
+
 | # | Decisão | Recomendação |
 |---|---|---|
 | D1 | Camada canônica no banco (ADR-029) | Aprovar — pré-requisito de tudo |
 | D2 | Padrão `features/` no frontend | Financeiro inaugura; demais domínios depois |
 | D3 | Modelo de vínculo de conciliação | (a) manter 3 estruturas via RPC agora; (b) modelo único N:M `conciliacoes`+`conciliacao_itens` como evolução. FK física em `transacao_vinculada_id` após saneamento |
 | D4 | Imutabilidade | Editar/excluir lançamento conciliado? Parcela do meio? A RPC precisa de resposta |
-| D5 | Getnet tipo 1 vs tipo 5 | Tipo 5 como verdade do espelho, só novos períodos |
+| D5 | Getnet tipo 1 vs tipo 5 | Tipo 5 como verdade do espelho, só novos períodos — ✅ implementado na F6 (opt-in via `config.espelho_tipo5_desde`) |
 | D6 | Recorrência/parcelamento | Materializar tudo na criação (parcelado); job mensal (recorrente) |
 | D7 | Efeitos colaterais (alertas) | Fila no banco lida por edge — bot e front geram os mesmos alertas |
 | D8 | Status ENUM vs TEXT+CHECK | Padronizar na F1 (barato agora, caro depois) — inclui sanear os status de `sessoes_contagem` (CHECK × `finalizado` × StatusBadge) |

@@ -1640,6 +1640,30 @@ O tipo 1 pode aparecer duas vezes para o mesmo RV:
 
 O campo `indicador_tipo_pagamento` faz parte da chave única `(integracao_id, rv, data_rv, indicador_tipo_pagamento)`, permitindo armazenar PF e LQ como linhas distintas e suportando reimportações idempotentes.
 
+### Espelho em `extratos_bancarios`: tipo 1 (LQ) vs tipo 5 (PG) {#getnet-espelho-tipo5}
+
+Além de gravar nas tabelas cruas acima, o sync espelha o valor efetivamente
+movimentado em `extratos_bancarios` (usado pela conciliação). Duas fontes
+possíveis para esse espelho, configuráveis por integração:
+
+- **Tipo 1 / LQ** (comportamento padrão, sem configuração adicional): usa os
+  registros do tipo 1 com `indicador_tipo_pagamento = 'LQ'`.
+- **Tipo 5 / PG** (opt-in): usa só as linhas do tipo 5
+  (`getnet_financeiro_resumo`) com `tipo_operacao = 'PG'` (Pagamento de
+  Agenda Livre) — o único tipo de operação que representa dinheiro
+  efetivamente creditado na conta naquele dia (os demais tipos — CS, CF, AC,
+  CL, GL, GF, AL — são liquidação contábil de valores já adiantados em uma
+  data anterior). É a fonte mais precisa, pois isola o dinheiro real dos
+  ajustes contratuais que aparecem misturados no tipo 1.
+
+Para ativar o tipo 5 numa integração, preencha o campo **"Espelhar extrato a
+partir do tipo 5 (dinheiro real) desde"** no diálogo de edição da integração
+(visível só quando o layout é "Extrato Eletrônico v10.1"). A partir da data
+escolhida, arquivos processados usam o tipo 5; arquivos anteriores continuam
+usando o tipo 1 — não há reprocessamento automático do histórico já
+importado. Sem essa data preenchida, a integração continua no comportamento
+padrão (tipo 1).
+
 ### Componentes de UI
 
 - **`GetnetListFilesDialog`**: Lista os arquivos disponíveis no servidor SFTP, exibindo nome, tamanho e data de modificação. Detecta a data de referência a partir do nome do arquivo.
@@ -1692,8 +1716,13 @@ Parser posicional sem dependências externas. Destaques:
 - `src/components/financas/GetnetImportDialog.tsx` (novo)
 - `src/components/financas/GetnetListFilesDialog.tsx` (novo)
 - `src/pages/financas/Integracoes.tsx` (botões de listagem e importação)
-- `supabase/functions/getnet-sftp/getnetExtratoParser.ts` (novo)
-- `supabase/functions/getnet-sftp/index.ts` (expandido)
+- `supabase/functions/getnet-sftp/getnetExtratoParser.ts` (novo; F6: função
+  `selecionarEspelhoTipo5`)
+- `supabase/functions/getnet-sftp/getnetExtratoParser.test.ts` (novo, F6)
+- `supabase/functions/getnet-sftp/index.ts` (expandido; F6: branch tipo1/tipo5
+  do espelho em `extratos_bancarios`)
+- `src/components/financas/IntegracoesCriarDialog.tsx` (F6: campo
+  `espelho_tipo5_desde`)
 - `supabase/migrations/20260617000001_getnet_schema_expand.sql` (novo)
 - `src/App.tsx` (rota `/financas/integracoes`)
 

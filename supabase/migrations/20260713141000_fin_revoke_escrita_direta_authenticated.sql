@@ -7,7 +7,7 @@
 -- `authenticated` nunca tinha sido revogado — a regra valia só por convenção
 -- de código, não por enforcement do banco.
 --
--- Auditoria (jul/2026, ver docs/arquitetura-financeiro.md §9.6) encontrou 7
+-- Auditoria (jul/2026, ver docs/arquitetura-financeiro.md §9.7) encontrou 7
 -- tabelas do domínio: `transacoes_financeiras`, `transferencias_contas`,
 -- `extratos_bancarios`, `conciliacoes_lote`, `conciliacoes_lote_extratos`,
 -- `conciliacoes_divisao`, `conciliacoes_divisao_transacoes`. Resultado:
@@ -31,7 +31,7 @@
 --     produção — NÃO revogado nesta migration. Fica para a próxima fatia da F7
 --     (decomposição das telas de conciliação) migrar esses call-sites para
 --     RPCs fin_* antes de fechar o REVOKE nessas duas tabelas. Detalhe completo
---     em docs/arquitetura-financeiro.md §9.6.
+--     em docs/arquitetura-financeiro.md §9.7.
 --
 -- Todas as RPCs `fin_*` de escrita são SECURITY DEFINER, de propriedade do
 -- role que roda as migrations (mesmo dono de todas as demais funções do

@@ -23,7 +23,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import nacl from "npm:tweetnacl@1.0.3";
 import SftpClient from "npm:ssh2-sftp-client@10.0.3";
 import Papa from "npm:papaparse@5.4.1";
-import { parseExtrato } from "./getnetExtratoParser.ts";
+import { parseExtrato, selecionarEspelhoTipo5, resolverUsoTipo5 } from "./getnetExtratoParser.ts";
+import { ingerirExtratos, type ExtratoItemInput } from "../_shared/financeiro-core.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -711,33 +712,33 @@ async function runSettlementV1(args: {
     let inserted = 0;
     let ignored = 0;
     if (parsed.length > 0) {
-      const inserts = parsed.map((p) => ({
-        conta_id: contaId,
-        igreja_id: integracao.igreja_id,
-        filial_id: integracao.filial_id ?? null,
+      const itens: ExtratoItemInput[] = parsed.map((p) => ({
         data_transacao: p.data_transacao,
-        descricao: p.descricao,
         valor: p.valor,
-        numero_documento: p.numero_documento,
         tipo: p.tipo,
+        descricao: p.descricao,
+        numero_documento: p.numero_documento,
         external_id: p.external_id,
-        origem: "getnet_sftp",
-        reconciliado: false,
       }));
-      const { data: up, error: upErr } = await supabaseAdmin
-        .from("extratos_bancarios")
-        .upsert(inserts, { onConflict: "conta_id,external_id", ignoreDuplicates: true })
-        .select("id");
-      if (upErr) {
+      try {
+        // Porta única de ingestão (F5): canal 'integracao' sem ator humano
+        // (D-F5.2) — condizente com o client service-role usado em toda a function.
+        const res = await ingerirExtratos(supabaseAdmin, contaId, "getnet_sftp", itens, {
+          igreja_id: integracao.igreja_id,
+          filial_id: integracao.filial_id ?? null,
+          canal: "integracao",
+        });
+        inserted = Number(res.inseridos ?? 0);
+        ignored = Number(res.duplicados ?? 0);
+      } catch (upErr) {
+        const message = upErr instanceof Error ? upErr.message : String(upErr);
         await finishLog(supabaseAdmin, logId, startedAt, {
           status: "error",
           arquivo_nome: target.name,
-          erro_mensagem: `Erro ao inserir extratos: ${upErr.message}`,
+          erro_mensagem: `Erro ao inserir extratos: ${message}`,
         });
-        return json(200, { success: false, error: upErr.message });
+        return json(200, { success: false, error: message });
       }
-      inserted = up?.length ?? 0;
-      ignored = parsed.length - inserted;
     }
 
     await finishLog(supabaseAdmin, logId, startedAt, {
@@ -790,6 +791,18 @@ async function runExtratoEletronicoV10(args: {
     username, password, filePatternRegex, contaId, integracao,
     dataReferencia, requestedFile,
   } = args;
+
+  // F6/D5: espelho em extratos_bancarios nasce do tipo 5 (PG, dinheiro real)
+  // em vez do tipo 1 (LQ) para arquivos com data_referencia >= corte
+  // configurado por integração. Opt-in: sem `espelho_tipo5_desde`, mantém o
+  // comportamento legado (tipo 1). Fica no nível raiz de `config` (não em
+  // `config.sftp`) para sobreviver ao merge raso da edge integracoes-config.
+  const cfgIntegracao = (integracao.config ?? {}) as Record<string, unknown>;
+  const espelhoTipo5Desde =
+    typeof cfgIntegracao.espelho_tipo5_desde === "string" && cfgIntegracao.espelho_tipo5_desde
+      ? cfgIntegracao.espelho_tipo5_desde
+      : null;
+  const usarTipo5 = espelhoTipo5Desde !== null && dataReferencia >= espelhoTipo5Desde;
 
   // regex default: getnetextr_YYYYMMDD_XXXXXXXX_c101.txt
   const defaultRegex = "^getnetextr_(\\d{4})(\\d{2})(\\d{2})_.+\\.txt$";
@@ -1112,30 +1125,62 @@ async function runExtratoEletronicoV10(args: {
         if (finDetRes.error) throw new Error(`getnet_financeiro_detalhe: ${finDetRes.error}`);
       }
 
-      // ── Espelha RVs liquidados (LQ) em extratos_bancarios ──────────────
+      // ── Espelha em extratos_bancarios ───────────────────────────────────
+      // Porta única de ingestão (F5): canal 'integracao' sem ator humano (D-F5.2).
+      // F6/D5: fonte do espelho é tipo 5 (PG, dinheiro real) para arquivos
+      // pós-corte (`usarTipo5`); tipo 1 (RV liquidado/LQ) permanece o
+      // comportamento legado para integrações sem `espelho_tipo5_desde`.
+      //
+      // P1 (review PR #52): a origem escolhida na 1a importação de um
+      // arquivo TRAVA — reprocessar o mesmo arquivo depois de mudar/setar
+      // `espelho_tipo5_desde` retroativamente não pode trocar de origem, ou
+      // o external_id muda (getnet_rv:... -> getnet_fin5:...) e o dedupe
+      // (conta_id, external_id) não vê os dois como o mesmo crédito,
+      // duplicando o valor em extratos_bancarios. NULL (arquivo importado
+      // antes desta coluna existir) conta como tipo 1, já que a origem tipo5
+      // não existia antes da F6.
+      const { data: arquivoJaProcessado } = await supabaseAdmin
+        .from("getnet_arquivos")
+        .select("espelho_origem")
+        .eq("integracao_id", integracao.id)
+        .eq("arquivo_nome", arq.nome)
+        .maybeSingle();
+      const usarTipo5ParaEsteArquivo = resolverUsoTipo5(arquivoJaProcessado, usarTipo5);
+
       let extratosInseridos = 0;
       let extratosIgnorados = 0;
-      const resumosLQ = resumos.filter((r) => r.indicadorTipoPagamento === "LQ" && r.dataRv);
-      if (resumosLQ.length > 0) {
-        const extratosRows = resumosLQ.map((r) => ({
-          conta_id: contaId,
-          igreja_id: integracao.igreja_id,
-          filial_id: integracao.filial_id ?? null,
-          data_transacao: r.dataPagamentoRv || r.dataRv,
-          descricao: `Getnet RV ${r.rv}`,
-          valor: r.sinal === "-" ? -Math.abs(r.valorLiquido) : r.valorLiquido,
-          numero_documento: r.rv,
-          tipo: r.sinal === "-" ? "debito" : "credito",
-          external_id: `getnet_rv:${r.rv}:${r.dataRv}:LQ`,
-          origem: "getnet_sftp_txt",
-          reconciliado: false,
-        }));
-        const exRes = await upsertChunks(
-          supabaseAdmin, "extratos_bancarios", extratosRows, "conta_id,external_id"
-        );
-        if (exRes.error) throw new Error(`extratos_bancarios: ${exRes.error}`);
-        extratosInseridos = exRes.inserted;
-        extratosIgnorados = exRes.ignored;
+      const itensExtrato: ExtratoItemInput[] = usarTipo5ParaEsteArquivo
+        ? selecionarEspelhoTipo5(financeirosResumo)
+        : resumos
+            .filter((r) => r.indicadorTipoPagamento === "LQ" && r.dataRv)
+            .map((r) => ({
+              // r.dataRv truthy é garantido pelo filter acima; o TS não
+              // propaga essa narrowing através do .map() seguinte.
+              data_transacao: (r.dataPagamentoRv || r.dataRv) as string,
+              valor: r.sinal === "-" ? -Math.abs(r.valorLiquido) : r.valorLiquido,
+              tipo: r.sinal === "-" ? "debito" : "credito",
+              descricao: `Getnet RV ${r.rv}`,
+              numero_documento: r.rv,
+              external_id: `getnet_rv:${r.rv}:${r.dataRv}:LQ`,
+            }));
+      if (itensExtrato.length > 0) {
+        try {
+          const exRes = await ingerirExtratos(
+            supabaseAdmin,
+            contaId,
+            usarTipo5ParaEsteArquivo ? "getnet_sftp_tipo5" : "getnet_sftp_txt",
+            itensExtrato,
+            {
+              igreja_id: integracao.igreja_id,
+              filial_id: integracao.filial_id ?? null,
+              canal: "integracao",
+            },
+          );
+          extratosInseridos = Number(exRes.inseridos ?? 0);
+          extratosIgnorados = Number(exRes.duplicados ?? 0);
+        } catch (err) {
+          throw new Error(`extratos_bancarios: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
 
       // ── getnet_arquivos (controle por arquivo) — written only after all upserts succeed
@@ -1155,6 +1200,7 @@ async function runExtratoEletronicoV10(args: {
           erros_validacao: validacao.erros.length > 0 ? validacao.erros : null,
           codigo_estabelecimento: parsed.header?.codigoEstabelecimento ?? null,
           cnpj_adquirente: parsed.header?.cnpjAdquirente ?? null,
+          espelho_origem: usarTipo5ParaEsteArquivo ? "getnet_sftp_tipo5" : "getnet_sftp_txt",
         }, { onConflict: "integracao_id,arquivo_nome" });
 
       const totalLinhas = validacao.qtdRegistrosLidos;
