@@ -595,7 +595,7 @@ Cada fase é deployável isolada; legado convive com o novo.
 | **F4 Motor único de score** ✅ | Migration `20260711150000`: `fin_gerar_candidatos_conciliacao` (score 0..1, 1:1 e 1:N, corte por igreja em `financeiro_config.conciliacao_score_minimo`). `ConciliacaoManual`/`DashboardConciliacao`/`ConciliacaoInteligente` migrados ao motor único + `fin_confirmar_conciliacao`; `reconciliar_transacoes`/`aplicar_conciliacao`/`gerar_candidatos_conciliacao` deprecadas (DROP na F7); `ModoABToggle` (código morto) removido; `reclass-transacoes` recusa transação conciliada. Ver §9.3 | Concluída (jul/2026) |
 | **F5 Pipeline de ingestão** ✅ | Migration `20260712120000`: `fin_ingerir_extratos` (contrato ExtratoItem, valor ABS, dedupe por `(conta_id, external_id)` com id determinístico, job + auditoria) + `fin_desfazer_ingestao`; canal **manual** (OFX/CSV/XLSX) via `core/api/extratos.api`; edge `gerar-sugestoes-ml` migrada ao motor único F4. Caminho service-role de integração (`20260712130000`, D-F5.2) + adaptadores **santander-api**, **getnet-sftp** (2 pontos: settlement_v1 e extrato_eletronico_v10/LQ) e **PIX** (3 pontos: pix-webhook, buscar-pix-recebidos, santander-api/buscar_pix — resolve conta via `cob_pix.conta_id`/`contas.cnpj_banco`, novo helper `ingerirExtratoPix`). Ver §9.4/§9.5 | Concluída (jul/2026); Getnet tipo-1→tipo-5 fica para a F6 (D5), sem relação com a porta de ingestão |
 | **F6 Getnet tipo 5** ✅ | Espelho em `extratos_bancarios` passa a nascer do tipo 5 (`getnet_financeiro_resumo`, `tipo_operacao='PG'`) em vez do tipo 1 (LQ) — opt-in por integração via `config.espelho_tipo5_desde`; tipo 1 vira puramente analítico. Ver §9.6 | Concluída (jul/2026); sem backfill (opcional, não feito nesta fase) |
-| **F7 Endurecimento + UX conciliação** (parcial — sub-frente 1/5 ✅ COMPLETA, 2/5 ✅ quase completa) | (1) ✅ Revogar escrita direta do role `authenticated` — **completa: as 7 tabelas do domínio revogadas**; (2) ✅ decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll) — `ConciliacaoInteligente` (crítico), `Reconciliacao`, `ConciliacaoManual` e `DashboardConciliacao` **decompostos**; `HistoricoExtratos` recebeu só **ajuste responsivo mínimo** (sem decomposição em subcomponentes — pendente); (3) Finanças no bottom-nav; (4) DRE mobile em cards; (5) limpeza de código morto | Migrations `20260713141000`/`20260713150000`/`20260713160000` (sub-frente 1). Ver §9.7/§9.8/§9.9. Sub-frentes (3)-(5) e a decomposição completa de `HistoricoExtratos` **continuam pendentes** |
+| **F7 Endurecimento + UX conciliação** ✅ (com 1 pendência menor documentada) | (1) ✅ Revogar escrita direta do role `authenticated` — completa: as 7 tabelas do domínio revogadas; (2) ✅ decompor telas gigantes de conciliação em `features/financeiro/conciliacao` já responsivas — `ConciliacaoInteligente` (crítico), `Reconciliacao`, `ConciliacaoManual` e `DashboardConciliacao` decompostos; `HistoricoExtratos` recebeu só ajuste responsivo mínimo (decomposição completa em subcomponentes fica pendente, prioridade baixa por decisão de escopo); (3) ✅ Finanças no bottom-nav (condicionado por permissão); (4) ✅ DRE mobile em cards (`features/financeiro/relatorios/`); (5) ✅ limpeza de código morto (14 arquivos removidos do módulo financeiro) | Migrations `20260713141000`/`20260713150000`/`20260713160000` (sub-frente 1). Ver §9.7-§9.10. Único item aberto: decomposição completa de `HistoricoExtratos.tsx` em subcomponentes (§9.9) |
 
 ---
 
@@ -1391,6 +1391,86 @@ decomposição estrutural).
 browser/screenshot disponível neste ambiente; validado só por revisão de
 código/classes Tailwind, não por inspeção visual real. Pendente conferência
 manual antes da PR.
+
+### 9.10 Notas de implementação F7 — frentes 3, 4 e 5 (bottom-nav, DRE mobile, código morto, jul/2026)
+
+Fecha as 3 frentes restantes do roadmap F7. Com isso, **as 5 frentes da F7
+estão endereçadas** — a única pendência remanescente é a decomposição
+completa de `HistoricoExtratos.tsx` em subcomponentes (§9.9), tratada com
+ajuste responsivo mínimo por decisão explícita de escopo (prioridade baixa).
+
+**Frente 5 — limpeza de código morto**: auditoria restrita ao módulo
+financeiro (`src/components/financas/`, `src/features/financeiro/`,
+`src/pages/financas/`) por arquivos sem nenhuma referência em `src/`
+(grep do nome de cada componente, excluindo a própria definição — a mesma
+técnica usada para confirmar código morto nas sub-frentes 1/5 e 2/5).
+**14 arquivos removidos** (4786 linhas): os 2 já documentados como órfãos
+na frente 1 (`ImportarExcelDialog.tsx`, `ImportarExcelWizard.tsx`,
+superados por `ImportarTab`/`ImportarFinancasPage`) e `SugestoesML.tsx`
+(único call-site de `aplicar_sugestao_conciliacao`, já `DROP`ada); mais 11
+achados nesta varredura — `FornecedorDialog`/`CentroCustoDialog`/
+`SubcategoriaDialog`/`FormaPagamentoDialog`/`BaseMinisterialDialog.tsx`
+(confirmado que `Fornecedores.tsx`/`CentrosCusto.tsx`/etc. implementam o
+próprio dialog inline via `ResponsiveDialog`, não usam mais os componentes
+extraídos), `ProcessarNotaFiscalDialog.tsx` (a funcionalidade de OCR
+continua viva, chamada direto da edge `processar-nota-fiscal` por
+`TransacaoDialog.tsx`/`Reembolsos.tsx` — só este componente específico
+ficou órfão), `SincronizacaoTransferenciasWidget.tsx` (nenhum caller
+restante da edge `sync-transferencias-conciliacao` — provavelmente
+superado pelo sincronismo automático de perna irmã já embutido em
+`fin_confirmar_conciliacao`/`fin_alternar_conferencia_manual`),
+`ExtratoSugestaoMLB.tsx` (variante "B" órfã — `ExtratoSugestaoMLA` é a
+usada; mesma família do `ModoABToggle` já removido na F4),
+`ReconciliacaoBancaria.tsx`/`TransacaoFiltros.tsx`/
+`TransacaoVinculadaDialog.tsx` (sem caller identificável). Confirmação
+adicional: typecheck sem nenhum erro "cannot find module" após a remoção.
+**Fora de escopo, só registro**: `supabase/functions/
+sync-transferencias-conciliacao` ficou sem nenhum caller frontend
+identificado após a remoção do widget — não é código do módulo financeiro
+frontend, não foi tocado (limpeza de edge functions é outra frente).
+
+**Frente 3 — Finanças no bottom-nav**: `MobileNavbar.tsx` ganha um item
+"Finanças" (ícone `DollarSign`, rota `/financas`) condicionado à mesma
+permissão que a `Sidebar` já usa para mostrar/esconder a seção
+("financeiro.view", via `checkPermission`) — segue o padrão condicional já
+existente no arquivo (Pessoas vira Perfil se `!hasPessoasAccess`) em vez de
+inventar um mecanismo novo. Quem não tem acesso ao financeiro continua
+vendo exatamente os 5 itens de sempre, tamanho inalterado — zero mudança
+visual. Quem tem acesso vê 6 ícones; para não apertar em telas estreitas
+(~360-375px), ícone/padding/label reduzem levemente só quando há mais de 5
+itens (`24px→22px`, `p-1.5→p-1`, `text-[10px]→text-[9px]`) — nenhum item
+existente foi removido ou reordenado, "Finanças" entra entre Pessoas/Perfil
+e Menu. Decisão sem alternativa avaliada (o roadmap deixava em aberto
+"bottom-nav OU atalho contextual"; a direção de seguir com bottom-nav
+condicional foi definida pelo usuário para não gastar mais uma rodada de
+pergunta) — fica documentada aqui para reverter fácil se o resultado visual
+não agradar.
+
+**Frente 4 — DRE mobile em cards**: `DRE.tsx` (522 l., tabela de 12 meses +
+total só com `overflow-x-auto`) decomposto e movido para
+`src/features/financeiro/relatorios/` (primeira ocupação dessa pasta,
+prevista em §7.3), seguindo o padrão "casca de rota" que a F2 já aplicou em
+Entradas/Saidas — `src/pages/financas/DRE.tsx` vira um wrapper de 6 linhas.
+`lib/dreCalculos.ts` isola as funções puras (`processarDados`,
+`calcularResultadoLiquido`, sem mudança de comportamento);
+`components/DreMonthGrid.tsx` é uma grade compacta 3×4 dos 12 meses (evita
+recriar o problema original — scroll horizontal — dentro do próprio card);
+`components/SecaoDreCard.tsx` reaproveita o mesmo estado `expandedSections`
+da tabela original (cabeçalho sempre visível com o total do ano, expande
+para o detalhe mensal + por categoria — mesmo dado, reorganizado em
+drill-down); `components/ResultadoLiquidoCard.tsx` fica sempre visível (não
+colapsável) e é posicionado no **topo** da lista mobile — no desktop
+permanece na última linha da tabela; a única reorganização deliberada é
+essa (mostrar o resultado líquido primeiro no card, já que é o número mais
+consultado), sem esconder nenhum dado. `useIsMobile` decide entre a tabela
+original (desktop/tablet, inalterada) e a lista de cards; exportação Excel
+(`handleExport`) não foi tocada.
+
+**Verificação visual**: mesma ressalva das rodadas anteriores — sem
+ferramenta de browser/screenshot disponível neste ambiente; as 3 frentes
+foram validadas só por revisão de código/classes Tailwind. Pendente
+conferência manual antes da PR, em especial o bottom-nav com 6 ícones
+(frente 3) e a densidade dos cards do DRE em telas pequenas (frente 4).
 
 ## 10. Decisões em aberto (bater o martelo)
 

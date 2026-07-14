@@ -532,3 +532,33 @@ flowchart TD
     DD -."score/100 → score 0..1\n(escala nativa da RPC)".-> AR
     MD -->|"score 0..1 já nativo"| AR
 ```
+
+## F7 — frentes 3, 4 e 5 (bottom-nav, DRE mobile, código morto, jul/2026)
+
+Fecha as 3 frentes restantes do roadmap F7 (ver §9.10 do
+`arquitetura-financeiro.md`). Único item aberto: decomposição completa de
+`HistoricoExtratos.tsx` (§9.9, tratado com ajuste responsivo mínimo).
+
+```mermaid
+flowchart TD
+    subgraph F5["Frente 5 — código morto"]
+        D1["14 arquivos removidos\n(src/components/financas/)"]
+    end
+
+    subgraph F3["Frente 3 — bottom-nav"]
+        NAV["MobileNavbar.tsx"]
+        PERM{"checkPermission\n('financeiro.view')\nmesma checagem da Sidebar"}
+        NAV --> PERM
+        PERM -->|não| NAV5["5 itens (inalterado)"]
+        PERM -->|sim| NAV6["6 itens\n(ícone/label levemente menores)"]
+    end
+
+    subgraph F4["Frente 4 — DRE mobile"]
+        DRE["DRE.tsx (casca de rota)"]
+        DREF["features/financeiro/relatorios/DRE.tsx"]
+        DRE --> DREF
+        DREF --> ISM{useIsMobile}
+        ISM -->|false| TABLE["Table original\n(12 meses + total)"]
+        ISM -->|true| CARDS["ResultadoLiquidoCard (topo, sempre visível)\n+ SecaoDreCard por seção\n(expande → DreMonthGrid 3×4 + categorias)"]
+    end
+```
