@@ -655,7 +655,7 @@ export function HistoricoExtratos() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
@@ -666,81 +666,87 @@ export function HistoricoExtratos() {
               />
             </div>
 
-            <Select
-              value={contaSelecionada}
-              onValueChange={setContaSelecionada}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Conta" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as contas</SelectItem>
-                {contas.map((conta) => (
-                  <SelectItem key={conta.id} value={conta.id}>
-                    {conta.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Selects de filtro: full-width empilhados em 2 colunas no
+                celular (larguras fixas em px eram inutilizáveis abaixo de
+                ~375px — várias linhas de "chips" apertados); a partir de
+                sm: voltam à largura fixa original em linha única com wrap. */}
+            <div className="grid grid-cols-2 gap-2 sm:contents">
+              <Select
+                value={contaSelecionada}
+                onValueChange={setContaSelecionada}
+              >
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as contas</SelectItem>
+                  {contas.map((conta) => (
+                    <SelectItem key={conta.id} value={conta.id}>
+                      {conta.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select value={statusFiltro} onValueChange={setStatusFiltro}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="pendente">Pendente</SelectItem>
-                <SelectItem value="conciliado">Conciliado</SelectItem>
-                <SelectItem value="ignorado">Ignorado</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={statusFiltro} onValueChange={setStatusFiltro}>
+                <SelectTrigger className="w-full sm:w-[150px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="conciliado">Conciliado</SelectItem>
+                  <SelectItem value="ignorado">Ignorado</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={tipoFiltro} onValueChange={setTipoFiltro}>
-              <SelectTrigger className="w-[130px]">
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="credito">Crédito</SelectItem>
-                <SelectItem value="debito">Débito</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={tipoFiltro} onValueChange={setTipoFiltro}>
+                <SelectTrigger className="w-full sm:w-[130px]">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="credito">Crédito</SelectItem>
+                  <SelectItem value="debito">Débito</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={origemFiltro} onValueChange={setOrigemFiltro}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Origem" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="api_santander">API Santander</SelectItem>
-                <SelectItem value="manual">Manual</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={origemFiltro} onValueChange={setOrigemFiltro}>
+                <SelectTrigger className="w-full sm:w-[150px]">
+                  <SelectValue placeholder="Origem" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="api_santander">API Santander</SelectItem>
+                  <SelectItem value="manual">Manual</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <MonthPicker
-              selectedMonth={selectedMonth}
-              onMonthChange={setSelectedMonth}
-              customRange={customRange}
-              onCustomRangeChange={setCustomRange}
-            />
+              <MonthPicker
+                selectedMonth={selectedMonth}
+                onMonthChange={setSelectedMonth}
+                customRange={customRange}
+                onCustomRangeChange={setCustomRange}
+              />
 
-            {/* Grouping selector */}
-            <Select
-              value={groupBy}
-              onValueChange={(v) => setGroupBy(v as GroupByOption)}
-            >
-              <SelectTrigger className="w-[160px]">
-                <Layers className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Agrupar por" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sem agrupamento</SelectItem>
-                <SelectItem value="status">Status</SelectItem>
-                <SelectItem value="tipo">Tipo</SelectItem>
-                <SelectItem value="origem">Origem</SelectItem>
-                <SelectItem value="conta">Conta</SelectItem>
-              </SelectContent>
-            </Select>
+              {/* Grouping selector */}
+              <Select
+                value={groupBy}
+                onValueChange={(v) => setGroupBy(v as GroupByOption)}
+              >
+                <SelectTrigger className="w-full sm:w-[160px]">
+                  <Layers className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Agrupar por" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem agrupamento</SelectItem>
+                  <SelectItem value="status">Status</SelectItem>
+                  <SelectItem value="tipo">Tipo</SelectItem>
+                  <SelectItem value="origem">Origem</SelectItem>
+                  <SelectItem value="conta">Conta</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* List */}
@@ -785,7 +791,7 @@ export function HistoricoExtratos() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4 border-t">
+            <div className="flex flex-col gap-2 pt-4 border-t sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground">
                 Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1} -{" "}
                 {Math.min(
@@ -794,7 +800,7 @@ export function HistoricoExtratos() {
                 )}{" "}
                 de {extratosFiltrados.length}
               </p>
-              <Pagination>
+              <Pagination className="mx-0 w-auto justify-start sm:justify-end">
                 <PaginationContent>
                   <PaginationItem>
                     <PaginationPrevious
