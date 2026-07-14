@@ -595,7 +595,7 @@ Cada fase é deployável isolada; legado convive com o novo.
 | **F4 Motor único de score** ✅ | Migration `20260711150000`: `fin_gerar_candidatos_conciliacao` (score 0..1, 1:1 e 1:N, corte por igreja em `financeiro_config.conciliacao_score_minimo`). `ConciliacaoManual`/`DashboardConciliacao`/`ConciliacaoInteligente` migrados ao motor único + `fin_confirmar_conciliacao`; `reconciliar_transacoes`/`aplicar_conciliacao`/`gerar_candidatos_conciliacao` deprecadas (DROP na F7); `ModoABToggle` (código morto) removido; `reclass-transacoes` recusa transação conciliada. Ver §9.3 | Concluída (jul/2026) |
 | **F5 Pipeline de ingestão** ✅ | Migration `20260712120000`: `fin_ingerir_extratos` (contrato ExtratoItem, valor ABS, dedupe por `(conta_id, external_id)` com id determinístico, job + auditoria) + `fin_desfazer_ingestao`; canal **manual** (OFX/CSV/XLSX) via `core/api/extratos.api`; edge `gerar-sugestoes-ml` migrada ao motor único F4. Caminho service-role de integração (`20260712130000`, D-F5.2) + adaptadores **santander-api**, **getnet-sftp** (2 pontos: settlement_v1 e extrato_eletronico_v10/LQ) e **PIX** (3 pontos: pix-webhook, buscar-pix-recebidos, santander-api/buscar_pix — resolve conta via `cob_pix.conta_id`/`contas.cnpj_banco`, novo helper `ingerirExtratoPix`). Ver §9.4/§9.5 | Concluída (jul/2026); Getnet tipo-1→tipo-5 fica para a F6 (D5), sem relação com a porta de ingestão |
 | **F6 Getnet tipo 5** ✅ | Espelho em `extratos_bancarios` passa a nascer do tipo 5 (`getnet_financeiro_resumo`, `tipo_operacao='PG'`) em vez do tipo 1 (LQ) — opt-in por integração via `config.espelho_tipo5_desde`; tipo 1 vira puramente analítico. Ver §9.6 | Concluída (jul/2026); sem backfill (opcional, não feito nesta fase) |
-| **F7 Endurecimento + UX conciliação** (parcial — sub-frente 1/5 ✅ COMPLETA, 2/5 em andamento) | (1) ✅ Revogar escrita direta do role `authenticated` — **completa: as 7 tabelas do domínio revogadas**; (2) 🔶 decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll) — `ConciliacaoInteligente` (crítico) e `Reconciliacao` **feitos**; `ConciliacaoManual`/`DashboardConciliacao`/`HistoricoExtratos` **pendentes**; (3) Finanças no bottom-nav; (4) DRE mobile em cards; (5) limpeza de código morto | Migrations `20260713141000`/`20260713150000`/`20260713160000` (sub-frente 1). Ver §9.7/§9.8. Sub-frentes (3)-(5) e o restante de (2) **continuam pendentes** |
+| **F7 Endurecimento + UX conciliação** (parcial — sub-frente 1/5 ✅ COMPLETA, 2/5 ✅ quase completa) | (1) ✅ Revogar escrita direta do role `authenticated` — **completa: as 7 tabelas do domínio revogadas**; (2) ✅ decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll) — `ConciliacaoInteligente` (crítico), `Reconciliacao`, `ConciliacaoManual` e `DashboardConciliacao` **decompostos**; `HistoricoExtratos` recebeu só **ajuste responsivo mínimo** (sem decomposição em subcomponentes — pendente); (3) Finanças no bottom-nav; (4) DRE mobile em cards; (5) limpeza de código morto | Migrations `20260713141000`/`20260713150000`/`20260713160000` (sub-frente 1). Ver §9.7/§9.8/§9.9. Sub-frentes (3)-(5) e a decomposição completa de `HistoricoExtratos` **continuam pendentes** |
 
 ---
 
@@ -1306,6 +1306,91 @@ componentes com `DashboardConciliacao.tsx` (853 l., mesmo domínio do motor
 antecipava. `HistoricoExtratos.tsx` (865 l.) já foi tocado na sub-frente 1
 (migração de RPC) e acompanha o mesmo domínio; decomposição/responsivo ficam
 para quando o tempo permitir, sem prioridade sobre os outros.
+
+### 9.9 Notas de implementação F7 — decomposição/responsivo (sub-frente 2/5, continuação — itens 3-4, jul/2026)
+
+Continuação do §9.8: itens 3 (`ConciliacaoManual` + `DashboardConciliacao`) e
+4 (`HistoricoExtratos`) do roadmap de decomposição. Com isso, a sub-frente
+2/5 fica **quase completa** — só falta a decomposição plena de
+`HistoricoExtratos` em subcomponentes (recebeu apenas ajuste responsivo
+nesta rodada, ver abaixo).
+
+**Item 3 — `ConciliacaoManual.tsx` (1037 l.) + `DashboardConciliacao.tsx`
+(853 l.)**: mesmo domínio (motor único F4 — `fin_gerar_candidatos_conciliacao`
++ `fin_confirmar_conciliacao`), decompostos juntos para
+`src/features/financeiro/conciliacao/`. Diferente do `ConciliacaoInteligente`,
+nenhuma das duas telas tinha o problema crítico de colunas fixas — ambas já
+usavam padrões responsivos razoáveis (`ConciliacaoManual` já alternava as
+duas visões via `Tabs`; `DashboardConciliacao` já usava
+`grid-cols-2 md:grid-cols-4`/`grid-cols-1 lg:grid-cols-3`). O trabalho foi
+sobretudo decomposição + eliminação de duplicação real encontrada entre as
+duas:
+
+- **Compartilhado de verdade** (extraído primeiro, antes de decompor cada
+  tela): `hooks/useAutoReconciliar.ts` — a lógica de "Reconciliar Automático"
+  (dedupe extrato↔transação 1:1 + loop de aplicação via
+  `fin_confirmar_conciliacao` + montagem do `MatchResult[]`) estava duplicada
+  quase linha a linha nas duas telas; só a *busca* de candidatos (janela de
+  datas, lista de contas) genuinamente difere, então fica a cargo de cada
+  tela via callback (`buscarCandidatos`). `hooks/useConciliacaoDialogs.ts` +
+  `components/ConciliacaoDialogs.tsx` — estado e render dos 4 diálogos
+  secundários (vincular 1:1, dividir 1:N, lote N:1, resultado), também
+  quase idênticos nas duas telas. `model/types.ts` —
+  `ExtratoItem`/`TransacaoConciliacao`/`ContaConciliacao` (não reaproveita os
+  tipos de `useConciliacaoInteligente`: aquela tela busca colunas adicionais
+  que aqui não existem — unificar criaria acoplamento artificial).
+- **Não forçado**: as duas telas continuam orquestradores **separados**
+  (`ConciliacaoManual.tsx`, `DashboardConciliacao.tsx`) — os propósitos
+  divergem o bastante (uma é o modo clássico com abas paginadas por extrato/
+  transação; a outra é um dashboard com stats + ações recentes + sugestões
+  inline) para não valer a pena forçar um componente-mãe comum além dos
+  hooks/tipos já listados.
+- `ConciliacaoManual`: `hooks/useConciliacaoManualData.ts` (queries/filtros/
+  paginação das 2 abas — mesmas query keys originais:
+  `extratos-pendentes`, `transacoes-conciliacao`, `transacoes-ja-vinculadas`,
+  `contas-conciliacao`) + `components/manual/`: `ManualFiltrosBar`
+  (as duas abas tinham a mesma barra de filtros quase idêntica —
+  parametrizada por `tipoOptions` em vez de duplicada), `ExtratoManualCard`,
+  `TransacaoManualCard`, `PaginacaoCompacta` (a paginação também estava
+  duplicada *dentro do próprio arquivo*, entre as duas abas).
+- `DashboardConciliacao`: `hooks/useDashboardConciliacaoData.ts` (as 5
+  queries + `fetchSugestoes1x1`/`periodoDosExtratos`, helpers do arquivo
+  original — mesmas query keys: `contas-dashboard`, `reconciliacao-stats`,
+  `extratos-pendentes-dashboard`, `transacoes-dashboard`, `audit-logs-recent`,
+  `sugestoes-match`) + `components/dashboard/`: `ConciliacaoStatsCards`,
+  `AcoesRecentesCard`, `PendentesCard` + `PendenteExtratoCard`. Nuance de
+  escala: `fetchSugestoes1x1` devolve score 0-100 (usado para exibir a
+  sugestão inline no card), mas `useAutoReconciliar` espera 0..1 (escala
+  nativa da RPC) — `buscarCandidatosAutoReconciliar` faz a conversão de volta
+  antes de entregar ao hook compartilhado, em vez de alterar a escala de
+  exibição já em uso.
+- **Escrita direta**: nenhuma encontrada para migrar em nenhuma das duas
+  telas — ambas já usam só RPCs `fin_*` desde a F4, como esperado (a F7
+  frente 1 tinha revogado exatamente as tabelas que essas RPCs escrevem).
+
+**Item 4 — `HistoricoExtratos.tsx` (865 l.)**: prioridade menor, conforme o
+roadmap já registrava. Diagnóstico: os itens da lista (`renderExtratoItem`)
+já eram responsivos (`flex flex-col md:flex-row`) e os cards de estatística
+já usavam grid responsivo — **não** tinha o problema crítico de
+`ConciliacaoInteligente`. O que precisava de ajuste era a barra de filtros
+(6 controles com largura fixa em px, formando várias linhas de "chips"
+apertados abaixo de ~375px) e a linha de paginação (rótulo + controles
+espremidos lado a lado). Aplicado **só o ajuste responsivo pontual, sem
+decomposição em subcomponentes/hook** — os filtros passam a ocupar um grid
+de 2 colunas full-width no mobile (`sm:contents` devolve o layout original
+em linha única com wrap a partir de `sm:`) e a paginação empilha em coluna
+no mobile. A migração de RPC da sub-frente 1
+(`fin_marcar_extrato_ignorado`/`fin_desconciliar`) não foi tocada.
+**Pendente**: decomposição completa (hook de dados + subcomponentes, mesmo
+padrão de `ConciliacaoManual`) fica para uma rodada futura — o arquivo
+continua em `src/components/financas/HistoricoExtratos.tsx` (não movido para
+`features/financeiro/conciliacao/` nesta rodada, já que não houve
+decomposição estrutural).
+
+**Verificação visual**: mesma ressalva do §9.8 — sem ferramenta de
+browser/screenshot disponível neste ambiente; validado só por revisão de
+código/classes Tailwind, não por inspeção visual real. Pendente conferência
+manual antes da PR.
 
 ## 10. Decisões em aberto (bater o martelo)
 

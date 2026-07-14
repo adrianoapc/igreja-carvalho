@@ -497,4 +497,38 @@ flowchart TD
     ExtratoPainel --> ExtratoListItem
     TransacaoPainel --> TransacaoListItem
 ```
+
+## Decomposição — ConciliacaoManual + DashboardConciliacao (F7 sub-frente 2/5, item 3, jul/2026)
+
+Mesmo domínio (motor único F4), decompostas juntas — mas como orquestradores
+**separados** (propósitos divergem: modo clássico com abas vs. dashboard com
+stats). Compartilham só o que era genuinamente duplicado: a lógica de
+"Reconciliar Automático" e os 4 diálogos secundários. `HistoricoExtratos`
+(item 4) recebeu apenas ajuste responsivo, sem decomposição — ver §9.9.
+
+```mermaid
+flowchart TD
+    subgraph SHARED["Compartilhado (extraído ANTES de decompor cada tela)"]
+        AR["hooks/useAutoReconciliar.ts\ndedupe 1:1 + apply loop via\nfin_confirmar_conciliacao + MatchResult[]"]
+        CD["hooks/useConciliacaoDialogs.ts +\ncomponents/ConciliacaoDialogs.tsx\nvincular · dividir · lote · resultado"]
+        TY["model/types.ts\nExtratoItem · TransacaoConciliacao · ContaConciliacao"]
+    end
+
+    subgraph MANUAL["ConciliacaoManual.tsx (orquestrador)"]
+        MD["hooks/useConciliacaoManualData.ts"]
+        MF["components/manual/\nManualFiltrosBar · ExtratoManualCard ·\nTransacaoManualCard · PaginacaoCompacta"]
+    end
+
+    subgraph DASH["DashboardConciliacao.tsx (orquestrador)"]
+        DD["hooks/useDashboardConciliacaoData.ts\n+ fetchSugestoes1x1 (score 0-100 p/ exibição)"]
+        DF["components/dashboard/\nConciliacaoStatsCards · AcoesRecentesCard ·\nPendentesCard · PendenteExtratoCard"]
+    end
+
+    SHARED --> MANUAL
+    SHARED --> DASH
+    MD --> MF
+    DD --> DF
+
+    DD -."score/100 → score 0..1\n(escala nativa da RPC)".-> AR
+    MD -->|"score 0..1 já nativo"| AR
 ```
