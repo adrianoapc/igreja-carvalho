@@ -1,7 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { DashboardConciliacao } from "@/components/financas/DashboardConciliacao";
-import { ConciliacaoManual } from "@/components/financas/ConciliacaoManual";
+import { ConciliacaoManual } from "@/features/financeiro/conciliacao/ConciliacaoManual";
 import { ConciliacaoInteligente } from "@/features/financeiro/conciliacao/ConciliacaoInteligente";
 import { HistoricoExtratos } from "@/components/financas/HistoricoExtratos";
 import { RelatorioCobertura } from "@/components/financas/RelatorioCobertura";
