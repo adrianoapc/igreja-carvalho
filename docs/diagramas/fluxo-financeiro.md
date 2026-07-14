@@ -453,3 +453,48 @@ flowchart TD
 
     SR["service_role (edges: getnet-sftp, santander-extrato,\nreclass-transacoes, undo-reclass, undo-import)"] -->|"não afetado\n(SUPABASE_SERVICE_ROLE_KEY, não JWT)"| REVOGADO
 ```
+
+## Decomposição/responsivo — Fase F7 (sub-frente 2/5, EM ANDAMENTO, jul/2026)
+
+`ConciliacaoInteligente.tsx` (item crítico do §6.3 — colunas fixas
+lado-a-lado, "inutilizável em celular") decomposto para
+`src/features/financeiro/conciliacao/`, mesmo padrão do `TransacaoDialog`
+(`useIsMobile` + layout mobile dedicado). `Reconciliacao.tsx` ganhou
+`TabsList` com scroll horizontal no lugar do `grid-cols-5` fixo. Pendente:
+`ConciliacaoManual`/`DashboardConciliacao`/`HistoricoExtratos` (ver §9.8 do
+`arquitetura-financeiro.md`).
+
+```mermaid
+flowchart TD
+    subgraph HOOK["hooks/useConciliacaoInteligente.ts"]
+        Q["3 queries (extratos · transações ·\ncandidatos motor F4) + filtros derivados"]
+        M["mutations: confirmarConciliacao ·\nmarcarConferenciaManual · rejeitarSugestao"]
+    end
+
+    subgraph ORQ["ConciliacaoInteligente.tsx (orquestrador, 203 l.)"]
+        MOBILE{useIsMobile}
+    end
+    HOOK --> ORQ
+
+    subgraph DESKTOP["≥768px — 3 colunas (layout original)"]
+        D1[ExtratoPainel]
+        D2["ConciliacaoInteligenteBalanco\nvariant=sidebar"]
+        D3[TransacaoPainel]
+    end
+
+    subgraph MOBILE_UI["<768px — Tabs (padrão de ConciliacaoManual:552)"]
+        T1["Tab Banco → ExtratoPainel"]
+        T2["Tab Sistema → TransacaoPainel"]
+        F["ConciliacaoInteligenteBalanco\nvariant=footer (fixo, independe da aba ativa)"]
+    end
+
+    MOBILE -->|false| DESKTOP
+    MOBILE -->|true| MOBILE_UI
+
+    D1 -.mesmo componente.-> T1
+    D3 -.mesmo componente.-> T2
+
+    ExtratoPainel --> ExtratoListItem
+    TransacaoPainel --> TransacaoListItem
+```
+```

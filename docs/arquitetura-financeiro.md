@@ -595,7 +595,7 @@ Cada fase é deployável isolada; legado convive com o novo.
 | **F4 Motor único de score** ✅ | Migration `20260711150000`: `fin_gerar_candidatos_conciliacao` (score 0..1, 1:1 e 1:N, corte por igreja em `financeiro_config.conciliacao_score_minimo`). `ConciliacaoManual`/`DashboardConciliacao`/`ConciliacaoInteligente` migrados ao motor único + `fin_confirmar_conciliacao`; `reconciliar_transacoes`/`aplicar_conciliacao`/`gerar_candidatos_conciliacao` deprecadas (DROP na F7); `ModoABToggle` (código morto) removido; `reclass-transacoes` recusa transação conciliada. Ver §9.3 | Concluída (jul/2026) |
 | **F5 Pipeline de ingestão** ✅ | Migration `20260712120000`: `fin_ingerir_extratos` (contrato ExtratoItem, valor ABS, dedupe por `(conta_id, external_id)` com id determinístico, job + auditoria) + `fin_desfazer_ingestao`; canal **manual** (OFX/CSV/XLSX) via `core/api/extratos.api`; edge `gerar-sugestoes-ml` migrada ao motor único F4. Caminho service-role de integração (`20260712130000`, D-F5.2) + adaptadores **santander-api**, **getnet-sftp** (2 pontos: settlement_v1 e extrato_eletronico_v10/LQ) e **PIX** (3 pontos: pix-webhook, buscar-pix-recebidos, santander-api/buscar_pix — resolve conta via `cob_pix.conta_id`/`contas.cnpj_banco`, novo helper `ingerirExtratoPix`). Ver §9.4/§9.5 | Concluída (jul/2026); Getnet tipo-1→tipo-5 fica para a F6 (D5), sem relação com a porta de ingestão |
 | **F6 Getnet tipo 5** ✅ | Espelho em `extratos_bancarios` passa a nascer do tipo 5 (`getnet_financeiro_resumo`, `tipo_operacao='PG'`) em vez do tipo 1 (LQ) — opt-in por integração via `config.espelho_tipo5_desde`; tipo 1 vira puramente analítico. Ver §9.6 | Concluída (jul/2026); sem backfill (opcional, não feito nesta fase) |
-| **F7 Endurecimento + UX conciliação** (parcial — sub-frente 1/5 ✅ COMPLETA) | (1) ✅ Revogar escrita direta do role `authenticated` — **completa: as 7 tabelas do domínio revogadas**; (2) decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll); (3) Finanças no bottom-nav; (4) DRE mobile em cards; (5) limpeza de código morto | Migrations `20260713141000`/`20260713150000`/`20260713160000`. Ver §9.7. Sub-frentes (2)-(5) **continuam pendentes** — não tratadas nesta fatia |
+| **F7 Endurecimento + UX conciliação** (parcial — sub-frente 1/5 ✅ COMPLETA, 2/5 em andamento) | (1) ✅ Revogar escrita direta do role `authenticated` — **completa: as 7 tabelas do domínio revogadas**; (2) 🔶 decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll) — `ConciliacaoInteligente` (crítico) e `Reconciliacao` **feitos**; `ConciliacaoManual`/`DashboardConciliacao`/`HistoricoExtratos` **pendentes**; (3) Finanças no bottom-nav; (4) DRE mobile em cards; (5) limpeza de código morto | Migrations `20260713141000`/`20260713150000`/`20260713160000` (sub-frente 1). Ver §9.7/§9.8. Sub-frentes (3)-(5) e o restante de (2) **continuam pendentes** |
 
 ---
 
@@ -1223,6 +1223,89 @@ nos dois lados de novo:
 Todos os cenários das duas rodadas (17 no total) batidos. Typecheck: 0 erros
 novos (baseline 62) — confirmado a cada commit incremental (migração feita
 call-site por call-site, não num único commit monolítico).
+
+### 9.8 Notas de implementação F7 — decomposição/responsivo (sub-frente 2/5, jul/2026)
+
+Sub-frente **em andamento** (não completa): dos 4 alvos listados em §3.4/§6.3
+(`ConciliacaoInteligente.tsx`, `Reconciliacao.tsx`, `ConciliacaoManual.tsx` +
+`DashboardConciliacao.tsx`, `HistoricoExtratos.tsx`), esta rodada entregou os
+dois primeiros — na ordem de prioridade que o próprio §6.3 já apontava
+("`ConciliacaoInteligente.tsx:841` — crítico... inutilizável em celular").
+Os outros dois ficam para uma próxima rodada.
+
+**`ConciliacaoInteligente.tsx` (item crítico)**: 1033 l., duas colunas fixas
+lado a lado + coluna central `w-32` sem nenhuma classe responsiva/`isMobile`
+— decomposto e movido para `src/features/financeiro/conciliacao/`, espelhando
+o padrão que a F2 já aplicou em `TransacaoDialog` (§6.2, "o mais bem adaptado"
+do módulo: `useIsMobile` + layout mobile dedicado + barra de ações fixa no
+rodapé + grids `md:grid-cols-2`):
+
+- `hooks/useConciliacaoInteligente.ts`: toda a lógica de dados/mutações
+  (3 queries — extratos/transações/candidatos do motor F4 —, filtros
+  derivados, `confirmarConciliacao`/`marcarConferenciaManual`/
+  `rejeitarSugestao`). Extraída **preservando as query keys originais**
+  (`extratos-pendentes-inteligente`, `transacoes-pendentes-inteligente`,
+  `candidatos-motor-inteligente`, `contas-conciliacao`,
+  `transacoes-conciliacao`) — de propósito: `QuickCreateTransacaoDialog`
+  invalida as duas primeiras e `ConciliacaoManual` compartilha
+  `transacoes-conciliacao`; renomear teria quebrado invalidação cross-file
+  silenciosamente.
+- `components/`: `ExtratoPainel`+`ExtratoListItem` (painel "Banco"),
+  `TransacaoPainel`+`TransacaoListItem` (painel "Sistema"),
+  `ConciliacaoInteligenteFiltros` (busca/conta/tipo/regenerar sugestões ML),
+  `ConciliacaoInteligenteBalanco` (resumo Banco×Sistema×Diferença + botão
+  Confirmar — **2 variantes visuais da mesma lógica**: `sidebar` replica a
+  coluna vertical fixa original no desktop, `footer` é uma barra compacta
+  fixa no rodapé para o mobile).
+- `ConciliacaoInteligente.tsx` (orquestrador, 203 l.): `useIsMobile` decide o
+  layout. **Desktop (≥768px)**: mantém os 3 painéis lado a lado
+  (`h-[calc(100vh-320px)]`) idêntico ao original. **Mobile**: os dois painéis
+  viram abas — reaproveitando o padrão de `Tabs`/`TabsList` já usado em
+  `ConciliacaoManual:552` (a direção que o §6.5 já mandava seguir, não uma
+  escolha nova) — com contadores no rótulo (`Banco (N)` / `Sistema (N)`); o
+  resumo/confirmar usa a variante `footer`, sempre visível **independente da
+  aba ativa** (mesmo padrão de rodapé fixo do `TransacaoDialog`) porque a
+  confirmação depende de seleção nos dois lados ao mesmo tempo — escondê-lo
+  atrás de uma aba obrigaria o usuário a alternar só para ver se pode
+  confirmar. Aceitar uma sugestão ML no mobile troca automaticamente para a
+  aba "Sistema" (a transação sugerida já vem selecionada, então faz sentido
+  o usuário já ver onde ela caiu).
+
+**`Reconciliacao.tsx` (item 2, §6.3)**: `TabsList` com `grid grid-cols-5`
+fixo esmagava os rótulos das 5 abas abaixo de ~640px. **Decisão de scroll
+horizontal vs `<Select>`** (o doc deixava em aberto): procurado por outro
+`TabsList` do app com tratamento responsivo para muitas abas — não existe
+nenhum precedente direto (`EscalaDetailsSheet`/`EventoDetalhes` lidam com
+2-4 abas via `flex-1`/`flex-wrap`, não scroll). Optamos por **scroll
+horizontal** (`overflow-x-auto` + `flex w-max`, virando `grid` só a partir de
+`sm:`) em vez de `<Select>` por ser o padrão recomendado pelo próprio
+Radix/shadcn para "abas demais": preserva a semântica nativa de `Tabs`
+(navegação por teclado, ARIA `tablist`/`tab`) sem precisar sincronizar um
+`<Select>` controlado à parte — que duplicaria estado por pouco ganho real
+com apenas 5 itens (um `<Select>` faria mais sentido com muito mais opções,
+onde a rolagem horizontal deixasse de ser prática).
+
+**Estrutura de pastas** (§7.3): primeira ocupação de
+`src/features/financeiro/conciliacao/` — reaproveita `core/api`,
+`core/hooks` já existentes (nenhuma duplicação; a única lógica nova é
+específica da tela e mora em `conciliacao/hooks/`, não em `core/`).
+
+**Verificação visual**: não há ferramenta de browser/screenshot disponível
+neste ambiente (conferido via busca de ferramentas antes de começar) — a
+adaptação responsiva foi validada por leitura de código/classes Tailwind e
+por paridade com o padrão já em produção do `TransacaoDialog`, **não** por
+inspeção visual real em viewport 375px/768px. Fica pendente uma conferência
+manual antes de abrir a PR.
+
+**Pendente para a próxima rodada da sub-frente 2/5**: `ConciliacaoManual.tsx`
+(1037 l.) já usa `Tabs` para alternar "Por Extrato"/"Por Transação" em
+qualquer viewport (não tem o problema de colunas fixas do `ConciliacaoInteligente`),
+mas ainda é monolítico e concentra bastante lógica que poderia compartilhar
+componentes com `DashboardConciliacao.tsx` (853 l., mesmo domínio do motor
+único F4) — decompor os dois juntos faz sentido, como o item 3 já
+antecipava. `HistoricoExtratos.tsx` (865 l.) já foi tocado na sub-frente 1
+(migração de RPC) e acompanha o mesmo domínio; decomposição/responsivo ficam
+para quando o tempo permitir, sem prioridade sobre os outros.
 
 ## 10. Decisões em aberto (bater o martelo)
 
