@@ -407,7 +407,16 @@ export function HistoricoExtratos() {
       queryClient.invalidateQueries({ queryKey: ["extratos-historico"] });
     } catch (err) {
       console.error(err);
-      toast.error("Erro ao reativar extrato");
+      // Extrato conciliado via lote/divisão também aparece aqui como
+      // "ignorado" (reconciliado sem vínculo 1:1) — a RPC recusa com
+      // FIN_CONCILIADO; a UI não distingue os dois casos sem query extra.
+      if (err instanceof Error && err.message.includes("FIN_CONCILIADO")) {
+        toast.error(
+          "Este extrato faz parte de uma conciliação em lote ou divisão — desfaça a conciliação pela transação vinculada.",
+        );
+      } else {
+        toast.error("Erro ao reativar extrato");
+      }
     } finally {
       setActionLoading(null);
     }
@@ -432,7 +441,13 @@ export function HistoricoExtratos() {
       queryClient.invalidateQueries({ queryKey: ["saidas"] });
     } catch (err) {
       console.error(err);
-      toast.error("Erro ao desvincular");
+      if (err instanceof Error && err.message.includes("FIN_CONCILIADO")) {
+        toast.error(
+          "Este extrato faz parte de uma conciliação em lote ou divisão — desfaça a conciliação pela transação vinculada.",
+        );
+      } else {
+        toast.error("Erro ao desvincular");
+      }
     } finally {
       setActionLoading(null);
     }

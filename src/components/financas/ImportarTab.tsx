@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   criarLancamento,
   alterarStatusLancamento,
+  excluirLancamento,
 } from "@/features/financeiro/core/api/lancamentos.api";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { read, utils, WorkBook } from "xlsx";
@@ -807,7 +808,33 @@ export function ImportarTab() {
             if (!resultado.id)
               throw new Error("Lançamento criado sem id retornado.");
             if (t.status === "cancelado") {
-              await alterarStatusLancamento(resultado.id, "cancelado");
+              try {
+                await alterarStatusLancamento(resultado.id, "cancelado");
+              } catch (cancelError) {
+                // A criação já aconteceu; sem compensar, a linha ficaria viva
+                // como "pendente" fantasma (reportada como falha, invisível ao
+                // undo-import, duplicada num re-import).
+                try {
+                  await excluirLancamento(resultado.id);
+                } catch {
+                  // Exclusão também falhou: a transação existe — registra como
+                  // importada (o undo-import passa a alcançá-la) e avisa.
+                  importedIds.push(resultado.id);
+                  successItems.push({
+                    job_id: jobId,
+                    transacao_id: resultado.id,
+                    row_index: rowIndex,
+                    status: "imported",
+                  });
+                  errs.push({
+                    index: rowIndex,
+                    reason:
+                      "Linha criada como 'pendente', mas falhou ao marcar como cancelada — cancele manualmente ou use o desfazer da importação.",
+                  });
+                  continue;
+                }
+                throw cancelError;
+              }
             }
             importedIds.push(resultado.id);
             successItems.push({

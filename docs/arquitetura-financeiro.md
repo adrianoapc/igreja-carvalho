@@ -1387,6 +1387,18 @@ continua em `src/components/financas/HistoricoExtratos.tsx` (não movido para
 `features/financeiro/conciliacao/` nesta rodada, já que não houve
 decomposição estrutural).
 
+**Débito nomeado — dialogs do domínio ainda em `components/financas/`**: os
+orquestradores decompostos importam de `src/components/financas/` vários
+componentes que pertencem conceitualmente ao domínio conciliação —
+`QuickCreateTransacaoDialog`, `VincularTransacaoDialog`,
+`ExtratoDetalheDrawer`, `ConciliacaoLoteDialog`, `DividirExtratoDialog`,
+`ResultadoReconciliacaoDialog`, `TransacaoActionsMenu`,
+`TransacaoDetalheDrawer` — além do próprio `HistoricoExtratos.tsx`. Coerente
+com o strangler fig (mesmo precedente da F2; sem violação da regra
+módulo→módulo do §7.3), mas fica registrado como a lista concreta da próxima
+rodada de migração para `features/financeiro/`, para não precisar ser
+redescoberta.
+
 **Verificação visual**: mesma ressalva do §9.8 — sem ferramenta de
 browser/screenshot disponível neste ambiente; validado só por revisão de
 código/classes Tailwind, não por inspeção visual real. Pendente conferência
