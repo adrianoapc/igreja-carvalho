@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { criarLancamento } from "@/features/financeiro/core";
+import { confirmarConciliacao } from "@/features/financeiro/core/api/conciliacao.api";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -121,8 +122,9 @@ export function QuickCreateTransacaoDialog({
     mutationFn: async (values: FormValues) => {
       if (!extratoItem || !igrejaId) throw new Error("Dados incompletos.");
 
-      // Criação via CORE (fin_criar_lancamento, ADR-029); o vínculo com o
-      // extrato permanece direto até a F3 (fin_confirmar_conciliacao).
+      // Criação via CORE (fin_criar_lancamento, ADR-029); vínculo com o
+      // extrato via fin_confirmar_conciliacao (F3/F7) — cobre o 1:1 numa
+      // única transação.
       const resultado = await criarLancamento({
         tipo: extratoItem.tipo === "credit" ? "entrada" : "saida",
         valor: values.valor,
@@ -137,15 +139,12 @@ export function QuickCreateTransacaoDialog({
         },
       });
 
-      const { error: extratoError } = await supabase
-        .from("extratos_bancarios")
-        .update({
-          reconciliado: true,
-          transacao_vinculada_id: resultado.id,
-        })
-        .eq("id", extratoItem.id);
+      if (!resultado.id) throw new Error("Lançamento criado sem id retornado.");
 
-      if (extratoError) throw extratoError;
+      await confirmarConciliacao({
+        extrato_ids: [extratoItem.id],
+        transacao_ids: [resultado.id],
+      });
     },
     onSuccess: () => {
       toast.success("Transação criada e conciliada com sucesso!");

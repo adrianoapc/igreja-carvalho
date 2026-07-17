@@ -1,5 +1,13 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { Home, Users, Calendar, Heart, Menu, UserCircle } from "lucide-react";
+import {
+  Home,
+  Users,
+  Calendar,
+  Heart,
+  Menu,
+  UserCircle,
+  DollarSign,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useState, useEffect } from "react";
@@ -11,20 +19,26 @@ export function MobileNavbar() {
 
   const [hasMinisterioAccess, setHasMinisterioAccess] = useState(false);
   const [hasPessoasAccess, setHasPessoasAccess] = useState(false);
+  // Mesma checagem que a Sidebar usa pra mostrar/esconder "Financeiro"
+  // (Sidebar.tsx, permission "financeiro.view") — F7 frente 3.
+  const [hasFinanceiroAccess, setHasFinanceiroAccess] = useState(false);
 
   useEffect(() => {
     const checkAccess = async () => {
       if (isAdmin) {
         setHasMinisterioAccess(true);
         setHasPessoasAccess(true);
+        setHasFinanceiroAccess(true);
         return;
       }
-      const [ministerio, pessoas] = await Promise.all([
+      const [ministerio, pessoas, financeiro] = await Promise.all([
         checkPermission("ministerio.view"),
         checkPermission("pessoas.view"),
+        checkPermission("financeiro.view"),
       ]);
       setHasMinisterioAccess(ministerio);
       setHasPessoasAccess(pessoas);
+      setHasFinanceiroAccess(financeiro);
     };
     if (!loading) {
       checkAccess();
@@ -61,6 +75,19 @@ export function MobileNavbar() {
       path: pessoasPath,
       activeColor: "text-orange-600",
     },
+    // Só aparece pra quem tem acesso ao financeiro (mesma checagem da
+    // Sidebar) — quem não tem continua vendo exatamente os 5 itens de
+    // sempre, zero mudança visual (F7 frente 3).
+    ...(hasFinanceiroAccess
+      ? [
+          {
+            label: "Finanças",
+            icon: DollarSign,
+            path: "/financas",
+            activeColor: "text-emerald-600",
+          },
+        ]
+      : []),
     {
       label: "Menu",
       icon: Menu,
@@ -77,9 +104,21 @@ export function MobileNavbar() {
     },
   ];
 
+  // Com "Finanças" o nav passa de 5 pra 6 ícones — reduz um pouco o
+  // ícone/padding pra não apertar em telas estreitas (~360-375px); quem
+  // não tem acesso ao financeiro não é afetado (continua nos 5 de sempre
+  // no tamanho original). F7 frente 3.
+  const isCompact = navItems.length > 5;
+  const iconSize = isCompact ? 22 : 24;
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border/40 shadow-[0_-1px_3px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)] md:hidden transition-all duration-300">
-      <div className="flex items-center justify-around h-16 px-2">
+      <div
+        className={cn(
+          "flex items-center justify-around h-16",
+          isCompact ? "px-0.5" : "px-2"
+        )}
+      >
         {navItems.map((item) => {
           // Verifica se está ativo (tratando sub-rotas)
           const isActive =
@@ -103,21 +142,23 @@ export function MobileNavbar() {
             >
               <div
                 className={cn(
-                  "p-1.5 rounded-xl transition-all duration-300",
+                  "rounded-xl transition-all duration-300",
+                  isCompact ? "p-1" : "p-1.5",
                   isActive
                     ? "bg-primary/10 translate-y-[-2px]"
                     : "bg-transparent"
                 )}
               >
                 <item.icon
-                  size={24}
+                  size={iconSize}
                   strokeWidth={isActive ? 2.5 : 2}
                   className={cn("transition-all", isActive && "scale-110")}
                 />
               </div>
               <span
                 className={cn(
-                  "text-[10px] font-medium transition-all",
+                  "font-medium transition-all",
+                  isCompact ? "text-[9px]" : "text-[10px]",
                   isActive ? "opacity-100 font-bold" : "opacity-70"
                 )}
               >

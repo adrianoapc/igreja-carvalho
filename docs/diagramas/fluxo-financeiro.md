@@ -406,3 +406,159 @@ flowchart TD
 
     EXT -->|gancho pós-ingestão ADR-028| SCORE["fin_gerar_candidatos_conciliacao\n(edge gerar-sugestoes-ml migrada na F5)"]
 ```
+
+## Endurecimento — Fase F7 (sub-frente 1/5 ✅ COMPLETA, jul/2026)
+
+Migrations `20260713140000` + `20260713150000` + `20260713160000`. Fecha a
+"regra de ouro" do §7.1 do `arquitetura-financeiro.md` com enforcement de
+banco (`REVOKE`), não só convenção de código — **as 7 tabelas do domínio**
+agora revogadas para `authenticated`/`anon`. A 1ª migration revogou as 5 já
+100% migradas; a auditoria daquela rodada achou 13 call-sites de escrita
+direta ainda vivos em `transacoes_financeiras`/`extratos_bancarios` — foram
+migrados para RPCs `fin_*` (2 novas: `fin_alternar_conferencia_manual`,
+`fin_marcar_extrato_ignorado`) antes da 3ª migration estender o `REVOKE` a
+essas duas (ver §9.6). As 3 RPCs legadas de conciliação deprecadas na F4
+(+ 1 achado bônus, órfã) foram `DROP`adas na 1ª migration.
+
+```mermaid
+flowchart TD
+    subgraph AUTH["role authenticated (frontend via PostgREST/JWT)"]
+        FE["Frontend SPA"]
+    end
+
+    subgraph REVOGADO["REVOKE INSERT/UPDATE/DELETE (authenticated, anon) — as 7 tabelas do domínio"]
+        T1[(transferencias_contas)]
+        T2[(conciliacoes_lote)]
+        T3[(conciliacoes_lote_extratos)]
+        T4[(conciliacoes_divisao)]
+        T5[(conciliacoes_divisao_transacoes)]
+        T6[(transacoes_financeiras)]
+        T7[(extratos_bancarios)]
+    end
+
+    FE -.->|"INSERT/UPDATE/DELETE direto\n→ permission denied"| REVOGADO
+
+    subgraph CORE["RPCs fin_* (SECURITY DEFINER, dono com grant pleno)"]
+        RPC["fin_criar_lancamento · fin_atualizar_lancamento ·\nfin_criar_transferencia · fin_confirmar_conciliacao ·\nfin_desconciliar · fin_ingerir_extratos ·\nfin_desfazer_ingestao · fin_alternar_conferencia_manual ·\nfin_marcar_extrato_ignorado · ..."]
+    end
+    FE -->|EXECUTE| RPC
+    RPC -->|"escreve com o privilégio do DONO\n(não do chamador)"| REVOGADO
+
+    subgraph DROP["DROP FUNCTION (zero call-site vivo)"]
+        L1[reconciliar_transacoes]
+        L2["aplicar_conciliacao\n(2 overloads: uuid,uuid / uuid,uuid,text,integer,uuid)"]
+        L3[gerar_candidatos_conciliacao]
+        L4["aplicar_sugestao_conciliacao\n(achado bônus — SugestoesML.tsx órfão)"]
+    end
+
+    SR["service_role (edges: getnet-sftp, santander-extrato,\nreclass-transacoes, undo-reclass, undo-import)"] -->|"não afetado\n(SUPABASE_SERVICE_ROLE_KEY, não JWT)"| REVOGADO
+```
+
+## Decomposição/responsivo — Fase F7 (sub-frente 2/5, EM ANDAMENTO, jul/2026)
+
+`ConciliacaoInteligente.tsx` (item crítico do §6.3 — colunas fixas
+lado-a-lado, "inutilizável em celular") decomposto para
+`src/features/financeiro/conciliacao/`, mesmo padrão do `TransacaoDialog`
+(`useIsMobile` + layout mobile dedicado). `Reconciliacao.tsx` ganhou
+`TabsList` com scroll horizontal no lugar do `grid-cols-5` fixo. Pendente:
+`ConciliacaoManual`/`DashboardConciliacao`/`HistoricoExtratos` (ver §9.8 do
+`arquitetura-financeiro.md`).
+
+```mermaid
+flowchart TD
+    subgraph HOOK["hooks/useConciliacaoInteligente.ts"]
+        Q["3 queries (extratos · transações ·\ncandidatos motor F4) + filtros derivados"]
+        M["mutations: confirmarConciliacao ·\nmarcarConferenciaManual · rejeitarSugestao"]
+    end
+
+    subgraph ORQ["ConciliacaoInteligente.tsx (orquestrador, 203 l.)"]
+        MOBILE{useIsMobile}
+    end
+    HOOK --> ORQ
+
+    subgraph DESKTOP["≥768px — 3 colunas (layout original)"]
+        D1[ExtratoPainel]
+        D2["ConciliacaoInteligenteBalanco\nvariant=sidebar"]
+        D3[TransacaoPainel]
+    end
+
+    subgraph MOBILE_UI["<768px — Tabs (padrão de ConciliacaoManual:552)"]
+        T1["Tab Banco → ExtratoPainel"]
+        T2["Tab Sistema → TransacaoPainel"]
+        F["ConciliacaoInteligenteBalanco\nvariant=footer (fixo, independe da aba ativa)"]
+    end
+
+    MOBILE -->|false| DESKTOP
+    MOBILE -->|true| MOBILE_UI
+
+    D1 -.mesmo componente.-> T1
+    D3 -.mesmo componente.-> T2
+
+    ExtratoPainel --> ExtratoListItem
+    TransacaoPainel --> TransacaoListItem
+```
+
+## Decomposição — ConciliacaoManual + DashboardConciliacao (F7 sub-frente 2/5, item 3, jul/2026)
+
+Mesmo domínio (motor único F4), decompostas juntas — mas como orquestradores
+**separados** (propósitos divergem: modo clássico com abas vs. dashboard com
+stats). Compartilham só o que era genuinamente duplicado: a lógica de
+"Reconciliar Automático" e os 4 diálogos secundários. `HistoricoExtratos`
+(item 4) recebeu apenas ajuste responsivo, sem decomposição — ver §9.9.
+
+```mermaid
+flowchart TD
+    subgraph SHARED["Compartilhado (extraído ANTES de decompor cada tela)"]
+        AR["hooks/useAutoReconciliar.ts\ndedupe 1:1 + apply loop via\nfin_confirmar_conciliacao + MatchResult[]"]
+        CD["hooks/useConciliacaoDialogs.ts +\ncomponents/ConciliacaoDialogs.tsx\nvincular · dividir · lote · resultado"]
+        TY["model/types.ts\nExtratoItem · TransacaoConciliacao · ContaConciliacao"]
+    end
+
+    subgraph MANUAL["ConciliacaoManual.tsx (orquestrador)"]
+        MD["hooks/useConciliacaoManualData.ts"]
+        MF["components/manual/\nManualFiltrosBar · ExtratoManualCard ·\nTransacaoManualCard · PaginacaoCompacta"]
+    end
+
+    subgraph DASH["DashboardConciliacao.tsx (orquestrador)"]
+        DD["hooks/useDashboardConciliacaoData.ts\n+ fetchSugestoes1x1 (score 0-100 p/ exibição)"]
+        DF["components/dashboard/\nConciliacaoStatsCards · AcoesRecentesCard ·\nPendentesCard · PendenteExtratoCard"]
+    end
+
+    SHARED --> MANUAL
+    SHARED --> DASH
+    MD --> MF
+    DD --> DF
+
+    DD -."score/100 → score 0..1\n(escala nativa da RPC)".-> AR
+    MD -->|"score 0..1 já nativo"| AR
+```
+
+## F7 — frentes 3, 4 e 5 (bottom-nav, DRE mobile, código morto, jul/2026)
+
+Fecha as 3 frentes restantes do roadmap F7 (ver §9.10 do
+`arquitetura-financeiro.md`). Único item aberto: decomposição completa de
+`HistoricoExtratos.tsx` (§9.9, tratado com ajuste responsivo mínimo).
+
+```mermaid
+flowchart TD
+    subgraph F5["Frente 5 — código morto"]
+        D1["14 arquivos removidos\n(src/components/financas/)"]
+    end
+
+    subgraph F3["Frente 3 — bottom-nav"]
+        NAV["MobileNavbar.tsx"]
+        PERM{"checkPermission\n('financeiro.view')\nmesma checagem da Sidebar"}
+        NAV --> PERM
+        PERM -->|não| NAV5["5 itens (inalterado)"]
+        PERM -->|sim| NAV6["6 itens\n(ícone/label levemente menores)"]
+    end
+
+    subgraph F4["Frente 4 — DRE mobile"]
+        DRE["DRE.tsx (casca de rota)"]
+        DREF["features/financeiro/relatorios/DRE.tsx"]
+        DRE --> DREF
+        DREF --> ISM{useIsMobile}
+        ISM -->|false| TABLE["Table original\n(12 meses + total)"]
+        ISM -->|true| CARDS["ResultadoLiquidoCard (topo, sempre visível)\n+ SecaoDreCard por seção\n(expande → DreMonthGrid 3×4 + categorias)"]
+    end
+```

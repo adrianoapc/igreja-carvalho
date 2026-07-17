@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { criarLancamento } from "@/features/financeiro/core/api/lancamentos.api";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -261,25 +262,23 @@ export default function MeusCursos() {
       const hoje = new Date();
       const data = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
 
-      const { data: transacaoCriada, error: txError } = await supabase
-        .from("transacoes_financeiras")
-        .insert({
-          descricao: `Inscrição Jornada: ${jornada.titulo}`,
-          valor: Number(jornada.valor || 0),
-          tipo: "entrada",
+      const transacaoCriada = await criarLancamento({
+        tipo: "entrada",
+        valor: Number(jornada.valor || 0),
+        data_vencimento: data,
+        conta_id: contaId,
+        descricao: `Inscrição Jornada: ${jornada.titulo}`,
+        categoria_id: categoriaId,
+        extras: {
           tipo_lancamento: "unico",
           status: "pendente",
-          data_vencimento: data,
           data_competencia: data,
-          conta_id: contaId,
-          categoria_id: categoriaId,
           base_ministerial_id: baseMinisterialId,
-          igreja_id: igrejaId,
           filial_id: isAllFiliais ? null : filialId,
-        })
-        .select("id")
-        .single();
-      if (txError) throw txError;
+        },
+      });
+      if (!transacaoCriada.id)
+        throw new Error("Lançamento criado sem id retornado.");
 
       const { data: inscricaoCriada, error: inscError } = await supabase
         .from("inscricoes_jornada")

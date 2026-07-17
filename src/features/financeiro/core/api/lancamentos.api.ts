@@ -105,3 +105,19 @@ export function excluirLancamento(
     p_extras: { escopo },
   });
 }
+
+/**
+ * Alterna conferido_manual + conciliacao_status (nao_conciliado<->
+ * conciliado_manual) de um lançamento sem extrato correspondente (F7).
+ * Sincroniza a perna irmã de transferência; bloqueia se já conciliado via
+ * extrato/bot (D4).
+ */
+export function alternarConferenciaManual(
+  id: string,
+  conferido: boolean,
+): Promise<FinResultado> {
+  return callFinRpc("fin_alternar_conferencia_manual", {
+    p_id: id,
+    p_conferido: conferido,
+  });
+}

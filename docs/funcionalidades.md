@@ -522,7 +522,7 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 
 - **Importação Excel**: Importação em massa de transações com validação
 - **Processamento de Notas Fiscais**: IA (Gemini) extrai dados de NF automaticamente
-- **Reconciliação Bancária**: Comparação automática entre lançamentos e extrato bancário
+- **Reconciliação Bancária**: Comparação automática entre lançamentos e extrato bancário. Modo Inteligente (matching por score) e a navegação por abas da tela de Reconciliação são responsivos (celular/tablet) desde jul/2026 — ver `docs/arquitetura-financeiro.md` §9.8; Modo Clássico e Histórico ainda pendentes de adaptação mobile
 - **Sistema de Aprendizado**: Auto-sugestão de categoria/fornecedor baseada em histórico
 - **Exportação**: Excel com todos os dados filtrados e formatados
 

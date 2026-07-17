@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { criarLancamento } from "@/features/financeiro/core/api/lancamentos.api";
 import { toast } from "sonner";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
@@ -188,24 +189,23 @@ export function AdicionarInscricaoDialog({
           ? `Inscrição - ${evento.titulo} (${lote.nome})`
           : `Inscrição - ${evento.titulo}`;
 
-        const { data: transacao, error: txError } = await supabase
-          .from("transacoes_financeiras")
-          .insert({
-            tipo: "entrada",
-            tipo_lancamento: "avulso",
-            descricao: descricaoTx,
-            valor: valorFinal,
-            data_vencimento: new Date().toISOString().split("T")[0],
-            data_pagamento: new Date().toISOString().split("T")[0],
-            data_competencia: new Date().toISOString().split("T")[0],
+        const hoje = new Date().toISOString().split("T")[0];
+        const transacao = await criarLancamento({
+          tipo: "entrada",
+          valor: valorFinal,
+          data_vencimento: hoje,
+          conta_id: evento.conta_financeira_id,
+          descricao: descricaoTx,
+          categoria_id: evento.categoria_financeira_id,
+          extras: {
+            tipo_lancamento: "unico",
             status: "pago",
-            conta_id: evento.conta_financeira_id,
-            categoria_id: evento.categoria_financeira_id,
-          })
-          .select()
-          .single();
-
-        if (txError) throw txError;
+            data_pagamento: hoje,
+            data_competencia: hoje,
+          },
+        });
+        if (!transacao.id)
+          throw new Error("Lançamento criado sem id retornado.");
         transacaoId = transacao.id;
       }
 

@@ -595,7 +595,7 @@ Cada fase é deployável isolada; legado convive com o novo.
 | **F4 Motor único de score** ✅ | Migration `20260711150000`: `fin_gerar_candidatos_conciliacao` (score 0..1, 1:1 e 1:N, corte por igreja em `financeiro_config.conciliacao_score_minimo`). `ConciliacaoManual`/`DashboardConciliacao`/`ConciliacaoInteligente` migrados ao motor único + `fin_confirmar_conciliacao`; `reconciliar_transacoes`/`aplicar_conciliacao`/`gerar_candidatos_conciliacao` deprecadas (DROP na F7); `ModoABToggle` (código morto) removido; `reclass-transacoes` recusa transação conciliada. Ver §9.3 | Concluída (jul/2026) |
 | **F5 Pipeline de ingestão** ✅ | Migration `20260712120000`: `fin_ingerir_extratos` (contrato ExtratoItem, valor ABS, dedupe por `(conta_id, external_id)` com id determinístico, job + auditoria) + `fin_desfazer_ingestao`; canal **manual** (OFX/CSV/XLSX) via `core/api/extratos.api`; edge `gerar-sugestoes-ml` migrada ao motor único F4. Caminho service-role de integração (`20260712130000`, D-F5.2) + adaptadores **santander-api**, **getnet-sftp** (2 pontos: settlement_v1 e extrato_eletronico_v10/LQ) e **PIX** (3 pontos: pix-webhook, buscar-pix-recebidos, santander-api/buscar_pix — resolve conta via `cob_pix.conta_id`/`contas.cnpj_banco`, novo helper `ingerirExtratoPix`). Ver §9.4/§9.5 | Concluída (jul/2026); Getnet tipo-1→tipo-5 fica para a F6 (D5), sem relação com a porta de ingestão |
 | **F6 Getnet tipo 5** ✅ | Espelho em `extratos_bancarios` passa a nascer do tipo 5 (`getnet_financeiro_resumo`, `tipo_operacao='PG'`) em vez do tipo 1 (LQ) — opt-in por integração via `config.espelho_tipo5_desde`; tipo 1 vira puramente analítico. Ver §9.6 | Concluída (jul/2026); sem backfill (opcional, não feito nesta fase) |
-| **F7 Endurecimento + UX conciliação** | Revogar escrita direta do role `authenticated`; decompor telas gigantes de conciliação em `features/financeiro/conciliacao` **já responsivas** (Tabs/stepper mobile, abas com scroll); Finanças no bottom-nav; DRE mobile em cards; limpeza de código morto | Fecha o ciclo |
+| **F7 Endurecimento + UX conciliação** ✅ (com 1 pendência menor documentada) | (1) ✅ Revogar escrita direta do role `authenticated` — completa: as 7 tabelas do domínio revogadas; (2) ✅ decompor telas gigantes de conciliação em `features/financeiro/conciliacao` já responsivas — `ConciliacaoInteligente` (crítico), `Reconciliacao`, `ConciliacaoManual` e `DashboardConciliacao` decompostos; `HistoricoExtratos` recebeu só ajuste responsivo mínimo (decomposição completa em subcomponentes fica pendente, prioridade baixa por decisão de escopo); (3) ✅ Finanças no bottom-nav (condicionado por permissão); (4) ✅ DRE mobile em cards (`features/financeiro/relatorios/`); (5) ✅ limpeza de código morto (14 arquivos removidos do módulo financeiro) | Migrations `20260713141000`/`20260713150000`/`20260713160000` (sub-frente 1). Ver §9.7-§9.10. Único item aberto: decomposição completa de `HistoricoExtratos.tsx` em subcomponentes (§9.9) |
 
 ---
 
@@ -1018,6 +1018,471 @@ JSONB livre.
   exato do P1: arquivo legado com `espelho_origem NULL` trava em tipo 1
   mesmo com corte retroativo cobrindo a data). `npx tsc` mantém os 62
   erros pré-existentes catalogados desde a F5, zero novos.
+
+### 9.7 Notas de implementação F7 — revogação de escrita direta (jul/2026)
+
+Três migrations (`20260713141000`, `20260713150000`, `20260713160000`, todas
+jul/2026, mesma leva de trabalho). Fecham **só a sub-frente (1)** do roadmap F7
+("revogar escrita direta do role `authenticated`") — **agora completa: as 7
+tabelas do domínio revogadas** — as outras 4 (decompor telas de conciliação,
+bottom-nav, DRE mobile, limpeza de código morto genérica) permanecem pendentes
+e não foram tocadas nesta fatia.
+
+A sub-frente foi entregue em duas rodadas: a 1ª (`20260713141000`) revogou as 5
+tabelas já 100% migradas e tratou as RPCs legadas; a auditoria daquela rodada
+encontrou call-sites de escrita direta ainda vivos em
+`transacoes_financeiras`/`extratos_bancarios` e deixou as duas de fora do
+`REVOKE` (não revogar coisa que quebraria produção). A 2ª rodada
+(`20260713150000` + `20260713160000`) migrou esses call-sites para RPCs `fin_*`
+(duas novas) e só então estendeu o `REVOKE` às duas tabelas restantes.
+
+**Auditoria (passo obrigatório antes de qualquer `REVOKE`)**: grep exaustivo por
+`.insert(`/`.update(`/`.delete(`/`.upsert(` encadeado em `.from(<tabela>)` nas 7
+tabelas do CORE (`transacoes_financeiras`, `transferencias_contas`,
+`extratos_bancarios`, `conciliacoes_lote`, `conciliacoes_lote_extratos`,
+`conciliacoes_divisao`, `conciliacoes_divisao_transacoes`), em `src/**` e
+`supabase/functions/**`, fora de `core/api/`. Resultado — **não** o que as notas
+das fases anteriores sugeriam por analogia; precisou ser confirmado call-site a
+call-site:
+
+- **100% migradas → `REVOKE INSERT, UPDATE, DELETE` de `authenticated, anon`
+  aplicado**: `transferencias_contas`, `conciliacoes_lote`,
+  `conciliacoes_lote_extratos`, `conciliacoes_divisao`,
+  `conciliacoes_divisao_transacoes`. Zero `.insert/.update/.delete` diretos
+  restantes fora das RPCs `fin_*` (confirmado em `src/` e
+  `supabase/functions/**`).
+- **1ª rodada: deixadas de fora, depois migradas na 2ª rodada e revogadas
+  (`20260713160000`)**: `transacoes_financeiras` e `extratos_bancarios`
+  tinham escrita direta viva no **frontend** (rodando como `authenticated`
+  via PostgREST/JWT — não `service_role`, que não é afetado por este
+  `REVOKE`). Achados originais: gerenciamento de conciliação manual fora do
+  fluxo migrado nas fases anteriores (`TransacaoActionsMenu.
+  handleToggleConferidoManual`, `TransacaoDetalheDrawer.handleSave`,
+  `VincularTransacaoDialog.handleVincular`, `QuickCreateTransacaoDialog`,
+  `HistoricoExtratos.handleIgnorar/handleReativar/handleDesvincular`,
+  `ConciliacaoManual.handleIgnorar`, `DashboardConciliacao.handleIgnorar`,
+  marcação `conciliado_manual` em `ConciliacaoInteligente`); e criação direta
+  de lançamento fora do CORE (`ImportarTab`/`ImportarFinancasPage` — insert em
+  lote de lançamentos do Excel/CSV; `MeusCursos`, `InscricoesTabContent` e
+  `AdicionarInscricaoDialog` — criam a transação de pagamento de
+  inscrição/curso direto). **Todos os 13 call-sites foram migrados** para RPCs
+  `fin_*` (existentes ou 2 novas — ver abaixo) antes do `REVOKE` de
+  `20260713160000`. Reauditoria pós-migração: zero `.insert/.update/.delete`
+  vivo restante nessas 2 tabelas fora de `core/api/`, exceto
+  `ImportarExcelDialog.tsx`/`ImportarExcelWizard.tsx` — **código morto
+  confirmado** (nenhuma rota/tela importa esses componentes; superados por
+  `ImportarTab`/`ImportarFinancasPage`), não removidos (limpeza de código
+  morto genérica é a frente 5/5, fora de escopo desta fatia).
+- **`supabase/functions/**` não bloqueia o REVOKE em nenhuma tabela**: os únicos
+  edges que ainda escrevem direto nessas tabelas (`getnet-sftp` em
+  `extratos_bancarios`, `santander-extrato` em `extratos_bancarios`,
+  `reclass-transacoes`/`undo-reclass`/`undo-import` em `transacoes_financeiras`)
+  usam `SUPABASE_SERVICE_ROLE_KEY` para o client de escrita — rodam como
+  `service_role`, não como `authenticated`, e portanto não são afetados por este
+  `REVOKE` (mesmo continuando a violar a "regra de ouro" arquitetural — débito
+  já conhecido, fora de escopo desta fatia).
+
+**RPCs legadas (mesma migration)**: `reconciliar_transacoes`,
+`aplicar_conciliacao` e `gerar_candidatos_conciliacao` — deprecadas via
+`COMMENT` na F4 — tiveram seus call-sites reconfirmados: **zero** vivos em
+`src/**`/`supabase/functions/**` (a edge `gerar-sugestoes-ml` já chama
+`fin_gerar_candidatos_conciliacao`, o motor único, desde a F5 — confirmado lendo
+o corpo do arquivo, o comentário de cabeçalho é que ficou desatualizado). As 3
+foram **DROPadas**. Achado extra da mesma auditoria: `aplicar_sugestao_conciliacao`
+(mesma categoria de risco — `SECURITY DEFINER` escrevendo direto em
+`extratos_bancarios`/`transacoes_financeiras`/`conciliacoes_lote`) só tinha um
+call-site, em `src/components/financas/SugestoesML.tsx` — componente **órfão**
+(sem import em nenhuma rota/tela). Tratada junto, mesmo não estando nos 3 nomes
+originais do roadmap, por ser a mesma categoria de risco e ter zero uso real.
+`rejeitar_sugestao_conciliacao` **não** entrou — segue com call-site vivo em
+`ConciliacaoInteligente.tsx`.
+
+Descoberta relevante no histórico de migrations: `aplicar_conciliacao` teve
+**duas assinaturas** ao longo do tempo (`(uuid, uuid)` na criação original,
+`(uuid, uuid, text, integer, uuid)` a partir de 20260203172530) sem nenhum
+`DROP FUNCTION` explícito no meio — plausível que os dois overloads coexistissem
+no schema real. A migration não assume a assinatura; itera `pg_proc` por
+`proname` e faz `DROP FUNCTION` de **todo** overload encontrado, blindando
+contra o risco de drift schema real × migrations já registrado no §11.
+
+**Por que revogar de `authenticated` não quebra as RPCs `fin_*`**: todas são
+`SECURITY DEFINER`, de propriedade do role que roda as migrations (mesmo dono
+de todo o resto do schema, com privilégio pleno de escrita) — o corpo da
+função roda com o privilégio do **dono**, não do chamador. Confirmado (não
+assumido) lendo cada `CREATE OR REPLACE FUNCTION` das migrations
+`20260710120000`/`20260710123000`/`20260711140000`/`20260711150000`/
+`20260712120000`/`20260712130000`: todas `SECURITY DEFINER`, todas com `GRANT
+EXECUTE ... TO authenticated, service_role` explícito.
+
+**Validação — harness docker (postgres:15 real)**: réplica de todas as
+migrations `fin_*` (F1-F5) + stubs das 4 RPCs legadas (assinaturas reais) +
+simulação do bootstrap padrão Supabase (`GRANT ALL ON ALL TABLES` para
+`anon`/`authenticated`/`service_role`, já que hoje esse é o estado real em
+produção) + a migration desta fase. Diferente das fases anteriores, o teste
+usa `SET ROLE authenticated` (não apenas `postgres` superuser) nos dois lados:
+
+- **Ataque** (authenticated, escrita direta): `INSERT`/`UPDATE`/`DELETE` direto
+  em cada uma das 5 tabelas revogadas → `insufficient_privilege` (permission
+  denied) em todos os 5 casos; chamar cada uma das 4 RPCs legadas (incluindo os
+  2 overloads de `aplicar_conciliacao`) → `undefined_function` (não existem
+  mais) nos 5 casos.
+- **Controle positivo** (authenticated, via RPC): `fin_criar_lancamento`,
+  `fin_alterar_status_lancamento`, `fin_criar_transferencia`,
+  `fin_ingerir_extratos`, `fin_confirmar_conciliacao`, `fin_desconciliar`,
+  `fin_gerar_candidatos_conciliacao`, `fin_desfazer_ingestao` — todas chamadas
+  com `SET ROLE authenticated` de verdade (não como superuser) e todas
+  funcionando normalmente, incluindo gravar de fato na tabela revogada
+  (`fin_criar_transferencia` grava em `transferencias_contas` mesmo com
+  `authenticated` sem `INSERT` direto nela).
+- **`service_role`**: `INSERT` direto em `transferencias_contas` (a mesma tabela
+  do teste de ataque) continua funcionando sem erro.
+
+Todos os cenários da 1ª rodada batidos. Typecheck: 0 erros novos (baseline de
+62 pré-existentes em Dashboard/Insights/outros, não relacionados).
+
+**2ª rodada — migração dos call-sites e fechamento do REVOKE**: para cada
+call-site, a regra foi checar se uma RPC `fin_*` **já existente** cobria a
+operação antes de criar uma nova:
+
+- **RPC existente reaproveitada** (nenhuma mudança de schema):
+  `fin_atualizar_lancamento` (`TransacaoDetalheDrawer.handleSave` — os campos
+  valor/taxas/juros/multas/desconto/valor_liquido já estavam no `p_patch`
+  permitido); `fin_confirmar_conciliacao` (`VincularTransacaoDialog.
+  handleVincular` — troca uma sequência manual de 3 updates pelo 1:1 transacional,
+  ganhando de brinde a baixa `pendente→pago` que o fluxo antigo não fazia;
+  `QuickCreateTransacaoDialog` — fecha o TODO deixado desde a F3 "vínculo
+  permanece direto até a F3"); `fin_desconciliar` (`HistoricoExtratos.
+  handleDesvincular`, ramo com vínculo — trocou a chamada pelo **nome antigo**
+  `desconciliar_transacao`, que fica sem call-site vivo a partir daqui, mas
+  não foi tocada nesta fatia — não é uma das RPCs nomeadas para `DROP`);
+  `fin_criar_lancamento` (`MeusCursos`, `InscricoesTabContent`,
+  `AdicionarInscricaoDialog` — inserts pontuais de transação de pagamento; e
+  `ImportarTab`/`ImportarFinancasPage` — o `INSERT` em lote virou um
+  `fin_criar_lancamento` **por linha**, dentro do mesmo loop de chunks;
+  ganho colateral: isola erro por linha — antes uma linha ruim rejeitava o
+  `INSERT` inteiro do chunk, até 100 linhas; `tipo_lancamento: "avulso"`, um
+  valor usado só nesses 2 pontos sem nenhum outro consumidor, foi normalizado
+  para `"unico"`, o vocabulário canônico da RPC; status `"cancelado"`, não
+  aceito na criação (só `pendente|pago`), cria como pendente e transiciona via
+  `fin_alterar_status_lancamento`).
+- **RPC nova — nenhuma existente cobria a operação**:
+  - `fin_alternar_conferencia_manual(p_id, p_conferido, p_contexto)`: toggle de
+    `conferido_manual` + `conciliacao_status` (`nao_conciliado`↔
+    `conciliado_manual`) **sem extrato correspondente** (dinheiro conferido em
+    caixa) — `fin_confirmar_conciliacao` não serve porque exige sempre
+    `extrato_ids` não vazio. Sincroniza a perna irmã de transferência (mesmo
+    padrão de `fin_confirmar_conciliacao`). Usada por
+    `TransacaoActionsMenu.handleToggleConferidoManual` (toggle nos dois
+    sentidos) e `ConciliacaoInteligente` (marcar, um sentido só).
+  - `fin_marcar_extrato_ignorado(p_extrato_id, p_ignorado, p_contexto)`:
+    toggle de `extratos_bancarios.reconciliado` para um extrato **sem nenhum
+    vínculo de conciliação** ("ignorar"/"reativar" ruído do extrato) —
+    `fin_ingerir_extratos`/`fin_desfazer_ingestao` são sobre criação em lote,
+    não alternância pontual de uma flag. Usada por `HistoricoExtratos`
+    (`handleIgnorar`/`handleReativar`/`handleDesvincular` no ramo sem
+    vínculo), `ConciliacaoManual.handleIgnorar` e `DashboardConciliacao.
+    handleIgnorar`.
+
+  Checklist de segurança (§7.2) aplicado às duas: `SECURITY DEFINER` +
+  `fin_resolver_contexto` (mesmo gate admin|tesoureiro no JWT / `p_contexto`
+  estrito no service role das demais RPCs `fin_*`); escopo por `igreja_id` via
+  `FOR UPDATE ... WHERE id = $1 AND igreja_id = $2` (mesmo padrão de
+  `fin_atualizar_lancamento`/`fin_alterar_status_lancamento`/
+  `fin_desconciliar` — não há seleção de filial nem candidatos multi-linha
+  numa RPC de alternância pontual por id, então o item do checklist sobre
+  CTE/`p_filial_id` não se aplica aqui); imutabilidade D4 (bloqueiam alternar
+  quando já há conciliação real via extrato/bot ou lote/divisão — fecha um
+  estado *dangling* que o fallback antigo do frontend podia produzir, já que
+  ele limpava `reconciliado` sem checar lote/divisão antes); auditoria em
+  `fin_audit_log`; `GRANT EXECUTE ... TO authenticated, service_role` +
+  `REVOKE ALL ... FROM anon` explícitos no fim da migration.
+
+**Reauditoria + REVOKE final (`20260713160000`)**: com os 13 call-sites
+migrados, `transacoes_financeiras` e `extratos_bancarios` entraram no mesmo
+`REVOKE INSERT, UPDATE, DELETE ... FROM authenticated, anon` das outras 5 —
+as 7 tabelas do domínio agora enforçam a "regra de ouro" do §7.1 no banco, não
+só por convenção de código.
+
+**Validação da 2ª rodada — harness docker**: mesma réplica de migrations +
+stubs, com as 2 migrations novas aplicadas por cima. `SET ROLE authenticated`
+nos dois lados de novo:
+
+- **Ataque**: `INSERT`/`UPDATE`/`DELETE` direto em `transacoes_financeiras` e
+  `extratos_bancarios` como `authenticated` → `insufficient_privilege` nos 5
+  casos (as 5 tabelas da 1ª rodada continuam bloqueadas — sem regressão).
+- **Controle positivo**: `fin_alternar_conferencia_manual` (marcar e
+  desmarcar) e `fin_marcar_extrato_ignorado` (ignorar e reativar) chamadas
+  como `authenticated` de verdade, com efeito real confirmado nas tabelas
+  agora revogadas.
+- **Guardas D4-like**: `fin_marcar_extrato_ignorado` recusa extrato já
+  vinculado 1:1 (`FIN_CONCILIADO`); `fin_alternar_conferencia_manual` recusa
+  lançamento já `conciliado_extrato` (`FIN_CONCILIADO`).
+- **`service_role`**: `INSERT` direto em `transacoes_financeiras` continua
+  funcionando sem erro.
+
+Todos os cenários das duas rodadas (17 no total) batidos. Typecheck: 0 erros
+novos (baseline 62) — confirmado a cada commit incremental (migração feita
+call-site por call-site, não num único commit monolítico).
+
+### 9.8 Notas de implementação F7 — decomposição/responsivo (sub-frente 2/5, jul/2026)
+
+Sub-frente **em andamento** (não completa): dos 4 alvos listados em §3.4/§6.3
+(`ConciliacaoInteligente.tsx`, `Reconciliacao.tsx`, `ConciliacaoManual.tsx` +
+`DashboardConciliacao.tsx`, `HistoricoExtratos.tsx`), esta rodada entregou os
+dois primeiros — na ordem de prioridade que o próprio §6.3 já apontava
+("`ConciliacaoInteligente.tsx:841` — crítico... inutilizável em celular").
+Os outros dois ficam para uma próxima rodada.
+
+**`ConciliacaoInteligente.tsx` (item crítico)**: 1033 l., duas colunas fixas
+lado a lado + coluna central `w-32` sem nenhuma classe responsiva/`isMobile`
+— decomposto e movido para `src/features/financeiro/conciliacao/`, espelhando
+o padrão que a F2 já aplicou em `TransacaoDialog` (§6.2, "o mais bem adaptado"
+do módulo: `useIsMobile` + layout mobile dedicado + barra de ações fixa no
+rodapé + grids `md:grid-cols-2`):
+
+- `hooks/useConciliacaoInteligente.ts`: toda a lógica de dados/mutações
+  (3 queries — extratos/transações/candidatos do motor F4 —, filtros
+  derivados, `confirmarConciliacao`/`marcarConferenciaManual`/
+  `rejeitarSugestao`). Extraída **preservando as query keys originais**
+  (`extratos-pendentes-inteligente`, `transacoes-pendentes-inteligente`,
+  `candidatos-motor-inteligente`, `contas-conciliacao`,
+  `transacoes-conciliacao`) — de propósito: `QuickCreateTransacaoDialog`
+  invalida as duas primeiras e `ConciliacaoManual` compartilha
+  `transacoes-conciliacao`; renomear teria quebrado invalidação cross-file
+  silenciosamente.
+- `components/`: `ExtratoPainel`+`ExtratoListItem` (painel "Banco"),
+  `TransacaoPainel`+`TransacaoListItem` (painel "Sistema"),
+  `ConciliacaoInteligenteFiltros` (busca/conta/tipo/regenerar sugestões ML),
+  `ConciliacaoInteligenteBalanco` (resumo Banco×Sistema×Diferença + botão
+  Confirmar — **2 variantes visuais da mesma lógica**: `sidebar` replica a
+  coluna vertical fixa original no desktop, `footer` é uma barra compacta
+  fixa no rodapé para o mobile).
+- `ConciliacaoInteligente.tsx` (orquestrador, 203 l.): `useIsMobile` decide o
+  layout. **Desktop (≥768px)**: mantém os 3 painéis lado a lado
+  (`h-[calc(100vh-320px)]`) idêntico ao original. **Mobile**: os dois painéis
+  viram abas — reaproveitando o padrão de `Tabs`/`TabsList` já usado em
+  `ConciliacaoManual:552` (a direção que o §6.5 já mandava seguir, não uma
+  escolha nova) — com contadores no rótulo (`Banco (N)` / `Sistema (N)`); o
+  resumo/confirmar usa a variante `footer`, sempre visível **independente da
+  aba ativa** (mesmo padrão de rodapé fixo do `TransacaoDialog`) porque a
+  confirmação depende de seleção nos dois lados ao mesmo tempo — escondê-lo
+  atrás de uma aba obrigaria o usuário a alternar só para ver se pode
+  confirmar. Aceitar uma sugestão ML no mobile troca automaticamente para a
+  aba "Sistema" (a transação sugerida já vem selecionada, então faz sentido
+  o usuário já ver onde ela caiu).
+
+**`Reconciliacao.tsx` (item 2, §6.3)**: `TabsList` com `grid grid-cols-5`
+fixo esmagava os rótulos das 5 abas abaixo de ~640px. **Decisão de scroll
+horizontal vs `<Select>`** (o doc deixava em aberto): procurado por outro
+`TabsList` do app com tratamento responsivo para muitas abas — não existe
+nenhum precedente direto (`EscalaDetailsSheet`/`EventoDetalhes` lidam com
+2-4 abas via `flex-1`/`flex-wrap`, não scroll). Optamos por **scroll
+horizontal** (`overflow-x-auto` + `flex w-max`, virando `grid` só a partir de
+`sm:`) em vez de `<Select>` por ser o padrão recomendado pelo próprio
+Radix/shadcn para "abas demais": preserva a semântica nativa de `Tabs`
+(navegação por teclado, ARIA `tablist`/`tab`) sem precisar sincronizar um
+`<Select>` controlado à parte — que duplicaria estado por pouco ganho real
+com apenas 5 itens (um `<Select>` faria mais sentido com muito mais opções,
+onde a rolagem horizontal deixasse de ser prática).
+
+**Estrutura de pastas** (§7.3): primeira ocupação de
+`src/features/financeiro/conciliacao/` — reaproveita `core/api`,
+`core/hooks` já existentes (nenhuma duplicação; a única lógica nova é
+específica da tela e mora em `conciliacao/hooks/`, não em `core/`).
+
+**Verificação visual**: não há ferramenta de browser/screenshot disponível
+neste ambiente (conferido via busca de ferramentas antes de começar) — a
+adaptação responsiva foi validada por leitura de código/classes Tailwind e
+por paridade com o padrão já em produção do `TransacaoDialog`, **não** por
+inspeção visual real em viewport 375px/768px. Fica pendente uma conferência
+manual antes de abrir a PR.
+
+**Pendente para a próxima rodada da sub-frente 2/5**: `ConciliacaoManual.tsx`
+(1037 l.) já usa `Tabs` para alternar "Por Extrato"/"Por Transação" em
+qualquer viewport (não tem o problema de colunas fixas do `ConciliacaoInteligente`),
+mas ainda é monolítico e concentra bastante lógica que poderia compartilhar
+componentes com `DashboardConciliacao.tsx` (853 l., mesmo domínio do motor
+único F4) — decompor os dois juntos faz sentido, como o item 3 já
+antecipava. `HistoricoExtratos.tsx` (865 l.) já foi tocado na sub-frente 1
+(migração de RPC) e acompanha o mesmo domínio; decomposição/responsivo ficam
+para quando o tempo permitir, sem prioridade sobre os outros.
+
+### 9.9 Notas de implementação F7 — decomposição/responsivo (sub-frente 2/5, continuação — itens 3-4, jul/2026)
+
+Continuação do §9.8: itens 3 (`ConciliacaoManual` + `DashboardConciliacao`) e
+4 (`HistoricoExtratos`) do roadmap de decomposição. Com isso, a sub-frente
+2/5 fica **quase completa** — só falta a decomposição plena de
+`HistoricoExtratos` em subcomponentes (recebeu apenas ajuste responsivo
+nesta rodada, ver abaixo).
+
+**Item 3 — `ConciliacaoManual.tsx` (1037 l.) + `DashboardConciliacao.tsx`
+(853 l.)**: mesmo domínio (motor único F4 — `fin_gerar_candidatos_conciliacao`
++ `fin_confirmar_conciliacao`), decompostos juntos para
+`src/features/financeiro/conciliacao/`. Diferente do `ConciliacaoInteligente`,
+nenhuma das duas telas tinha o problema crítico de colunas fixas — ambas já
+usavam padrões responsivos razoáveis (`ConciliacaoManual` já alternava as
+duas visões via `Tabs`; `DashboardConciliacao` já usava
+`grid-cols-2 md:grid-cols-4`/`grid-cols-1 lg:grid-cols-3`). O trabalho foi
+sobretudo decomposição + eliminação de duplicação real encontrada entre as
+duas:
+
+- **Compartilhado de verdade** (extraído primeiro, antes de decompor cada
+  tela): `hooks/useAutoReconciliar.ts` — a lógica de "Reconciliar Automático"
+  (dedupe extrato↔transação 1:1 + loop de aplicação via
+  `fin_confirmar_conciliacao` + montagem do `MatchResult[]`) estava duplicada
+  quase linha a linha nas duas telas; só a *busca* de candidatos (janela de
+  datas, lista de contas) genuinamente difere, então fica a cargo de cada
+  tela via callback (`buscarCandidatos`). `hooks/useConciliacaoDialogs.ts` +
+  `components/ConciliacaoDialogs.tsx` — estado e render dos 4 diálogos
+  secundários (vincular 1:1, dividir 1:N, lote N:1, resultado), também
+  quase idênticos nas duas telas. `model/types.ts` —
+  `ExtratoItem`/`TransacaoConciliacao`/`ContaConciliacao` (não reaproveita os
+  tipos de `useConciliacaoInteligente`: aquela tela busca colunas adicionais
+  que aqui não existem — unificar criaria acoplamento artificial).
+- **Não forçado**: as duas telas continuam orquestradores **separados**
+  (`ConciliacaoManual.tsx`, `DashboardConciliacao.tsx`) — os propósitos
+  divergem o bastante (uma é o modo clássico com abas paginadas por extrato/
+  transação; a outra é um dashboard com stats + ações recentes + sugestões
+  inline) para não valer a pena forçar um componente-mãe comum além dos
+  hooks/tipos já listados.
+- `ConciliacaoManual`: `hooks/useConciliacaoManualData.ts` (queries/filtros/
+  paginação das 2 abas — mesmas query keys originais:
+  `extratos-pendentes`, `transacoes-conciliacao`, `transacoes-ja-vinculadas`,
+  `contas-conciliacao`) + `components/manual/`: `ManualFiltrosBar`
+  (as duas abas tinham a mesma barra de filtros quase idêntica —
+  parametrizada por `tipoOptions` em vez de duplicada), `ExtratoManualCard`,
+  `TransacaoManualCard`, `PaginacaoCompacta` (a paginação também estava
+  duplicada *dentro do próprio arquivo*, entre as duas abas).
+- `DashboardConciliacao`: `hooks/useDashboardConciliacaoData.ts` (as 5
+  queries + `fetchSugestoes1x1`/`periodoDosExtratos`, helpers do arquivo
+  original — mesmas query keys: `contas-dashboard`, `reconciliacao-stats`,
+  `extratos-pendentes-dashboard`, `transacoes-dashboard`, `audit-logs-recent`,
+  `sugestoes-match`) + `components/dashboard/`: `ConciliacaoStatsCards`,
+  `AcoesRecentesCard`, `PendentesCard` + `PendenteExtratoCard`. Nuance de
+  escala: `fetchSugestoes1x1` devolve score 0-100 (usado para exibir a
+  sugestão inline no card), mas `useAutoReconciliar` espera 0..1 (escala
+  nativa da RPC) — `buscarCandidatosAutoReconciliar` faz a conversão de volta
+  antes de entregar ao hook compartilhado, em vez de alterar a escala de
+  exibição já em uso.
+- **Escrita direta**: nenhuma encontrada para migrar em nenhuma das duas
+  telas — ambas já usam só RPCs `fin_*` desde a F4, como esperado (a F7
+  frente 1 tinha revogado exatamente as tabelas que essas RPCs escrevem).
+
+**Item 4 — `HistoricoExtratos.tsx` (865 l.)**: prioridade menor, conforme o
+roadmap já registrava. Diagnóstico: os itens da lista (`renderExtratoItem`)
+já eram responsivos (`flex flex-col md:flex-row`) e os cards de estatística
+já usavam grid responsivo — **não** tinha o problema crítico de
+`ConciliacaoInteligente`. O que precisava de ajuste era a barra de filtros
+(6 controles com largura fixa em px, formando várias linhas de "chips"
+apertados abaixo de ~375px) e a linha de paginação (rótulo + controles
+espremidos lado a lado). Aplicado **só o ajuste responsivo pontual, sem
+decomposição em subcomponentes/hook** — os filtros passam a ocupar um grid
+de 2 colunas full-width no mobile (`sm:contents` devolve o layout original
+em linha única com wrap a partir de `sm:`) e a paginação empilha em coluna
+no mobile. A migração de RPC da sub-frente 1
+(`fin_marcar_extrato_ignorado`/`fin_desconciliar`) não foi tocada.
+**Pendente**: decomposição completa (hook de dados + subcomponentes, mesmo
+padrão de `ConciliacaoManual`) fica para uma rodada futura — o arquivo
+continua em `src/components/financas/HistoricoExtratos.tsx` (não movido para
+`features/financeiro/conciliacao/` nesta rodada, já que não houve
+decomposição estrutural).
+
+**Débito nomeado — dialogs do domínio ainda em `components/financas/`**: os
+orquestradores decompostos importam de `src/components/financas/` vários
+componentes que pertencem conceitualmente ao domínio conciliação —
+`QuickCreateTransacaoDialog`, `VincularTransacaoDialog`,
+`ExtratoDetalheDrawer`, `ConciliacaoLoteDialog`, `DividirExtratoDialog`,
+`ResultadoReconciliacaoDialog`, `TransacaoActionsMenu`,
+`TransacaoDetalheDrawer` — além do próprio `HistoricoExtratos.tsx`. Coerente
+com o strangler fig (mesmo precedente da F2; sem violação da regra
+módulo→módulo do §7.3), mas fica registrado como a lista concreta da próxima
+rodada de migração para `features/financeiro/`, para não precisar ser
+redescoberta.
+
+**Verificação visual**: mesma ressalva do §9.8 — sem ferramenta de
+browser/screenshot disponível neste ambiente; validado só por revisão de
+código/classes Tailwind, não por inspeção visual real. Pendente conferência
+manual antes da PR.
+
+### 9.10 Notas de implementação F7 — frentes 3, 4 e 5 (bottom-nav, DRE mobile, código morto, jul/2026)
+
+Fecha as 3 frentes restantes do roadmap F7. Com isso, **as 5 frentes da F7
+estão endereçadas** — a única pendência remanescente é a decomposição
+completa de `HistoricoExtratos.tsx` em subcomponentes (§9.9), tratada com
+ajuste responsivo mínimo por decisão explícita de escopo (prioridade baixa).
+
+**Frente 5 — limpeza de código morto**: auditoria restrita ao módulo
+financeiro (`src/components/financas/`, `src/features/financeiro/`,
+`src/pages/financas/`) por arquivos sem nenhuma referência em `src/`
+(grep do nome de cada componente, excluindo a própria definição — a mesma
+técnica usada para confirmar código morto nas sub-frentes 1/5 e 2/5).
+**14 arquivos removidos** (4786 linhas): os 2 já documentados como órfãos
+na frente 1 (`ImportarExcelDialog.tsx`, `ImportarExcelWizard.tsx`,
+superados por `ImportarTab`/`ImportarFinancasPage`) e `SugestoesML.tsx`
+(único call-site de `aplicar_sugestao_conciliacao`, já `DROP`ada); mais 11
+achados nesta varredura — `FornecedorDialog`/`CentroCustoDialog`/
+`SubcategoriaDialog`/`FormaPagamentoDialog`/`BaseMinisterialDialog.tsx`
+(confirmado que `Fornecedores.tsx`/`CentrosCusto.tsx`/etc. implementam o
+próprio dialog inline via `ResponsiveDialog`, não usam mais os componentes
+extraídos), `ProcessarNotaFiscalDialog.tsx` (a funcionalidade de OCR
+continua viva, chamada direto da edge `processar-nota-fiscal` por
+`TransacaoDialog.tsx`/`Reembolsos.tsx` — só este componente específico
+ficou órfão), `SincronizacaoTransferenciasWidget.tsx` (nenhum caller
+restante da edge `sync-transferencias-conciliacao` — provavelmente
+superado pelo sincronismo automático de perna irmã já embutido em
+`fin_confirmar_conciliacao`/`fin_alternar_conferencia_manual`),
+`ExtratoSugestaoMLB.tsx` (variante "B" órfã — `ExtratoSugestaoMLA` é a
+usada; mesma família do `ModoABToggle` já removido na F4),
+`ReconciliacaoBancaria.tsx`/`TransacaoFiltros.tsx`/
+`TransacaoVinculadaDialog.tsx` (sem caller identificável). Confirmação
+adicional: typecheck sem nenhum erro "cannot find module" após a remoção.
+**Fora de escopo, só registro**: `supabase/functions/
+sync-transferencias-conciliacao` ficou sem nenhum caller frontend
+identificado após a remoção do widget — não é código do módulo financeiro
+frontend, não foi tocado (limpeza de edge functions é outra frente).
+
+**Frente 3 — Finanças no bottom-nav**: `MobileNavbar.tsx` ganha um item
+"Finanças" (ícone `DollarSign`, rota `/financas`) condicionado à mesma
+permissão que a `Sidebar` já usa para mostrar/esconder a seção
+("financeiro.view", via `checkPermission`) — segue o padrão condicional já
+existente no arquivo (Pessoas vira Perfil se `!hasPessoasAccess`) em vez de
+inventar um mecanismo novo. Quem não tem acesso ao financeiro continua
+vendo exatamente os 5 itens de sempre, tamanho inalterado — zero mudança
+visual. Quem tem acesso vê 6 ícones; para não apertar em telas estreitas
+(~360-375px), ícone/padding/label reduzem levemente só quando há mais de 5
+itens (`24px→22px`, `p-1.5→p-1`, `text-[10px]→text-[9px]`) — nenhum item
+existente foi removido ou reordenado, "Finanças" entra entre Pessoas/Perfil
+e Menu. Decisão sem alternativa avaliada (o roadmap deixava em aberto
+"bottom-nav OU atalho contextual"; a direção de seguir com bottom-nav
+condicional foi definida pelo usuário para não gastar mais uma rodada de
+pergunta) — fica documentada aqui para reverter fácil se o resultado visual
+não agradar.
+
+**Frente 4 — DRE mobile em cards**: `DRE.tsx` (522 l., tabela de 12 meses +
+total só com `overflow-x-auto`) decomposto e movido para
+`src/features/financeiro/relatorios/` (primeira ocupação dessa pasta,
+prevista em §7.3), seguindo o padrão "casca de rota" que a F2 já aplicou em
+Entradas/Saidas — `src/pages/financas/DRE.tsx` vira um wrapper de 6 linhas.
+`lib/dreCalculos.ts` isola as funções puras (`processarDados`,
+`calcularResultadoLiquido`, sem mudança de comportamento);
+`components/DreMonthGrid.tsx` é uma grade compacta 3×4 dos 12 meses (evita
+recriar o problema original — scroll horizontal — dentro do próprio card);
+`components/SecaoDreCard.tsx` reaproveita o mesmo estado `expandedSections`
+da tabela original (cabeçalho sempre visível com o total do ano, expande
+para o detalhe mensal + por categoria — mesmo dado, reorganizado em
+drill-down); `components/ResultadoLiquidoCard.tsx` fica sempre visível (não
+colapsável) e é posicionado no **topo** da lista mobile — no desktop
+permanece na última linha da tabela; a única reorganização deliberada é
+essa (mostrar o resultado líquido primeiro no card, já que é o número mais
+consultado), sem esconder nenhum dado. `useIsMobile` decide entre a tabela
+original (desktop/tablet, inalterada) e a lista de cards; exportação Excel
+(`handleExport`) não foi tocada.
+
+**Verificação visual**: mesma ressalva das rodadas anteriores — sem
+ferramenta de browser/screenshot disponível neste ambiente; as 3 frentes
+foram validadas só por revisão de código/classes Tailwind. Pendente
+conferência manual antes da PR, em especial o bottom-nav com 6 ícones
+(frente 3) e a densidade dos cards do DRE em telas pequenas (frente 4).
 
 ## 10. Decisões em aberto (bater o martelo)
 

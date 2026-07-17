@@ -41,6 +41,27 @@ using (
 - Auditar politicas em novas migracoes e vincular ao ADR correspondente.
 - Testar politicas com usuarios de cada papel antes de liberar features.
 
+## GRANT como segunda camada (além de RLS) — módulo financeiro (F7, jul/2026)
+
+RLS controla *quais linhas* um role enxerga/afeta; o `GRANT` de
+INSERT/UPDATE/DELETE controla se o role pode sequer tentar a operação na
+tabela. O CORE financeiro (`docs/arquitetura-financeiro.md` §7.1) usa RPCs
+`SECURITY DEFINER` (`fin_*`) como única porta de escrita em
+`transacoes_financeiras`, `transferencias_contas`, `extratos_bancarios` e
+tabelas de conciliação — mas até jul/2026 essa regra valia só por convenção de
+código: o role `authenticated` ainda tinha o `GRANT` de escrita herdado do
+bootstrap padrão do Supabase. Migrations `20260713140000` (5 tabelas de
+transferência/conciliação em lote/divisão) e `20260713160000`
+(`transacoes_financeiras`/`extratos_bancarios`, depois de migrar os 13
+call-sites de escrita direta que ainda restavam no frontend — ver
+`docs/arquitetura-financeiro.md` §9.6) fecham essa lacuna: as **7 tabelas do
+domínio financeiro** agora têm `REVOKE INSERT, UPDATE, DELETE ... FROM
+authenticated, anon`. `SELECT` não foi tocado — RLS continua sendo a camada de
+leitura. RPCs `SECURITY DEFINER` não são afetadas (rodam com o privilégio do
+dono da função, não do chamador) — validado com harness real via `SET ROLE
+authenticated` (não só `postgres` superuser), provando os dois lados: escrita
+direta bloqueada e RPCs continuando a funcionar.
+
 ## Funcoes de Seguranca
 
 | Funcao | Escopo | Descricao |

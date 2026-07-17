@@ -48,3 +48,18 @@ export function ingerirExtratos(
 export function desfazerIngestao(jobId: string): Promise<FinResultado> {
   return callFinRpc("fin_desfazer_ingestao", { p_job_id: jobId });
 }
+
+/**
+ * → fin_marcar_extrato_ignorado. Alterna `reconciliado` de um extrato SEM
+ * vínculo de conciliação (F7) — "ignorar"/"reativar" ruído do extrato.
+ * Recusa extrato vinculado (1:1/lote/divisão); use `desconciliar` nesses casos.
+ */
+export function marcarExtratoIgnorado(
+  extratoId: string,
+  ignorado: boolean,
+): Promise<FinResultado> {
+  return callFinRpc("fin_marcar_extrato_ignorado", {
+    p_extrato_id: extratoId,
+    p_ignorado: ignorado,
+  });
+}

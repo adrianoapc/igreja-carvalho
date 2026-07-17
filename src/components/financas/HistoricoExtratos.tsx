@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { marcarExtratoIgnorado } from "@/features/financeiro/core/api/extratos.api";
+import { desconciliar } from "@/features/financeiro/core/api/conciliacao.api";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { useHideValues } from "@/hooks/useHideValues";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -384,12 +386,7 @@ export function HistoricoExtratos() {
   const handleIgnorar = async (extrato: ExtratoItem) => {
     setActionLoading(extrato.id);
     try {
-      const { error } = await supabase
-        .from("extratos_bancarios")
-        .update({ reconciliado: true })
-        .eq("id", extrato.id);
-
-      if (error) throw error;
+      await marcarExtratoIgnorado(extrato.id, true);
 
       toast.success("Extrato marcado como ignorado");
       queryClient.invalidateQueries({ queryKey: ["extratos-historico"] });
@@ -404,18 +401,22 @@ export function HistoricoExtratos() {
   const handleReativar = async (extrato: ExtratoItem) => {
     setActionLoading(extrato.id);
     try {
-      const { error } = await supabase
-        .from("extratos_bancarios")
-        .update({ reconciliado: false })
-        .eq("id", extrato.id);
-
-      if (error) throw error;
+      await marcarExtratoIgnorado(extrato.id, false);
 
       toast.success("Extrato reativado para conciliação");
       queryClient.invalidateQueries({ queryKey: ["extratos-historico"] });
     } catch (err) {
       console.error(err);
-      toast.error("Erro ao reativar extrato");
+      // Extrato conciliado via lote/divisão também aparece aqui como
+      // "ignorado" (reconciliado sem vínculo 1:1) — a RPC recusa com
+      // FIN_CONCILIADO; a UI não distingue os dois casos sem query extra.
+      if (err instanceof Error && err.message.includes("FIN_CONCILIADO")) {
+        toast.error(
+          "Este extrato faz parte de uma conciliação em lote ou divisão — desfaça a conciliação pela transação vinculada.",
+        );
+      } else {
+        toast.error("Erro ao reativar extrato");
+      }
     } finally {
       setActionLoading(null);
     }
@@ -424,19 +425,14 @@ export function HistoricoExtratos() {
   const handleDesvincular = async (extrato: ExtratoItem) => {
     setActionLoading(extrato.id);
     try {
-      // Se tem transação vinculada, usar a RPC para desconciliar atomicamente
+      // Se tem transação vinculada, usar a RPC para desconciliar atomicamente;
+      // senão (extrato ignorado/sem vínculo real) só reativa (fin_marcar_
+      // extrato_ignorado recusa qualquer extrato realmente vinculado via
+      // lote/divisão, evitando o estado dangling do fallback antigo).
       if (extrato.transacao_vinculada_id) {
-        const { error } = await supabase.rpc("desconciliar_transacao", {
-          p_transacao_id: extrato.transacao_vinculada_id,
-        });
-        if (error) throw error;
+        await desconciliar(extrato.transacao_vinculada_id);
       } else {
-        // Fallback: limpar apenas o extrato
-        const { error } = await supabase
-          .from("extratos_bancarios")
-          .update({ transacao_vinculada_id: null, reconciliado: false })
-          .eq("id", extrato.id);
-        if (error) throw error;
+        await marcarExtratoIgnorado(extrato.id, false);
       }
 
       toast.success("Vínculo removido com sucesso");
@@ -445,7 +441,13 @@ export function HistoricoExtratos() {
       queryClient.invalidateQueries({ queryKey: ["saidas"] });
     } catch (err) {
       console.error(err);
-      toast.error("Erro ao desvincular");
+      if (err instanceof Error && err.message.includes("FIN_CONCILIADO")) {
+        toast.error(
+          "Este extrato faz parte de uma conciliação em lote ou divisão — desfaça a conciliação pela transação vinculada.",
+        );
+      } else {
+        toast.error("Erro ao desvincular");
+      }
     } finally {
       setActionLoading(null);
     }
@@ -668,7 +670,7 @@ export function HistoricoExtratos() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
@@ -679,81 +681,87 @@ export function HistoricoExtratos() {
               />
             </div>
 
-            <Select
-              value={contaSelecionada}
-              onValueChange={setContaSelecionada}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Conta" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as contas</SelectItem>
-                {contas.map((conta) => (
-                  <SelectItem key={conta.id} value={conta.id}>
-                    {conta.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Selects de filtro: full-width empilhados em 2 colunas no
+                celular (larguras fixas em px eram inutilizáveis abaixo de
+                ~375px — várias linhas de "chips" apertados); a partir de
+                sm: voltam à largura fixa original em linha única com wrap. */}
+            <div className="grid grid-cols-2 gap-2 sm:contents">
+              <Select
+                value={contaSelecionada}
+                onValueChange={setContaSelecionada}
+              >
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as contas</SelectItem>
+                  {contas.map((conta) => (
+                    <SelectItem key={conta.id} value={conta.id}>
+                      {conta.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select value={statusFiltro} onValueChange={setStatusFiltro}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="pendente">Pendente</SelectItem>
-                <SelectItem value="conciliado">Conciliado</SelectItem>
-                <SelectItem value="ignorado">Ignorado</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={statusFiltro} onValueChange={setStatusFiltro}>
+                <SelectTrigger className="w-full sm:w-[150px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="conciliado">Conciliado</SelectItem>
+                  <SelectItem value="ignorado">Ignorado</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={tipoFiltro} onValueChange={setTipoFiltro}>
-              <SelectTrigger className="w-[130px]">
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="credito">Crédito</SelectItem>
-                <SelectItem value="debito">Débito</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={tipoFiltro} onValueChange={setTipoFiltro}>
+                <SelectTrigger className="w-full sm:w-[130px]">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="credito">Crédito</SelectItem>
+                  <SelectItem value="debito">Débito</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={origemFiltro} onValueChange={setOrigemFiltro}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Origem" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="api_santander">API Santander</SelectItem>
-                <SelectItem value="manual">Manual</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={origemFiltro} onValueChange={setOrigemFiltro}>
+                <SelectTrigger className="w-full sm:w-[150px]">
+                  <SelectValue placeholder="Origem" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="api_santander">API Santander</SelectItem>
+                  <SelectItem value="manual">Manual</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <MonthPicker
-              selectedMonth={selectedMonth}
-              onMonthChange={setSelectedMonth}
-              customRange={customRange}
-              onCustomRangeChange={setCustomRange}
-            />
+              <MonthPicker
+                selectedMonth={selectedMonth}
+                onMonthChange={setSelectedMonth}
+                customRange={customRange}
+                onCustomRangeChange={setCustomRange}
+              />
 
-            {/* Grouping selector */}
-            <Select
-              value={groupBy}
-              onValueChange={(v) => setGroupBy(v as GroupByOption)}
-            >
-              <SelectTrigger className="w-[160px]">
-                <Layers className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Agrupar por" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sem agrupamento</SelectItem>
-                <SelectItem value="status">Status</SelectItem>
-                <SelectItem value="tipo">Tipo</SelectItem>
-                <SelectItem value="origem">Origem</SelectItem>
-                <SelectItem value="conta">Conta</SelectItem>
-              </SelectContent>
-            </Select>
+              {/* Grouping selector */}
+              <Select
+                value={groupBy}
+                onValueChange={(v) => setGroupBy(v as GroupByOption)}
+              >
+                <SelectTrigger className="w-full sm:w-[160px]">
+                  <Layers className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Agrupar por" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem agrupamento</SelectItem>
+                  <SelectItem value="status">Status</SelectItem>
+                  <SelectItem value="tipo">Tipo</SelectItem>
+                  <SelectItem value="origem">Origem</SelectItem>
+                  <SelectItem value="conta">Conta</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* List */}
@@ -798,7 +806,7 @@ export function HistoricoExtratos() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4 border-t">
+            <div className="flex flex-col gap-2 pt-4 border-t sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground">
                 Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1} -{" "}
                 {Math.min(
@@ -807,7 +815,7 @@ export function HistoricoExtratos() {
                 )}{" "}
                 de {extratosFiltrados.length}
               </p>
-              <Pagination>
+              <Pagination className="mx-0 w-auto justify-start sm:justify-end">
                 <PaginationContent>
                   <PaginationItem>
                     <PaginationPrevious
