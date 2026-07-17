@@ -562,3 +562,11 @@ flowchart TD
         ISM -->|true| CARDS["ResultadoLiquidoCard (topo, sempre visível)\n+ SecaoDreCard por seção\n(expande → DreMonthGrid 3×4 + categorias)"]
     end
 ```
+
+## Correções pós-F7 — PR #54 (jul/2026)
+
+Ver §9.11 do `arquitetura-financeiro.md`. Achados da conferência visual real
+na Conciliação Inteligente: badge de tipo (entrada/saída) + filtro de
+categoria no `QuickCreateTransacaoDialog`, bug de comparação `"credit"` vs
+`"credito"` no cálculo do tipo, e badge de conta no painel "Sistema"
+(incluindo contas desativadas, P2 do review Codex).

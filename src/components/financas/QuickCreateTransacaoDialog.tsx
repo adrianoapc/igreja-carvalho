@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/form";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { format, parseISO } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
   descricao: z.string().min(3, "A descrição é obrigatória."),
@@ -51,6 +52,7 @@ interface ExtratoItem {
   data_transacao: string;
   descricao: string;
   valor: number;
+  /** extratos_bancarios.tipo — sempre em português ("credito"/"debito"), nunca "credit"/"debit". */
   tipo: string;
   conta_id: string;
 }
@@ -70,6 +72,20 @@ export function QuickCreateTransacaoDialog({
 }: QuickCreateTransacaoDialogProps) {
   const { igrejaId } = useIgrejaId();
   const queryClient = useQueryClient();
+
+  // Review PR #53: o tipo vem do sinal do item de extrato (não é escolha do
+  // usuário) — precisa ficar visível, e a categoria precisa ser filtrada por
+  // ele (mesma convenção de useDadosApoio/TransacaoDialog), senão o usuário
+  // consegue escolher uma categoria de saída para uma entrada e vice-versa.
+  //
+  // Bug achado na conferência visual deste próprio fix: extratos_bancarios.tipo
+  // vem em português ("credito"/"debito", ver ExtratoDetalheDrawer.tsx:224,
+  // useConciliacaoInteligente.ts:335-336) — o check antigo comparava com
+  // "credit" (inglês), que nunca batia, então TODO lançamento rápido criado a
+  // partir de um crédito no extrato nascia como saída. Pré-existente ao F7,
+  // só ficou visível agora que o tipo aparece na tela.
+  const tipoLancamento: "entrada" | "saida" =
+    extratoItem?.tipo === "credito" ? "entrada" : "saida";
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -107,15 +123,17 @@ export function QuickCreateTransacaoDialog({
   });
 
   const { data: categorias } = useQuery({
-    queryKey: ["categorias_financeiras", igrejaId],
+    queryKey: ["categorias-select", tipoLancamento],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("categorias_financeiras")
         .select("id, nome")
-        .eq("igreja_id", igrejaId!);
+        .eq("tipo", tipoLancamento)
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
       return data;
     },
-    enabled: !!igrejaId,
   });
 
   const createAndReconcileMutation = useMutation({
@@ -126,7 +144,7 @@ export function QuickCreateTransacaoDialog({
       // extrato via fin_confirmar_conciliacao (F3/F7) — cobre o 1:1 numa
       // única transação.
       const resultado = await criarLancamento({
-        tipo: extratoItem.tipo === "credit" ? "entrada" : "saida",
+        tipo: tipoLancamento,
         valor: values.valor,
         data_vencimento: values.data_pagamento,
         conta_id: values.conta_id,
@@ -166,7 +184,19 @@ export function QuickCreateTransacaoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Lançamento Rápido</DialogTitle>
+          <div className="flex items-center gap-2">
+            <DialogTitle>Lançamento Rápido</DialogTitle>
+            <span
+              className={cn(
+                "text-xs font-semibold px-2 py-0.5 rounded-full",
+                tipoLancamento === "entrada"
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                  : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400",
+              )}
+            >
+              {tipoLancamento === "entrada" ? "Entrada" : "Saída"}
+            </span>
+          </div>
           <DialogDescription>
             Crie uma nova transação baseada neste item do extrato.
           </DialogDescription>

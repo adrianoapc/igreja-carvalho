@@ -1,14 +1,18 @@
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RotateCcw } from "lucide-react";
 import { MonthPicker } from "@/components/financas/MonthPicker";
 import { TransacaoListItem } from "./TransacaoListItem";
 import type { TransacaoItemComScore } from "./TransacaoListItem";
+import type { Conta } from "../hooks/useConciliacaoInteligente";
 
 interface TransacaoPainelProps {
   transacoes: TransacaoItemComScore[];
   loading: boolean;
   selectedTransacoes: string[];
+  /** Usado só para resolver o nome exibido no badge de conta de cada item. */
+  contas?: Conta[];
   mesTransacoes: Date;
   onMesTransacoesChange: (date: Date) => void;
   transacoesCustomRange: { from: Date; to: Date } | null;
@@ -31,6 +35,7 @@ export function TransacaoPainel({
   transacoes,
   loading,
   selectedTransacoes,
+  contas,
   mesTransacoes,
   onMesTransacoesChange,
   transacoesCustomRange,
@@ -41,6 +46,12 @@ export function TransacaoPainel({
   onMarcarConferenciaManual,
   className,
 }: TransacaoPainelProps) {
+  const contaNomeById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const conta of contas ?? []) map.set(conta.id, conta.nome);
+    return map;
+  }, [contas]);
+
   return (
     <div
       className={
@@ -92,6 +103,7 @@ export function TransacaoPainel({
               key={item.id}
               item={item}
               selected={selectedTransacoes.includes(item.id)}
+              contaNome={contaNomeById.get(item.conta_id)}
               onSelect={onSelect}
               onAjustarValores={onAjustarValores}
               onMarcarConferenciaManual={onMarcarConferenciaManual}

@@ -1484,6 +1484,41 @@ foram validadas só por revisão de código/classes Tailwind. Pendente
 conferência manual antes da PR, em especial o bottom-nav com 6 ícones
 (frente 3) e a densidade dos cards do DRE em telas pequenas (frente 4).
 
+### 9.11 Correções pós-F7 — conferência visual real (PR #54, jul/2026)
+
+A conferência visual manual pendente desde §9.8-§9.10 (sem ferramenta de
+browser disponível para os agentes) aconteceu de verdade após o merge da F7
+(#53) e achou 3 problemas reais na tela de Conciliação Inteligente — nenhum
+deles pego pelo typecheck, já que envolvem valor de string em runtime ou uma
+query filtrada demais:
+
+1. **`QuickCreateTransacaoDialog` ("Lançamento Rápido") não mostrava o tipo
+   (entrada/saída) nem filtrava a categoria por ele.** O tipo é inferido do
+   extrato (não é escolha do usuário) mas ficava invisível na tela — agora
+   tem um badge Entrada/Saída no header. A lista de categorias passou a
+   filtrar por tipo via a mesma convenção de `useDadosApoio`/`TransacaoDialog`
+   (`categorias_financeiras.tipo`, queryKey `"categorias-select"`).
+2. **Bug real achado testando o item 1**: o cálculo do tipo comparava
+   `extratoItem.tipo === "credit"` (inglês) — mas `extratos_bancarios.tipo`
+   sempre vem em português (`credito`/`debito`, mesma convenção usada em
+   `ExtratoDetalheDrawer.tsx:224` e em todo `useConciliacaoInteligente.ts`).
+   A comparação nunca batia, então **todo** lançamento rápido criado a partir
+   de um crédito no extrato nascia como saída — silenciosamente, desde antes
+   da F7. Corrigido comparando com `"credito"`.
+3. **Painel "Sistema" (transações pendentes) não indicava a conta** quando o
+   filtro "Todas as contas" está ativo — badge de conta adicionado ao lado da
+   data em `TransacaoListItem`. Review do Codex na PR #54 (P2) achou que o
+   lookup usava `data.contas`, que só traz contas `ativo=true` (filtro correto
+   para o dropdown "Todas as contas", mas não para o lookup do badge — uma
+   transação pendente ligada a uma conta já desativada ficava sem badge,
+   silenciosamente). Nova query `contasComInativas` (mesma tabela, sem o
+   filtro `ativo`) alimenta só o lookup do badge.
+
+Commits: `ac109d5`→`5ce4e0e`/`3415fe0` (itens 1/3, extraído em branch própria
+`fix/conciliacao-quickcreate-tipo-badge-v2`, PR #54, já que a #53 tinha
+mergeado antes dessa conferência acontecer), `a3c340a` (item 2), `d9c83e5`
+(item 3, fix do P2).
+
 ## 10. Decisões em aberto (bater o martelo)
 
 | # | Decisão | Recomendação |

@@ -114,7 +114,8 @@ export function useConciliacaoInteligente() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [igrejaId, contaFiltro, mesExtratos, extratosCustomRange]);
 
-  // Fetch accounts
+  // Fetch accounts (só ativas — usada no filtro "Todas as contas"; não faz
+  // sentido deixar o usuário filtrar por uma conta desativada).
   const { data: contas } = useQuery<Conta[]>({
     queryKey: ["contas-conciliacao", igrejaId],
     queryFn: async () => {
@@ -124,6 +125,25 @@ export function useConciliacaoInteligente() {
         .select("id, nome")
         .eq("igreja_id", igrejaId)
         .eq("ativo", true);
+      return data || [];
+    },
+    enabled: !!igrejaId,
+  });
+
+  // Todas as contas, incluindo desativadas (P2 do review da PR #54): o badge
+  // de conta no painel "Sistema" precisa resolver o nome mesmo de uma
+  // transação pendente ligada a uma conta já desativada — a lista de
+  // `transacoesFiltradas`/`sortedTransacoes` abaixo não filtra por
+  // contas.ativo, então o lookup não pode filtrar também, senão o badge some
+  // silenciosamente pra essas transações.
+  const { data: contasComInativas } = useQuery<Conta[]>({
+    queryKey: ["contas-conciliacao-todas", igrejaId],
+    queryFn: async () => {
+      if (!igrejaId) return [];
+      const { data } = await supabase
+        .from("contas")
+        .select("id, nome")
+        .eq("igreja_id", igrejaId);
       return data || [];
     },
     enabled: !!igrejaId,
@@ -535,6 +555,7 @@ export function useConciliacaoInteligente() {
   return {
     // filtros
     contas,
+    contasComInativas,
     contaFiltro,
     setContaFiltro,
     tipoFiltro,
