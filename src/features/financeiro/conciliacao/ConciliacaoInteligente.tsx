@@ -107,6 +107,7 @@ export function ConciliacaoInteligente() {
       transacoes={data.sortedTransacoes}
       loading={data.loadingTransacoes}
       selectedTransacoes={data.selectedTransacoes}
+      contas={data.contas}
       mesTransacoes={data.mesTransacoes}
       onMesTransacoesChange={data.setMesTransacoes}
       transacoesCustomRange={data.transacoesCustomRange}
