@@ -15,6 +15,7 @@ export interface TransacaoItemComScore extends TransacaoItem {
 interface TransacaoListItemProps {
   item: TransacaoItemComScore;
   selected: boolean;
+  contaNome?: string;
   onSelect: (id: string) => void;
   onAjustarValores: (item: TransacaoItemComScore) => void;
   onMarcarConferenciaManual: (id: string) => void;
@@ -24,6 +25,7 @@ interface TransacaoListItemProps {
 export function TransacaoListItem({
   item,
   selected,
+  contaNome,
   onSelect,
   onAjustarValores,
   onMarcarConferenciaManual,
@@ -51,17 +53,27 @@ export function TransacaoListItem({
             </span>
           )}
         </div>
-        <div className="flex justify-between items-center">
-          <p className="text-xs text-muted-foreground">
-            {(() => {
-              const data = parseLocalDate(
-                item.status === "pendente"
-                  ? item.data_vencimento!
-                  : item.data_pagamento!,
-              );
-              return data ? format(data, "dd/MM", { locale: ptBR }) : "-";
-            })()}
-          </p>
+        <div className="flex justify-between items-center gap-1">
+          <span className="flex items-center gap-1 min-w-0">
+            <p className="text-xs text-muted-foreground whitespace-nowrap">
+              {(() => {
+                const data = parseLocalDate(
+                  item.status === "pendente"
+                    ? item.data_vencimento!
+                    : item.data_pagamento!,
+                );
+                return data ? format(data, "dd/MM", { locale: ptBR }) : "-";
+              })()}
+            </p>
+            {contaNome && (
+              <span
+                className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0 rounded truncate"
+                title={contaNome}
+              >
+                {contaNome}
+              </span>
+            )}
+          </span>
           <p
             className={cn(
               "font-bold text-xs",
