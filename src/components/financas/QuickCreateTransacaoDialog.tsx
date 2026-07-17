@@ -52,6 +52,7 @@ interface ExtratoItem {
   data_transacao: string;
   descricao: string;
   valor: number;
+  /** extratos_bancarios.tipo — sempre em português ("credito"/"debito"), nunca "credit"/"debit". */
   tipo: string;
   conta_id: string;
 }
@@ -76,8 +77,15 @@ export function QuickCreateTransacaoDialog({
   // usuário) — precisa ficar visível, e a categoria precisa ser filtrada por
   // ele (mesma convenção de useDadosApoio/TransacaoDialog), senão o usuário
   // consegue escolher uma categoria de saída para uma entrada e vice-versa.
+  //
+  // Bug achado na conferência visual deste próprio fix: extratos_bancarios.tipo
+  // vem em português ("credito"/"debito", ver ExtratoDetalheDrawer.tsx:224,
+  // useConciliacaoInteligente.ts:335-336) — o check antigo comparava com
+  // "credit" (inglês), que nunca batia, então TODO lançamento rápido criado a
+  // partir de um crédito no extrato nascia como saída. Pré-existente ao F7,
+  // só ficou visível agora que o tipo aparece na tela.
   const tipoLancamento: "entrada" | "saida" =
-    extratoItem?.tipo === "credit" ? "entrada" : "saida";
+    extratoItem?.tipo === "credito" ? "entrada" : "saida";
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
