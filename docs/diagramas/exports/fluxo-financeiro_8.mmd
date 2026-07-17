@@ -1,0 +1,31 @@
+flowchart TD
+    subgraph AUTH["role authenticated (frontend via PostgREST/JWT)"]
+        FE["Frontend SPA"]
+    end
+
+    subgraph REVOGADO["REVOKE INSERT/UPDATE/DELETE (authenticated, anon) — as 7 tabelas do domínio"]
+        T1[(transferencias_contas)]
+        T2[(conciliacoes_lote)]
+        T3[(conciliacoes_lote_extratos)]
+        T4[(conciliacoes_divisao)]
+        T5[(conciliacoes_divisao_transacoes)]
+        T6[(transacoes_financeiras)]
+        T7[(extratos_bancarios)]
+    end
+
+    FE -.->|"INSERT/UPDATE/DELETE direto\n→ permission denied"| REVOGADO
+
+    subgraph CORE["RPCs fin_* (SECURITY DEFINER, dono com grant pleno)"]
+        RPC["fin_criar_lancamento · fin_atualizar_lancamento ·\nfin_criar_transferencia · fin_confirmar_conciliacao ·\nfin_desconciliar · fin_ingerir_extratos ·\nfin_desfazer_ingestao · fin_alternar_conferencia_manual ·\nfin_marcar_extrato_ignorado · ..."]
+    end
+    FE -->|EXECUTE| RPC
+    RPC -->|"escreve com o privilégio do DONO\n(não do chamador)"| REVOGADO
+
+    subgraph DROP["DROP FUNCTION (zero call-site vivo)"]
+        L1[reconciliar_transacoes]
+        L2["aplicar_conciliacao\n(2 overloads: uuid,uuid / uuid,uuid,text,integer,uuid)"]
+        L3[gerar_candidatos_conciliacao]
+        L4["aplicar_sugestao_conciliacao\n(achado bônus — SugestoesML.tsx órfão)"]
+    end
+
+    SR["service_role (edges: getnet-sftp, santander-extrato,\nreclass-transacoes, undo-reclass, undo-import)"] -->|"não afetado\n(SUPABASE_SERVICE_ROLE_KEY, não JWT)"| REVOGADO

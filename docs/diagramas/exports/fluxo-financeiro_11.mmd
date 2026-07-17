@@ -1,0 +1,21 @@
+flowchart TD
+    subgraph F5["Frente 5 — código morto"]
+        D1["14 arquivos removidos\n(src/components/financas/)"]
+    end
+
+    subgraph F3["Frente 3 — bottom-nav"]
+        NAV["MobileNavbar.tsx"]
+        PERM{"checkPermission\n('financeiro.view')\nmesma checagem da Sidebar"}
+        NAV --> PERM
+        PERM -->|não| NAV5["5 itens (inalterado)"]
+        PERM -->|sim| NAV6["6 itens\n(ícone/label levemente menores)"]
+    end
+
+    subgraph F4["Frente 4 — DRE mobile"]
+        DRE["DRE.tsx (casca de rota)"]
+        DREF["features/financeiro/relatorios/DRE.tsx"]
+        DRE --> DREF
+        DREF --> ISM{useIsMobile}
+        ISM -->|false| TABLE["Table original\n(12 meses + total)"]
+        ISM -->|true| CARDS["ResultadoLiquidoCard (topo, sempre visível)\n+ SecaoDreCard por seção\n(expande → DreMonthGrid 3×4 + categorias)"]
+    end

@@ -1,0 +1,31 @@
+flowchart TD
+    subgraph HOOK["hooks/useConciliacaoInteligente.ts"]
+        Q["3 queries (extratos · transações ·\ncandidatos motor F4) + filtros derivados"]
+        M["mutations: confirmarConciliacao ·\nmarcarConferenciaManual · rejeitarSugestao"]
+    end
+
+    subgraph ORQ["ConciliacaoInteligente.tsx (orquestrador, 203 l.)"]
+        MOBILE{useIsMobile}
+    end
+    HOOK --> ORQ
+
+    subgraph DESKTOP["≥768px — 3 colunas (layout original)"]
+        D1[ExtratoPainel]
+        D2["ConciliacaoInteligenteBalanco\nvariant=sidebar"]
+        D3[TransacaoPainel]
+    end
+
+    subgraph MOBILE_UI["<768px — Tabs (padrão de ConciliacaoManual:552)"]
+        T1["Tab Banco → ExtratoPainel"]
+        T2["Tab Sistema → TransacaoPainel"]
+        F["ConciliacaoInteligenteBalanco\nvariant=footer (fixo, independe da aba ativa)"]
+    end
+
+    MOBILE -->|false| DESKTOP
+    MOBILE -->|true| MOBILE_UI
+
+    D1 -.mesmo componente.-> T1
+    D3 -.mesmo componente.-> T2
+
+    ExtratoPainel --> ExtratoListItem
+    TransacaoPainel --> TransacaoListItem
