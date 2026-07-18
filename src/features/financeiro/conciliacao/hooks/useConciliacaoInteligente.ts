@@ -27,6 +27,8 @@ export interface ExtratoItem {
   valor: number;
   tipo: string;
   conta_id: string;
+  origem?: string | null;
+  possivel_duplicata_de?: string | null;
 }
 
 export interface TransacaoItem {
@@ -171,7 +173,7 @@ export function useConciliacaoInteligente() {
 
       let query = supabase
         .from("extratos_bancarios")
-        .select("id, data_transacao, descricao, valor, tipo, conta_id")
+        .select("id, data_transacao, descricao, valor, tipo, conta_id, origem, possivel_duplicata_de")
         .eq("igreja_id", igrejaId)
         .eq("reconciliado", false)
         .is("transacao_vinculada_id", null)
@@ -189,7 +191,10 @@ export function useConciliacaoInteligente() {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []) as ExtratoItem[];
+      // `possivel_duplicata_de` ainda não está em types.ts gerado (coluna
+      // nova, ver HistoricoExtratos.tsx para o mesmo padrão) — cast via
+      // unknown até a próxima regeneração de tipos.
+      return (data || []) as unknown as ExtratoItem[];
     },
     enabled: !igrejaLoading && !filialLoading && !!igrejaId,
     staleTime: 0,

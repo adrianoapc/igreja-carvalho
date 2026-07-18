@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { anonymizePixDescription } from "@/utils/anonymization";
@@ -41,6 +42,7 @@ export function ExtratoListItem({
 }: ExtratoListItemProps) {
   return (
     <div
+      id={`extrato-${item.id}`}
       onClick={() => {
         onSelect(item.id);
         if (sugestao?.transacaoId) {
@@ -66,6 +68,32 @@ export function ExtratoListItem({
           : "border-border hover:bg-slate-50 dark:hover:bg-slate-800",
       )}
     >
+      {item.possivel_duplicata_de && (
+        <Badge
+          variant="outline"
+          className="mb-1 gap-1 border-amber-400 text-amber-700 dark:text-amber-400 text-[10px] font-normal cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            const originalElement = document.getElementById(
+              `extrato-${item.possivel_duplicata_de}`,
+            );
+            if (originalElement) {
+              originalElement.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+              });
+              originalElement.classList.add("ring-2", "ring-amber-400");
+              setTimeout(() => {
+                originalElement.classList.remove("ring-2", "ring-amber-400");
+              }, 2000);
+            }
+          }}
+          title="Outra linha de extrato com mesmo valor/conta e data próxima, de origem diferente — pode ser a mesma movimentação importada duas vezes. Clique para ver."
+        >
+          <AlertTriangle className="w-2.5 h-2.5" />
+          possível duplicata
+        </Badge>
+      )}
       <ExtratoSugestaoMLA
         extratoId={item.id}
         valor={item.valor}

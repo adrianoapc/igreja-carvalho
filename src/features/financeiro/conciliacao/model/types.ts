@@ -19,6 +19,7 @@ export interface ExtratoItem {
   reconciliado: boolean;
   transacao_vinculada_id?: string | null;
   origem?: string | null;
+  possivel_duplicata_de?: string | null;
   contas?: { nome: string } | null;
 }
 

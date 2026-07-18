@@ -392,7 +392,7 @@ flowchart TD
     PIX -->|"resolve conta_id via\ncob_pix.conta_id ou contas.cnpj_banco"| SHIM
 
     subgraph RPC["Porta única (SECURITY DEFINER + fin_resolver_contexto)"]
-        ING["fin_ingerir_extratos\nvalida tenant/filial · valor ABS ·\ndedupe (conta_id, external_id) ·\nexternal_id auto:md5 se ausente ·\ncanal integracao sem ator (D-F5.2)"]
+        ING["fin_ingerir_extratos\nvalida tenant/filial · valor ABS ·\ndedupe (conta_id, external_id) ·\nexternal_id auto:md5 se ausente ·\ncanal integracao sem ator (D-F5.2) ·\ndetecta duplicata cross-canal (jul/2026)"]
         UNDO["fin_desfazer_ingestao\nremove não conciliados · preserva conciliado"]
     end
     EAPI --> ING
@@ -570,3 +570,25 @@ na Conciliação Inteligente: badge de tipo (entrada/saída) + filtro de
 categoria no `QuickCreateTransacaoDialog`, bug de comparação `"credit"` vs
 `"credito"` no cálculo do tipo, e badge de conta no painel "Sistema"
 (incluindo contas desativadas, P2 do review Codex).
+
+## Detecção de duplicata cross-canal Getnet×Santander (jul/2026)
+
+Ver §9.12 do `arquitetura-financeiro.md`. Migration `20260717150000`.
+Getnet SFTP (cron diário) e Santander (importação manual) podem gerar duas
+linhas em `extratos_bancarios` para a mesma antecipação liquidada — nenhuma
+colide no dedupe técnico `(conta_id, external_id)`, já que cada provedor gera
+o `external_id` a partir de campos só seus.
+
+```mermaid
+flowchart TD
+    GET["getnet-sftp\n(cron diário, sozinho)"] -->|"origem=getnet_sftp_*"| ING["fin_ingerir_extratos"]
+    SAN["santander-api/sync\n(manual, tesoureiro)"] -->|"origem=api_santander"| ING
+
+    ING -->|"INSERT nova linha"| CHECK{"existe irmã?\nmesma conta+tipo+valor,\norigem diferente,\ndata ±2 dias"}
+    CHECK -->|não| EXT[(extratos_bancarios\npendente normal)]
+    CHECK -->|sim| FLAG["marca possivel_duplicata_de\nna linha MAIS NOVA\n(não decide sozinho)"]
+    FLAG --> EXT
+
+    EXT -->|"badge ⚠ possível duplicata"| UI["ExtratoListItem · PendenteExtratoCard ·\nExtratoManualCard"]
+    UI -->|"tesoureiro confirma"| IGN["fin_marcar_extrato_ignorado\n(já existia, F7)"]
+```
