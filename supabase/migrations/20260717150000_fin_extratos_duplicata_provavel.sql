@@ -29,6 +29,15 @@ CREATE INDEX IF NOT EXISTS idx_extratos_bancarios_duplicata_provavel
   ON public.extratos_bancarios (possivel_duplicata_de)
   WHERE possivel_duplicata_de IS NOT NULL;
 
+-- Review Codex (P2): o índice acima só ajuda a LER o resultado da detecção;
+-- a busca da "irmã" cross-canal em fin_ingerir_extratos filtra por
+-- conta_id/tipo/valor/data_transacao, que não tinha índice composto — cada
+-- item ingerido variava um scan sobre todo o histórico da conta. Sem isso,
+-- um backfill Getnet/Santander ou uma conta com histórico grande degrada
+-- progressivamente.
+CREATE INDEX IF NOT EXISTS idx_extratos_bancarios_dedupe_lookup
+  ON public.extratos_bancarios (conta_id, tipo, valor, data_transacao);
+
 COMMENT ON COLUMN public.extratos_bancarios.possivel_duplicata_de IS
   'Aponta para outra linha de extratos_bancarios (mesma conta/tipo/valor, origem diferente, data até 2 dias de diferença) detectada como possível duplicata cross-canal na ingestão (ex.: Getnet SFTP × Santander para a mesma antecipação). Só sinaliza — nenhuma ação automática; tesoureiro confirma via fin_marcar_extrato_ignorado.';
 
