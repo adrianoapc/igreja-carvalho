@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  AlertTriangle,
   ArrowDownCircle,
   ArrowUpCircle,
   CheckCircle2,
@@ -64,6 +65,16 @@ export function PendenteExtratoCard({
             {extrato.contas?.nome && (
               <Badge variant="outline" className="text-xs">
                 {extrato.contas.nome}
+              </Badge>
+            )}
+            {extrato.possivel_duplicata_de && (
+              <Badge
+                variant="outline"
+                className="gap-1 border-amber-400 text-amber-700 dark:text-amber-400 text-xs font-normal"
+                title="Outra linha de extrato com mesmo valor/conta e data próxima, de origem diferente — pode ser a mesma movimentação importada duas vezes."
+              >
+                <AlertTriangle className="w-3 h-3" />
+                possível duplicata
               </Badge>
             )}
           </div>

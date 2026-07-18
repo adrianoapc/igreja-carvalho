@@ -1519,6 +1519,49 @@ Commits: `ac109d5`→`5ce4e0e`/`3415fe0` (itens 1/3, extraído em branch própri
 mergeado antes dessa conferência acontecer), `a3c340a` (item 2), `d9c83e5`
 (item 3, fix do P2).
 
+### 9.12 Detecção de duplicata cross-canal Getnet×Santander (jul/2026)
+
+Auditoria de antecipação de recebíveis Getnet (2026-07-17, focada no registro
+tipo 5/`AC` e tipo 6/UR do Manual Extrato Eletrônico V10.1) confirmou com o
+usuário um bug ativo na operação real, não coberto pela F6: o canal **Getnet
+SFTP** (`getnet-sftp`, roda sozinho via `pg_cron` todo dia, `origem`
+`getnet_sftp_tipo5`/`getnet_sftp_txt`) e o canal **Santander** (`santander-api`
+ação `sync`, 100% manual via "Ver Extrato" em `Contas.tsx`, `origem`
+`api_santander`) podem gerar **duas linhas em `extratos_bancarios` para a
+mesma movimentação real** (o crédito líquido de uma antecipação). O único
+dedupe existente, `UNIQUE(conta_id, external_id)`, nunca pega esse caso —
+cada provedor gera `external_id` a partir de campos só seus (RV/chave-UR da
+Getnet vs `transactionId`/`fitId` do Santander).
+
+Correção (migration `20260717150000_fin_extratos_duplicata_provavel.sql`):
+nova coluna `extratos_bancarios.possivel_duplicata_de` (FK para outra linha da
+mesma tabela) + `fin_ingerir_extratos` estendida para, a cada linha realmente
+nova (não duplicata técnica por `external_id`), procurar uma "irmã" na mesma
+`conta_id`/`tipo`/`valor` com `origem` diferente e `data_transacao` até 2 dias
+de diferença (cobre liquidação D+1/D+2 entre o arquivo Getnet e o crédito
+bancário real) e, se achar, apontar a linha mais nova para a mais antiga.
+**Decisão deliberada: só sinaliza, não decide** — é dinheiro real, então a
+confirmação de que é de fato duplicata fica com o tesoureiro, reaproveitando
+a RPC `fin_marcar_extrato_ignorado` (F7) já existente para "ignorar ruído do
+extrato" — nenhuma RPC nova de ação foi criada. Frontend: badge "possível
+duplicata" nos 3 componentes que já listam extratos pendentes
+(`ExtratoListItem` do Modo Inteligente, com scroll-to-highlight até a linha
+original; `PendenteExtratoCard` do Dashboard; `ExtratoManualCard` do Modo
+Clássico) — todos já tinham `Badge` e a ação de ignorar; só o sinal era novo.
+
+Validado via harness Docker isolado (postgres:15 standalone, sem afetar o
+`supabase start` local de outro projeto rodando na mesma porta): 7 cenários —
+cross-canal dentro da janela detecta, fora da janela (5 dias) não detecta,
+mesma `origem` não é tratada como cross-canal, o fluxo de "ignorar" convive
+sem conflito com o novo campo, re-ingestão do mesmo `external_id` não quebra
+a nova lógica (dedupe técnico continua funcionando), limite exato de 2 dias
+detecta (inclusivo), e contas diferentes não se cruzam (isolamento por
+`conta_id` preservado). `npx tsc --noEmit`: 62 erros (baseline, nenhum novo).
+
+Fora de escopo (deliberado): `HistoricoExtratos.tsx` não recebeu a badge
+(tela de histórico já resolvido, não de pendências); `santander-extrato/index.ts`
+não foi tocado (código órfão, sem caller, confirmado na auditoria).
+
 ## 10. Decisões em aberto (bater o martelo)
 
 | # | Decisão | Recomendação |

@@ -62,6 +62,19 @@ dono da função, não do chamador) — validado com harness real via `SET ROLE
 authenticated` (não só `postgres` superuser), provando os dois lados: escrita
 direta bloqueada e RPCs continuando a funcionar.
 
+### Nova coluna em `extratos_bancarios` não muda o modelo de acesso (jul/2026)
+
+Migration `20260717150000` (detecção de duplicata cross-canal Getnet×
+Santander, `docs/arquitetura-financeiro.md` §9.12) adiciona
+`extratos_bancarios.possivel_duplicata_de` (FK para outra linha da mesma
+tabela) e estende a lógica interna de `fin_ingerir_extratos` — mas não
+introduz nenhuma política de RLS nova nem muda o `GRANT` revogado acima: a
+coluna é populada exclusivamente dentro da mesma RPC `SECURITY DEFINER` já
+coberta pelo tenant/filial scoping existente (`fin_resolver_contexto`). A
+decisão de "isso é duplicata" continua exigindo uma ação explícita do
+tesoureiro via `fin_marcar_extrato_ignorado` (já auditada) — nenhuma escrita
+automática de dados financeiros foi adicionada.
+
 ## Funcoes de Seguranca
 
 | Funcao | Escopo | Descricao |

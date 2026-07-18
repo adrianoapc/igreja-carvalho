@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Link2, Split, X } from "lucide-react";
+import { AlertTriangle, Link2, Split, X } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useHideValues } from "@/hooks/useHideValues";
@@ -41,6 +41,16 @@ export function ExtratoManualCard({
             <Badge variant="outline" className="text-xs shrink-0">
               {isCredito ? "Crédito" : "Débito"}
             </Badge>
+            {extrato.possivel_duplicata_de && (
+              <Badge
+                variant="outline"
+                className="gap-1 border-amber-400 text-amber-700 dark:text-amber-400 text-xs font-normal shrink-0"
+                title="Outra linha de extrato com mesmo valor/conta e data próxima, de origem diferente — pode ser a mesma movimentação importada duas vezes."
+              >
+                <AlertTriangle className="w-3 h-3" />
+                possível duplicata
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>
