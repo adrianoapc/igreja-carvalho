@@ -14,7 +14,7 @@ flowchart TD
     PIX -->|"resolve conta_id via\ncob_pix.conta_id ou contas.cnpj_banco"| SHIM
 
     subgraph RPC["Porta única (SECURITY DEFINER + fin_resolver_contexto)"]
-        ING["fin_ingerir_extratos\nvalida tenant/filial · valor ABS ·\ndedupe (conta_id, external_id) ·\nexternal_id auto:md5 se ausente ·\ncanal integracao sem ator (D-F5.2)"]
+        ING["fin_ingerir_extratos\nvalida tenant/filial · valor ABS ·\ndedupe (conta_id, external_id) ·\nexternal_id auto:md5 se ausente ·\ncanal integracao sem ator (D-F5.2) ·\ndetecta duplicata cross-canal (jul/2026)"]
         UNDO["fin_desfazer_ingestao\nremove não conciliados · preserva conciliado"]
     end
     EAPI --> ING

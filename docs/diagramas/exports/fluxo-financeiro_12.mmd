@@ -1,0 +1,11 @@
+flowchart TD
+    GET["getnet-sftp\n(cron diário, sozinho)"] -->|"origem=getnet_sftp_*"| ING["fin_ingerir_extratos"]
+    SAN["santander-api/sync\n(manual, tesoureiro)"] -->|"origem=api_santander"| ING
+
+    ING -->|"INSERT nova linha"| CHECK{"existe irmã?\nmesma conta+tipo+valor,\norigem diferente,\ndata ±2 dias"}
+    CHECK -->|não| EXT[(extratos_bancarios\npendente normal)]
+    CHECK -->|sim| FLAG["marca possivel_duplicata_de\nna linha MAIS NOVA\n(não decide sozinho)"]
+    FLAG --> EXT
+
+    EXT -->|"badge ⚠ possível duplicata"| UI["ExtratoListItem · PendenteExtratoCard ·\nExtratoManualCard"]
+    UI -->|"tesoureiro confirma"| IGN["fin_marcar_extrato_ignorado\n(já existia, F7)"]
