@@ -1,0 +1,5 @@
+flowchart LR
+    SEL["Select de filtro\n(Categoria/Subcategoria/\nCentro/Fornecedor/Conta)"]
+    SEL -->|"Todas/Todos"| ALL["sem filtro"]
+    SEL -->|"valor específico"| EQ[".eq(coluna, id)"]
+    SEL -->|"Sem X (novo)"| NULL[".is(coluna, null)"]
