@@ -1562,6 +1562,41 @@ Fora de escopo (deliberado): `HistoricoExtratos.tsx` não recebeu a badge
 (tela de histórico já resolvido, não de pendências); `santander-extrato/index.ts`
 não foi tocado (código órfão, sem caller, confirmado na auditoria).
 
+### 9.13 Fix: depósito duplicado (mesma assinatura) descartado no sync Santander (jul/2026)
+
+Achado em produção: extrato real tinha duas linhas "DEP DINHEIRO BCO 24H"
+(depósito em terminal 24h) de R$ 100,00 no mesmo dia, mas só uma foi
+importada. Causa raiz confirmada com o payload bruto do Santander: a API de
+extrato **não devolve nenhum campo de identificação por transação** para esse
+tipo de lançamento — só `creditDebitType`, `transactionName`,
+`historicComplement`, `amount`, `transactionDate`. Sem `transactionId`/
+`fitId`/`id`/`documentNumber`, o fallback de `syncExtrato()`
+(`santander-api/index.ts`) monta o `external_id` a partir de
+`data|valor|descrição|documento|tipo` — para as duas linhas de R$ 100,00
+isso é **idêntico**, gera o mesmo hash SHA-256 e a constraint
+`UNIQUE(conta_id, external_id)` descarta a segunda no `ON CONFLICT DO
+NOTHING`. Perda silenciosa de dinheiro real da reconciliação, sem erro nem
+aviso.
+
+Correção: `syncExtrato()` passa a contar quantas vezes a mesma assinatura já
+apareceu **dentro do mesmo lote** (`Map` local) antes de gerar o hash — só
+sufixa a partir da 2ª ocorrência (`#1`, `#2`, ...). A 1ª ocorrência mantém o
+hash exatamente igual ao de antes (não duplica o que já está importado em
+produção); as ocorrências extras passam a ter `external_id` próprio e deixam
+de colidir. Verificado reproduzindo a lógica isolada contra o payload real
+enviado pelo usuário: hash da 1ª ocorrência inalterado, 2ª ocorrência com
+hash novo e distinto. `deno check` limpo.
+
+Ação operacional pós-deploy: reabrir "Ver Extrato" pra essa conta/período e
+"Importar para Conciliação" de novo — o depósito que faltava entra como
+novo, o que já foi importado não duplica (mesmo `external_id`).
+
+Fora de escopo (mesma limitação, não corrigida agora): o fallback genérico
+de `fin_ingerir_extratos` (usado por canais que não passam `external_id`
+explícito, ex. importação manual) tem o mesmo risco teórico de colisão por
+assinatura idêntica — não confirmado como problema ativo em nenhum canal
+além do Santander até este momento.
+
 ## 10. Decisões em aberto (bater o martelo)
 
 | # | Decisão | Recomendação |
