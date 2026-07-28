@@ -220,12 +220,17 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
           .filter((t) => t.status === "pendente")
           .reduce((sum, t) => sum + valorLiquidoOuBruto(t), 0)
       : totalPendente;
+  // Review Codex (P1, PR #60): valor - valor_liquido NÃO isola a taxa —
+  // carrega juros/multas/desconto junto (valor_liquido = valor + juros +
+  // multas - taxas - desconto). Somar taxas_administrativas direto, que já
+  // é gravada como magnitude positiva nas RPCs fin_*. (P2): restringir a
+  // pago/pendente — status "cancelado" mantém o campo preenchido mas não
+  // deve contar (mesmo escopo de Recebido + Pendente).
   const totalTaxas =
     tipo === "entrada"
-      ? transacoesNormais.reduce(
-          (sum, t) => sum + (Number(t.valor) - valorLiquidoOuBruto(t)),
-          0,
-        )
+      ? transacoesNormais
+          .filter((t) => t.status === "pago" || t.status === "pendente")
+          .reduce((sum, t) => sum + Number(t.taxas_administrativas || 0), 0)
       : 0;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

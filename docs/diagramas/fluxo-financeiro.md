@@ -639,7 +639,7 @@ flowchart TD
     ENT --> BRUTA["Receita Bruta\nSUM(valor)"]
     ENT --> REC["Recebido\nSUM(valor_liquido) dos pagos"]
     ENT --> PEND["Pendente\nSUM(valor_liquido) dos pendentes\n(taxa estimada, não corrigida\npela conciliação)"]
-    REC --> TAXAS["Taxas\nSUM(valor - valor_liquido)\npago + pendente"]
+    REC --> TAXAS["Taxas\nSUM(taxas_administrativas)\npago + pendente (não cancelado)"]
     PEND --> TAXAS
     ENT --> TRANSF["Transferências\nSUM(valor) — sem taxa"]
 ```

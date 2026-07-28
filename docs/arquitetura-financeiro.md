@@ -1723,18 +1723,29 @@ viram 5 só para `tipo='entrada'` (Saídas não muda, fora de escopo):
   confirmar, só `status`/`conciliacao_status`/`data_pagamento` — então
   Pendente e Recebido carregam a mesma precisão de estimativa, a
   conciliação não "melhora" o número, só confirma que o dinheiro chegou).
-- **Taxas** (novo) — `SUM(valor − valor_liquido)` de pago + pendente juntos
-  — quanto a adquirente retém/vai reter no período.
+- **Taxas** (novo) — `SUM(taxas_administrativas)` de pago + pendente juntos
+  — quanto a adquirente retém/vai reter no período. **Não** é
+  `valor − valor_liquido` (review Codex P1, PR #60): essa subtração também
+  carrega juros/multas/desconto (`valor_liquido = valor + juros + multas −
+  taxas − desconto`), então dava um número contaminado — inclusive negativo
+  em lançamentos com desconto sem taxa. `taxas_administrativas` já é
+  gravada como magnitude positiva pelas RPCs `fin_*`, soma direta resolve.
 - **Transferências** — sem mudança (não tem taxa de adquirente).
+
+Filtro `status IN ('pago','pendente')` no card Taxas (review Codex P2):
+`status='cancelado'` mantém `taxas_administrativas` preenchida no registro,
+mas não deve contar — mesmo escopo de Recebido + Pendente.
 
 Grid responsivo condicional (`lg:grid-cols-3 xl:grid-cols-5` só para
 entrada, mantém `lg:grid-cols-4` para saída). Verificado isolando a soma
 em Node contra um cenário com múltiplas ofertas em cartão + dinheiro +
-transferência interna (Bruta − Taxas = Recebido quando tudo está pago).
-Testado com o dev server real (Playwright headless): app carrega sem erro
-de console, rota `/financas/entradas` redireciona corretamente pra
-`/auth` sem sessão (não foi possível validar os números renderizados
-contra dado real de produção — sem credencial de login disponível neste
+transferência interna (Bruta − Taxas = Recebido quando tudo está pago) e
+contra o cenário dos 2 achados do review (desconto sem taxa + lançamento
+cancelado, confirmando que não contaminam mais o total). Testado com o dev
+server real (Playwright headless): app carrega sem erro de console, rota
+`/financas/entradas` redireciona corretamente pra `/auth` sem sessão (não
+foi possível validar os números renderizados contra dado real de produção
+— sem credencial de login disponível neste
 ambiente).
 
 | # | Decisão | Recomendação |
