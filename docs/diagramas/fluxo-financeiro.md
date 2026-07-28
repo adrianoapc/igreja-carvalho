@@ -665,3 +665,18 @@ flowchart LR
     SEL -->|"valor específico"| EQ[".eq(coluna, id)"]
     SEL -->|"Sem X (novo)"| NULL[".is(coluna, null)"]
 ```
+
+## Bloqueio de conciliada por campo na Reclassificação (jul/2026)
+
+Ver §5.5 do `arquitetura-financeiro.md`. O bloqueio de transação conciliada
+era tudo-ou-nada; agora só bloqueia quando o campo alterado afeta o vínculo
+bancário ou o período do DRE.
+
+```mermaid
+flowchart TD
+    REQ["updateFields (novos_valores)"] --> CHECK{"contém conta_id,\ndata_competencia ou status?"}
+    CHECK -->|"não\n(só categoria/subcategoria/fornecedor)"| LIVRE["aplica mesmo\nse conciliada"]
+    CHECK -->|"sim"| CONC{"alguma transação\nconciliada/conferida?"}
+    CONC -->|"não"| LIVRE
+    CONC -->|"sim"| BLOQ["409 TRANSACAO_CONCILIADA\n(desconciliar antes)"]
+```

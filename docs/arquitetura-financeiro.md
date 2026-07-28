@@ -331,11 +331,11 @@ corrigir a materialização (D6) é pré-requisito de qualquer projeção séria
   `reclass_job_items`; `undo-reclass` reverte por upsert do snapshot.
   **Este padrão (job + snapshot + undo) deve virar convenção das RPCs
   `fin_*`.**
-- Lacunas: **não bloqueia transação conciliada** (TODO explícito em
-  `reclass-transacoes/index.ts:324`); janela de tempo do undo comentada e
-  não implementada; como pode alterar `data_competencia` e categorias,
-  **muda o DRE retroativamente** sem trilha visível no relatório;
-  `itens_reembolso` (competência) fica fora do alcance da reclassificação.
+- Lacunas: janela de tempo do undo comentada e não implementada; como pode
+  alterar `data_competencia` e categorias, **muda o DRE retroativamente**
+  sem trilha visível no relatório; `itens_reembolso` (competência) fica
+  fora do alcance da reclassificação. (Bloqueio de transação conciliada:
+  ver granularidade por campo abaixo — não é mais "tudo ou nada".)
 - **Fix jul/2026**: os 5 filtros da etapa 1 (Categoria/Subcategoria/Centro/
   Fornecedor/Conta) não tinham como buscar lançamentos com o campo NULO —
   útil justamente pra achar o que falta classificar. Adicionada opção "Sem
@@ -360,6 +360,17 @@ corrigir a materialização (D6) é pré-requisito de qualquer projeção séria
     novo. Fix: constante `EMPTY_RESULTADOS` no módulo (referência estável)
     no lugar do `[]` inline — padrão clássico de estabilização de
     default do React.
+- **Fix jul/2026 (2) — bloqueio de conciliada por campo, não por
+  transação**: o bloqueio de reclassificar transação conciliada
+  (ADR-030 F4) era tudo-ou-nada — se **qualquer** transação selecionada
+  estivesse conciliada, a operação inteira era recusada (409
+  `TRANSACAO_CONCILIADA`), independente de quais campos estavam de fato
+  sendo alterados. Pedido do usuário: liberar quando a alteração não mexe
+  em "valores" (vínculo bancário/período fechado). Corrigido em
+  `reclass-transacoes/index.ts` para só bloquear quando `updateFields`
+  contém `conta_id`, `data_competencia` ou `status` — `categoria_id`,
+  `subcategoria_id` e `fornecedor_id` ficam liberados mesmo em transação
+  conciliada/conferida manualmente, sem precisar desconciliar antes.
 
 ---
 

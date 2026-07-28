@@ -333,32 +333,41 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Bloqueia reclassificar transação conciliada (ADR-030 F4): a reclassificação
-    // pode mudar categoria/competência/conta — alterar isso após a conciliação
-    // bancária quebraria a trilha extrato↔transação e o DRE já fechado. O
-    // caminho correto é fin_desconciliar antes de reclassificar.
-    // Allow-list: só 'nao_conciliado' (ou nulo) e não conferido em caixa passam —
-    // cobre conciliado_extrato/bot/manual e o conferido_manual (dinheiro em espécie).
-    const conciliadas = transacoes.filter(
-      (t) =>
-        (t.conciliacao_status ?? "nao_conciliado") !== "nao_conciliado" ||
-        t.conferido_manual === true,
+    // Bloqueia reclassificar transação conciliada (ADR-030 F4) SÓ quando o campo
+    // alterado afeta o vínculo bancário ou o período do DRE: conta_id/status
+    // quebrariam a trilha extrato↔transação, data_competencia reabriria um
+    // período já fechado. categoria_id/subcategoria_id/fornecedor_id não tocam
+    // nenhum dos dois, então ficam liberados mesmo já conciliada (pedido do
+    // usuário: reclassificar sem precisar desconciliar quando não há alteração
+    // de valores). Allow-list de status: só 'nao_conciliado' (ou nulo) e não
+    // conferido em caixa passam livre — cobre conciliado_extrato/bot/manual e o
+    // conferido_manual (dinheiro em espécie).
+    const CAMPOS_BLOQUEIAM_CONCILIADA = ["conta_id", "data_competencia", "status"];
+    const alteraCampoSensivel = CAMPOS_BLOQUEIAM_CONCILIADA.some(
+      (campo) => campo in updateFields,
     );
-    if (conciliadas.length > 0) {
-      return new Response(
-        JSON.stringify({
-          error: "TRANSACAO_CONCILIADA",
-          message:
-            `${conciliadas.length} transação(ões) selecionada(s) já estão conciliadas e não podem ser reclassificadas. ` +
-            "Desfaça a conciliação (desconciliar) antes de reclassificar.",
-          total_conciliadas: conciliadas.length,
-          ids_conciliadas: conciliadas.map((t) => t.id),
-        }),
-        {
-          status: 409,
-          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-        },
+    if (alteraCampoSensivel) {
+      const conciliadas = transacoes.filter(
+        (t) =>
+          (t.conciliacao_status ?? "nao_conciliado") !== "nao_conciliado" ||
+          t.conferido_manual === true,
       );
+      if (conciliadas.length > 0) {
+        return new Response(
+          JSON.stringify({
+            error: "TRANSACAO_CONCILIADA",
+            message:
+              `${conciliadas.length} transação(ões) selecionada(s) já estão conciliadas e não podem ter conta/competência/status alterados. ` +
+              "Desfaça a conciliação (desconciliar) antes de reclassificar esses campos.",
+            total_conciliadas: conciliadas.length,
+            ids_conciliadas: conciliadas.map((t) => t.id),
+          }),
+          {
+            status: 409,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          },
+        );
+      }
     }
 
     const alvoIds = transacoes.map((t) => t.id);
