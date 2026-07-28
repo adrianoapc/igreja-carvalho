@@ -14,6 +14,7 @@ import {
   ChevronDown,
   ChevronRight,
   Layers,
+  Percent,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -199,6 +200,33 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
       .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
   const totalTransferencias =
     transferencias.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+
+  // Entradas: taxa administrativa reduz o líquido do que a igreja recebe
+  // (ADR-027, §9.15 do doc de arquitetura) — Recebido/Pendente passam a
+  // refletir o líquido de verdade, e a taxa retida pela adquirente fica
+  // visível como card próprio, sem precisar abrir lançamento por
+  // lançamento. Saídas não muda (segue bruto, fora de escopo por ora).
+  const valorLiquidoOuBruto = (t: (typeof transacoesNormais)[number]) =>
+    Number(t.valor_liquido ?? t.valor);
+  const totalPagoLiquido =
+    tipo === "entrada"
+      ? transacoesNormais
+          .filter((t) => t.status === "pago")
+          .reduce((sum, t) => sum + valorLiquidoOuBruto(t), 0)
+      : totalPago;
+  const totalPendenteLiquido =
+    tipo === "entrada"
+      ? transacoesNormais
+          .filter((t) => t.status === "pendente")
+          .reduce((sum, t) => sum + valorLiquidoOuBruto(t), 0)
+      : totalPendente;
+  const totalTaxas =
+    tipo === "entrada"
+      ? transacoesNormais.reduce(
+          (sum, t) => sum + (Number(t.valor) - valorLiquidoOuBruto(t)),
+          0,
+        )
+      : 0;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const abrirEdicao = (transacao: any) => {
@@ -420,25 +448,37 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
       </div>
 
       {/* Resumo */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      <div
+        className={`grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 ${
+          tipo === "entrada" ? "lg:grid-cols-3 xl:grid-cols-5" : "lg:grid-cols-4"
+        }`}
+      >
         <ResumoCard
           icone={<TotalIcone className="w-5 h-5 text-blue-600" />}
           fundo="bg-blue-100 dark:bg-blue-900/20"
-          label="Total"
+          label={tipo === "entrada" ? "Receita Bruta" : "Total"}
           valor={formatCurrency(total)}
         />
         <ResumoCard
           icone={<TotalIcone className="w-5 h-5 text-green-600" />}
           fundo="bg-green-100 dark:bg-green-900/20"
           label={config.totalLabelPago}
-          valor={formatCurrency(totalPago)}
+          valor={formatCurrency(totalPagoLiquido)}
         />
         <ResumoCard
           icone={<Calendar className="w-5 h-5 text-yellow-600" />}
           fundo="bg-yellow-100 dark:bg-yellow-900/20"
           label="Pendente"
-          valor={formatCurrency(totalPendente)}
+          valor={formatCurrency(totalPendenteLiquido)}
         />
+        {tipo === "entrada" && (
+          <ResumoCard
+            icone={<Percent className="w-5 h-5 text-orange-600" />}
+            fundo="bg-orange-100 dark:bg-orange-900/20"
+            label="Taxas"
+            valor={formatCurrency(totalTaxas)}
+          />
+        )}
         <ResumoCard
           icone={<ArrowLeft className="w-5 h-5 text-purple-600" />}
           fundo="bg-purple-100 dark:bg-purple-900/20"

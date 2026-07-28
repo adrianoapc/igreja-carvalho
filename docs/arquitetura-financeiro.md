@@ -1704,7 +1704,38 @@ saída (R$50,90, taxa continua somando). `npx tsc --noEmit`: 62 erros
 (baseline, nenhum novo). Ver também `docs/adr/ADR-027-valor-bruto-vs-
 valor-liquido.md`, fórmula atualizada.
 
-## 10. Decisões em aberto (bater o martelo)
+### 9.16 Visibilidade de taxa na tela de Entradas (jul/2026)
+
+Fecha o "Achado 4" da avaliação de taxa administrativa (§9.15) diretamente
+na tela `Entradas` (`TransacoesPage.tsx`, `tipo='entrada'`), sem relatório
+novo — critério de aceite do usuário: contabilidade/membros veem o bruto,
+tesouraria confirma o líquido, auditoria acha a taxa "nos relatórios que já
+existem". Os 4 cards de resumo (Total/Recebido/Pendente/Transferências)
+viram 5 só para `tipo='entrada'` (Saídas não muda, fora de escopo):
+
+- **Receita Bruta** (era "Total") — `SUM(valor)` de tudo no período, sem
+  mudança de valor, só de rótulo.
+- **Recebido** (rótulo inalterado) — passa a somar `valor_liquido` (não
+  mais `valor`) dos lançamentos já pagos.
+- **Pendente** — mesma troca, `valor_liquido` dos ainda pendentes (usa a
+  taxa estimada gravada na criação — `fin_confirmar_conciliacao` não
+  corrige `taxas_administrativas`/`valor_liquido` para o valor real ao
+  confirmar, só `status`/`conciliacao_status`/`data_pagamento` — então
+  Pendente e Recebido carregam a mesma precisão de estimativa, a
+  conciliação não "melhora" o número, só confirma que o dinheiro chegou).
+- **Taxas** (novo) — `SUM(valor − valor_liquido)` de pago + pendente juntos
+  — quanto a adquirente retém/vai reter no período.
+- **Transferências** — sem mudança (não tem taxa de adquirente).
+
+Grid responsivo condicional (`lg:grid-cols-3 xl:grid-cols-5` só para
+entrada, mantém `lg:grid-cols-4` para saída). Verificado isolando a soma
+em Node contra um cenário com múltiplas ofertas em cartão + dinheiro +
+transferência interna (Bruta − Taxas = Recebido quando tudo está pago).
+Testado com o dev server real (Playwright headless): app carrega sem erro
+de console, rota `/financas/entradas` redireciona corretamente pra
+`/auth` sem sessão (não foi possível validar os números renderizados
+contra dado real de produção — sem credencial de login disponível neste
+ambiente).
 
 | # | Decisão | Recomendação |
 |---|---|---|
