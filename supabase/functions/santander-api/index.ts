@@ -671,6 +671,17 @@ async function syncExtrato(
   }
   const itens: ExtratoItemInput[] = []
 
+  // Conta ocorrências da MESMA assinatura (data|valor|descricao|documento|tipo)
+  // dentro deste lote. O Santander não devolve nenhum id por transação nos
+  // depósitos de terminal 24h/dinheiro (confirmado: payload bruto só tem
+  // creditDebitType/transactionName/historicComplement/amount/transactionDate)
+  // — duas transações reais e distintas no mesmo dia, mesmo valor, mesma
+  // descrição genérica, geravam o MESMO fallbackKey e portanto o MESMO
+  // external_id, e a segunda era descartada pelo ON CONFLICT DO NOTHING.
+  // Só sufixa a partir da 2ª ocorrência: a 1ª mantém o hash sem sufixo (não
+  // muda o external_id de linhas já importadas em produção).
+  const ocorrenciasFallback = new Map<string, number>()
+
   for (const tx of transacoes) {
     try {
       const record = tx as Record<string, unknown>
@@ -754,7 +765,10 @@ async function syncExtrato(
 
       // ID externo: preferir ID do provedor; fallback determinístico (ADR-022)
       const providerId = pickStr(record.transactionId, record.fitId, record.id)
-      const fallbackKey = `${dataTransacao}|${valorRaw}|${descricao}|${numeroDocumento ?? ''}|${pickStr(record.creditDebitType)}`
+      const fallbackKeyBase = `${dataTransacao}|${valorRaw}|${descricao}|${numeroDocumento ?? ''}|${pickStr(record.creditDebitType)}`
+      const ocorrencia = ocorrenciasFallback.get(fallbackKeyBase) ?? 0
+      ocorrenciasFallback.set(fallbackKeyBase, ocorrencia + 1)
+      const fallbackKey = ocorrencia > 0 ? `${fallbackKeyBase}#${ocorrencia}` : fallbackKeyBase
       const externalId = providerId || await sha256Hex(fallbackKey)
 
       if (!externalId || !dataTransacao) {

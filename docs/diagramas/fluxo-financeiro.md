@@ -592,3 +592,20 @@ flowchart TD
     EXT -->|"badge ⚠ possível duplicata"| UI["ExtratoListItem · PendenteExtratoCard ·\nExtratoManualCard"]
     UI -->|"tesoureiro confirma"| IGN["fin_marcar_extrato_ignorado\n(já existia, F7)"]
 ```
+
+## Fix: depósito duplicado descartado no sync Santander (jul/2026)
+
+Ver §9.13 do `arquitetura-financeiro.md`. A API de extrato do Santander não
+devolve nenhum id por transação para depósito em terminal 24h — duas linhas
+reais e distintas no mesmo dia/valor/descrição geravam o mesmo
+`external_id` (fallback por hash) e a 2ª era descartada silenciosamente.
+
+```mermaid
+flowchart TD
+    API["Santander /extrato\n(sem id por transação\npara DEP DINHEIRO BCO 24H)"] --> SYNC["syncExtrato()"]
+    SYNC --> SIG{"assinatura já vista\nneste lote?\n(data+valor+descrição+tipo)"}
+    SIG -->|"não (1ª vez)"| H0["hash sem sufixo\n(igual ao de antes)"]
+    SIG -->|"sim (2ª+)"| H1["hash + #ocorrência\n(novo, distinto)"]
+    H0 --> ING["fin_ingerir_extratos\nON CONFLICT (conta_id, external_id)"]
+    H1 --> ING
+```
