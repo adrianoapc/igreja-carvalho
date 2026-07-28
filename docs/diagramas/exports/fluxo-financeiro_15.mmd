@@ -1,0 +1,8 @@
+flowchart TD
+    ENT["Entradas do período\n(TransacoesPage, tipo=entrada)"]
+    ENT --> BRUTA["Receita Bruta\nSUM(valor)"]
+    ENT --> REC["Recebido\nSUM(valor_liquido) dos pagos"]
+    ENT --> PEND["Pendente\nSUM(valor_liquido) dos pendentes\n(taxa estimada, não corrigida\npela conciliação)"]
+    REC --> TAXAS["Taxas\nSUM(taxas_administrativas)\npago + pendente (não cancelado)"]
+    PEND --> TAXAS
+    ENT --> TRANSF["Transferências\nSUM(valor) — sem taxa"]
