@@ -30,6 +30,14 @@ type TransacaoPreview = {
   conta_id: string | null;
 };
 
+// Referência estável para o default de `data` — um `[]` inline no
+// destructuring (`data: resultados = []`) cria um array NOVO a cada
+// render enquanto a query fica desabilitada (etapa 1, sem searchParams),
+// o que muda a referência de `resultados` a cada render e faz o
+// `useEffect([resultados])` de sincronizar `selectedIds` rodar pra
+// sempre — loop infinito ("Maximum update depth exceeded").
+const EMPTY_RESULTADOS: TransacaoPreview[] = [];
+
 const ReclassificacaoPage = () => {
   const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [tipo, setTipo] = useState<"entrada" | "saida">("saida");
@@ -90,6 +98,10 @@ const ReclassificacaoPage = () => {
   const categoriaMap = useMemo(
     () => Object.fromEntries(options.categorias.map((c) => [c.id, c.nome])),
     [options.categorias]
+  );
+  const subcategoriaMap = useMemo(
+    () => Object.fromEntries(options.subcategorias.map((s) => [s.id, s.nome])),
+    [options.subcategorias]
   );
   const centroMap = useMemo(
     () => Object.fromEntries(options.centros.map((c) => [c.id, c.nome])),
@@ -244,9 +256,10 @@ const ReclassificacaoPage = () => {
     setSelectedIds([]);
   }, [tipo]);
 
-  const { data: resultados = [], isLoading: loadingResultados } = useQuery<
-    TransacaoPreview[]
-  >({
+  const {
+    data: resultados = EMPTY_RESULTADOS,
+    isLoading: loadingResultados,
+  } = useQuery<TransacaoPreview[]>({
     queryKey: [
       "reclass-results",
       igrejaId,
@@ -277,15 +290,32 @@ const ReclassificacaoPage = () => {
         query = query.gte("data_competencia", searchParams.competenciaInicio);
       if (searchParams.competenciaFim)
         query = query.lte("data_competencia", searchParams.competenciaFim);
-      if (searchParams.categoria)
+      // NONE_VALUE ("Sem categoria"/"Sem conta"/...) filtra pelo campo NULO
+      // — precisa vir antes do eq(), senão cairia no ramo de valor normal.
+      if (searchParams.categoria === NONE_VALUE)
+        query = query.is("categoria_id", null);
+      else if (searchParams.categoria)
         query = query.eq("categoria_id", searchParams.categoria);
-      if (searchParams.subcategoria)
+
+      if (searchParams.subcategoria === NONE_VALUE)
+        query = query.is("subcategoria_id", null);
+      else if (searchParams.subcategoria)
         query = query.eq("subcategoria_id", searchParams.subcategoria);
-      if (searchParams.centro)
+
+      if (searchParams.centro === NONE_VALUE)
+        query = query.is("centro_custo_id", null);
+      else if (searchParams.centro)
         query = query.eq("centro_custo_id", searchParams.centro);
-      if (searchParams.fornecedor)
+
+      if (searchParams.fornecedor === NONE_VALUE)
+        query = query.is("fornecedor_id", null);
+      else if (searchParams.fornecedor)
         query = query.eq("fornecedor_id", searchParams.fornecedor);
-      if (searchParams.conta) query = query.eq("conta_id", searchParams.conta);
+
+      if (searchParams.conta === NONE_VALUE)
+        query = query.is("conta_id", null);
+      else if (searchParams.conta)
+        query = query.eq("conta_id", searchParams.conta);
 
       const { data, error } = await query.limit(5000);
       if (error) throw error;
@@ -532,6 +562,7 @@ const ReclassificacaoPage = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={ALL_VALUE}>Todas</SelectItem>
+                        <SelectItem value={NONE_VALUE}>Sem categoria</SelectItem>
                         {categoriasDoTipo.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.nome}
@@ -556,6 +587,7 @@ const ReclassificacaoPage = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={ALL_VALUE}>Todas</SelectItem>
+                        <SelectItem value={NONE_VALUE}>Sem subcategoria</SelectItem>
                         {options.subcategorias.map((s) => (
                           <SelectItem key={s.id} value={s.id}>
                             {s.nome}
@@ -580,6 +612,7 @@ const ReclassificacaoPage = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={ALL_VALUE}>Todos</SelectItem>
+                        <SelectItem value={NONE_VALUE}>Sem centro de custo</SelectItem>
                         {options.centros.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.nome}
@@ -604,6 +637,7 @@ const ReclassificacaoPage = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={ALL_VALUE}>Todos</SelectItem>
+                        <SelectItem value={NONE_VALUE}>Sem fornecedor</SelectItem>
                         {options.fornecedores.map((f) => (
                           <SelectItem key={f.id} value={f.id}>
                             {f.nome}
@@ -628,6 +662,7 @@ const ReclassificacaoPage = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={ALL_VALUE}>Todas</SelectItem>
+                        <SelectItem value={NONE_VALUE}>Sem conta</SelectItem>
                         {options.contas.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.nome}
@@ -710,6 +745,7 @@ const ReclassificacaoPage = () => {
                           <th className="p-3 text-left">Vencimento</th>
                           <th className="p-3 text-left">Competência</th>
                           <th className="p-3 text-left">Categoria</th>
+                          <th className="p-3 text-left">Subcategoria</th>
                           <th className="p-3 text-left">Centro</th>
                           <th className="p-3 text-left">Fornecedor</th>
                           <th className="p-3 text-left">Conta</th>
@@ -747,6 +783,9 @@ const ReclassificacaoPage = () => {
                               </td>
                               <td className="p-3 text-left">
                                 {categoriaMap[r.categoria_id || ""] || "-"}
+                              </td>
+                              <td className="p-3 text-left">
+                                {subcategoriaMap[r.subcategoria_id || ""] || "-"}
                               </td>
                               <td className="p-3 text-left">
                                 {centroMap[r.centro_custo_id || ""] || "-"}

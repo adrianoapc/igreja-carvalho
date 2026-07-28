@@ -336,6 +336,30 @@ corrigir a materialização (D6) é pré-requisito de qualquer projeção séria
   não implementada; como pode alterar `data_competencia` e categorias,
   **muda o DRE retroativamente** sem trilha visível no relatório;
   `itens_reembolso` (competência) fica fora do alcance da reclassificação.
+- **Fix jul/2026**: os 5 filtros da etapa 1 (Categoria/Subcategoria/Centro/
+  Fornecedor/Conta) não tinham como buscar lançamentos com o campo NULO —
+  útil justamente pra achar o que falta classificar. Adicionada opção "Sem
+  X" em cada filtro (`.is(coluna, null)` no lugar de `.eq`), válida tanto
+  pra entrada quanto saída. A tabela de revisão (etapa 2) também ganhou a
+  coluna Subcategoria, que faltava (o dado já vinha na query, só não era
+  renderizado).
+  - Review Codex (P1): o sentinel `__NONE__` ("Sem X") só era tratado no
+    preview (`Reclassificacao.tsx`) — a edge `reclass-transacoes` reaplica
+    os mesmos `filtros` pra validar os `ids` recebidos antes de escrever, e
+    comparava a coluna UUID com a string literal `__NONE__`, aplicando 0
+    linhas silenciosamente mesmo com itens selecionados. Corrigido com o
+    mesmo `.is(coluna, null)` no edge (`index.ts:287-299`).
+  - **Achado extra (usuário testou a tela e travou)**: `resultados` vinha
+    de `useQuery` com default inline `data: resultados = []` — cria um
+    array NOVO a cada render enquanto a query fica desabilitada (etapa 1,
+    antes de filtrar), mudando a referência a cada vez; o
+    `useEffect([resultados])` que sincroniza `selectedIds` rodava sem
+    parar → "Maximum update depth exceeded", tela travava só de
+    interagir. Bug pré-existente (não introduzido por esta mudança), só
+    encontrado agora porque a tela foi de fato aberta pra testar o filtro
+    novo. Fix: constante `EMPTY_RESULTADOS` no módulo (referência estável)
+    no lugar do `[]` inline — padrão clássico de estabilização de
+    default do React.
 
 ---
 

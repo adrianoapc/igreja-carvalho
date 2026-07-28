@@ -534,6 +534,23 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 
 ---
 
+### Reclassificação Financeira (wizard em lote)
+
+**Componente**: `Reclassificacao.tsx` — wizard de 3 etapas (Filtrar →
+Revisar e selecionar → Aplicar), disponível para Entradas e Saídas.
+
+- **Etapa 1 (Filtrar)**: descrição, status, datas de vencimento/competência,
+  Categoria, Subcategoria, Centro de Custo, Fornecedor e Conta. Cada um dos
+  5 filtros de classificação tem, além de "Todas/Todos", uma opção **"Sem
+  X"** (jul/2026) que busca lançamentos com o campo NULO — útil para achar
+  rapidamente o que ainda falta classificar.
+- **Etapa 2 (Revisar e selecionar)**: tabela com Descrição, Vencimento,
+  Competência, Categoria, Subcategoria, Centro, Fornecedor, Conta, Status e
+  Valor, com checkbox por linha e "Selecionar todos".
+- **Etapa 3 (Aplicar)**: novo destino (categoria/subcategoria/centro/
+  fornecedor/conta/status/competência) aplicado só aos selecionados, via
+  edge `reclass-transacoes` (job + snapshot + `undo-reclass`).
+
 ### Regras de Negócio
 
 #### O que altera o DRE

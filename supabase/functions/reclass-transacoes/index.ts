@@ -284,19 +284,31 @@ Deno.serve(async (req) => {
     if (filial_id) query = query.eq("filial_id", filial_id);
     if (ids && ids.length) query = query.in("id", ids);
 
-    // Filtros simples (IDs/nome direto)
+    // Filtros simples (IDs/nome direto). NONE_VALUE ("__NONE__") é o
+    // sentinel de "Sem X" da UI (Reclassificacao.tsx) — filtra pelo campo
+    // NULO em vez de comparar um UUID com a string literal (review Codex
+    // P1, PR #62): sem isso, reaplicar o mesmo filtro aqui pra validar os
+    // `ids` recebidos nunca bate, e o job "aplica" 0 linhas silenciosamente.
+    const NONE_VALUE = "__NONE__";
     if (filtros.descricao)
       query = query.ilike("descricao", `%${filtros.descricao}%` as string);
     if (filtros.status) query = query.eq("status", filtros.status as string);
-    if (filtros.categoria)
+    if (filtros.categoria === NONE_VALUE) query = query.is("categoria_id", null);
+    else if (filtros.categoria)
       query = query.eq("categoria_id", filtros.categoria as string);
-    if (filtros.subcategoria)
+    if (filtros.subcategoria === NONE_VALUE)
+      query = query.is("subcategoria_id", null);
+    else if (filtros.subcategoria)
       query = query.eq("subcategoria_id", filtros.subcategoria as string);
-    if (filtros.centro)
+    if (filtros.centro === NONE_VALUE) query = query.is("centro_custo_id", null);
+    else if (filtros.centro)
       query = query.eq("centro_custo_id", filtros.centro as string);
-    if (filtros.fornecedor)
+    if (filtros.fornecedor === NONE_VALUE)
+      query = query.is("fornecedor_id", null);
+    else if (filtros.fornecedor)
       query = query.eq("fornecedor_id", filtros.fornecedor as string);
-    if (filtros.conta) query = query.eq("conta_id", filtros.conta as string);
+    if (filtros.conta === NONE_VALUE) query = query.is("conta_id", null);
+    else if (filtros.conta) query = query.eq("conta_id", filtros.conta as string);
     if (filtros.dataInicio)
       query = query.gte("data_vencimento", filtros.dataInicio as string);
     if (filtros.dataFim)
