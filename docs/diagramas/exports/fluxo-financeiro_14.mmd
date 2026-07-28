@@ -1,0 +1,8 @@
+flowchart TD
+    TIPO{"tipo do\nlançamento?"}
+    TIPO -->|"entrada\n(oferta em cartão)"| SUB["valor_liquido = valor\n+ juros + multas\n- taxas_administrativas\n- desconto"]
+    TIPO -->|"saída\n(despesa, boleto)"| SOM["valor_liquido = valor\n+ juros + multas\n+ taxas_administrativas\n- desconto (inalterado)"]
+
+    SUB --> RPCS["fin_criar_lancamento · fin_atualizar_lancamento ·\nfin_alterar_status_lancamento · fin_lancar_sessao"]
+    SOM --> RPCS
+    RPCS --> UI["TransacaoDialog.tsx\n(mesma correção de sinal +\nformatação BR consistente\nno recálculo client-side)"]
