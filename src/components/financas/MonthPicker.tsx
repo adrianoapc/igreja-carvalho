@@ -91,18 +91,21 @@ export function MonthPicker({
     }
   }, [customRange, selectedMonth]);
 
+  // subDays(N-1) porque "from" e "to" são ambos inclusivos (consumidores
+  // filtram com gte/lte em coluna date-only) — subDays(7) daria 8 dias
+  // (hoje + 7 anteriores), não 7. Review Codex, PR #61.
   const rangePresets = [
     {
       label: "Últimos 7 dias",
-      getValue: () => ({ from: subDays(new Date(), 7), to: new Date() }),
+      getValue: () => ({ from: subDays(new Date(), 6), to: new Date() }),
     },
     {
       label: "Últimos 15 dias",
-      getValue: () => ({ from: subDays(new Date(), 15), to: new Date() }),
+      getValue: () => ({ from: subDays(new Date(), 14), to: new Date() }),
     },
     {
       label: "Últimos 30 dias",
-      getValue: () => ({ from: subDays(new Date(), 30), to: new Date() }),
+      getValue: () => ({ from: subDays(new Date(), 29), to: new Date() }),
     },
     {
       label: "Últimos 3 meses",
