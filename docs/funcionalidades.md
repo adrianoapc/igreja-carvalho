@@ -550,13 +550,15 @@ Revisar e selecionar → Aplicar), disponível para Entradas e Saídas.
 - **Etapa 3 (Aplicar)**: novo destino (categoria/subcategoria/centro/
   fornecedor/conta/status/competência) aplicado só aos selecionados, via
   edge `reclass-transacoes` (job + snapshot + `undo-reclass`).
-- **Transação já conciliada** (jul/2026): categoria, subcategoria e
-  fornecedor podem ser alterados mesmo em transação conciliada ou
-  conferida manualmente, sem precisar desconciliar antes — esses campos
-  não afetam o vínculo com o extrato bancário. Alterar conta, status ou
-  competência continua exigindo desconciliar primeiro, pois isso
-  quebraria a trilha extrato↔transação ou reabriria um período já
-  fechado no DRE.
+- **Transação já conciliada** (jul/2026): categoria, subcategoria,
+  centro de custo e fornecedor podem ser alterados mesmo em transação
+  conciliada ou conferida manualmente, sem precisar desconciliar antes —
+  esses campos não afetam o vínculo com o extrato bancário. Alterar
+  conta, status ou competência continua exigindo desconciliar primeiro,
+  pois isso quebraria a trilha extrato↔transação ou reabriria um período
+  já fechado no DRE. Em nenhum caso a reclassificação altera valor
+  monetário ou data de vencimento/pagamento — o endpoint só aceita as 7
+  colunas de metadado citadas acima.
 
 ### Regras de Negócio
 

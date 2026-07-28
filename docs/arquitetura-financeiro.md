@@ -369,8 +369,20 @@ corrigir a materialização (D6) é pré-requisito de qualquer projeção séria
   em "valores" (vínculo bancário/período fechado). Corrigido em
   `reclass-transacoes/index.ts` para só bloquear quando `updateFields`
   contém `conta_id`, `data_competencia` ou `status` — `categoria_id`,
-  `subcategoria_id` e `fornecedor_id` ficam liberados mesmo em transação
-  conciliada/conferida manualmente, sem precisar desconciliar antes.
+  `subcategoria_id`, `centro_custo_id` e `fornecedor_id` ficam liberados
+  mesmo em transação conciliada/conferida manualmente, sem precisar
+  desconciliar antes.
+  - **Achado extra (revisão própria, mesma sessão)**: `updateFields` vinha
+    direto de `Object.entries(novos_valores)` sem allow-list de coluna —
+    o tipo `ReclassPayload` é só compile-time, não protege em runtime. Um
+    payload bruto poderia incluir `valor`/`valor_liquido`/
+    `data_vencimento`/`data_pagamento` e isso seria aplicado sem
+    nenhuma validação (esses campos não passam por nenhum dos `if
+    (updateFields.X)` existentes). Corrigido com uma allow-list explícita
+    (`CAMPOS_PERMITIDOS`) das 7 colunas de metadado que este endpoint
+    pode escrever — reclassificação nunca toca valor monetário nem data
+    de vencimento/pagamento, isso é papel de `fin_atualizar_lancamento`/
+    `fin_confirmar_conciliacao`.
 
 ---
 

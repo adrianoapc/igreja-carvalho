@@ -670,12 +670,17 @@ flowchart LR
 
 Ver §5.5 do `arquitetura-financeiro.md`. O bloqueio de transação conciliada
 era tudo-ou-nada; agora só bloqueia quando o campo alterado afeta o vínculo
-bancário ou o período do DRE.
+bancário ou o período do DRE. Uma allow-list de colunas garante que valor
+monetário e datas de vencimento/pagamento nunca passam por este endpoint,
+independente do payload recebido.
 
 ```mermaid
 flowchart TD
-    REQ["updateFields (novos_valores)"] --> CHECK{"contém conta_id,\ndata_competencia ou status?"}
-    CHECK -->|"não\n(só categoria/subcategoria/fornecedor)"| LIVRE["aplica mesmo\nse conciliada"]
+    RAW["novos_valores (payload bruto)"] --> ALLOW{"allow-list:\ncategoria/subcategoria/\ncentro/fornecedor/conta/\nstatus/data_competencia"}
+    ALLOW -->|"campo fora da lista\n(valor, data_vencimento...)"| DROP["descartado silenciosamente"]
+    ALLOW -->|"campo permitido"| REQ["updateFields"]
+    REQ --> CHECK{"contém conta_id,\ndata_competencia ou status?"}
+    CHECK -->|"não\n(categoria/subcategoria/\ncentro/fornecedor)"| LIVRE["aplica mesmo\nse conciliada"]
     CHECK -->|"sim"| CONC{"alguma transação\nconciliada/conferida?"}
     CONC -->|"não"| LIVRE
     CONC -->|"sim"| BLOQ["409 TRANSACAO_CONCILIADA\n(desconciliar antes)"]

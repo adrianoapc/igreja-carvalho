@@ -154,9 +154,27 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Normaliza novos valores (remove undefined)
+    // Allow-list de colunas que este endpoint pode escrever: reclassificação é
+    // metadado (categoria/vínculo/status/competência), nunca valor monetário
+    // nem data de vencimento/pagamento — isso é papel de fin_atualizar_lancamento/
+    // fin_confirmar_conciliacao. O tipo ReclassPayload é só compile-time; sem
+    // este filtro, um payload bruto poderia enviar "valor"/"data_vencimento" e o
+    // `.update({...updateFields})` abaixo aplicaria sem nenhuma validação.
+    const CAMPOS_PERMITIDOS = [
+      "categoria_id",
+      "subcategoria_id",
+      "centro_custo_id",
+      "fornecedor_id",
+      "conta_id",
+      "status",
+      "data_competencia",
+    ];
+
+    // Normaliza novos valores (remove undefined, restringe à allow-list)
     const updateFields = Object.fromEntries(
-      Object.entries(novos_valores).filter(([, v]) => v !== undefined)
+      Object.entries(novos_valores).filter(
+        ([k, v]) => v !== undefined && CAMPOS_PERMITIDOS.includes(k)
+      )
     );
 
     if (Object.keys(updateFields).length === 0) {
