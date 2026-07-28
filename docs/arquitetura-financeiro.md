@@ -1632,6 +1632,46 @@ desambigua pro `array_append`. Sintaxe validada com `check_function_bodies
 referenciadas, já que o corpo de cada função é idêntico ao que já roda em
 produção, só com o cast adicionado).
 
+### 9.15 Fix: taxa administrativa somava em vez de subtrair em ENTRADAS (jul/2026)
+
+Achado a partir de um print real: lançamento "Oferta - C.Débito", Valor
+(Bruto) R$200,00, Valor Pago (Líquido) R$203,58, Taxas Administrativas
+R$3,58 — o líquido ficava **maior** que o bruto, o que não corresponde a
+dinheiro real (a adquirente fica com a taxa; a igreja recebe menos, não
+mais). Avaliação completa (2 agentes em paralelo, sem código, registrada
+antes da implementação) confirmou que a fórmula `valor + juros + multas +
+taxas_administrativas - desconto` estava correta para SAÍDA (você paga mais
+por causa de uma taxa) mas era aplicada igual para ENTRADA em 4 pontos:
+`fin_lancar_sessao` (cria a oferta a partir do Relatório de Ofertas — a taxa
+já é calculada automaticamente do cadastro de `formas_pagamento`, o
+tesoureiro nunca digita nada, então toda oferta em cartão já nascia com o
+líquido inflado), `fin_criar_lancamento`, `fin_atualizar_lancamento`
+(recálculo automático) e `fin_alterar_status_lancamento` (baixa
+pendente→pago). `TransacaoDetalheDrawer.tsx` (ajuste manual na tela de
+conciliação) já calculava na direção certa — o sistema "sabia" a fórmula
+certa em um lugar, só não usava no ponto de criação.
+
+Fix (migration `20260728170000_fin_taxa_entrada_subtrai_liquido.sql`):
+`taxas_administrativas` agora subtrai quando `tipo='entrada'` e continua
+somando quando `tipo='saida'` — `juros`/`multas` continuam somando e
+`desconto` continua subtraindo nos dois tipos (fazem sentido nas duas
+direções). Escopo estrito: só a fórmula de `valor_liquido` — motor de
+conciliação comparar por líquido, fonte real da taxa via
+`getnet_financeiro_resumo`, relatório agregado de taxas e a reconciliação
+em duas camadas (Oferta↔Getnet↔Banco, cada uma com granularidade própria:
+oferta por culto, Getnet por transação individual com bruto/custo/líquido
+reais, banco por lote de liquidação por bandeira) ficam para fases
+seguintes — avaliação completa registrada, aguardando decisão de onde
+implementar (motor genérico estendido vs. lógica própria).
+
+Validado via harness Docker isolado — 7 cenários: `fin_criar_lancamento`
+entrada (subtrai) e saída (soma, sem regressão), parcela 2+ da mesma RPC
+(ramo de fórmula separado), `fin_atualizar_lancamento` recálculo
+automático, `fin_alterar_status_lancamento` baixando entrada e saída, e
+`fin_lancar_sessao` reproduzindo exatamente o cenário do print (bruto
+R$200 + taxa R$3,58 → líquido R$196,42, não mais R$203,58). Todos
+passaram.
+
 ## 10. Decisões em aberto (bater o martelo)
 
 | # | Decisão | Recomendação |
