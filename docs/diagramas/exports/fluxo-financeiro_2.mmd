@@ -1,6 +1,8 @@
 flowchart LR
     UI[Entradas/Saídas] --> TAB[ExportarTab]
-    TAB --> MAP[Mapeamento para colunas]
+    TAB --> MP["MonthPicker\n(mês + atalhos ou range customizado)"]
+    MP --> PERIODO["getPeriodoRange\n(lib/periodo, CORE)"]
+    PERIODO --> MAP[Mapeamento para colunas]
     MAP --> NORMALIZE[Normalização de valor numérico]
     NORMALIZE --> XLSX[exportToExcel]
     XLSX --> FILE[Arquivo XLSX com células numéricas]
