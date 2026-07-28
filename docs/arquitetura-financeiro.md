@@ -336,6 +336,13 @@ corrigir a materialização (D6) é pré-requisito de qualquer projeção séria
   não implementada; como pode alterar `data_competencia` e categorias,
   **muda o DRE retroativamente** sem trilha visível no relatório;
   `itens_reembolso` (competência) fica fora do alcance da reclassificação.
+- **Fix jul/2026**: os 5 filtros da etapa 1 (Categoria/Subcategoria/Centro/
+  Fornecedor/Conta) não tinham como buscar lançamentos com o campo NULO —
+  útil justamente pra achar o que falta classificar. Adicionada opção "Sem
+  X" em cada filtro (`.is(coluna, null)` no lugar de `.eq`), válida tanto
+  pra entrada quanto saída. A tabela de revisão (etapa 2) também ganhou a
+  coluna Subcategoria, que faltava (o dado já vinha na query, só não era
+  renderizado).
 
 ---
 

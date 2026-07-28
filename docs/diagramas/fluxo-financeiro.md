@@ -651,3 +651,17 @@ flowchart TD
     PEND --> TAXAS
     ENT --> TRANSF["Transferências\nSUM(valor) — sem taxa"]
 ```
+
+## Filtro "Sem X" na Reclassificação (jul/2026)
+
+Ver §5.5 do `arquitetura-financeiro.md`. Os 5 filtros da etapa 1 não tinham
+como buscar lançamentos com campo NULO — útil pra achar o que falta
+classificar, em entradas e saídas.
+
+```mermaid
+flowchart LR
+    SEL["Select de filtro\n(Categoria/Subcategoria/\nCentro/Fornecedor/Conta)"]
+    SEL -->|"Todas/Todos"| ALL["sem filtro"]
+    SEL -->|"valor específico"| EQ[".eq(coluna, id)"]
+    SEL -->|"Sem X (novo)"| NULL[".is(coluna, null)"]
+```
