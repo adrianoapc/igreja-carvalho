@@ -165,10 +165,18 @@ graph TD
 
 ## Fluxo de Exportação (Entradas e Saídas)
 
+Período (jul/2026): `ExportarTab` trocou os 2 seletores de data única
+(`Calendar` mode="single" separados, "Data Início"/"Data Fim") pelo mesmo
+`MonthPicker` já usado em Entradas/Saídas — mês com atalhos + range
+customizado, resolvido via `getPeriodoRange` (mesmo helper do CORE,
+`lib/periodo`).
+
 ```mermaid
 flowchart LR
     UI[Entradas/Saídas] --> TAB[ExportarTab]
-    TAB --> MAP[Mapeamento para colunas]
+    TAB --> MP["MonthPicker\n(mês + atalhos ou range customizado)"]
+    MP --> PERIODO["getPeriodoRange\n(lib/periodo, CORE)"]
+    PERIODO --> MAP[Mapeamento para colunas]
     MAP --> NORMALIZE[Normalização de valor numérico]
     NORMALIZE --> XLSX[exportToExcel]
     XLSX --> FILE[Arquivo XLSX com células numéricas]

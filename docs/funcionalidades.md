@@ -1411,7 +1411,7 @@ Centralizar operações de importação e exportação de transações financeir
 
 **Funcionalidades**:
 
-- Filtros avançados: tipo (entrada/saída), status (pago/pendente), período (data início/fim), conta, categoria
+- Filtros avançados: tipo (entrada/saída), status (pago/pendente), período (mês, atalhos rápidos ou range customizado — mesmo `MonthPicker` das telas Entradas/Saídas, jul/2026; antes eram 2 seletores de data única separados), conta, categoria
 - Seleção customizada de colunas para export
 - Preview virtualizado dos dados antes da exportação
 - Exportação para Excel via biblioteca `xlsx`

@@ -9,12 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,17 +17,11 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useFilialId } from "@/hooks/useFilialId";
 import { exportToExcel, formatDateForExport } from "@/lib/exportUtils";
-import {
-  Download,
-  Calendar as CalendarIcon,
-  AlertCircle,
-  FileSpreadsheet,
-  Filter,
-} from "lucide-react";
+import { Download, AlertCircle, FileSpreadsheet, Filter } from "lucide-react";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
 import { formatLocalDate } from "@/utils/dateUtils";
+import { MonthPicker } from "@/components/financas/MonthPicker";
+import { getPeriodoRange } from "@/features/financeiro/core";
 
 type TipoExportacao =
   | "entradas"
@@ -86,10 +74,12 @@ export function ExportarTab() {
   const [tipoExportacao, setTipoExportacao] =
     useState<TipoExportacao>(tipoInicial);
   const [statusFiltro, setStatusFiltro] = useState<StatusFiltro>("todos");
-  const [dataInicio, setDataInicio] = useState<Date | undefined>(
-    new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-  );
-  const [dataFim, setDataFim] = useState<Date | undefined>(new Date());
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const [customRange, setCustomRange] = useState<{
+    from: Date;
+    to: Date;
+  } | null>(null);
+  const periodo = getPeriodoRange(selectedMonth, customRange);
   const [contaFiltro, setContaFiltro] = useState<string>("todas");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>("todas");
   const [colunasSelecionadas, setColunasSelecionadas] = useState<string[]>(
@@ -149,8 +139,8 @@ export function ExportarTab() {
       isAllFiliais,
       tipoExportacao,
       statusFiltro,
-      dataInicio,
-      dataFim,
+      periodo.inicio,
+      periodo.fim,
       contaFiltro,
       categoriaFiltro,
     ],
@@ -193,12 +183,9 @@ export function ExportarTab() {
         query = query.eq("filial_id", filialId);
       }
 
-      if (dataInicio) {
-        query = query.gte("data_competencia", formatLocalDate(dataInicio));
-      }
-      if (dataFim) {
-        query = query.lte("data_competencia", formatLocalDate(dataFim));
-      }
+      query = query
+        .gte("data_competencia", periodo.inicio)
+        .lte("data_competencia", periodo.fim);
 
       if (statusFiltro !== "todos") {
         if (statusFiltro === "pago") {
@@ -366,64 +353,14 @@ export function ExportarTab() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Data Início</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dataInicio && "text-muted-foreground",
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dataInicio
-                      ? format(dataInicio, "dd/MM/yyyy", { locale: ptBR })
-                      : "Selecione"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={dataInicio}
-                    onSelect={setDataInicio}
-                    locale={ptBR}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Data Fim</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dataFim && "text-muted-foreground",
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dataFim
-                      ? format(dataFim, "dd/MM/yyyy", { locale: ptBR })
-                      : "Selecione"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={dataFim}
-                    onSelect={setDataFim}
-                    locale={ptBR}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+          <div className="space-y-2">
+            <Label>Período</Label>
+            <MonthPicker
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+              customRange={customRange}
+              onCustomRangeChange={setCustomRange}
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
