@@ -609,3 +609,21 @@ flowchart TD
     H0 --> ING["fin_ingerir_extratos\nON CONFLICT (conta_id, external_id)"]
     H1 --> ING
 ```
+
+## Fix: taxa administrativa somava em vez de subtrair em entradas (jul/2026)
+
+Ver §9.15 do `arquitetura-financeiro.md` e ADR-027 (fórmula atualizada).
+Corrigido em 4 RPCs `fin_*` + `TransacaoDialog.tsx` (que tinha o mesmo bug
+de sinal, mais um bug de formatação que multiplicava taxas fracionárias
+por 10 ao editar um lançamento existente).
+
+```mermaid
+flowchart TD
+    TIPO{"tipo do\nlançamento?"}
+    TIPO -->|"entrada\n(oferta em cartão)"| SUB["valor_liquido = valor\n+ juros + multas\n- taxas_administrativas\n- desconto"]
+    TIPO -->|"saída\n(despesa, boleto)"| SOM["valor_liquido = valor\n+ juros + multas\n+ taxas_administrativas\n- desconto (inalterado)"]
+
+    SUB --> RPCS["fin_criar_lancamento · fin_atualizar_lancamento ·\nfin_alterar_status_lancamento · fin_lancar_sessao"]
+    SOM --> RPCS
+    RPCS --> UI["TransacaoDialog.tsx\n(mesma correção de sinal +\nformatação BR consistente\nno recálculo client-side)"]
+```

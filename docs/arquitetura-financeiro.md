@@ -1672,6 +1672,38 @@ automático, `fin_alterar_status_lancamento` baixando entrada e saída, e
 R$200 + taxa R$3,58 → líquido R$196,42, não mais R$203,58). Todos
 passaram.
 
+**Addendum — mesmo bug (+ um segundo) em `TransacaoDialog.tsx` (jul/2026,
+mesmo dia)**: um segundo print (Bruto R$50, Taxa R$0,90, Líquido R$59,00 —
+59, não 50,90 nem 49,10) revelou que essa tela tem sua PRÓPRIA cópia do
+cálculo de `valor_liquido`, independente das RPCs corrigidas acima, com
+dois bugs empilhados:
+
+1. **Sinal** — o `useEffect` de recálculo ao vivo (linha ~181) e o cálculo
+   automático no submit quando o campo líquido fica vazio (linha ~873)
+   somavam a taxa sempre, mesmo bug do backend, nunca corrigidos aqui.
+2. **Formatação** — ao abrir "Editar", `taxas_administrativas`/`juros`/
+   `multas`/`desconto` eram preenchidos com `String(numero)` cru (`"0.9"`,
+   formato JS) em vez do formato BR-locale usado por `valor`/`valor_liquido`
+   (`"0,90"`). O parser do recálculo ao vivo assume formato BR e remove
+   todo ponto como se fosse separador de milhar antes de trocar vírgula por
+   ponto — aplicado em `"0.9"`, o ponto decimal some e sobra `"09"` → **9**,
+   dez vezes o valor real. `50 + 9 = 59`, exatamente o print.
+
+**Isso não era só exibição**: o formulário manda `valor_liquido` (já
+corrompido) explícito no PATCH ao salvar, e `fin_atualizar_lancamento` só
+recalcula quando o campo está AUSENTE do patch — ou seja, abrir esse
+dialog pra editar qualquer coisa e salvar gravava o valor errado de
+verdade no banco, inclusive sobrescrevendo um lançamento que a criação já
+tivesse calculado certo. Fix: mesma correção de sinal (condicionado a
+`tipo`) nos dois pontos, mais formatação consistente
+(`transacao.taxas_administrativas` etc. formatados como `valor` no
+`useEffect` de preenchimento). Verificado isolando a lógica de
+formatação+parse em Node contra o cenário exato do print — reproduz os
+R$59,00 com o bug e dá R$49,10 (correto) depois do fix, sem regressão pra
+saída (R$50,90, taxa continua somando). `npx tsc --noEmit`: 62 erros
+(baseline, nenhum novo). Ver também `docs/adr/ADR-027-valor-bruto-vs-
+valor-liquido.md`, fórmula atualizada.
+
 ## 10. Decisões em aberto (bater o martelo)
 
 | # | Decisão | Recomendação |
