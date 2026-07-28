@@ -30,6 +30,14 @@ type TransacaoPreview = {
   conta_id: string | null;
 };
 
+// Referência estável para o default de `data` — um `[]` inline no
+// destructuring (`data: resultados = []`) cria um array NOVO a cada
+// render enquanto a query fica desabilitada (etapa 1, sem searchParams),
+// o que muda a referência de `resultados` a cada render e faz o
+// `useEffect([resultados])` de sincronizar `selectedIds` rodar pra
+// sempre — loop infinito ("Maximum update depth exceeded").
+const EMPTY_RESULTADOS: TransacaoPreview[] = [];
+
 const ReclassificacaoPage = () => {
   const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [tipo, setTipo] = useState<"entrada" | "saida">("saida");
@@ -248,9 +256,10 @@ const ReclassificacaoPage = () => {
     setSelectedIds([]);
   }, [tipo]);
 
-  const { data: resultados = [], isLoading: loadingResultados } = useQuery<
-    TransacaoPreview[]
-  >({
+  const {
+    data: resultados = EMPTY_RESULTADOS,
+    isLoading: loadingResultados,
+  } = useQuery<TransacaoPreview[]>({
     queryKey: [
       "reclass-results",
       igrejaId,
