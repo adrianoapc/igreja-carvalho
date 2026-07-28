@@ -1597,6 +1597,41 @@ explícito, ex. importação manual) tem o mesmo risco teórico de colisão por
 assinatura idêntica — não confirmado como problema ativo em nenhum canal
 além do Santander até este momento.
 
+### 9.14 Fix: "malformed array literal" em 4 RPCs (jul/2026)
+
+Achado em produção: excluir um lançamento com `status='pago'` sempre
+falhava com `22P02 malformed array literal`. Causa: `v_warnings text[] ||
+'string sem cast'` é ambíguo pro Postgres entre `array_cat(anyarray,
+anyarray)` e `array_append(anyarray, anyelement)` — com um literal de tipo
+"unknown" (sem cast explícito), o Postgres resolve como `array_cat` e tenta
+fazer PARSE da string como array literal (que precisa começar com `{`),
+falhando sempre que a string não é uma sintaxe de array válida. Reproduzido
+isoladamente (Docker standalone):
+```sql
+DO $$ DECLARE v text[] := '{}'; BEGIN
+  v := v || 'string sem chave'; -- ERRO: malformed array literal
+END $$;
+```
+Migration `20260728160000_fin_fix_array_literal_warnings.sql` recria (via
+`CREATE OR REPLACE`, sem nenhuma outra mudança de comportamento) as 4
+funções que tinham esse padrão exposto — todas em algum branch de warning,
+então o erro é 100% reprodutível sempre que aquele caminho específico é
+tomado, não intermitente:
+- `fin_alterar_status_lancamento` — mudar pro MESMO status que já está.
+- `fin_excluir_lancamento` — excluir lançamento com `status='pago'` (achado
+  original, reportado pelo usuário).
+- `fin_lancar_sessao` — item do Relatório de Ofertas com `valor <= 0`.
+- `fin_pagar_reembolso` — solicitante de reembolso sem `user_id`.
+
+Outros usos de `v_warnings || ...` no schema (`format(...)`,
+`left(SQLERRM,...)`) já retornam `text` explicitamente e nunca tiveram esse
+problema — só os 4 casos com literal cru estavam expostos (confirmado por
+`grep` em todas as migrations). Fix: `::text` explícito no literal, que
+desambigua pro `array_append`. Sintaxe validada com `check_function_bodies
+= off` num Postgres isolado (sem precisar recriar as ~5 tabelas
+referenciadas, já que o corpo de cada função é idêntico ao que já roda em
+produção, só com o cast adicionado).
+
 ## 10. Decisões em aberto (bater o martelo)
 
 | # | Decisão | Recomendação |
