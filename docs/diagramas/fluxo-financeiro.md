@@ -627,3 +627,19 @@ flowchart TD
     SOM --> RPCS
     RPCS --> UI["TransacaoDialog.tsx\n(mesma correção de sinal +\nformatação BR consistente\nno recálculo client-side)"]
 ```
+
+## Visibilidade de taxa na tela de Entradas (jul/2026)
+
+Ver §9.16 do `arquitetura-financeiro.md`. Fecha o Achado 4 direto nos cards
+de resumo já existentes — sem relatório novo.
+
+```mermaid
+flowchart TD
+    ENT["Entradas do período\n(TransacoesPage, tipo=entrada)"]
+    ENT --> BRUTA["Receita Bruta\nSUM(valor)"]
+    ENT --> REC["Recebido\nSUM(valor_liquido) dos pagos"]
+    ENT --> PEND["Pendente\nSUM(valor_liquido) dos pendentes\n(taxa estimada, não corrigida\npela conciliação)"]
+    REC --> TAXAS["Taxas\nSUM(taxas_administrativas)\npago + pendente (não cancelado)"]
+    PEND --> TAXAS
+    ENT --> TRANSF["Transferências\nSUM(valor) — sem taxa"]
+```
