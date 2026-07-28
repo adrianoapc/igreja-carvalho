@@ -49,9 +49,32 @@ Como garantir que:
 
 ### Fórmula de Cálculo
 
+**Atualizada em jul/2026 (fix produção, ver `arquitetura-financeiro.md` §9.15
+e §9.13-9.14 vizinhos)**: a fórmula original abaixo estava correta só para
+`tipo='saida'` — uma taxa administrativa AUMENTA o que se paga numa despesa,
+mas DIMINUI o que se recebe numa receita (ex.: oferta em cartão — a
+adquirente fica com a taxa, a igreja recebe menos, não mais). Achado a
+partir de um lançamento real com Valor Bruto R$200/Valor Líquido R$203,58 —
+líquido maior que o bruto, o que não corresponde a dinheiro real.
+
 ```text
+-- entrada (receita): taxa reduz o líquido
+valor_liquido = valor + juros + multas - taxas_administrativas - desconto
+
+-- saída (despesa): taxa aumenta o líquido (fórmula original, inalterada)
 valor_liquido = valor + juros + multas + taxas_administrativas - desconto
 ```
+
+Corrigido nas 4 RPCs `fin_*` que calculam `valor_liquido`
+(`fin_criar_lancamento`, `fin_atualizar_lancamento`,
+`fin_alterar_status_lancamento`, `fin_lancar_sessao`) e no recálculo
+client-side de `TransacaoDialog.tsx` (que tinha o mesmo bug de sinal, mais
+um bug de formatação: `taxas_administrativas`/`juros`/`multas`/`desconto`
+eram preenchidos com `String(numero)` cru ao editar, em vez do formato
+BR-locale usado por `valor`/`valor_liquido` — o parser do recálculo
+automático assume formato BR e removia o ponto decimal como se fosse
+separador de milhar, multiplicando taxas fracionárias por 10, ex.: `"0.9"`
+virava `9`).
 
 ### Regras de Importação
 

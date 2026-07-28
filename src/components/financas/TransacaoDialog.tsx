@@ -178,7 +178,12 @@ export function TransacaoDialog({
     const multasNum = parse(multas);
     const descontoNum = parse(desconto);
 
-    const liquido = valorBruto + taxas + jurosNum + multasNum - descontoNum;
+    // Taxa administrativa reduz o que se RECEBE (entrada) e aumenta o que
+    // se PAGA (saída) — mesma correção do backend (fin_criar_lancamento e
+    // demais RPCs fin_*, ver docs/arquitetura-financeiro.md §9.15).
+    const sinalTaxa = tipo === "saida" ? 1 : -1;
+    const liquido =
+      valorBruto + sinalTaxa * taxas + jurosNum + multasNum - descontoNum;
 
     setValorLiquido(
       liquido === 0
@@ -188,7 +193,7 @@ export function TransacaoDialog({
             maximumFractionDigits: 2,
           }),
     );
-  }, [valor, taxasAdministrativas, juros, multas, desconto]);
+  }, [valor, taxasAdministrativas, juros, multas, desconto, tipo]);
 
   // Preencher formulário quando estiver editando
   useEffect(() => {
@@ -270,12 +275,16 @@ export function TransacaoDialog({
 
       setFoiPago(transacao.status === "pago");
       setDataPagamento(parseLocalDate(transacao.data_pagamento));
-      setJuros(transacao.juros ? String(transacao.juros) : "");
-      setMultas(transacao.multas ? String(transacao.multas) : "");
-      setDesconto(transacao.desconto ? String(transacao.desconto) : "");
+      // Mesma formatação BR de valor/valorLiquido acima — String(numero) cru
+      // (ex: "0.9") quebra o parser do recálculo automático abaixo, que
+      // assume formato BR (remove ponto de milhar antes de trocar vírgula
+      // por ponto): "0.9" virava 9, não 0,9.
+      setJuros(transacao.juros ? formatarValorBR(transacao.juros) : "");
+      setMultas(transacao.multas ? formatarValorBR(transacao.multas) : "");
+      setDesconto(transacao.desconto ? formatarValorBR(transacao.desconto) : "");
       setTaxasAdministrativas(
         transacao.taxas_administrativas
-          ? String(transacao.taxas_administrativas)
+          ? formatarValorBR(transacao.taxas_administrativas)
           : "",
       );
       if (transacao.total_parcelas)
@@ -860,9 +869,12 @@ export function TransacaoDialog({
           valorLiquido.replace(/\./g, "").replace(",", "."),
         );
       } else {
-        // Calcular automaticamente: valor + juros + multas + taxas - desconto
+        // Calcular automaticamente: taxa reduz o que se recebe (entrada) e
+        // aumenta o que se paga (saída) — mesma regra do backend (ver
+        // docs/arquitetura-financeiro.md §9.15).
+        const sinalTaxa = tipo === "saida" ? 1 : -1;
         valorLiquidoFinal =
-          valorNumerico + jurosNum + multasNum + taxasAdmNum - descontoNum;
+          valorNumerico + jurosNum + multasNum + sinalTaxa * taxasAdmNum - descontoNum;
       }
 
       // Campos comuns criar/editar — a escrita acontece nas RPCs fin_* do
