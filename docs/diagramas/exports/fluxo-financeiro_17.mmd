@@ -1,0 +1,6 @@
+flowchart TD
+    REQ["updateFields (novos_valores)"] --> CHECK{"contém conta_id,\ndata_competencia ou status?"}
+    CHECK -->|"não\n(só categoria/subcategoria/fornecedor)"| LIVRE["aplica mesmo\nse conciliada"]
+    CHECK -->|"sim"| CONC{"alguma transação\nconciliada/conferida?"}
+    CONC -->|"não"| LIVRE
+    CONC -->|"sim"| BLOQ["409 TRANSACAO_CONCILIADA\n(desconciliar antes)"]
