@@ -1,0 +1,7 @@
+flowchart TD
+    API["Santander /extrato\n(sem id por transação\npara DEP DINHEIRO BCO 24H)"] --> SYNC["syncExtrato()"]
+    SYNC --> SIG{"assinatura já vista\nneste lote?\n(data+valor+descrição+tipo)"}
+    SIG -->|"não (1ª vez)"| H0["hash sem sufixo\n(igual ao de antes)"]
+    SIG -->|"sim (2ª+)"| H1["hash + #ocorrência\n(novo, distinto)"]
+    H0 --> ING["fin_ingerir_extratos\nON CONFLICT (conta_id, external_id)"]
+    H1 --> ING
