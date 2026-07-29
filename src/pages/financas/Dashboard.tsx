@@ -14,7 +14,13 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { callFinRpc } from "@/features/financeiro/core";
+import {
+  callFinRpc,
+  colunaDataFiltro,
+  TIPO_DATA_FILTRO_DEFAULT,
+  type TipoDataFiltro,
+} from "@/features/financeiro/core";
+import { TipoDataFiltroSelect } from "@/components/financas/TipoDataFiltroSelect";
 import {
   startOfMonth,
   endOfMonth,
@@ -66,6 +72,9 @@ export default function Dashboard() {
   const [contaId, setContaId] = useState("all");
   const [categoriaId, setCategoriaId] = useState("all");
   const [status, setStatus] = useState("all");
+  const [tipoData, setTipoData] = useState<TipoDataFiltro>(
+    TIPO_DATA_FILTRO_DEFAULT,
+  );
 
   const mesAtual = new Date();
   const mesAnterior = subMonths(mesAtual, 1);
@@ -139,9 +148,11 @@ export default function Dashboard() {
       contaId,
       categoriaId,
       status,
+      tipoData,
     ],
     queryFn: async () => {
       if (!igrejaId) return [];
+      const colunaPeriodo = colunaDataFiltro(tipoData);
       let query = supabase
         .from("transacoes_financeiras")
         .select(
@@ -152,8 +163,8 @@ export default function Dashboard() {
         `,
         )
         .eq("igreja_id", igrejaId)
-        .gte("data_vencimento", dateRange.inicio)
-        .lte("data_vencimento", dateRange.fim);
+        .gte(colunaPeriodo, dateRange.inicio)
+        .lte(colunaPeriodo, dateRange.fim);
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
@@ -448,6 +459,11 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
             <HideValuesToggle />
+            <TipoDataFiltroSelect
+              value={tipoData}
+              onValueChange={setTipoData}
+              labelPagamento="Data de Caixa"
+            />
             <FiltrosSheet
               selectedMonth={selectedMonth}
               onMonthChange={setSelectedMonth}
@@ -469,6 +485,7 @@ export default function Dashboard() {
                 setContaId("all");
                 setCategoriaId("all");
                 setStatus("all");
+                setTipoData(TIPO_DATA_FILTRO_DEFAULT);
               }}
               onAplicar={() => {}}
             />

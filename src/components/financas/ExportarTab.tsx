@@ -19,9 +19,16 @@ import { useFilialId } from "@/hooks/useFilialId";
 import { exportToExcel, formatDateForExport } from "@/lib/exportUtils";
 import { Download, AlertCircle, FileSpreadsheet, Filter } from "lucide-react";
 import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { formatLocalDate } from "@/utils/dateUtils";
 import { MonthPicker } from "@/components/financas/MonthPicker";
-import { getPeriodoRange } from "@/features/financeiro/core";
+import { TipoDataFiltroSelect } from "@/components/financas/TipoDataFiltroSelect";
+import {
+  getPeriodoRange,
+  colunaDataFiltro,
+  TIPO_DATA_FILTRO_DEFAULT,
+  type TipoDataFiltro,
+} from "@/features/financeiro/core";
 
 type TipoExportacao =
   | "entradas"
@@ -49,12 +56,16 @@ type TransacaoExportacao = {
   conta?: { nome: string } | null;
   categoria?: { nome: string } | null;
   subcategoria?: { nome: string } | null;
-  fornecedor?: { nome: string } | null;
+  fornecedor?: { nome: string; cpf_cnpj: string | null } | null;
   base_ministerial?: { titulo: string } | null;
   centro_custo?: { nome: string } | null;
 };
 
 const COLUNAS_DISPONIVEIS = [
+  { id: "ano", label: "Ano" },
+  { id: "mes", label: "Mês" },
+  { id: "cnpj", label: "CNPJ" },
+  { id: "competencia", label: "Competência" },
   { id: "descricao", label: "Descrição" },
   { id: "valor", label: "Valor" },
   { id: "valor_liquido", label: "Valor Líquido" },
@@ -88,6 +99,9 @@ export function ExportarTab() {
     to: Date;
   } | null>(null);
   const periodo = getPeriodoRange(selectedMonth, customRange);
+  const [tipoData, setTipoData] = useState<TipoDataFiltro>(
+    TIPO_DATA_FILTRO_DEFAULT,
+  );
   const [contaFiltro, setContaFiltro] = useState<string>("todas");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>("todas");
   const [colunasSelecionadas, setColunasSelecionadas] = useState<string[]>(
@@ -149,6 +163,7 @@ export function ExportarTab() {
       statusFiltro,
       periodo.inicio,
       periodo.fim,
+      tipoData,
       contaFiltro,
       categoriaFiltro,
     ],
@@ -183,7 +198,7 @@ export function ExportarTab() {
           conta:conta_id(nome),
           categoria:categoria_id(nome),
           subcategoria:subcategoria_id(nome),
-          fornecedor:fornecedor_id(nome),
+          fornecedor:fornecedor_id(nome, cpf_cnpj),
           base_ministerial:base_ministerial_id(titulo),
           centro_custo:centro_custo_id(nome)
         `,
@@ -195,9 +210,10 @@ export function ExportarTab() {
         query = query.eq("filial_id", filialId);
       }
 
+      const colunaPeriodo = colunaDataFiltro(tipoData);
       query = query
-        .gte("data_vencimento", periodo.inicio)
-        .lte("data_vencimento", periodo.fim);
+        .gte(colunaPeriodo, periodo.inicio)
+        .lte(colunaPeriodo, periodo.fim);
 
       if (statusFiltro !== "todos") {
         if (statusFiltro === "pago") {
@@ -242,9 +258,21 @@ export function ExportarTab() {
         return;
       }
 
+      const colunaPeriodo = colunaDataFiltro(tipoData);
       const dadosExportacao = transacoes.map((t) => {
         const row: Record<string, string | number> = {};
+        const dataFiltro = t[colunaPeriodo];
 
+        if (colunasSelecionadas.includes("ano"))
+          row.Ano = dataFiltro ? new Date(dataFiltro).getFullYear() : "";
+        if (colunasSelecionadas.includes("mes"))
+          row.Mês = dataFiltro
+            ? format(new Date(dataFiltro), "MMMM", { locale: ptBR })
+            : "";
+        if (colunasSelecionadas.includes("cnpj"))
+          row.CNPJ = t.fornecedor?.cpf_cnpj || "";
+        if (colunasSelecionadas.includes("competencia"))
+          row.Competência = formatDateForExport(t.data_competencia);
         if (colunasSelecionadas.includes("descricao"))
           row.Descrição = t.descricao;
         if (colunasSelecionadas.includes("valor")) row.Valor = t.valor;
@@ -377,14 +405,28 @@ export function ExportarTab() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Período</Label>
-            <MonthPicker
-              selectedMonth={selectedMonth}
-              onMonthChange={setSelectedMonth}
-              customRange={customRange}
-              onCustomRangeChange={setCustomRange}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Período</Label>
+              <MonthPicker
+                selectedMonth={selectedMonth}
+                onMonthChange={setSelectedMonth}
+                customRange={customRange}
+                onCustomRangeChange={setCustomRange}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tipo de Data</Label>
+              <TipoDataFiltroSelect
+                value={tipoData}
+                onValueChange={setTipoData}
+                labelPagamento={
+                  tipoExportacao === "entradas" ? "Recebimento" : "Pagamento"
+                }
+                className="w-full"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

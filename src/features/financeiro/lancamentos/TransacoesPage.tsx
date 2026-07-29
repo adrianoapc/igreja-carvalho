@@ -35,6 +35,7 @@ import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
 import { ExtratoDetalheDrawer } from "@/components/financas/ExtratoDetalheDrawer";
 import { FiltrosSheet } from "@/components/financas/FiltrosSheet";
 import { MonthPicker } from "@/components/financas/MonthPicker";
+import { TipoDataFiltroSelect } from "@/components/financas/TipoDataFiltroSelect";
 import {
   exportToExcel,
   formatDateForExport,
@@ -48,6 +49,8 @@ import {
   useLancamentos,
   useDadosFiltros,
   useConciliacaoMap,
+  TIPO_DATA_FILTRO_DEFAULT,
+  type TipoDataFiltro,
 } from "@/features/financeiro/core";
 import { TRANSACOES_PAGE_CONFIG } from "./transacoesPage.config";
 import { LancamentoCard } from "./components/LancamentoCard";
@@ -82,6 +85,9 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
     from: Date;
     to: Date;
   } | null>(null);
+  const [tipoData, setTipoData] = useState<TipoDataFiltro>(
+    TIPO_DATA_FILTRO_DEFAULT,
+  );
 
   // Filtros
   const [busca, setBusca] = useState("");
@@ -112,7 +118,11 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
 
   const periodo = getPeriodoRange(selectedMonth, customRange);
 
-  const { transacoes, isLoading, refetch } = useLancamentos(tipo, periodo);
+  const { transacoes, isLoading, refetch } = useLancamentos(
+    tipo,
+    periodo,
+    tipoData,
+  );
   const { contas, categorias, fornecedores } = useDadosFiltros(tipo);
 
   const transacoesIds = useMemo(
@@ -271,6 +281,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
     setConciliacaoStatusFilter("all");
     setSelectedMonth(new Date());
     setCustomRange(null);
+    setTipoData(TIPO_DATA_FILTRO_DEFAULT);
   };
 
   const handleExportar = () => {
@@ -347,6 +358,11 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
             customRange={customRange}
             onCustomRangeChange={setCustomRange}
           />
+          <TipoDataFiltroSelect
+            value={tipoData}
+            onValueChange={setTipoData}
+            labelPagamento={config.tipoDataPagamentoLabel}
+          />
           <FiltrosSheet
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
@@ -407,6 +423,12 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
         </Badge>
         {customRange && (
           <FiltroBadge label="Período customizado" onClear={() => setCustomRange(null)} />
+        )}
+        {tipoData !== TIPO_DATA_FILTRO_DEFAULT && (
+          <FiltroBadge
+            label={`Data: ${config.tipoDataPagamentoLabel}`}
+            onClear={() => setTipoData(TIPO_DATA_FILTRO_DEFAULT)}
+          />
         )}
         {busca && (
           <FiltroBadge label={`Busca: ${busca}`} onClear={() => setBusca("")} />

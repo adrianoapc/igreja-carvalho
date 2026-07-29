@@ -42,8 +42,14 @@ import {
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
+import { TipoDataFiltroSelect } from "@/components/financas/TipoDataFiltroSelect";
 import { useHideValues } from "@/hooks/useHideValues";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
+import {
+  colunaDataFiltro,
+  TIPO_DATA_FILTRO_DEFAULT,
+  type TipoDataFiltro,
+} from "@/features/financeiro/core";
 
 const COLORS = [
   "#8B5CF6",
@@ -56,6 +62,9 @@ const COLORS = [
 
 export default function Insights() {
   const [periodo, setPeriodo] = useState<"3" | "6" | "12">("6");
+  const [tipoData, setTipoData] = useState<TipoDataFiltro>(
+    TIPO_DATA_FILTRO_DEFAULT,
+  );
   const { formatValue } = useHideValues();
   const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
 
@@ -71,9 +80,11 @@ export default function Insights() {
       filialId,
       isAllFiliais,
       periodo,
+      tipoData,
     ],
     queryFn: async () => {
       if (!igrejaId) return [];
+      const colunaPeriodo = colunaDataFiltro(tipoData);
       let query = supabase
         .from("transacoes_financeiras")
         .select(
@@ -86,9 +97,9 @@ export default function Insights() {
         )
         .eq("tipo", "saida")
         .eq("igreja_id", igrejaId)
-        .gte("data_vencimento", dataInicial.toISOString())
-        .lte("data_vencimento", dataFinal.toISOString())
-        .order("data_vencimento", { ascending: true });
+        .gte(colunaPeriodo, dataInicial.toISOString())
+        .lte(colunaPeriodo, dataFinal.toISOString())
+        .order(colunaPeriodo, { ascending: true });
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
@@ -147,6 +158,11 @@ export default function Insights() {
               <SelectItem value="12">Último ano</SelectItem>
             </SelectContent>
           </Select>
+          <TipoDataFiltroSelect
+            value={tipoData}
+            onValueChange={setTipoData}
+            labelPagamento="Pagamento"
+          />
         </div>
       </div>
 

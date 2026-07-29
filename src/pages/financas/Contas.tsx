@@ -53,7 +53,13 @@ import {
 } from "@/utils/dateUtils";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
+import { TipoDataFiltroSelect } from "@/components/financas/TipoDataFiltroSelect";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
+import {
+  colunaDataFiltro,
+  TIPO_DATA_FILTRO_DEFAULT,
+  type TipoDataFiltro,
+} from "@/features/financeiro/core";
 
 export default function Contas() {
   const navigate = useNavigate();
@@ -73,6 +79,9 @@ export default function Contas() {
     from: Date;
     to: Date;
   } | null>(null);
+  const [tipoData, setTipoData] = useState<TipoDataFiltro>(
+    TIPO_DATA_FILTRO_DEFAULT,
+  );
   const [agruparPorData, setAgruparPorData] = useState(false);
   const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(
     new Set(),
@@ -230,9 +239,11 @@ export default function Contas() {
       selectedContaIds,
       selectedMonth,
       customRange,
+      tipoData,
     ],
     queryFn: async () => {
       if (!igrejaId) return [];
+      const colunaPeriodo = colunaDataFiltro(tipoData);
       let query = supabase
         .from("transacoes_financeiras")
         .select(
@@ -244,9 +255,9 @@ export default function Contas() {
         `,
         )
         .eq("igreja_id", igrejaId)
-        .gte("data_vencimento", startDate)
-        .lte("data_vencimento", endDate)
-        .order("data_vencimento", { ascending: false });
+        .gte(colunaPeriodo, startDate)
+        .lte(colunaPeriodo, endDate)
+        .order(colunaPeriodo, { ascending: false });
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
@@ -271,15 +282,17 @@ export default function Contas() {
       isAllFiliais,
       selectedMonth,
       customRange,
+      tipoData,
     ],
     queryFn: async () => {
       if (!igrejaId) return [];
+      const colunaPeriodo = colunaDataFiltro(tipoData);
       let query = supabase
         .from("transacoes_financeiras")
         .select("conta_id, tipo, valor, status")
         .eq("igreja_id", igrejaId)
-        .gte("data_vencimento", startDate)
-        .lte("data_vencimento", endDate);
+        .gte(colunaPeriodo, startDate)
+        .lte(colunaPeriodo, endDate);
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
@@ -808,12 +821,19 @@ export default function Contas() {
               )}`
             : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
         </Badge>
-        <MonthPicker
-          selectedMonth={selectedMonth}
-          onMonthChange={setSelectedMonth}
-          customRange={customRange}
-          onCustomRangeChange={setCustomRange}
-        />
+        <div className="flex items-center gap-2">
+          <MonthPicker
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+            customRange={customRange}
+            onCustomRangeChange={setCustomRange}
+          />
+          <TipoDataFiltroSelect
+            value={tipoData}
+            onValueChange={setTipoData}
+            labelPagamento="Data de Caixa"
+          />
+        </div>
       </div>
 
       {/* Cards de Contas */}
