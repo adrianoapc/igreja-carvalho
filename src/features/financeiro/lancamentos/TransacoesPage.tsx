@@ -352,17 +352,6 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end flex-wrap">
-          <MonthPicker
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-            customRange={customRange}
-            onCustomRangeChange={setCustomRange}
-          />
-          <TipoDataFiltroSelect
-            value={tipoData}
-            onValueChange={setTipoData}
-            labelPagamento={config.tipoDataPagamentoLabel}
-          />
           <FiltrosSheet
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
@@ -412,24 +401,19 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
 
       {/* Filtros ativos */}
       <div className="flex flex-wrap gap-2 mt-3">
-        <Badge variant="outline" className="gap-1.5">
-          <Calendar className="w-3 h-3" />
-          {customRange
-            ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(
-                customRange.to,
-                "dd/MM/yyyy",
-              )}`
-            : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
-        </Badge>
-        {customRange && (
-          <FiltroBadge label="Período customizado" onClear={() => setCustomRange(null)} />
-        )}
-        {tipoData !== TIPO_DATA_FILTRO_DEFAULT && (
-          <FiltroBadge
-            label={`Data: ${config.tipoDataPagamentoLabel}`}
-            onClear={() => setTipoData(TIPO_DATA_FILTRO_DEFAULT)}
-          />
-        )}
+        <MonthPicker
+          selectedMonth={selectedMonth}
+          onMonthChange={setSelectedMonth}
+          customRange={customRange}
+          onCustomRangeChange={setCustomRange}
+          variant="pill"
+        />
+        <TipoDataFiltroSelect
+          value={tipoData}
+          onValueChange={setTipoData}
+          labelPagamento={config.tipoDataPagamentoLabel}
+          variant="pill"
+        />
         {busca && (
           <FiltroBadge label={`Busca: ${busca}`} onClear={() => setBusca("")} />
         )}

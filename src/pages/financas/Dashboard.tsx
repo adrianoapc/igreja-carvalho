@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
   TrendingUp,
@@ -21,6 +20,7 @@ import {
   type TipoDataFiltro,
 } from "@/features/financeiro/core";
 import { TipoDataFiltroSelect } from "@/components/financas/TipoDataFiltroSelect";
+import { MonthPicker } from "@/components/financas/MonthPicker";
 import {
   startOfMonth,
   endOfMonth,
@@ -459,11 +459,6 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
             <HideValuesToggle />
-            <TipoDataFiltroSelect
-              value={tipoData}
-              onValueChange={setTipoData}
-              labelPagamento="Data de Caixa"
-            />
             <FiltrosSheet
               selectedMonth={selectedMonth}
               onMonthChange={setSelectedMonth}
@@ -494,15 +489,19 @@ export default function Dashboard() {
 
         {/* Period Badge */}
         <div className="flex flex-wrap gap-2 mt-3">
-          <Badge variant="outline" className="gap-1.5">
-            <Calendar className="w-3 h-3" />
-            {customRange
-              ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(
-                  customRange.to,
-                  "dd/MM/yyyy",
-                )}`
-              : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
-          </Badge>
+          <MonthPicker
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+            customRange={customRange}
+            onCustomRangeChange={setCustomRange}
+            variant="pill"
+          />
+          <TipoDataFiltroSelect
+            value={tipoData}
+            onValueChange={setTipoData}
+            labelPagamento="Data de Caixa"
+            variant="pill"
+          />
         </div>
       </div>
 

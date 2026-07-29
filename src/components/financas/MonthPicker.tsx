@@ -32,6 +32,10 @@ interface MonthPickerProps {
   customRange?: { from: Date; to: Date } | null;
   onCustomRangeChange?: (range: { from: Date; to: Date } | null) => void;
   className?: string;
+  /** "pill" reduz o gatilho ao mesmo visual do Badge de período (ícone/fonte
+   * text-xs, formato "MMMM 'de' yyyy") e esconde as setas prev/next — usado
+   * quando o picker some do header e vira o próprio badge de período. */
+  variant?: "control" | "pill";
 }
 
 const MONTHS = [
@@ -55,6 +59,7 @@ export function MonthPicker({
   customRange,
   onCustomRangeChange,
   className,
+  variant = "control",
 }: MonthPickerProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"month" | "custom">(
@@ -179,28 +184,33 @@ export function MonthPicker({
 
   const getDisplayText = () => {
     if (mode === "custom" && customRange?.from && customRange?.to) {
-      return `${format(customRange.from, "dd/MM")} - ${format(customRange.to, "dd/MM")}`;
+      return variant === "pill"
+        ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(customRange.to, "dd/MM/yyyy")}`
+        : `${format(customRange.from, "dd/MM")} - ${format(customRange.to, "dd/MM")}`;
     }
-    return format(selectedMonth, "MMM yyyy", { locale: ptBR });
+    return format(
+      selectedMonth,
+      variant === "pill" ? "MMMM 'de' yyyy" : "MMM yyyy",
+      { locale: ptBR },
+    );
   };
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
-  return (
-    <div className={cn("flex items-center gap-1", className)}>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-8 w-8 p-0"
-        onClick={handlePrevMonth}
-        disabled={mode === "custom"}
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </Button>
-
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
+  const trigger = (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        {variant === "pill" ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-auto w-auto gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold"
+          >
+            <CalendarIcon className="h-3 w-3" />
+            {getDisplayText()}
+          </Button>
+        ) : (
           <Button
             variant="outline"
             size="sm"
@@ -209,7 +219,8 @@ export function MonthPicker({
             <CalendarIcon className="mr-2 h-4 w-4" />
             {getDisplayText()}
           </Button>
-        </PopoverTrigger>
+        )}
+      </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
           <Tabs
             value={mode}
@@ -415,6 +426,25 @@ export function MonthPicker({
           </Tabs>
         </PopoverContent>
       </Popover>
+  );
+
+  if (variant === "pill") {
+    return <div className={className}>{trigger}</div>;
+  }
+
+  return (
+    <div className={cn("flex items-center gap-1", className)}>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-8 w-8 p-0"
+        onClick={handlePrevMonth}
+        disabled={mode === "custom"}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+
+      {trigger}
 
       <Button
         variant="ghost"

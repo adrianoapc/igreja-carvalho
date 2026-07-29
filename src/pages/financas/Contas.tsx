@@ -811,29 +811,20 @@ export default function Contas() {
       </div>
 
       {/* Filtro de Período Global */}
-      <div className="flex items-center justify-between">
-        <Badge variant="outline" className="gap-1.5">
-          <Calendar className="w-3 h-3" />
-          {customRange
-            ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(
-                customRange.to,
-                "dd/MM/yyyy",
-              )}`
-            : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
-        </Badge>
-        <div className="flex items-center gap-2">
-          <MonthPicker
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-            customRange={customRange}
-            onCustomRangeChange={setCustomRange}
-          />
-          <TipoDataFiltroSelect
-            value={tipoData}
-            onValueChange={setTipoData}
-            labelPagamento="Data de Caixa"
-          />
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <MonthPicker
+          selectedMonth={selectedMonth}
+          onMonthChange={setSelectedMonth}
+          customRange={customRange}
+          onCustomRangeChange={setCustomRange}
+          variant="pill"
+        />
+        <TipoDataFiltroSelect
+          value={tipoData}
+          onValueChange={setTipoData}
+          labelPagamento="Data de Caixa"
+          variant="pill"
+        />
       </div>
 
       {/* Cards de Contas */}
