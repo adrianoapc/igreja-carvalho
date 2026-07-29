@@ -82,6 +82,11 @@ export default function Contas() {
   const [tipoData, setTipoData] = useState<TipoDataFiltro>(
     TIPO_DATA_FILTRO_DEFAULT,
   );
+  // Eixo de data usado pra agrupar/exibir por dia (lista agrupada, calendário)
+  // — precisa acompanhar o mesmo eixo usado pra buscar (colunaDataFiltro),
+  // senão um lançamento com vencimento em junho e pagamento em julho some do
+  // calendário de julho ou aparece em junho mesmo filtrando por pagamento.
+  const colunaData = colunaDataFiltro(tipoData);
   const [agruparPorData, setAgruparPorData] = useState(false);
   const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(
     new Set(),
@@ -445,7 +450,9 @@ export default function Contas() {
     if (!transacoes) return {};
     return transacoes.reduce(
       (acc, t) => {
-        const data = t.data_vencimento || "sem-data";
+        const data =
+          (t as Record<string, string | null | undefined>)[colunaData] ||
+          "sem-data";
         if (!acc[data]) {
           acc[data] = [];
         }
@@ -454,7 +461,7 @@ export default function Contas() {
       },
       {} as Record<string, typeof transacoes>,
     );
-  }, [transacoes]);
+  }, [transacoes, colunaData]);
 
   // Ordenar datas (mais recentes primeiro)
   const datasOrdenadas = useMemo(() => {
@@ -525,9 +532,9 @@ export default function Contas() {
               </div>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <p className="text-xs text-muted-foreground">
-                  {t.data_vencimento &&
+                  {t[colunaData] &&
                     format(
-                      new Date(t.data_vencimento + "T00:00:00"),
+                      new Date(`${t[colunaData]}T00:00:00`),
                       "dd/MM/yyyy",
                       { locale: ptBR },
                     )}
@@ -575,14 +582,15 @@ export default function Contas() {
   const renderTransactionListGrouped = (
     filteredTransacoes: TransacaoLista[],
   ) => {
-    // Agrupar transações filtradas por data de vencimento
+    // Agrupar transações filtradas pelo eixo de data selecionado (colunaData)
     const gruposFiltrados = filteredTransacoes.reduce(
       (acc, t) => {
+        const valor = t[colunaData];
         const data =
-          typeof t.data_vencimento === "string"
-            ? t.data_vencimento
-            : t.data_vencimento
-              ? t.data_vencimento.toISOString().split("T")[0]
+          typeof valor === "string"
+            ? valor
+            : valor
+              ? valor.toISOString().split("T")[0]
               : "sem-data";
         if (!acc[data]) {
           acc[data] = [];
@@ -1189,7 +1197,7 @@ export default function Contas() {
                     dataInicio={formatLocalDate(customRange.from)}
                     dataFim={formatLocalDate(customRange.to)}
                     dadosPorDia={transacoesFiltradas?.reduce((acc: Record<string, any[]>, t: any) => {
-                      const data = t.data_vencimento || "sem-data";
+                      const data = t[colunaData] || "sem-data";
                       if (!acc[data]) acc[data] = [];
                       acc[data].push(t);
                       return acc;
@@ -1200,7 +1208,7 @@ export default function Contas() {
                     ano={selectedMonth.getFullYear()}
                     mes={selectedMonth.getMonth()}
                     dadosPorDia={transacoesFiltradas?.reduce((acc: Record<string, any[]>, t: any) => {
-                      const data = t.data_vencimento || "sem-data";
+                      const data = t[colunaData] || "sem-data";
                       if (!acc[data]) acc[data] = [];
                       acc[data].push(t);
                       return acc;
@@ -1222,7 +1230,7 @@ export default function Contas() {
                     dataInicio={formatLocalDate(customRange.from)}
                     dataFim={formatLocalDate(customRange.to)}
                     dadosPorDia={transacoesFiltradas?.filter((t) => t.tipo === "entrada").reduce((acc: Record<string, any[]>, t: any) => {
-                      const data = t.data_vencimento || "sem-data";
+                      const data = t[colunaData] || "sem-data";
                       if (!acc[data]) acc[data] = [];
                       acc[data].push(t);
                       return acc;
@@ -1233,7 +1241,7 @@ export default function Contas() {
                     ano={selectedMonth.getFullYear()}
                     mes={selectedMonth.getMonth()}
                     dadosPorDia={transacoesFiltradas?.filter((t) => t.tipo === "entrada").reduce((acc: Record<string, any[]>, t: any) => {
-                      const data = t.data_vencimento || "sem-data";
+                      const data = t[colunaData] || "sem-data";
                       if (!acc[data]) acc[data] = [];
                       acc[data].push(t);
                       return acc;
@@ -1261,7 +1269,7 @@ export default function Contas() {
                     dataInicio={formatLocalDate(customRange.from)}
                     dataFim={formatLocalDate(customRange.to)}
                     dadosPorDia={transacoesFiltradas?.filter((t) => t.tipo === "saida").reduce((acc: Record<string, any[]>, t: any) => {
-                      const data = t.data_vencimento || "sem-data";
+                      const data = t[colunaData] || "sem-data";
                       if (!acc[data]) acc[data] = [];
                       acc[data].push(t);
                       return acc;
@@ -1272,7 +1280,7 @@ export default function Contas() {
                     ano={selectedMonth.getFullYear()}
                     mes={selectedMonth.getMonth()}
                     dadosPorDia={transacoesFiltradas?.filter((t) => t.tipo === "saida").reduce((acc: Record<string, any[]>, t: any) => {
-                      const data = t.data_vencimento || "sem-data";
+                      const data = t[colunaData] || "sem-data";
                       if (!acc[data]) acc[data] = [];
                       acc[data].push(t);
                       return acc;

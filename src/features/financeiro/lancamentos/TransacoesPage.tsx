@@ -50,6 +50,7 @@ import {
   useDadosFiltros,
   useConciliacaoMap,
   TIPO_DATA_FILTRO_DEFAULT,
+  colunaDataFiltro,
   type TipoDataFiltro,
 } from "@/features/financeiro/core";
 import { TRANSACOES_PAGE_CONFIG } from "./transacoesPage.config";
@@ -145,8 +146,8 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
   );
 
   const transacoesAgrupadas = useMemo(
-    () => agruparPorData(transacoesFiltradas),
-    [transacoesFiltradas],
+    () => agruparPorData(transacoesFiltradas, colunaDataFiltro(tipoData)),
+    [transacoesFiltradas, tipoData],
   );
   const datasOrdenadas = useMemo(
     () => ordenarDatasDesc(transacoesAgrupadas),

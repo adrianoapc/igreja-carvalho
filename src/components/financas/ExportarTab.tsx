@@ -20,7 +20,7 @@ import { exportToExcel, formatDateForExport } from "@/lib/exportUtils";
 import { Download, AlertCircle, FileSpreadsheet, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { formatLocalDate } from "@/utils/dateUtils";
+import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 import { MonthPicker } from "@/components/financas/MonthPicker";
 import { TipoDataFiltroSelect } from "@/components/financas/TipoDataFiltroSelect";
 import {
@@ -261,13 +261,17 @@ export function ExportarTab() {
       const colunaPeriodo = colunaDataFiltro(tipoData);
       const dadosExportacao = transacoes.map((t) => {
         const row: Record<string, string | number> = {};
-        const dataFiltro = t[colunaPeriodo];
+        // parseLocalDate em vez de `new Date(string)`: "YYYY-MM-DD" seria
+        // interpretado como meia-noite UTC, que em fusos a oeste de UTC
+        // (ex: Brasil) volta um dia no horário local — ano/mês errados
+        // perto da virada de mês/ano.
+        const dataFiltro = parseLocalDate(t[colunaPeriodo]);
 
         if (colunasSelecionadas.includes("ano"))
-          row.Ano = dataFiltro ? new Date(dataFiltro).getFullYear() : "";
+          row.Ano = dataFiltro ? dataFiltro.getFullYear() : "";
         if (colunasSelecionadas.includes("mes"))
           row.Mês = dataFiltro
-            ? format(new Date(dataFiltro), "MMMM", { locale: ptBR })
+            ? format(dataFiltro, "MMMM", { locale: ptBR })
             : "";
         if (colunasSelecionadas.includes("cnpj"))
           row.CNPJ = t.fornecedor?.cpf_cnpj || "";

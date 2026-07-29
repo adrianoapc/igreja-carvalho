@@ -111,8 +111,11 @@ export default function Insights() {
     enabled: !loading && !!igrejaId,
   });
 
-  // Processar dados para insights
-  const insights = transacoes ? processarInsights(transacoes) : null;
+  // Processar dados para insights — mesmo eixo de data usado na busca acima,
+  // senão a tendência mensal/anomalias atribuem a transação ao mês errado.
+  const insights = transacoes
+    ? processarInsights(transacoes, colunaDataFiltro(tipoData))
+    : null;
 
   if (isLoading) {
     return (
@@ -528,11 +531,15 @@ type TransacaoFinanceira = {
   valor: number;
   descricao?: string;
   data_vencimento: string | Date;
+  data_pagamento?: string | Date | null;
   fornecedor?: { nome?: string } | null;
   categoria?: { nome?: string } | null;
 };
 
-function processarInsights(transacoes: TransacaoFinanceira[]) {
+function processarInsights(
+  transacoes: TransacaoFinanceira[],
+  coluna: "data_vencimento" | "data_pagamento" = "data_vencimento",
+) {
   const totalGasto = transacoes.reduce((acc, t) => acc + (t.valor || 0), 0);
   const mediaTransacao = totalGasto / (transacoes.length || 1);
 
@@ -591,7 +598,7 @@ function processarInsights(transacoes: TransacaoFinanceira[]) {
   // Gastos mensais
   const mesesMap = new Map<string, number>();
   transacoes.forEach((t) => {
-    const mes = format(new Date(t.data_vencimento), "MMM/yyyy", {
+    const mes = format(new Date(t[coluna] as string | Date), "MMM/yyyy", {
       locale: ptBR,
     });
     mesesMap.set(mes, (mesesMap.get(mes) || 0) + (t.valor || 0));
@@ -627,7 +634,7 @@ function processarInsights(transacoes: TransacaoFinanceira[]) {
       descricao: t.descricao,
       valor: t.valor,
       fornecedor: t.fornecedor?.nome,
-      data: t.data_vencimento,
+      data: t[coluna],
       desvio: t.valor / mediaTransacao,
     }))
     .sort((a, b) => b.valor - a.valor);

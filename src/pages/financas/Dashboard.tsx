@@ -196,13 +196,22 @@ export default function Dashboard() {
 
   // Totais do mês anterior agregados no servidor (fin_resumo_periodo,
   // F2.5/ADR-029) — só o comparativo precisa deles, não das linhas cruas.
+  // p_eixo acompanha o mesmo Tipo de Data do período atual (tipoData),
+  // senão o comparativo mistura vencimento x pagamento entre os dois meses.
   const { data: resumoMesAnterior } = useQuery({
-    queryKey: ["dashboard-mes-anterior", igrejaId, filialId, isAllFiliais],
+    queryKey: [
+      "dashboard-mes-anterior",
+      igrejaId,
+      filialId,
+      isAllFiliais,
+      tipoData,
+    ],
     queryFn: async () => {
       const resultado = await callFinRpc("fin_resumo_periodo", {
         p_inicio: formatLocalDate(startOfMonthLocal(mesAnterior)),
         p_fim: formatLocalDate(endOfMonthLocal(mesAnterior)),
         p_filial_id: !isAllFiliais && filialId ? filialId : null,
+        p_eixo: tipoData,
       });
       return resultado as unknown as {
         tipo: string;
