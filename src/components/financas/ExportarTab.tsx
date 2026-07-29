@@ -196,8 +196,8 @@ export function ExportarTab() {
       }
 
       query = query
-        .gte("data_competencia", periodo.inicio)
-        .lte("data_competencia", periodo.fim);
+        .gte("data_vencimento", periodo.inicio)
+        .lte("data_vencimento", periodo.fim);
 
       if (statusFiltro !== "todos") {
         if (statusFiltro === "pago") {
