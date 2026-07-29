@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Loader2, CheckCircle2, XCircle, FileText } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
+import { DateFieldPicker } from "@/components/financas/DateFieldPicker";
 import {
   Dialog,
   DialogContent,
@@ -12,11 +11,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -119,33 +113,13 @@ export function GetnetImportDialog({
 
           <div className="space-y-1">
             <p className="text-sm font-medium">Data de referência</p>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
-                  )}
-                  disabled={loading || !!result?.success}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date
-                    ? format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
-                    : "Selecione uma data"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={setDate}
-                  locale={ptBR}
-                  disabled={(d) => d > new Date()}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+            <DateFieldPicker
+              value={date}
+              onChange={setDate}
+              disabled={loading || !!result?.success}
+              disabledDate={(d) => d > new Date()}
+              placeholder="Selecione uma data"
+            />
             <p className="text-xs text-muted-foreground">
               Buscará arquivo no padrão EEVD_*_{format(date ?? new Date(), "ddMMyyyy")}.txt
             </p>
