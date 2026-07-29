@@ -36,6 +36,10 @@ type TransacaoExportacao = {
   id: string;
   descricao: string;
   valor: number;
+  valor_liquido?: number | null;
+  taxas_administrativas?: number | null;
+  multas?: number | null;
+  juros?: number | null;
   status: string;
   data_vencimento: string;
   data_pagamento?: string | null;
@@ -53,6 +57,10 @@ type TransacaoExportacao = {
 const COLUNAS_DISPONIVEIS = [
   { id: "descricao", label: "Descrição" },
   { id: "valor", label: "Valor" },
+  { id: "valor_liquido", label: "Valor Líquido" },
+  { id: "taxas_administrativas", label: "Taxa Administrativa" },
+  { id: "multas", label: "Multa" },
+  { id: "juros", label: "Juros" },
   { id: "status", label: "Status" },
   { id: "data_vencimento", label: "Data Vencimento" },
   { id: "data_pagamento", label: "Data Pagamento" },
@@ -162,6 +170,10 @@ export function ExportarTab() {
           id,
           descricao,
           valor,
+          valor_liquido,
+          taxas_administrativas,
+          multas,
+          juros,
           status,
           data_vencimento,
           data_pagamento,
@@ -236,6 +248,12 @@ export function ExportarTab() {
         if (colunasSelecionadas.includes("descricao"))
           row.Descrição = t.descricao;
         if (colunasSelecionadas.includes("valor")) row.Valor = t.valor;
+        if (colunasSelecionadas.includes("valor_liquido"))
+          row["Valor Líquido"] = t.valor_liquido ?? 0;
+        if (colunasSelecionadas.includes("taxas_administrativas"))
+          row["Taxa Administrativa"] = t.taxas_administrativas ?? 0;
+        if (colunasSelecionadas.includes("multas")) row.Multa = t.multas ?? 0;
+        if (colunasSelecionadas.includes("juros")) row.Juros = t.juros ?? 0;
         if (colunasSelecionadas.includes("status")) row.Status = t.status;
         if (colunasSelecionadas.includes("data_vencimento"))
           row["Data Vencimento"] = formatDateForExport(t.data_vencimento);
@@ -269,7 +287,13 @@ export function ExportarTab() {
         dadosExportacao,
         nomeArquivo,
         tipoExportacao === "entradas" ? "Entradas" : "Saídas",
-        { Valor: "#,##0.00" },
+        {
+          Valor: "#,##0.00",
+          "Valor Líquido": "#,##0.00",
+          "Taxa Administrativa": "#,##0.00",
+          Multa: "#,##0.00",
+          Juros: "#,##0.00",
+        },
       );
       toast.success(`${transacoes.length} registros exportados com sucesso!`);
     } catch (error) {
