@@ -1,29 +1,41 @@
 -- ============================================================================
--- Fix: fin_atualizar_lancamento perdeu o suporte a forma_pagamento_id
--- (review Codex, PR #67)
+-- Fix: fin_atualizar_lancamento perdeu o suporte a forma_pagamento_id E o
+-- sinal correto de taxas_administrativas (review Codex + /code-review,
+-- PR #67)
 --
 -- 20260729130000_fin_forma_pagamento_fk.sql deu CREATE OR REPLACE em
 -- fin_atualizar_lancamento adicionando forma_pagamento_id (FK real,
--- ADR-029) na allow-list e no UPDATE. 20260729150000_fin_competencia_
--- grupo_parcelado.sql (D10, sessão paralela) deu OUTRO CREATE OR REPLACE
--- na mesma função — mas a cópia usada como base pra esse segundo replace
--- não incorporava a mudança de forma_pagamento_id (foi escrita antes da
--- reconciliação das duas sessões), então o replace apagou o suporte sem
--- ninguém perceber: a função final em produção só tinha a coluna
--- forma_pagamento (texto legado) na allow-list e no UPDATE.
+-- ADR-029) na allow-list e no UPDATE — já em cima da correção de sinal de
+-- taxas_administrativas de 20260728170000 (§9.15, PR #58/#59: taxa
+-- SUBTRAI de valor_liquido em entrada, soma em saída). 20260729150000_
+-- fin_competencia_grupo_parcelado.sql (D10, sessão paralela) deu OUTRO
+-- CREATE OR REPLACE na mesma função — mas a cópia usada como base pra
+-- esse segundo replace precedia AMBAS as correções (nem forma_pagamento_id
+-- nem o sinal de taxa), então o replace apagou as duas sem ninguém
+-- perceber: a função final em produção só tinha a coluna forma_pagamento
+-- (texto legado) na allow-list/UPDATE, e o recálculo de valor_liquido
+-- voltou a SOMAR taxas_administrativas sempre, independente do tipo.
 --
--- Efeito real: editar a forma de pagamento de uma transação existente
--- (TransacaoDialog.tsx manda forma_pagamento_id desde o PR #67) fazia a
--- RPC devolver sucesso com um warning "campo forma_pagamento_id ignorado"
--- — sem lançar erro, sem reverter a UI — só nunca gravava a mudança.
--- Cash/conferência manual (isPagamentoDinheiro) e os totais de cartão da
--- conferência Getnet (fin_conferencia_totais_getnet) ficavam classificando
--- pela forma_pagamento_id antiga.
+-- Efeito real (forma_pagamento_id): editar a forma de pagamento de uma
+-- transação existente (TransacaoDialog.tsx manda forma_pagamento_id desde
+-- o PR #67) fazia a RPC devolver sucesso com um warning "campo
+-- forma_pagamento_id ignorado" — sem lançar erro, sem reverter a UI — só
+-- nunca gravava a mudança. Cash/conferência manual (isPagamentoDinheiro) e
+-- os totais de cartão da conferência Getnet (fin_conferencia_totais_
+-- getnet) ficavam classificando pela forma_pagamento_id antiga.
 --
--- Fix: reincorpora o bloco de forma_pagamento_id (idêntico ao de
--- 20260729130000) na versão atual da função (que já tem o bloqueio D10 de
--- competência de grupo) — mantém as duas features juntas desta vez, sem
--- reverter nenhuma.
+-- Efeito real (sinal da taxa): a primeira versão desta própria migration
+-- (antes deste fix) já tinha herdado a regressão sem notar — achado pelo
+-- /code-review (angle line-by-line) ao revisar o fix do forma_pagamento_id.
+-- O caminho client-side (TransacaoDialog.tsx) sempre manda valor_liquido
+-- já calculado com o sinal certo, então não dispara o recálculo do
+-- servidor na prática hoje — mas a RPC é a porta única (ADR-029) e
+-- qualquer chamador futuro que não mande valor_liquido explícito
+-- receberia o valor errado sem aviso.
+--
+-- Fix: reincorpora os dois blocos (idênticos aos de 20260729130000) na
+-- versão atual da função (que já tem o bloqueio D10 de competência de
+-- grupo) — mantém as três features juntas desta vez, sem reverter nenhuma.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.fin_atualizar_lancamento(
@@ -53,6 +65,8 @@ DECLARE
   v_campo text;
   v_aplicar jsonb := '{}'::jsonb;
   v_novo_status text;
+  v_tipo_efetivo text;
+  v_sinal_taxa numeric;
   v_forma_nome text;
 BEGIN
   v_ctx := public.fin_resolver_contexto(p_contexto, NULL);
@@ -111,6 +125,14 @@ BEGIN
     RAISE EXCEPTION 'FIN_VALIDACAO: status inválido (%)', v_novo_status;
   END IF;
 
+  -- Taxa administrativa reduz o que se RECEBE (entrada) e aumenta o que se
+  -- PAGA (saída) — tipo efetivo é o do patch, senão o já gravado (§9.15,
+  -- PR #58/#59; restaurado aqui — tinha sido perdido pela mesma colisão de
+  -- CREATE OR REPLACE do forma_pagamento_id, achado no review Codex do
+  -- PR #67, ver §9.22).
+  v_tipo_efetivo := COALESCE(v_aplicar ->> 'tipo', v_atual.tipo);
+  v_sinal_taxa := CASE WHEN v_tipo_efetivo = 'saida' THEN 1 ELSE -1 END;
+
   -- ADR-027: recalcula valor_liquido quando componentes mudam sem fixação explícita.
   IF NOT (v_aplicar ? 'valor_liquido')
      AND (v_aplicar ?| ARRAY['valor','juros','multas','desconto','taxas_administrativas']) THEN
@@ -118,7 +140,7 @@ BEGIN
         COALESCE((v_aplicar ->> 'valor')::numeric, v_atual.valor)
       + COALESCE((v_aplicar ->> 'juros')::numeric, v_atual.juros, 0)
       + COALESCE((v_aplicar ->> 'multas')::numeric, v_atual.multas, 0)
-      + COALESCE((v_aplicar ->> 'taxas_administrativas')::numeric, v_atual.taxas_administrativas, 0)
+      + (v_sinal_taxa * COALESCE((v_aplicar ->> 'taxas_administrativas')::numeric, v_atual.taxas_administrativas, 0))
       - COALESCE((v_aplicar ->> 'desconto')::numeric, v_atual.desconto, 0));
   END IF;
 

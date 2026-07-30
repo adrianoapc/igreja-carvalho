@@ -2131,10 +2131,12 @@ simultâneos aplicam, patch sem `data_competencia` não aciona a checagem,
 lançamento único nunca aciona) — mesmo padrão já usado no repo para lógica
 pura de gate (PR #59/#63), sem harness SQL por não haver SQL nesse trecho.
 
-### 9.22 Fix pós-review (Codex, PR #67): forma_pagamento_id perdido + edição descartada no sync de competência (jul/2026)
+### 9.22 Fix pós-review (Codex + /code-review, PR #67): forma_pagamento_id e sinal da taxa perdidos + edição descartada no sync de competência (jul/2026)
 
-Duas rodadas de review Codex sobre o PR #67 (frontend do Recebível Getnet +
-FK de forma de pagamento + D10) acharam 2 P1 e 1 P2 reais:
+Review Codex sobre o PR #67 (frontend do Recebível Getnet + FK de forma de
+pagamento + D10) acharam 2 P1 e 1 P2 reais; a rodada seguinte de `/code-
+review` (angle line-by-line) achou uma 4ª regressão do MESMO padrão que a
+correção do 1º achado ainda não tinha coberto:
 
 1. **`fin_atualizar_lancamento` tinha perdido `forma_pagamento_id`.** A
    migration da FK (§9.18, `20260729130000`) deu `CREATE OR REPLACE` na
@@ -2169,15 +2171,36 @@ FK de forma de pagamento + D10) acharam 2 P1 e 1 P2 reais:
    de dependências do `useMemo`; o filtro "Conferido Manual" ficava vazio
    até algum outro filtro mudar, porque a resolução assíncrona do id do
    "Dinheiro" não disparava recálculo. Fix: adicionado à lista de deps.
+4. **`fin_atualizar_lancamento` TAMBÉM tinha perdido o sinal da taxa
+   administrativa** (§9.15, PR #58/#59: taxa subtrai de `valor_liquido` em
+   entrada, soma em saída) — a mesma colisão de `CREATE OR REPLACE` do
+   achado 1 apagou os dois ao mesmo tempo (a cópia usada como base pelo
+   D10 precedia AMBAS as correções), só que a 1ª rodada de fix (achado 1)
+   só notou o `forma_pagamento_id`, sem checar se mais alguma coisa tinha
+   sido revertida junto. Achado pelo `/code-review` (angle line-by-line)
+   ao revisar o próprio fix do achado 1 — confirmado direto no arquivo
+   antes de aplicar. Como `TransacaoDialog.tsx` sempre manda
+   `valor_liquido` já calculado com o sinal certo, o recálculo server-side
+   quebrado não disparava na prática pelo único chamador atual — mas a RPC
+   é a porta única (ADR-029) e qualquer chamador futuro sem `valor_liquido`
+   explícito receberia o valor errado sem aviso. Fix: reincorporado no
+   mesmo `20260730100000` (`v_sinal_taxa`, idêntico ao de `20260729130000`).
 
-**Verificação**: harness Docker (`postgres:15`) com 4 cenários — grava
+**Verificação**: harness Docker (`postgres:15`) com 6 cenários — grava
 `forma_pagamento_id` numa transação única sem warning de campo ignorado;
 rejeita `forma_pagamento_id` de outro tenant (regressão do `fin_validar_
 fk_tenant`, não voltou a passar batido); edita uma parcela sem tocar
 competência sem acionar o bloqueio D10; muda competência de fato numa
-parcela e o bloqueio D10 continua disparando — as duas features convivem
-sem uma pisar na outra. `npx tsc`: 63 baseline (herdado de `origin/main`
-pós-#65/#66), 0 novos.
+parcela e o bloqueio D10 continua disparando; recálculo de `valor_liquido`
+sem `valor_liquido` explícito no patch — entrada com taxa 3 dá líquido 97
+(100−3), saída com taxa 3 dá líquido 103 (100+3). `npx tsc`: 63 baseline
+(herdado de `origin/main` pós-#65/#66), 0 novos.
+
+**Lição**: ao restaurar um campo apagado por uma colisão de migrations,
+não basta reincorporar SÓ o campo que o review apontou — vale diffar a
+função inteira contra a última versão correta conhecida antes de assumir
+que só aquele campo foi afetado (aqui, os dois achados vieram do MESMO
+`CREATE OR REPLACE` malfeito, mas em duas rodadas de review separadas).
 
 ## 11. Riscos
 
