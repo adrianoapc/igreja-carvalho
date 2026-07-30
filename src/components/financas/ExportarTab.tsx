@@ -16,12 +16,19 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useFilialId } from "@/hooks/useFilialId";
-import { exportToExcel, formatDateForExport } from "@/lib/exportUtils";
+import {
+  exportSheetsToExcel,
+  formatDateForExport,
+} from "@/lib/exportUtils";
 import { Download, AlertCircle, FileSpreadsheet, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 import { MonthPicker } from "@/components/financas/MonthPicker";
+import {
+  MultiSelectFilter,
+  type MultiSelectOption,
+} from "@/components/financas/MultiSelectFilter";
 import { getPeriodoRange } from "@/features/financeiro/core";
 
 // Exportar tem um 3º eixo de data (Competência) que o resto do financeiro
@@ -49,7 +56,42 @@ type TipoExportacao =
   | "contas"
   | "categorias"
   | "fornecedores";
-type StatusFiltro = "todos" | "pago" | "pendente" | "atrasado";
+type TipoExportacaoFuncional = "entradas" | "saidas";
+type StatusFiltroValor = "pago" | "pendente" | "atrasado";
+
+const TIPO_DADOS_OPTIONS: MultiSelectOption[] = [
+  { value: "entradas", label: "Entradas" },
+  { value: "saidas", label: "Saídas" },
+  { value: "dre", label: "DRE (em breve)", disabled: true },
+  { value: "contas", label: "Contas (em breve)", disabled: true },
+  { value: "categorias", label: "Categorias (em breve)", disabled: true },
+  { value: "fornecedores", label: "Fornecedores (em breve)", disabled: true },
+];
+
+const STATUS_OPTIONS: MultiSelectOption[] = [
+  { value: "pago", label: "Pagos" },
+  { value: "pendente", label: "Pendentes" },
+  { value: "atrasado", label: "Atrasados" },
+];
+
+/** Combina Pendentes/Atrasados como "or" PostgREST — Atrasado é um
+ * subconjunto de Pendente (status=pendente + vencimento passado), então
+ * marcar os dois junto simplifica pra só "status=pendente" (sem perder
+ * nenhuma linha). Retorna null = sem filtro de status (todos). */
+function statusParaQuery(
+  selecionados: StatusFiltroValor[],
+  hoje: string,
+): string | null {
+  if (selecionados.length === 0) return null;
+  const partes: string[] = [];
+  if (selecionados.includes("pago")) partes.push("status.eq.pago");
+  if (selecionados.includes("pendente")) {
+    partes.push("status.eq.pendente");
+  } else if (selecionados.includes("atrasado")) {
+    partes.push(`and(status.eq.pendente,data_vencimento.lt.${hoje})`);
+  }
+  return partes.length ? partes.join(",") : null;
+}
 
 type TransacaoExportacao = {
   id: string;
@@ -74,6 +116,103 @@ type TransacaoExportacao = {
   base_ministerial?: { titulo: string } | null;
   centro_custo?: { nome: string } | null;
 };
+
+interface FetchTransacoesParams {
+  tipo: "entrada" | "saida";
+  igrejaId: string;
+  filialId: string | null;
+  isAllFiliais: boolean;
+  periodo: { inicio: string; fim: string };
+  tipoData: TipoDataFiltroExport;
+  statusSelecionados: StatusFiltroValor[];
+  contasSelecionadas: string[];
+  categoriasSelecionadas: string[];
+}
+
+async function fetchTransacoesExportacao({
+  tipo,
+  igrejaId,
+  filialId,
+  isAllFiliais,
+  periodo,
+  tipoData,
+  statusSelecionados,
+  contasSelecionadas,
+  categoriasSelecionadas,
+}: FetchTransacoesParams): Promise<TransacaoExportacao[]> {
+  // forma_pagamento_id ainda não consta nos tipos gerados de types.ts
+  // (regenerar com `supabase gen types` após o deploy da migration).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
+    .from("transacoes_financeiras")
+    .select(
+      `
+      id,
+      descricao,
+      valor,
+      valor_liquido,
+      taxas_administrativas,
+      multas,
+      juros,
+      desconto,
+      status,
+      data_vencimento,
+      data_pagamento,
+      data_competencia,
+      observacoes,
+      forma_pagamento,
+      conta:conta_id(nome),
+      categoria:categoria_id(nome),
+      subcategoria:subcategoria_id(nome),
+      fornecedor:fornecedor_id(nome, cpf_cnpj),
+      base_ministerial:base_ministerial_id(titulo),
+      centro_custo:centro_custo_id(nome),
+      forma:forma_pagamento_id(nome)
+    `,
+    )
+    .eq("tipo", tipo)
+    .eq("igreja_id", igrejaId);
+
+  if (!isAllFiliais && filialId) {
+    query = query.eq("filial_id", filialId);
+  }
+
+  const colunaPeriodo = colunaDataFiltroExport(tipoData);
+  query = query
+    .gte(colunaPeriodo, periodo.inicio)
+    .lte(colunaPeriodo, periodo.fim);
+
+  if (colunaPeriodo === "data_pagamento") {
+    // Data de Caixa: paid-only — mesma semântica já aplicada em
+    // Dashboard/Contas/useLancamentos/Insights. Uma transação paga e
+    // depois cancelada mantém data_pagamento preenchida
+    // (20260728170000_fin_taxa_entrada_subtrai_liquido.sql), então sem
+    // isso o export sairia com lançamentos que não valem mais. Ignora
+    // statusSelecionados por completo nesse modo (mesmo comportamento
+    // já existente antes do multi-select).
+    query = query.eq("status", "pago");
+  } else {
+    const statusClause = statusParaQuery(
+      statusSelecionados,
+      formatLocalDate(new Date()),
+    );
+    if (statusClause) query = query.or(statusClause);
+  }
+
+  if (contasSelecionadas.length > 0) {
+    query = query.in("conta_id", contasSelecionadas);
+  }
+
+  if (categoriasSelecionadas.length > 0) {
+    query = query.in("categoria_id", categoriasSelecionadas);
+  }
+
+  query = query.order(colunaPeriodo, { ascending: false });
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data;
+}
 
 const COLUNAS_DISPONIVEIS = [
   { id: "ano", label: "Ano" },
@@ -103,11 +242,14 @@ const COLUNAS_DISPONIVEIS = [
 export function ExportarTab() {
   const [searchParams] = useSearchParams();
   const tipoParam = searchParams.get("tipo");
-  const tipoInicial: TipoExportacao =
+  const tipoInicial: TipoExportacaoFuncional =
     tipoParam === "saidas" || tipoParam === "saida" ? "saidas" : "entradas";
-  const [tipoExportacao, setTipoExportacao] =
-    useState<TipoExportacao>(tipoInicial);
-  const [statusFiltro, setStatusFiltro] = useState<StatusFiltro>("todos");
+  const [tiposSelecionados, setTiposSelecionados] = useState<TipoExportacao[]>(
+    [tipoInicial],
+  );
+  const [statusSelecionados, setStatusSelecionados] = useState<
+    StatusFiltroValor[]
+  >([]);
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [customRange, setCustomRange] = useState<{
     from: Date;
@@ -117,11 +259,15 @@ export function ExportarTab() {
   const [tipoData, setTipoData] = useState<TipoDataFiltroExport>(
     TIPO_DATA_FILTRO_EXPORT_DEFAULT,
   );
-  const [contaFiltro, setContaFiltro] = useState<string>("todas");
-  const [categoriaFiltro, setCategoriaFiltro] = useState<string>("todas");
+  const [contasSelecionadas, setContasSelecionadas] = useState<string[]>([]);
+  const [categoriasSelecionadas, setCategoriasSelecionadas] = useState<
+    string[]
+  >([]);
   const [colunasSelecionadas, setColunasSelecionadas] = useState<string[]>(
     COLUNAS_DISPONIVEIS.map((c) => c.id),
   );
+  const [previewTipo, setPreviewTipo] =
+    useState<TipoExportacaoFuncional>(tipoInicial);
 
   const {
     igrejaId,
@@ -129,6 +275,16 @@ export function ExportarTab() {
     isAllFiliais,
     loading: filialLoading,
   } = useFilialId();
+
+  const tiposFuncionaisSelecionados = tiposSelecionados.filter(
+    (t): t is TipoExportacaoFuncional => t === "entradas" || t === "saidas",
+  );
+  // Deriva do state em vez de sincronizar com useEffect: se o tipo em
+  // preview foi desmarcado, cai pro primeiro tipo funcional que sobrou.
+  const previewTipoEfetivo: TipoExportacaoFuncional =
+    tiposFuncionaisSelecionados.includes(previewTipo)
+      ? previewTipo
+      : (tiposFuncionaisSelecionados[0] ?? "entradas");
 
   // Query para contas
   const { data: contas = [] } = useQuery({
@@ -147,219 +303,205 @@ export function ExportarTab() {
     enabled: !!igrejaId && !filialLoading,
   });
 
-  // Query para categorias
+  // Query para categorias — união dos tipos funcionais marcados, já que
+  // Categoria é filtro compartilhado entre Entradas e Saídas.
+  const tiposConceito = useMemo(
+    () => tiposFuncionaisSelecionados.map((t) => (t === "entradas" ? "entrada" : "saida")),
+    [tiposFuncionaisSelecionados],
+  );
   const { data: categorias = [] } = useQuery({
-    queryKey: ["categorias-exportacao", igrejaId, tipoExportacao],
+    queryKey: ["categorias-exportacao", igrejaId, tiposConceito],
     queryFn: async () => {
-      if (!igrejaId) return [];
-      const tipo = tipoExportacao === "entradas" ? "entrada" : "saida";
+      if (!igrejaId || tiposConceito.length === 0) return [];
       const { data, error } = await supabase
         .from("categorias_financeiras")
         .select("id, nome")
         .eq("ativo", true)
-        .eq("tipo", tipo)
+        .in("tipo", tiposConceito)
         .order("nome");
       if (error) throw error;
       return data;
     },
-    enabled:
-      !!igrejaId &&
-      (tipoExportacao === "entradas" || tipoExportacao === "saidas"),
+    enabled: !!igrejaId && tiposConceito.length > 0,
   });
 
-  // Query para dados de exportação
-  const { data: transacoes = [], isLoading } = useQuery<TransacaoExportacao[]>({
+  // Query de dados de exportação — uma por tipo funcional, pra poder gerar
+  // uma aba por tipo no Excel sem misturar entrada/saída na mesma busca.
+  const entradasQuery = useQuery<TransacaoExportacao[]>({
     queryKey: [
       "dados-exportacao",
+      "entrada",
       igrejaId,
       filialId,
       isAllFiliais,
-      tipoExportacao,
-      statusFiltro,
+      statusSelecionados,
       periodo.inicio,
       periodo.fim,
       tipoData,
-      contaFiltro,
-      categoriaFiltro,
+      contasSelecionadas,
+      categoriasSelecionadas,
     ],
-    queryFn: async () => {
-      if (
-        !igrejaId ||
-        tipoExportacao === "dre" ||
-        tipoExportacao === "contas" ||
-        tipoExportacao === "categorias" ||
-        tipoExportacao === "fornecedores"
-      )
-        return [];
-
-      const tipo = tipoExportacao === "entradas" ? "entrada" : "saida";
-      // forma_pagamento_id ainda não consta nos tipos gerados de types.ts
-      // (regenerar com `supabase gen types` após o deploy da migration).
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let query = (supabase as any)
-        .from("transacoes_financeiras")
-        .select(
-          `
-          id,
-          descricao,
-          valor,
-          valor_liquido,
-          taxas_administrativas,
-          multas,
-          juros,
-          desconto,
-          status,
-          data_vencimento,
-          data_pagamento,
-          data_competencia,
-          observacoes,
-          forma_pagamento,
-          conta:conta_id(nome),
-          categoria:categoria_id(nome),
-          subcategoria:subcategoria_id(nome),
-          fornecedor:fornecedor_id(nome, cpf_cnpj),
-          base_ministerial:base_ministerial_id(titulo),
-          centro_custo:centro_custo_id(nome),
-          forma:forma_pagamento_id(nome)
-        `,
-        )
-        .eq("tipo", tipo)
-        .eq("igreja_id", igrejaId);
-
-      if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
-      }
-
-      const colunaPeriodo = colunaDataFiltroExport(tipoData);
-      query = query
-        .gte(colunaPeriodo, periodo.inicio)
-        .lte(colunaPeriodo, periodo.fim);
-
-      if (colunaPeriodo === "data_pagamento") {
-        // Data de Caixa: paid-only — mesma semântica já aplicada em
-        // Dashboard/Contas/useLancamentos/Insights. Uma transação paga e
-        // depois cancelada mantém data_pagamento preenchida
-        // (20260728170000_fin_taxa_entrada_subtrai_liquido.sql), então sem
-        // isso o export sairia com lançamentos que não valem mais.
-        query = query.eq("status", "pago");
-      } else if (statusFiltro !== "todos") {
-        if (statusFiltro === "pago") {
-          query = query.eq("status", "pago");
-        } else if (statusFiltro === "pendente") {
-          query = query.eq("status", "pendente");
-        } else if (statusFiltro === "atrasado") {
-          query = query
-            .eq("status", "pendente")
-            .lt("data_vencimento", formatLocalDate(new Date()));
-        }
-      }
-
-      if (contaFiltro !== "todas") {
-        query = query.eq("conta_id", contaFiltro);
-      }
-
-      if (categoriaFiltro !== "todas") {
-        query = query.eq("categoria_id", categoriaFiltro);
-      }
-
-      query = query.order(colunaPeriodo, { ascending: false });
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () =>
+      fetchTransacoesExportacao({
+        tipo: "entrada",
+        igrejaId: igrejaId as string,
+        filialId,
+        isAllFiliais,
+        periodo,
+        tipoData,
+        statusSelecionados,
+        contasSelecionadas,
+        categoriasSelecionadas,
+      }),
     enabled:
-      !!igrejaId &&
-      !filialLoading &&
-      (tipoExportacao === "entradas" || tipoExportacao === "saidas"),
+      !!igrejaId && !filialLoading && tiposSelecionados.includes("entradas"),
   });
 
+  const saidasQuery = useQuery<TransacaoExportacao[]>({
+    queryKey: [
+      "dados-exportacao",
+      "saida",
+      igrejaId,
+      filialId,
+      isAllFiliais,
+      statusSelecionados,
+      periodo.inicio,
+      periodo.fim,
+      tipoData,
+      contasSelecionadas,
+      categoriasSelecionadas,
+    ],
+    queryFn: () =>
+      fetchTransacoesExportacao({
+        tipo: "saida",
+        igrejaId: igrejaId as string,
+        filialId,
+        isAllFiliais,
+        periodo,
+        tipoData,
+        statusSelecionados,
+        contasSelecionadas,
+        categoriasSelecionadas,
+      }),
+    enabled:
+      !!igrejaId && !filialLoading && tiposSelecionados.includes("saidas"),
+  });
+
+  const isLoading =
+    (tiposSelecionados.includes("entradas") && entradasQuery.isLoading) ||
+    (tiposSelecionados.includes("saidas") && saidasQuery.isLoading);
+
+  const totalRegistros =
+    (tiposSelecionados.includes("entradas")
+      ? entradasQuery.data?.length ?? 0
+      : 0) +
+    (tiposSelecionados.includes("saidas") ? saidasQuery.data?.length ?? 0 : 0);
+
+  const transacoesPreview = useMemo(
+    () =>
+      previewTipoEfetivo === "entradas"
+        ? entradasQuery.data ?? []
+        : saidasQuery.data ?? [],
+    [previewTipoEfetivo, entradasQuery.data, saidasQuery.data],
+  );
+
   const dadosPreview = useMemo(() => {
-    return transacoes?.slice(0, 10) || [];
-  }, [transacoes]);
+    return transacoesPreview.slice(0, 10);
+  }, [transacoesPreview]);
+
+  const montarLinhasExportacao = (dados: TransacaoExportacao[]) => {
+    const colunaPeriodo = colunaDataFiltroExport(tipoData);
+    return dados.map((t) => {
+      const row: Record<string, string | number> = {};
+      // parseLocalDate em vez de `new Date(string)`: "YYYY-MM-DD" seria
+      // interpretado como meia-noite UTC, que em fusos a oeste de UTC
+      // (ex: Brasil) volta um dia no horário local — ano/mês errados
+      // perto da virada de mês/ano.
+      const dataFiltro = parseLocalDate(t[colunaPeriodo]);
+
+      if (colunasSelecionadas.includes("ano"))
+        row.Ano = dataFiltro ? dataFiltro.getFullYear() : "";
+      if (colunasSelecionadas.includes("mes"))
+        row.Mês = dataFiltro
+          ? format(dataFiltro, "MMMM", { locale: ptBR })
+          : "";
+      if (colunasSelecionadas.includes("cnpj"))
+        row.CNPJ = t.fornecedor?.cpf_cnpj || "";
+      if (colunasSelecionadas.includes("competencia"))
+        row.Competência = formatDateForExport(t.data_competencia);
+      if (colunasSelecionadas.includes("descricao"))
+        row.Descrição = t.descricao;
+      if (colunasSelecionadas.includes("valor")) row.Valor = t.valor;
+      if (colunasSelecionadas.includes("valor_liquido"))
+        row["Valor Líquido"] = t.valor_liquido ?? 0;
+      if (colunasSelecionadas.includes("taxas_administrativas"))
+        row["Taxa Administrativa"] = t.taxas_administrativas ?? 0;
+      if (colunasSelecionadas.includes("multas")) row.Multa = t.multas ?? 0;
+      if (colunasSelecionadas.includes("juros")) row.Juros = t.juros ?? 0;
+      if (colunasSelecionadas.includes("desconto"))
+        row.Desconto = t.desconto ?? 0;
+      if (colunasSelecionadas.includes("status")) row.Status = t.status;
+      if (colunasSelecionadas.includes("data_vencimento"))
+        row["Data Vencimento"] = formatDateForExport(t.data_vencimento);
+      if (colunasSelecionadas.includes("data_pagamento"))
+        row["Data Pagamento"] = formatDateForExport(t.data_pagamento);
+      if (colunasSelecionadas.includes("conta"))
+        row.Conta = t.conta?.nome || "";
+      if (colunasSelecionadas.includes("categoria"))
+        row.Categoria = t.categoria?.nome || "";
+      if (colunasSelecionadas.includes("subcategoria"))
+        row.Subcategoria = t.subcategoria?.nome || "";
+      if (colunasSelecionadas.includes("fornecedor"))
+        row.Fornecedor = t.fornecedor?.nome || "";
+      if (colunasSelecionadas.includes("base_ministerial"))
+        row["Base Ministerial"] = t.base_ministerial?.titulo || "";
+      if (colunasSelecionadas.includes("centro_custo"))
+        row["Centro de Custo"] = t.centro_custo?.nome || "";
+      if (colunasSelecionadas.includes("forma_pagamento"))
+        row["Forma Pagamento"] = t.forma?.nome || t.forma_pagamento || "";
+      if (colunasSelecionadas.includes("observacoes"))
+        row.Observações = t.observacoes || "";
+
+      return row;
+    });
+  };
 
   const handleExportar = () => {
     try {
-      if (!transacoes || transacoes.length === 0) {
-        toast.error("Não há dados para exportar");
-        return;
-      }
+      const numberFormats = {
+        Valor: "#,##0.00",
+        "Valor Líquido": "#,##0.00",
+        "Taxa Administrativa": "#,##0.00",
+        Multa: "#,##0.00",
+        Juros: "#,##0.00",
+      };
 
-      const colunaPeriodo = colunaDataFiltroExport(tipoData);
-      const dadosExportacao = transacoes.map((t) => {
-        const row: Record<string, string | number> = {};
-        // parseLocalDate em vez de `new Date(string)`: "YYYY-MM-DD" seria
-        // interpretado como meia-noite UTC, que em fusos a oeste de UTC
-        // (ex: Brasil) volta um dia no horário local — ano/mês errados
-        // perto da virada de mês/ano.
-        const dataFiltro = parseLocalDate(t[colunaPeriodo]);
-
-        if (colunasSelecionadas.includes("ano"))
-          row.Ano = dataFiltro ? dataFiltro.getFullYear() : "";
-        if (colunasSelecionadas.includes("mes"))
-          row.Mês = dataFiltro
-            ? format(dataFiltro, "MMMM", { locale: ptBR })
-            : "";
-        if (colunasSelecionadas.includes("cnpj"))
-          row.CNPJ = t.fornecedor?.cpf_cnpj || "";
-        if (colunasSelecionadas.includes("competencia"))
-          row.Competência = formatDateForExport(t.data_competencia);
-        if (colunasSelecionadas.includes("descricao"))
-          row.Descrição = t.descricao;
-        if (colunasSelecionadas.includes("valor")) row.Valor = t.valor;
-        if (colunasSelecionadas.includes("valor_liquido"))
-          row["Valor Líquido"] = t.valor_liquido ?? 0;
-        if (colunasSelecionadas.includes("taxas_administrativas"))
-          row["Taxa Administrativa"] = t.taxas_administrativas ?? 0;
-        if (colunasSelecionadas.includes("multas")) row.Multa = t.multas ?? 0;
-        if (colunasSelecionadas.includes("juros")) row.Juros = t.juros ?? 0;
-        if (colunasSelecionadas.includes("desconto"))
-          row.Desconto = t.desconto ?? 0;
-        if (colunasSelecionadas.includes("status")) row.Status = t.status;
-        if (colunasSelecionadas.includes("data_vencimento"))
-          row["Data Vencimento"] = formatDateForExport(t.data_vencimento);
-        if (colunasSelecionadas.includes("data_pagamento"))
-          row["Data Pagamento"] = formatDateForExport(t.data_pagamento);
-        if (colunasSelecionadas.includes("conta"))
-          row.Conta = t.conta?.nome || "";
-        if (colunasSelecionadas.includes("categoria"))
-          row.Categoria = t.categoria?.nome || "";
-        if (colunasSelecionadas.includes("subcategoria"))
-          row.Subcategoria = t.subcategoria?.nome || "";
-        if (colunasSelecionadas.includes("fornecedor"))
-          row.Fornecedor = t.fornecedor?.nome || "";
-        if (colunasSelecionadas.includes("base_ministerial"))
-          row["Base Ministerial"] = t.base_ministerial?.titulo || "";
-        if (colunasSelecionadas.includes("centro_custo"))
-          row["Centro de Custo"] = t.centro_custo?.nome || "";
-        if (colunasSelecionadas.includes("forma_pagamento"))
-          row["Forma Pagamento"] = t.forma?.nome || t.forma_pagamento || "";
-        if (colunasSelecionadas.includes("observacoes"))
-          row.Observações = t.observacoes || "";
-
-        return row;
-      });
-
-      const nomeArquivo = `${tipoExportacao}_${format(
-        new Date(),
-        "yyyyMMdd_HHmmss",
-      )}`;
-      exportToExcel(
-        dadosExportacao,
-        nomeArquivo,
-        tipoExportacao === "entradas" ? "Entradas" : "Saídas",
-        {
-          Valor: "#,##0.00",
-          "Valor Líquido": "#,##0.00",
-          "Taxa Administrativa": "#,##0.00",
-          Multa: "#,##0.00",
-          Juros: "#,##0.00",
+      const sheets = [
+        tiposSelecionados.includes("entradas") && {
+          name: "Entradas",
+          data: montarLinhasExportacao(entradasQuery.data ?? []),
+          numberFormats,
         },
+        tiposSelecionados.includes("saidas") && {
+          name: "Saídas",
+          data: montarLinhasExportacao(saidasQuery.data ?? []),
+          numberFormats,
+        },
+      ].filter(
+        (s): s is { name: string; data: Record<string, string | number>[]; numberFormats: typeof numberFormats } =>
+          !!s,
       );
-      toast.success(`${transacoes.length} registros exportados com sucesso!`);
+
+      const nomeArquivo =
+        tiposFuncionaisSelecionados.join("_") || "exportacao";
+
+      exportSheetsToExcel(sheets, nomeArquivo);
+      toast.success(`${totalRegistros} registros exportados com sucesso!`);
     } catch (error) {
       console.error("Erro ao exportar:", error);
-      toast.error("Erro ao exportar dados");
+      toast.error(
+        error instanceof Error ? error.message : "Erro ao exportar dados",
+      );
     }
   };
 
@@ -379,6 +521,13 @@ export function ExportarTab() {
     setColunasSelecionadas([]);
   };
 
+  const labelPagamento =
+    tiposFuncionaisSelecionados.length === 1
+      ? tiposFuncionaisSelecionados[0] === "entradas"
+        ? "Recebimento"
+        : "Pagamento"
+      : "Pagamento/Recebimento";
+
   return (
     <div className="space-y-6">
       {/* Seletor de Tipo de Exportação */}
@@ -393,49 +542,25 @@ export function ExportarTab() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Tipo de Dados</Label>
-              <Select
-                value={tipoExportacao}
-                onValueChange={(v) => setTipoExportacao(v as TipoExportacao)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="entradas">Entradas</SelectItem>
-                  <SelectItem value="saidas">Saídas</SelectItem>
-                  <SelectItem value="dre" disabled>
-                    DRE (em breve)
-                  </SelectItem>
-                  <SelectItem value="contas" disabled>
-                    Contas (em breve)
-                  </SelectItem>
-                  <SelectItem value="categorias" disabled>
-                    Categorias (em breve)
-                  </SelectItem>
-                  <SelectItem value="fornecedores" disabled>
-                    Fornecedores (em breve)
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <MultiSelectFilter
+                options={TIPO_DADOS_OPTIONS}
+                selected={tiposSelecionados}
+                onChange={(v) => setTiposSelecionados(v as TipoExportacao[])}
+                allLabel="Selecione ao menos um tipo"
+              />
             </div>
 
             <div className="space-y-2">
               <Label>Status</Label>
-              <Select
-                value={statusFiltro}
-                onValueChange={(v) => setStatusFiltro(v as StatusFiltro)}
+              <MultiSelectFilter
+                options={STATUS_OPTIONS}
+                selected={statusSelecionados}
+                onChange={(v) =>
+                  setStatusSelecionados(v as StatusFiltroValor[])
+                }
+                allLabel="Todos"
                 disabled={tipoData === "pagamento"}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="pago">Pagos</SelectItem>
-                  <SelectItem value="pendente">Pendentes</SelectItem>
-                  <SelectItem value="atrasado">Atrasados</SelectItem>
-                </SelectContent>
-              </Select>
+              />
               {tipoData === "pagamento" && (
                 <p className="text-xs text-muted-foreground">
                   Data de Caixa exporta somente pagos.
@@ -464,7 +589,7 @@ export function ExportarTab() {
                   // A query já força status='pago' em modo Pagamento —
                   // reseta o filtro de Status pra não sugerir uma seleção
                   // (Pendente/Atrasado) que a busca ignoraria.
-                  if (v === "pagamento") setStatusFiltro("todos");
+                  if (v === "pagamento") setStatusSelecionados([]);
                 }}
               >
                 <SelectTrigger className="w-full">
@@ -472,11 +597,7 @@ export function ExportarTab() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="vencimento">Vencimento</SelectItem>
-                  <SelectItem value="pagamento">
-                    {tipoExportacao === "entradas"
-                      ? "Recebimento"
-                      : "Pagamento"}
-                  </SelectItem>
+                  <SelectItem value="pagamento">{labelPagamento}</SelectItem>
                   <SelectItem value="competencia">Competência</SelectItem>
                 </SelectContent>
               </Select>
@@ -486,39 +607,25 @@ export function ExportarTab() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Conta</Label>
-              <Select value={contaFiltro} onValueChange={setContaFiltro}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas as contas</SelectItem>
-                  {contas.map((conta) => (
-                    <SelectItem key={conta.id} value={conta.id}>
-                      {conta.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MultiSelectFilter
+                options={contas.map((c) => ({ value: c.id, label: c.nome }))}
+                selected={contasSelecionadas}
+                onChange={setContasSelecionadas}
+                allLabel="Todas as contas"
+              />
             </div>
 
             <div className="space-y-2">
               <Label>Categoria</Label>
-              <Select
-                value={categoriaFiltro}
-                onValueChange={setCategoriaFiltro}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas as categorias</SelectItem>
-                  {categorias.map((categoria) => (
-                    <SelectItem key={categoria.id} value={categoria.id}>
-                      {categoria.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MultiSelectFilter
+                options={categorias.map((c) => ({
+                  value: c.id,
+                  label: c.nome,
+                }))}
+                selected={categoriasSelecionadas}
+                onChange={setCategoriasSelecionadas}
+                allLabel="Todas as categorias"
+              />
             </div>
           </div>
         </CardContent>
@@ -575,98 +682,137 @@ export function ExportarTab() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">
-            Preview ({transacoes?.length || 0} registros encontrados)
+            Preview ({totalRegistros} registros encontrados)
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Carregando dados...
-            </div>
-          ) : dadosPreview.length === 0 ? (
+          {tiposSelecionados.length === 0 ? (
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Nenhum registro encontrado com os filtros selecionados.
+                Selecione ao menos um Tipo de Dados para exportar.
               </AlertDescription>
             </Alert>
+          ) : isLoading ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Carregando dados...
+            </div>
           ) : (
-            <div className="border rounded-lg overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted">
-                  <tr>
-                    {colunasSelecionadas.includes("descricao") && (
-                      <th className="px-3 py-2 text-left font-medium">
-                        Descrição
-                      </th>
-                    )}
-                    {colunasSelecionadas.includes("valor") && (
-                      <th className="px-3 py-2 text-right font-medium">
-                        Valor
-                      </th>
-                    )}
-                    {colunasSelecionadas.includes("status") && (
-                      <th className="px-3 py-2 text-left font-medium">
-                        Status
-                      </th>
-                    )}
-                    {colunasSelecionadas.includes("data_vencimento") && (
-                      <th className="px-3 py-2 text-left font-medium">
-                        Vencimento
-                      </th>
-                    )}
-                    {colunasSelecionadas.includes("conta") && (
-                      <th className="px-3 py-2 text-left font-medium">Conta</th>
-                    )}
-                    {colunasSelecionadas.includes("categoria") && (
-                      <th className="px-3 py-2 text-left font-medium">
-                        Categoria
-                      </th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {dadosPreview.map((t, idx) => (
-                    <tr key={idx} className="border-t hover:bg-muted/50">
-                      {colunasSelecionadas.includes("descricao") && (
-                        <td className="px-3 py-2">{t.descricao}</td>
-                      )}
-                      {colunasSelecionadas.includes("valor") && (
-                        <td className="px-3 py-2 text-right">
-                          {new Intl.NumberFormat("pt-BR", {
-                            style: "currency",
-                            currency: "BRL",
-                          }).format(t.valor)}
-                        </td>
-                      )}
-                      {colunasSelecionadas.includes("status") && (
-                        <td className="px-3 py-2 capitalize">{t.status}</td>
-                      )}
-                      {colunasSelecionadas.includes("data_vencimento") && (
-                        <td className="px-3 py-2">
-                          {t.data_vencimento
-                            ? format(new Date(t.data_vencimento), "dd/MM/yyyy")
-                            : "—"}
-                        </td>
-                      )}
-                      {colunasSelecionadas.includes("conta") && (
-                        <td className="px-3 py-2">{t.conta?.nome || "—"}</td>
-                      )}
-                      {colunasSelecionadas.includes("categoria") && (
-                        <td className="px-3 py-2">
-                          {t.categoria?.nome || "—"}
-                        </td>
-                      )}
-                    </tr>
+            <>
+              {tiposFuncionaisSelecionados.length > 1 && (
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-sm text-muted-foreground">
+                    Visualizando:
+                  </span>
+                  {tiposFuncionaisSelecionados.map((t) => (
+                    <Button
+                      key={t}
+                      type="button"
+                      variant={previewTipoEfetivo === t ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setPreviewTipo(t)}
+                    >
+                      {t === "entradas" ? "Entradas" : "Saídas"}
+                    </Button>
                   ))}
-                </tbody>
-              </table>
-              {transacoes && transacoes.length > 10 && (
-                <div className="px-3 py-2 bg-muted text-xs text-muted-foreground border-t">
-                  Mostrando 10 de {transacoes.length} registros
                 </div>
               )}
-            </div>
+
+              {dadosPreview.length === 0 ? (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Nenhum registro encontrado com os filtros selecionados.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="border rounded-lg overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted">
+                      <tr>
+                        {colunasSelecionadas.includes("descricao") && (
+                          <th className="px-3 py-2 text-left font-medium">
+                            Descrição
+                          </th>
+                        )}
+                        {colunasSelecionadas.includes("valor") && (
+                          <th className="px-3 py-2 text-right font-medium">
+                            Valor
+                          </th>
+                        )}
+                        {colunasSelecionadas.includes("status") && (
+                          <th className="px-3 py-2 text-left font-medium">
+                            Status
+                          </th>
+                        )}
+                        {colunasSelecionadas.includes("data_vencimento") && (
+                          <th className="px-3 py-2 text-left font-medium">
+                            Vencimento
+                          </th>
+                        )}
+                        {colunasSelecionadas.includes("conta") && (
+                          <th className="px-3 py-2 text-left font-medium">
+                            Conta
+                          </th>
+                        )}
+                        {colunasSelecionadas.includes("categoria") && (
+                          <th className="px-3 py-2 text-left font-medium">
+                            Categoria
+                          </th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dadosPreview.map((t, idx) => (
+                        <tr key={idx} className="border-t hover:bg-muted/50">
+                          {colunasSelecionadas.includes("descricao") && (
+                            <td className="px-3 py-2">{t.descricao}</td>
+                          )}
+                          {colunasSelecionadas.includes("valor") && (
+                            <td className="px-3 py-2 text-right">
+                              {new Intl.NumberFormat("pt-BR", {
+                                style: "currency",
+                                currency: "BRL",
+                              }).format(t.valor)}
+                            </td>
+                          )}
+                          {colunasSelecionadas.includes("status") && (
+                            <td className="px-3 py-2 capitalize">
+                              {t.status}
+                            </td>
+                          )}
+                          {colunasSelecionadas.includes("data_vencimento") && (
+                            <td className="px-3 py-2">
+                              {t.data_vencimento
+                                ? format(
+                                    new Date(t.data_vencimento),
+                                    "dd/MM/yyyy",
+                                  )
+                                : "—"}
+                            </td>
+                          )}
+                          {colunasSelecionadas.includes("conta") && (
+                            <td className="px-3 py-2">
+                              {t.conta?.nome || "—"}
+                            </td>
+                          )}
+                          {colunasSelecionadas.includes("categoria") && (
+                            <td className="px-3 py-2">
+                              {t.categoria?.nome || "—"}
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {transacoesPreview.length > 10 && (
+                    <div className="px-3 py-2 bg-muted text-xs text-muted-foreground border-t">
+                      Mostrando 10 de {transacoesPreview.length} registros
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -676,15 +822,15 @@ export function ExportarTab() {
         <Button
           onClick={handleExportar}
           disabled={
-            !transacoes ||
-            transacoes.length === 0 ||
+            tiposSelecionados.length === 0 ||
+            totalRegistros === 0 ||
             colunasSelecionadas.length === 0
           }
           size="lg"
           className="bg-gradient-primary"
         >
           <Download className="w-4 h-4 mr-2" />
-          Exportar {transacoes?.length || 0} registros
+          Exportar {totalRegistros} registros
         </Button>
       </div>
     </div>

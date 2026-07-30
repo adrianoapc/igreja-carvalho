@@ -2426,6 +2426,68 @@ sessão, com o mesmo cuidado.
 
 `npx tsc`: 63 baseline, 0 novos. `npx eslint` no arquivo: limpo.
 
+### 9.27 Checkboxes multi-seleção em ExportarTab: Tipo de Dados vira abas do Excel (jul/2026)
+
+Plano salvo numa sessão anterior (`podemos-transformar-essa-op-o-hidden-diffie.md`,
+nunca implementado) — usuário confirmou execução ao perguntar "perdemos a
+seleção múltipla?". Os 4 filtros de `ExportarTab.tsx` (Tipo de Dados,
+Status, Conta, Categoria) eram `Select` de valor único; viram checkbox
+multi-seleção (popover), com uma decisão central confirmada no plano
+original: **"aba" = worksheet dentro do MESMO arquivo `.xlsx`**, não uma
+tela nova — marcar Entradas + Saídas gera 1 arquivo com 2 abas.
+
+**Novo `src/components/financas/MultiSelectFilter.tsx`**: combobox
+genérico (`Popover` + `Checkbox`, "Selecionar todos"/"Limpar" no topo),
+mesmo formato visual de um `SelectTrigger`. `selected: string[]` vazio =
+"todos/todas" (sem filtro), reaproveitado nos 4 filtros.
+
+**`src/lib/exportUtils.ts`**: `exportToExcel` (assinatura inalterada,
+ainda usada por `DRE.tsx`/`TransacoesPage.tsx`/`Todos.tsx`/
+`SalaDeGuerra.tsx` sem mudança) teve sua lógica de montar worksheet
+(number format + autosize de coluna) extraída pra `buildWorksheet()`
+privada, reusada pela função nova `exportSheetsToExcel(sheets, filename)`
+— um `book_new()` só, uma aba por item de `sheets` (pula abas vazias, erro
+só se todas vierem vazias).
+
+**`ExportarTab.tsx`**: os 4 `useState` de valor único viraram arrays
+(`tiposSelecionados`, `statusSelecionados`, `contasSelecionadas`,
+`categoriasSelecionadas`). Mudanças de maior risco, todas conforme o plano
+original:
+- **Categorias** (filtro compartilhado): a query passou de `.eq("tipo",
+  tipo)` pra `.in("tipo", tiposConceito)` — união dos tipos funcionais
+  marcados, já que a lista de categorias precisa cobrir Entradas E Saídas
+  quando os dois estão marcados.
+- **Query de transações**: 1 query virou 2 (`entradasQuery`/`saidasQuery`,
+  uma por tipo funcional), cada uma habilitada só quando seu tipo está
+  marcado — extraídas pra `fetchTransacoesExportacao()` (função de módulo,
+  sem closures, parametrizada por `tipo`) pra não duplicar a query
+  inteira. Preserva TODAS as regras já existentes (Data de Caixa força
+  `status=pago` e ignora o filtro de Status; `.in()` em conta/categoria
+  quando array não vazio).
+- **Status multi-seleção**: `statusParaQuery()` combina Pago/Pendente/
+  Atrasado num `.or()` do PostgREST — Atrasado é subconjunto de Pendente
+  (pendente + vencimento passado), então marcar os dois junto simplifica
+  pra só `status.eq.pendente` (não perde nenhuma linha, não duplica).
+- **Preview**: quando mais de 1 tipo funcional está marcado, um seletor
+  "Visualizando: [Entradas] [Saídas]" (mesmo estilo dos botões Todas/
+  Nenhuma de Colunas) decide qual dataset a tabela mostra —
+  `previewTipoEfetivo` é **derivado do state**, não sincronizado via
+  `useEffect` (se o tipo em preview for desmarcado, cai pro primeiro tipo
+  funcional que sobrou automaticamente). O card "Preview (N registros)" e
+  o botão Exportar mostram o TOTAL somado de todos os tipos marcados; só a
+  tabela em si mostra o tipo em preview.
+- **Exportar**: monta as linhas de cada tipo marcado (mesmo mapeamento de
+  colunas de sempre, extraído pra `montarLinhasExportacao()`) e chama
+  `exportSheetsToExcel` uma vez com todas as abas. Efeito colateral
+  positivo: o nome do arquivo não duplica mais timestamp (o código antigo
+  carimbava manualmente E `exportToExcel` carimbava de novo por dentro).
+- **Zero tipos selecionados**: `Alert` pedindo pra selecionar ao menos um
+  tipo substitui o Preview; botão Exportar desabilitado.
+
+`npx tsc`: 63 baseline, 0 novos. `npx eslint`: 1 warning de
+`exhaustive-deps` (memo de `transacoesPreview` faltando), corrigido
+envolvendo o cálculo em `useMemo` próprio.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
