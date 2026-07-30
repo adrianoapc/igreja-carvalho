@@ -2488,6 +2488,66 @@ original:
 `exhaustive-deps` (memo de `transacoesPreview` faltando), corrigido
 envolvendo o cálculo em `useMemo` próprio.
 
+### 9.28 Fix crítico: saldo de conta somava valor BRUTO, não líquido + paridade em Contas.tsx (jul/2026)
+
+Usuário pediu pra replicar em `Contas.tsx` o mesmo tratamento Bruto/
+Líquido de Entradas/Saídas/Calendário (§9.25), e perguntou se o valor ali
+"provavelmente vai ter que bater com o saldo da conta". Investigação antes
+de mexer em UI achou algo mais sério: **o saldo real da conta
+(`contas.saldo_atual`) nunca considerou taxa/desconto/juros/multa.**
+
+`atualizar_saldo_conta()` — o trigger `AFTER UPDATE OF status` que é o
+executor único do saldo (D-2025-11, documentado no cabeçalho da F1) — soma/
+subtrai `NEW.valor`/`OLD.valor` (bruto) desde que foi criado em
+`20251130045754`, **antes** do conceito de `valor_liquido` existir
+(ADR-027, jul/2026). Nenhuma migration posterior redefiniu essa função.
+Mesmo bug em `fin_recalcular_saldo_conta()` (utilitário de correção de
+drift, existia desde a F1, nunca tinha sido chamado pela UI — sem call-site
+até este fix). Impacto real: toda entrada com taxa administrativa, toda
+saída com desconto de antecipação/juros/multa de atraso, fazia
+`saldo_atual` divergir do saldo de banco de verdade — ex.: entrada bruta
+R$203,58 com R$3,58 de taxa (líquido R$200,00) somava R$203,58 no saldo,
+não os R$200,00 que entraram de fato.
+
+**Fix** (`20260730110000_fin_saldo_conta_valor_liquido.sql`): as duas
+funções passam a usar `COALESCE(valor_liquido, valor)` em vez de `valor` —
+fallback pro bruto quando `valor_liquido` é NULL (lançamentos anteriores
+ao ADR-027, ou qualquer INSERT fora de `fin_criar_lancamento`), mesmo
+padrão de fallback já usado no frontend desde §9.15/9.24. `fin_criar_
+transferencia`/`fin_ajustar_saldo` NÃO tocados — não têm conceito de
+bruto×líquido (movimento interno de conta / ajuste manual direto).
+Harness Docker (`harness_saldo_liquido.sql`/`_tests.sql` no scratchpad): 7
+cenários — entrada com taxa, saída com multa, fallback pro bruto quando
+`valor_liquido` é NULL, reversão pago→pendente desfazendo pelo valor
+certo, dry-run do recálculo (não aplica), aplicação do recálculo corrige o
+drift, isolamento de tenant. Todos OK.
+
+**Corrigir o código só resolve daqui pra frente** — não reescreve
+`saldo_atual` já acumulado errado em produção. Como `fin_recalcular_saldo_
+conta` nunca tinha um botão na UI, adicionado um em `Contas.tsx`: ícone
+`RefreshCw` no card de cada conta chama a RPC em modo dry-run
+(`p_aplicar=false`) primeiro, mostra `window.confirm` com saldo registrado
+× saldo calculado, só aplica (`p_aplicar=true`) se o tesoureiro confirmar —
+nunca sobrescreve saldo sem revisão humana do diff, mesmo cuidado usado em
+toda mudança que mexe em dinheiro real nesta sessão.
+
+**Paridade visual** (o pedido original): `Contas.tsx` tem sua própria
+lista de "Lançamentos" (não usa `LancamentoCard` — implementação própria,
+pré-existente, fora de escopo revisitar aqui) que ganhou o mesmo toggle
+Bruto/Líquido + `EncargoBadges` + ID reposicionado pro fim da descrição de
+§9.25: total do período (Entradas/Saídas/Saldo), badges por lançamento, e
+os mini-totais "Entradas/Saídas/Saldo" dentro de cada card de conta
+(`totaisPorConta`, período selecionado — dado diferente de `saldo_atual`,
+que é o saldo corrente/histórico da conta). A visão Calendário de
+`Contas.tsx` já reusa `EntradasCalendario`/`EntradasTimelineCalendario`
+(mesmos componentes de §9.25) — herdou o líquido-abaixo-do-bruto e os
+badges do detalhe do dia de graça, sem código novo; aliás é o primeiro
+lugar onde o split entrada/saída desses 2 componentes realmente processa
+dado misto (em `TransacoesPage.tsx` só chega um tipo por vez).
+
+`npx tsc`: 63 baseline, 0 novos. `npx eslint`: mesmos 13 problemas
+pré-existentes (confirmados via `git stash`), nenhum novo.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
