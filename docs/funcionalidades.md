@@ -507,6 +507,10 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
   escolher qual data o filtro de Período usa — Vencimento continua sendo o
   padrão em todo lugar. Ver [ADR-031](adr/ADR-031-tipo-de-data-filtro-e-regime-caixa.md)
   e `docs/arquitetura-financeiro.md` §9.20.
+- **Campos de Data**: Vencimento, Competência e Data de Pagamento (e demais
+  datas avulsas do financeiro — ajuste de saldo, importação Getnet,
+  relatório de oferta) são digitáveis (`dd/mm/aaaa`), com o calendário
+  disponível como atalho pelo ícone. Ver [ADR-032](adr/ADR-032-campo-de-data-digitavel-financeiro.md).
 
 ### 2.3 Relatório de Ofertas
 

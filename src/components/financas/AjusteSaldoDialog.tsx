@@ -5,15 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
+import { DateFieldPicker } from "@/components/financas/DateFieldPicker";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { ajustarSaldo } from "@/features/financeiro/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { useFilialId } from "@/hooks/useFilialId";
 
@@ -125,29 +121,12 @@ export function AjusteSaldoDialog({ open, onOpenChange, conta }: AjusteSaldoDial
             </div>
 
             <div>
-              <Label>Data do ajuste *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !data && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {data ? format(data, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={data}
-                    onSelect={(date) => date && setData(date)}
-                    locale={ptBR}
-                  />
-                </PopoverContent>
-              </Popover>
+              <Label htmlFor="data-ajuste-saldo">Data do ajuste *</Label>
+              <DateFieldPicker
+                id="data-ajuste-saldo"
+                value={data}
+                onChange={(date) => date && setData(date)}
+              />
             </div>
           </div>
 

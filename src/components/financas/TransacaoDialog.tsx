@@ -16,14 +16,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar } from "@/components/ui/calendar";
+import { DateFieldPicker } from "@/components/financas/DateFieldPicker";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  CalendarIcon,
   X,
   Loader2,
   ZoomIn,
@@ -35,7 +29,6 @@ import {
   Check,
 } from "lucide-react";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import {
   criarLancamento,
@@ -1142,31 +1135,13 @@ export function TransacaoDialog({
           </div>
 
           <div>
-            <Label>Data fim (opcional)</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !dataFimRecorrencia && "text-muted-foreground",
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dataFimRecorrencia
-                    ? format(dataFimRecorrencia, "dd/MM/yyyy", { locale: ptBR })
-                    : "Opcional"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={dataFimRecorrencia}
-                  onSelect={setDataFimRecorrencia}
-                  locale={ptBR}
-                />
-              </PopoverContent>
-            </Popover>
+            <Label htmlFor="data-fim-recorrencia">Data fim (opcional)</Label>
+            <DateFieldPicker
+              id="data-fim-recorrencia"
+              value={dataFimRecorrencia}
+              onChange={setDataFimRecorrencia}
+              placeholder="Opcional"
+            />
           </div>
         </div>
       )}
@@ -1288,49 +1263,21 @@ export function TransacaoDialog({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <Label>Vencimento *</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left font-normal"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {format(dataVencimento, "dd/MM/yy", { locale: ptBR })}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={dataVencimento}
-                  onSelect={(date) => date && setDataVencimento(date)}
-                  locale={ptBR}
-                />
-              </PopoverContent>
-            </Popover>
+            <Label htmlFor="data-vencimento-transacao">Vencimento *</Label>
+            <DateFieldPicker
+              id="data-vencimento-transacao"
+              value={dataVencimento}
+              onChange={(date) => date && setDataVencimento(date)}
+            />
           </div>
 
           <div>
-            <Label>Competência *</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left font-normal"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {format(dataCompetencia, "dd/MM/yy", { locale: ptBR })}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={dataCompetencia}
-                  onSelect={(date) => date && setDataCompetencia(date)}
-                  locale={ptBR}
-                />
-              </PopoverContent>
-            </Popover>
+            <Label htmlFor="data-competencia-transacao">Competência *</Label>
+            <DateFieldPicker
+              id="data-competencia-transacao"
+              value={dataCompetencia}
+              onChange={(date) => date && setDataCompetencia(date)}
+            />
           </div>
         </div>
       </div>
@@ -1495,33 +1442,15 @@ export function TransacaoDialog({
         {foiPago && (
           <div className="space-y-3 pt-2 border-t">
             <div>
-              <Label>
+              <Label htmlFor="data-pagamento-transacao">
                 Data do {tipo === "entrada" ? "recebimento" : "pagamento"} *
               </Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dataPagamento && "text-muted-foreground",
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dataPagamento
-                      ? format(dataPagamento, "dd/MM/yyyy", { locale: ptBR })
-                      : "Selecione"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={dataPagamento}
-                    onSelect={setDataPagamento}
-                    locale={ptBR}
-                  />
-                </PopoverContent>
-              </Popover>
+              <DateFieldPicker
+                id="data-pagamento-transacao"
+                value={dataPagamento}
+                onChange={setDataPagamento}
+                placeholder="Selecione"
+              />
             </div>
 
             <p className="text-xs text-muted-foreground">

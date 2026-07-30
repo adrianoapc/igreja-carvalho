@@ -2,12 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { DateFieldPicker } from "@/components/financas/DateFieldPicker";
 import {
   Select,
   SelectContent,
@@ -19,7 +14,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import {
   ArrowLeft,
-  CalendarIcon,
   Save,
   DollarSign,
   Plus,
@@ -1402,31 +1396,12 @@ export default function RelatorioOferta() {
                   <>
                     <div className="space-y-2">
                       <Label htmlFor="data-culto">Data do Culto *</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !dataCulto && "text-muted-foreground",
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {dataCulto
-                              ? format(dataCulto, "PPP", { locale: ptBR })
-                              : "Selecione a data"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={dataCulto}
-                            onSelect={(date) => date && setDataCulto(date)}
-                            locale={ptBR}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <DateFieldPicker
+                        id="data-culto"
+                        value={dataCulto}
+                        onChange={(date) => date && setDataCulto(date)}
+                        placeholder="Selecione a data"
+                      />
                     </div>
 
                     <div className="space-y-2">
