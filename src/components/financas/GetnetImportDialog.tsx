@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { Loader2, CheckCircle2, XCircle, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { DateFieldPicker } from "@/components/financas/DateFieldPicker";
 import {
   Dialog,
@@ -112,8 +113,9 @@ export function GetnetImportDialog({
           )}
 
           <div className="space-y-1">
-            <p className="text-sm font-medium">Data de referência</p>
+            <Label htmlFor="data-referencia-getnet">Data de referência</Label>
             <DateFieldPicker
+              id="data-referencia-getnet"
               value={date}
               onChange={setDate}
               disabled={loading || !!result?.success}

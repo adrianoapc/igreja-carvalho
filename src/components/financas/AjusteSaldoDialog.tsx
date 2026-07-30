@@ -121,8 +121,9 @@ export function AjusteSaldoDialog({ open, onOpenChange, conta }: AjusteSaldoDial
             </div>
 
             <div>
-              <Label>Data do ajuste *</Label>
+              <Label htmlFor="data-ajuste-saldo">Data do ajuste *</Label>
               <DateFieldPicker
+                id="data-ajuste-saldo"
                 value={data}
                 onChange={(date) => date && setData(date)}
               />

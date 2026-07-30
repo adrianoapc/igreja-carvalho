@@ -75,8 +75,11 @@ export function ConfirmarPagamentoDialog({
         <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
           <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Data de {tipo === "entrada" ? "Recebimento" : "Pagamento"}</Label>
+            <Label htmlFor="data-confirmacao-pagamento">
+              Data de {tipo === "entrada" ? "Recebimento" : "Pagamento"}
+            </Label>
             <DateFieldPicker
+              id="data-confirmacao-pagamento"
               value={dataPagamento}
               onChange={(date) => date && setDataPagamento(date)}
             />

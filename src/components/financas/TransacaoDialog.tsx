@@ -1135,8 +1135,9 @@ export function TransacaoDialog({
           </div>
 
           <div>
-            <Label>Data fim (opcional)</Label>
+            <Label htmlFor="data-fim-recorrencia">Data fim (opcional)</Label>
             <DateFieldPicker
+              id="data-fim-recorrencia"
               value={dataFimRecorrencia}
               onChange={setDataFimRecorrencia}
               placeholder="Opcional"
@@ -1262,16 +1263,18 @@ export function TransacaoDialog({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <Label>Vencimento *</Label>
+            <Label htmlFor="data-vencimento-transacao">Vencimento *</Label>
             <DateFieldPicker
+              id="data-vencimento-transacao"
               value={dataVencimento}
               onChange={(date) => date && setDataVencimento(date)}
             />
           </div>
 
           <div>
-            <Label>Competência *</Label>
+            <Label htmlFor="data-competencia-transacao">Competência *</Label>
             <DateFieldPicker
+              id="data-competencia-transacao"
               value={dataCompetencia}
               onChange={(date) => date && setDataCompetencia(date)}
             />
@@ -1439,10 +1442,11 @@ export function TransacaoDialog({
         {foiPago && (
           <div className="space-y-3 pt-2 border-t">
             <div>
-              <Label>
+              <Label htmlFor="data-pagamento-transacao">
                 Data do {tipo === "entrada" ? "recebimento" : "pagamento"} *
               </Label>
               <DateFieldPicker
+                id="data-pagamento-transacao"
                 value={dataPagamento}
                 onChange={setDataPagamento}
                 placeholder="Selecione"
