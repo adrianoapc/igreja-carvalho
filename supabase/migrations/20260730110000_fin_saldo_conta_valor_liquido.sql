@@ -21,6 +21,18 @@
 -- fin_criar_lancamento podem ter valor_liquido NULL — cai pro bruto nesse
 -- caso, mesmo comportamento de fallback já usado no frontend
 -- (LancamentoCard, TransacoesPage) desde a §9.15/9.24.
+--
+-- Limitação conhecida de transição (achado no review Codex, PR #67): uma
+-- transação já paga ANTES desta migration, se revertida (pago→pendente)
+-- DEPOIS que ela roda, é desfeita pelo valor líquido — mas foi somada ao
+-- saldo originalmente pelo trigger antigo, em bruto. Uma entrada de R$100
+-- com R$10 de taxa, paga antes do deploy e cancelada depois, deixa R$10 de
+-- drift na conta. Não dá pra "congelar" a base original por transação sem
+-- um histórico de qual versão do trigger rodou em cada uma — não existe
+-- essa trilha. Mitigação: `fin_recalcular_saldo_conta` recalcula do zero
+-- (soma valor_liquido de tudo que está pago agora), sem depender de
+-- histórico de trigger — corrige esse drift junto com qualquer outro. Ação
+-- "Recalcular Saldo" em Contas.tsx (mesma PR) é o jeito de aplicar isso.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.atualizar_saldo_conta()

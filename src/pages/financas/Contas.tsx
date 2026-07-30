@@ -410,6 +410,7 @@ export default function Contas() {
       const confirmado = window.confirm(
         `Saldo registrado de "${conta.nome}": ${formatCurrency(registrado)}\n` +
           `Saldo calculado (Σ entradas líquidas − Σ saídas líquidas pagas): ${formatCurrency(calculado)}\n\n` +
+          `Atenção: o cálculo só considera lançamentos em transações — um ajuste manual de saldo feito ANTES do sistema atual (direto na conta, sem lançamento correspondente) não entra nessa soma e seria perdido ao aplicar.\n\n` +
           `Aplicar a correção?`,
       );
       if (!confirmado) return;

@@ -99,7 +99,15 @@ export function VincularExtratoLoteDialog({
         .gte("data_transacao", dateWindow.inicio)
         .lte("data_transacao", dateWindow.fim)
         .order("data_transacao", { ascending: false });
-      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      // Lote com filial definida só pode vincular extrato da mesma filial
+      // (fin_vincular_lote_antecipacao valida isso no backend desde
+      // 20260731100000) — escopa por ela sempre, independente da visão
+      // "todas as filiais". Lote sem filial (global) segue o seletor normal.
+      if (lote.filial_id) {
+        query = query.eq("filial_id", lote.filial_id);
+      } else if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
 
       const { data: extratos, error } = await query;
       if (error) throw error;

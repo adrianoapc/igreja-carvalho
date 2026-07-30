@@ -906,6 +906,12 @@ export function TransacaoDialog({
       // Campos comuns criar/editar — a escrita acontece nas RPCs fin_* do
       // CORE (ADR-029); tenant e permissão são validados no banco.
       const competenciaFormatada = formatLocalDate(dataCompetencia);
+      // "" é tanto o estado inicial de uma transação nova quanto o de uma
+      // existente cujo forma_pagamento_id nunca foi mapeado (reembolso/
+      // transferência — fora do escopo da FK, ver 20260729130000). "none"
+      // é a escolha explícita "Não especificado" no Select.
+      const formaPagamentoId =
+        formaPagamento && formaPagamento !== "none" ? formaPagamento : null;
       const camposComuns = {
         subcategoria_id:
           subcategoriaId && subcategoriaId !== "none" ? subcategoriaId : null,
@@ -917,8 +923,6 @@ export function TransacaoDialog({
             : null,
         fornecedor_id:
           fornecedorId && fornecedorId !== "none" ? fornecedorId : null,
-        forma_pagamento_id:
-          formaPagamento && formaPagamento !== "none" ? formaPagamento : null,
         data_pagamento:
           foiPago && dataPagamento ? formatLocalDate(dataPagamento) : null,
         // Juros e multas só quando pago (atraso); desconto/taxas sempre
@@ -942,11 +946,20 @@ export function TransacaoDialog({
         // o bloqueio à toa.
         const competenciaMudou =
           transacao.data_competencia !== competenciaFormatada;
+        // Mesmo raciocínio da competência: só inclui forma_pagamento_id no
+        // patch quando muda de verdade. Sem isso, reabrir uma transação
+        // legada sem forma_pagamento_id mapeado (formaPagamento carrega ""),
+        // salvar SEM tocar no campo, manda forma_pagamento_id:null — a RPC
+        // vê a chave presente e zera também o texto legado forma_pagamento
+        // (Codex P2), apagando um dado que o usuário nunca pediu pra mudar.
+        const formaPagamentoMudou =
+          formaPagamentoId !== (transacao.forma_pagamento_id || null);
         const patchAtualizar = {
           ...camposComuns,
           ...(competenciaMudou
             ? { data_competencia: competenciaFormatada }
             : {}),
+          ...(formaPagamentoMudou ? { forma_pagamento_id: formaPagamentoId } : {}),
           tipo,
           tipo_lancamento: tipoLancamento as "unico" | "parcelado" | "recorrente",
           descricao,
@@ -998,6 +1011,7 @@ export function TransacaoDialog({
             categoriaId && categoriaId !== "none" ? categoriaId : null,
           extras: {
             ...camposComuns,
+            forma_pagamento_id: formaPagamentoId,
             data_competencia: competenciaFormatada,
             status: foiPago ? "pago" : "pendente",
             tipo_lancamento: tipoLancamento as

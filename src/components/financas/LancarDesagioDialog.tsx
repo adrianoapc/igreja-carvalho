@@ -35,11 +35,19 @@ export function LancarDesagioDialog({ open, onOpenChange, lote, onLancado }: Lan
   const desagio = calcularDesagio(lote) ?? 0;
 
   const { data: contas = [] } = useQuery({
-    queryKey: ["contas-desagio", igrejaId, filialId, isAllFiliais],
+    queryKey: ["contas-desagio", igrejaId, filialId, isAllFiliais, lote.filial_id],
     queryFn: async () => {
       if (!igrejaId) return [];
       let query = supabase.from("contas").select("id, nome").eq("ativo", true).eq("igreja_id", igrejaId).order("nome");
-      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      // Lote com filial definida só aceita conta da mesma filial
+      // (fin_lancar_desagio_antecipacao valida isso no backend desde
+      // 20260731100000) — escopa por ela sempre, independente da visão
+      // "todas as filiais". Lote sem filial (global) segue o seletor normal.
+      if (lote.filial_id) {
+        query = query.eq("filial_id", lote.filial_id);
+      } else if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
       const { data, error } = await query;
       if (error) throw error;
       return data;

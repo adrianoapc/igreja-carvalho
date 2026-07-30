@@ -2561,6 +2561,100 @@ código morto — não alimenta nenhuma renderização (a agrupada de verdade é
 `renderTransactionListGrouped`, que recomputa por conta própria) —
 pré-existente, não tocado aqui.
 
+### 9.29 Fixes pós-review (Codex, PR #67, jul/2026): trigger de saldo em INSERT + filial em Fase B + forma_pagamento legada
+
+Usuário pediu pra triar os comentários do Codex na PR #67 (9 no total, 3
+rodadas). Cada um verificado por leitura direta do código antes de agir —
+não corrigido por suposição:
+
+**3 achados stale** (código já corrigia o problema descrito, de commits
+anteriores desta mesma sessão): `TransacaoDialog.tsx` linha do patch de
+competência (patchRestante já reaplicado, §9.22), linha do
+`forma_pagamento_id` em `fin_atualizar_lancamento` (migration
+`20260730100000` já resolve), `useTransacoesFiltro.ts` (`formaDinheiroId`
+já está no array de dependências do `useMemo`). Confirmados por leitura
+direta, não descartados por suposição.
+
+**1 achado real, corrigido no frontend**: `TransacaoDialog.tsx` mandava
+`forma_pagamento_id: null` no patch de UPDATE mesmo quando o campo nunca
+tinha sido tocado pelo usuário — para uma transação legada sem
+`forma_pagamento_id` mapeado (reembolso/transferência, fora do escopo da
+FK de `20260729130000`), isso fazia `fin_atualizar_lancamento` zerar
+também o texto legado `forma_pagamento`, mesmo editando um campo
+completamente não relacionado. Fix: mesmo padrão já usado pra
+`data_competencia` (§9.22) — só inclui `forma_pagamento_id` no patch
+quando o valor efetivamente muda em relação ao carregado.
+
+**3 achados reais na Fase B do Getnet, corrigidos no backend + frontend**
+(migration `20260731100000_fin_pos_review_pr67_fixes.sql`):
+
+1. **`fin_vincular_lote_antecipacao` não validava filial do extrato** — na
+   visão "todas as filiais", um lote de uma filial podia ser vinculado a um
+   crédito bancário de outra. Fix: rejeita quando `extrato.filial_id ≠
+   lote.filial_id` (lote sem filial = global, aceita qualquer extrato do
+   tenant).
+2. **`fin_lancar_desagio_antecipacao` não validava filial da conta** —
+   mesmo problema na escolha de conta pro lançamento da saída de deságio.
+   Mesma regra de fix.
+3. Frontend (`VincularExtratoLoteDialog.tsx`/`LancarDesagioDialog.tsx`):
+   as queries de candidatos/contas escopavam pelo seletor global
+   "todas as filiais", não pelo `lote.filial_id` — corrigido pra sempre
+   escopar pelo lote quando ele tem filial definida, com o backend como
+   última linha de defesa. `useLotesAntecipacao.ts` passou a expor
+   `filial_id` (faltava no select/tipo).
+
+**Achado adicional, fora do que o Codex sinalizou, encontrado investigando
+o #3** (`fin_lancar_desagio_antecipacao` usa `fin_criar_lancamento` com
+`status:'pago'` direto no INSERT): **o trigger de saldo
+(`atualizar_saldo_conta`) só dispara em `AFTER UPDATE OF status` — nunca
+em `INSERT`.** Qualquer lançamento criado JÁ pago (não via
+pendente→pago) nunca move `contas.saldo_atual`. Isso não é exclusivo do
+deságio — afeta **`fin_lancar_sessao`** (toda oferta com
+`forma_pagamento.gera_pago=true`, ex. PIX/Cartão — o caminho mais comum do
+Relatório de Ofertas) e **`fin_pagar_reembolso`** (todo pagamento de
+reembolso) igualmente, ambos pré-existentes, não introduzidos nesta PR.
+`fin_criar_transferencia` já sabia disso e compensava com um `UPDATE`
+manual de `saldo_atual` logo após os 2 INSERTs.
+
+Fix: trigger passa a cobrir `INSERT OR UPDATE OF status` (função ganha um
+branch `IF TG_OP = 'INSERT'`, testando só `NEW.status='pago'` — sem
+`OLD` pra comparar). `fin_criar_transferencia` perde a compensação manual
+duplicada (senão o saldo se moveria 2× pro mesmo valor: uma vez pelo
+UPDATE explícito, outra pelo trigger agora reagindo ao INSERT). Nenhuma
+mudança em `fin_criar_lancamento`/`fin_lancar_sessao`/`fin_pagar_reembolso`
+foi necessária — o fix no trigger cobre todos os call-sites de uma vez,
+sem precisar tocar em cada RPC individualmente.
+
+**Harness Docker** (`harness_pos_review_trigger.sql`/`_tests.sql`,
+extensão de `harness2_schema.sql` já usado nesta sessão): 9 cenários — 3
+de INSERT (entrada pago move saldo, saída pago move saldo, pendente não
+move nada), regressão do UPDATE pendente↔pago existente, `fin_criar_
+transferencia` de ponta a ponta confirmando que o saldo se move
+**exatamente 1×** em cada conta (não duplicado), os 2 guards de filial
+(rejeita cross-filial, aceita same-filial) e `fin_lancar_desagio_
+antecipacao` de ponta a ponta confirmando que o saldo se move sozinho
+agora. Todos OK.
+
+**Limitação de transição documentada, não corrigida por não ter solução
+sem uma trilha de auditoria que não existe**: uma transação já paga
+*antes* de `20260730110000` (fix bruto→líquido) rodar, se revertida
+*depois*, é desfeita pelo valor líquido — mas tinha sido somada
+originalmente em bruto pelo trigger antigo, deixando um pequeno drift
+permanente pra aquela transação específica. Mitigado pelo mesmo
+`fin_recalcular_saldo_conta`/botão "Recalcular Saldo" (§9.28) — o
+recálculo soma tudo do zero, não depende de qual versão do trigger rodou
+historicamente. Texto do `confirm()` de "Recalcular Saldo" em
+`Contas.tsx` também ganhou um aviso explícito sobre ajustes manuais
+pré-F1 (gravados direto em `saldo_atual`, sem transação correspondente)
+não entrarem na soma recalculada — mesmo achado do Codex, mitigado por
+aviso explícito no fluxo de confirmação humana já existente, não por
+detecção automática (não há como diferenciar programaticamente "drift de
+bug" de "ajuste legítimo antigo" sem mais dados).
+
+`npx tsc`: 63 baseline, 0 novos. `npx eslint`: mesmos erros/warnings
+pré-existentes em todos os arquivos tocados (confirmado via `git stash`),
+nenhum novo.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

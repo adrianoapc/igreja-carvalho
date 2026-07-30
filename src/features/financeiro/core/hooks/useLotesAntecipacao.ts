@@ -9,6 +9,7 @@ import { useFilialId } from "@/hooks/useFilialId";
  */
 export interface LoteAntecipacao {
   id: string;
+  filial_id: string | null;
   contrato_registradora: string;
   instituicao_negociadora: string | null;
   data_contratacao_contrato: string | null;
@@ -33,7 +34,7 @@ export function useLotesAntecipacao() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let query = (supabase.from as any)("getnet_antecipacao_lotes")
         .select(
-          "id, contrato_registradora, instituicao_negociadora, data_contratacao_contrato, valor_atual_contrato, extrato_bancario_id, lancamento_desagio_id, status, extratos_bancarios(valor, data_transacao, descricao)",
+          "id, filial_id, contrato_registradora, instituicao_negociadora, data_contratacao_contrato, valor_atual_contrato, extrato_bancario_id, lancamento_desagio_id, status, extratos_bancarios(valor, data_transacao, descricao)",
         )
         .eq("igreja_id", igrejaId)
         .order("data_contratacao_contrato", { ascending: false });
