@@ -235,7 +235,7 @@ export function ExportarTab() {
         query = query.eq("categoria_id", categoriaFiltro);
       }
 
-      query = query.order("data_vencimento", { ascending: false });
+      query = query.order(colunaPeriodo, { ascending: false });
 
       const { data, error } = await query;
       if (error) throw error;
