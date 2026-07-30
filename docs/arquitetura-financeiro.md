@@ -2131,6 +2131,54 @@ simultâneos aplicam, patch sem `data_competencia` não aciona a checagem,
 lançamento único nunca aciona) — mesmo padrão já usado no repo para lógica
 pura de gate (PR #59/#63), sem harness SQL por não haver SQL nesse trecho.
 
+### 9.22 Fix pós-review (Codex, PR #67): forma_pagamento_id perdido + edição descartada no sync de competência (jul/2026)
+
+Duas rodadas de review Codex sobre o PR #67 (frontend do Recebível Getnet +
+FK de forma de pagamento + D10) acharam 2 P1 e 1 P2 reais:
+
+1. **`fin_atualizar_lancamento` tinha perdido `forma_pagamento_id`.** A
+   migration da FK (§9.18, `20260729130000`) deu `CREATE OR REPLACE` na
+   função adicionando `forma_pagamento_id`; a migration do D10 (§9.19,
+   `20260729150000`, sessão paralela) deu OUTRO `CREATE OR REPLACE` na
+   mesma função, a partir de uma cópia anterior à reconciliação das duas
+   sessões — apagou o suporte à FK sem ninguém perceber (`CREATE OR
+   REPLACE` substitui o corpo inteiro). Efeito real: editar a forma de
+   pagamento de uma transação existente devolvia sucesso com um warning
+   "campo ignorado" — sem erro, sem reverter a UI, só nunca gravava.
+   Fix: nova migration `20260730100000_fin_atualizar_lancamento_forma_
+   pagamento_id.sql` reincorpora o bloco de `forma_pagamento_id` na versão
+   atual da função (já com o bloqueio D10), mantendo as duas features
+   juntas desta vez.
+2. **Sincronizar competência do grupo descartava o resto da edição.**
+   `TransacaoDialog.tsx` sempre mandava `data_competencia` no patch de
+   qualquer edição (mesmo sem mudança real), então `fin_atualizar_
+   lancamento` recusava com `FIN_COMPETENCIA_GRUPO` qualquer edição numa
+   parcela de grupo parcelado — não só quando a competência de fato
+   mudava. O fluxo de recuperação (`handleSincronizarCompetenciaGrupo`)
+   só sincronizava a competência e fechava o dialog, jogando fora
+   silenciosamente as outras mudanças (descrição, valor, forma de
+   pagamento, status...) que o usuário tinha pedido no mesmo submit. Fix
+   em duas camadas: (a) só inclui `data_competencia` no patch de edição
+   quando o valor realmente difere do que já estava salvo — elimina o
+   falso-positivo na maioria dos casos; (b) quando o bloqueio ainda assim
+   dispara (mudança deliberada de competência numa parcela, junto com
+   outros campos), o resto do patch é preservado e reaplicado via
+   `atualizarLancamento` depois de `fin_alterar_competencia_grupo`
+   sincronizar o grupo — nada se perde.
+3. **P2**: `useTransacoesFiltro.ts` — `formaDinheiroId` faltava no array
+   de dependências do `useMemo`; o filtro "Conferido Manual" ficava vazio
+   até algum outro filtro mudar, porque a resolução assíncrona do id do
+   "Dinheiro" não disparava recálculo. Fix: adicionado à lista de deps.
+
+**Verificação**: harness Docker (`postgres:15`) com 4 cenários — grava
+`forma_pagamento_id` numa transação única sem warning de campo ignorado;
+rejeita `forma_pagamento_id` de outro tenant (regressão do `fin_validar_
+fk_tenant`, não voltou a passar batido); edita uma parcela sem tocar
+competência sem acionar o bloqueio D10; muda competência de fato numa
+parcela e o bloqueio D10 continua disparando — as duas features convivem
+sem uma pisar na outra. `npx tsc`: 63 baseline (herdado de `origin/main`
+pós-#65/#66), 0 novos.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

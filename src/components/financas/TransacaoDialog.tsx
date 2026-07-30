@@ -151,6 +151,11 @@ export function TransacaoDialog({
   const [confirmarSincronizarGrupo, setConfirmarSincronizarGrupo] = useState<{
     lancamentoId: string;
     novaCompetencia: string;
+    // Resto do patch (descrição, valor, forma de pagamento etc.) que a RPC
+    // recusou junto por causa do bloqueio de competência — reaplicado após
+    // sincronizar o grupo, senão essas edições se perdem silenciosamente
+    // (review Codex P1).
+    patchRestante: Record<string, unknown>;
   } | null>(null);
   const [sincronizandoGrupo, setSincronizandoGrupo] = useState(false);
   const [contaId, setContaId] = useState("");
@@ -900,6 +905,7 @@ export function TransacaoDialog({
 
       // Campos comuns criar/editar — a escrita acontece nas RPCs fin_* do
       // CORE (ADR-029); tenant e permissão são validados no banco.
+      const competenciaFormatada = formatLocalDate(dataCompetencia);
       const camposComuns = {
         subcategoria_id:
           subcategoriaId && subcategoriaId !== "none" ? subcategoriaId : null,
@@ -913,7 +919,6 @@ export function TransacaoDialog({
           fornecedorId && fornecedorId !== "none" ? fornecedorId : null,
         forma_pagamento_id:
           formaPagamento && formaPagamento !== "none" ? formaPagamento : null,
-        data_competencia: formatLocalDate(dataCompetencia),
         data_pagamento:
           foiPago && dataPagamento ? formatLocalDate(dataPagamento) : null,
         // Juros e multas só quando pago (atraso); desconto/taxas sempre
@@ -928,8 +933,20 @@ export function TransacaoDialog({
       };
 
       if (transacao) {
-        await atualizarLancamento(String(transacao.id), {
+        // D10: fin_atualizar_lancamento recusa (FIN_COMPETENCIA_GRUPO)
+        // QUALQUER patch que contenha data_competencia numa parcela de
+        // grupo parcelado — mesmo sem mudança real de valor. Como o form
+        // sempre carrega esse campo, só inclui no patch quando o valor
+        // realmente difere do que já estava salvo (review Codex P1); assim
+        // editar outro campo (descrição, valor...) numa parcela não aciona
+        // o bloqueio à toa.
+        const competenciaMudou =
+          transacao.data_competencia !== competenciaFormatada;
+        const patchAtualizar = {
           ...camposComuns,
+          ...(competenciaMudou
+            ? { data_competencia: competenciaFormatada }
+            : {}),
           tipo,
           tipo_lancamento: tipoLancamento as "unico" | "parcelado" | "recorrente",
           descricao,
@@ -938,7 +955,7 @@ export function TransacaoDialog({
           conta_id: contaId,
           categoria_id:
             categoriaId && categoriaId !== "none" ? categoriaId : null,
-          status: foiPago ? "pago" : "pendente",
+          status: (foiPago ? "pago" : "pendente") as "pago" | "pendente",
           total_parcelas:
             tipoLancamento === "parcelado" ? parseInt(totalParcelas) : undefined,
           recorrencia: tipoLancamento === "recorrente" ? recorrencia : null,
@@ -947,7 +964,29 @@ export function TransacaoDialog({
               ? formatLocalDate(dataFimRecorrencia)
               : null,
           lancado_por: userData.user?.id,
-        });
+        };
+        try {
+          await atualizarLancamento(String(transacao.id), patchAtualizar);
+        } catch (updateError: unknown) {
+          // D10: mesmo com o filtro acima, uma mudança DELIBERADA de
+          // competência numa parcela ainda aciona o bloqueio — nesse caso
+          // preserva o resto do patch pra reaplicar depois de sincronizar
+          // o grupo, em vez de descartar silenciosamente (Codex P1).
+          if (
+            updateError instanceof Error &&
+            updateError.message.includes("FIN_COMPETENCIA_GRUPO")
+          ) {
+            const { data_competencia: _omit, ...patchRestante } =
+              patchAtualizar;
+            setConfirmarSincronizarGrupo({
+              lancamentoId: String(transacao.id),
+              novaCompetencia: competenciaFormatada!,
+              patchRestante,
+            });
+            return;
+          }
+          throw updateError;
+        }
       } else {
         const resultado = await criarLancamento({
           tipo: tipo as "entrada" | "saida",
@@ -959,6 +998,7 @@ export function TransacaoDialog({
             categoriaId && categoriaId !== "none" ? categoriaId : null,
           extras: {
             ...camposComuns,
+            data_competencia: competenciaFormatada,
             status: foiPago ? "pago" : "pendente",
             tipo_lancamento: tipoLancamento as
               | "unico"
@@ -1013,21 +1053,9 @@ export function TransacaoDialog({
       onOpenChange(false);
       resetForm();
     } catch (error: unknown) {
-      // D10: parcela de um lançamento parcelado recusou divergir de
-      // competência das irmãs — oferece sincronizar o grupo em vez de só
-      // mostrar o erro (mesmo padrão de tratamento nomeado já usado para
-      // FIN_CONCILIADO em HistoricoExtratos.tsx).
-      if (
-        transacao?.id &&
-        error instanceof Error &&
-        error.message.includes("FIN_COMPETENCIA_GRUPO")
-      ) {
-        setConfirmarSincronizarGrupo({
-          lancamentoId: String(transacao.id),
-          novaCompetencia: formatLocalDate(dataCompetencia)!,
-        });
-        return;
-      }
+      // FIN_COMPETENCIA_GRUPO (D10) já é tratado no catch específico em
+      // volta de atualizarLancamento, mais acima, onde o resto do patch
+      // ainda está disponível pra reaplicar depois de sincronizar o grupo.
       toast.error(
         error instanceof Error
           ? error.message
@@ -1048,6 +1076,18 @@ export function TransacaoDialog({
         confirmarSincronizarGrupo.novaCompetencia,
       );
       resultado.warnings?.forEach((w) => toast.info(w));
+
+      // Reaplica o resto do patch original (descrição, valor, forma de
+      // pagamento etc.) que a recusa FIN_COMPETENCIA_GRUPO tinha descartado
+      // junto com a mudança de competência — sincronizar o grupo não pode
+      // jogar fora as outras edições pedidas no mesmo submit (Codex P1).
+      if (Object.keys(confirmarSincronizarGrupo.patchRestante).length > 0) {
+        await atualizarLancamento(
+          confirmarSincronizarGrupo.lancamentoId,
+          confirmarSincronizarGrupo.patchRestante,
+        );
+      }
+
       toast.success("Competência sincronizada em todas as parcelas do lançamento!");
       queryClient.invalidateQueries({ queryKey: ["entradas"] });
       queryClient.invalidateQueries({ queryKey: ["saidas"] });

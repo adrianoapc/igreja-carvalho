@@ -73,5 +73,5 @@ export function useTransacoesFiltro(
       }
       return true;
     });
-  }, [transacoes, filtros, conciliacaoMap]);
+  }, [transacoes, filtros, conciliacaoMap, formaDinheiroId]);
 }
