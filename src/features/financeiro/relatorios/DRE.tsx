@@ -30,7 +30,6 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { exportToExcel } from "@/lib/exportUtils";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -195,33 +194,6 @@ export function DRE() {
           </div>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          <Select
-            value={regime}
-            onValueChange={(v) => setRegime(v as "caixa" | "competencia")}
-          >
-            <SelectTrigger className="w-[150px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="caixa">Regime de Caixa</SelectItem>
-              <SelectItem value="competencia">Competência</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            value={anoSelecionado.toString()}
-            onValueChange={(v) => setAnoSelecionado(Number(v))}
-          >
-            <SelectTrigger className="w-[120px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {anos.map((ano) => (
-                <SelectItem key={ano} value={ano.toString()}>
-                  {ano}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Button
             onClick={handleExport}
             disabled={isLoading || !dreData?.length}
@@ -234,10 +206,34 @@ export function DRE() {
 
       {/* Period Badge */}
       <div className="flex flex-wrap gap-2">
-        <Badge variant="outline" className="gap-1.5">
-          <Calendar className="w-3 h-3" />
-          Exercício {anoSelecionado}
-        </Badge>
+        <Select
+          value={regime}
+          onValueChange={(v) => setRegime(v as "caixa" | "competencia")}
+        >
+          <SelectTrigger className="h-auto w-auto gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="caixa">Regime de Caixa</SelectItem>
+            <SelectItem value="competencia">Competência</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={anoSelecionado.toString()}
+          onValueChange={(v) => setAnoSelecionado(Number(v))}
+        >
+          <SelectTrigger className="h-auto w-auto gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold">
+            <Calendar className="h-3 w-3" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {anos.map((ano) => (
+              <SelectItem key={ano} value={ano.toString()}>
+                Exercício {ano}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (

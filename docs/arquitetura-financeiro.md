@@ -1795,6 +1795,62 @@ foi possível validar os números renderizados contra dado real de produção
 — sem credencial de login disponível neste
 ambiente).
 
+### 9.20 D11 — Tipo de Data (Vencimento/Pagamento) e Regime de Caixa real no DRE (jul/2026)
+
+Usuário relatou ficar perdido sobre qual data cada filtro de "Período"
+usava — motivado por um caso real: lançamento com competência em maio,
+vencimento em julho e pagamento em agosto aparecendo em mês diferente
+dependendo da tela. Decisão completa, alternativas e trade-offs em
+[ADR-031](adr/ADR-031-tipo-de-data-filtro-e-regime-caixa.md); resumo
+técnico da implementação:
+
+- **`TipoDataFiltroSelect`** (novo componente) — Select controlado com
+  duas opções (Vencimento/Pagamento), label da segunda opção varia por
+  tela (`transacoesPage.config.tsx.tipoDataPagamentoLabel`). Adicionado
+  em `TransacoesPage`, `ExportarTab`, `Dashboard`, `Insights`, `Contas`.
+- **`colunaDataFiltro(tipoData)`** (`core/model/types.ts`) — resolve
+  `"data_vencimento" | "data_pagamento"`, usado em todo `.gte/.lte/.order`
+  que antes hardcoded `data_vencimento`.
+- **`MonthPicker` ganha `variant="pill"`** — em Entradas/Saídas, Dashboard,
+  Contas e DRE, o próprio seletor de período vira o badge clicável que
+  antes era só leitura (mesmo visual `text-xs`/`rounded-full`/ícone
+  `w-3 h-3` do Badge outline já usado no resto do app).
+- **`fin_resumo_periodo` ganha `p_eixo`** (migration `20260729160000`) e
+  **`get_dre_anual`** troca o eixo de agrupamento por regime (migration
+  `20260729120000`) — ambos exigem `status='pago'` explicitamente no eixo
+  Pagamento/Caixa, não só "tem a data no período" (transação paga e
+  cancelada mantém `data_pagamento`).
+- **Exportação** ganha 4 colunas no início do arquivo: Ano/Mês (derivados
+  do eixo selecionado), CNPJ (`fornecedor.cpf_cnpj`), Competência.
+
+**3 rodadas de review automático (Codex) pós-implementação** encontraram
+que trocar o eixo na busca não bastava — várias apresentações downstream
+continuavam hardcoded em `data_vencimento`, todas corrigidas na mesma PR:
+`agruparPorData` (lista agrupada/calendário de `TransacoesPage`),
+`transacoesAgrupadas`/6 reduces de calendário/`getStatusDisplay` em
+`Contas.tsx` (este último ficou **intencionalmente** em vencimento —
+"Atrasado" é conceito de vencimento vencido, não do eixo escolhido),
+`processarInsights` (tendência mensal e data das anomalias), `LancamentoCard`
+(bloco de data compacto do card), comparativo "mês anterior" do Dashboard
+(mistura de eixo com o período atual) e totais por conta em `Contas.tsx`
+(faltava `status='pago'` no eixo Caixa). Também apareceu um shift de UTC
+pré-existente em `formatDateForExport`/`processarInsights` — `new
+Date("YYYY-MM-DD")` vira meia-noite UTC, que em fuso Brasil volta um dia;
+corrigido usando `parseLocalDate` (`utils/dateUtils.ts`) só para strings
+`YYYY-MM-DD` puras, preservando o comportamento correto para colunas
+timestamptz completas (ex: `pessoas.data_primeira_visita`).
+
+**Efeito colateral encontrado ao aplicar a migration do DRE em produção**:
+outra migration aplicada em paralelo (`fin_lote_antecipacao_vinculo_
+desagio`, Fase B do Recebível Getnet) colidiu de timestamp com
+`get_dre_anual`'s migration — `supabase db push` rastreia por número de
+versão, não por conteúdo, então a migration Getnet ficou marcada como
+"aplicada" no histórico sem o SQL ter rodado de fato. Corrigido renomeando
+pra uma versão livre e reaplicando; ambas as migrations Getnet Fase B
+pendentes que ainda não tinham chegado a nenhum branch (`fin_forma_
+pagamento_fk`, `fin_conferencia_totais_getnet`, `fin_competencia_grupo_
+parcelado`) foram reconciliadas em `main` no mesmo momento.
+
 | # | Decisão | Recomendação |
 |---|---|---|
 | D1 | Camada canônica no banco (ADR-029) | Aprovar — pré-requisito de tudo |
@@ -1806,6 +1862,7 @@ ambiente).
 | D7 | Efeitos colaterais (alertas) | Fila no banco lida por edge — bot e front geram os mesmos alertas |
 | D8 | Status ENUM vs TEXT+CHECK | Padronizar na F1 (barato agora, caro depois) — inclui sanear os status de `sessoes_contagem` (CHECK × `finalizado` × StatusBadge) |
 | D9 | Workflow de reembolso | O estado `aprovado` entra no fluxo real (com ação de aprovar/rejeitar na UI e notificação) ou sai do schema? Quem aprova: `admin` (trigger atual) ou também `tesoureiro` (UI atual)? |
+| D11 | Tipo de Data (Vencimento/Pagamento) como eixo de filtro | Dois eixos ortogonais — Tipo de Data (qual coluna filtra a listagem) e Regime (o que entra no relatório) — ✅ implementado (jul/2026, ver §9.20 e [ADR-031](adr/ADR-031-tipo-de-data-filtro-e-regime-caixa.md)) |
 
 ## 11. Riscos
 

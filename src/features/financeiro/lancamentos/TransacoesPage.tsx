@@ -35,6 +35,7 @@ import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
 import { ExtratoDetalheDrawer } from "@/components/financas/ExtratoDetalheDrawer";
 import { FiltrosSheet } from "@/components/financas/FiltrosSheet";
 import { MonthPicker } from "@/components/financas/MonthPicker";
+import { TipoDataFiltroSelect } from "@/components/financas/TipoDataFiltroSelect";
 import {
   exportToExcel,
   formatDateForExport,
@@ -48,6 +49,9 @@ import {
   useLancamentos,
   useDadosFiltros,
   useConciliacaoMap,
+  TIPO_DATA_FILTRO_DEFAULT,
+  colunaDataFiltro,
+  type TipoDataFiltro,
 } from "@/features/financeiro/core";
 import { TRANSACOES_PAGE_CONFIG } from "./transacoesPage.config";
 import { LancamentoCard } from "./components/LancamentoCard";
@@ -82,6 +86,9 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
     from: Date;
     to: Date;
   } | null>(null);
+  const [tipoData, setTipoData] = useState<TipoDataFiltro>(
+    TIPO_DATA_FILTRO_DEFAULT,
+  );
 
   // Filtros
   const [busca, setBusca] = useState("");
@@ -112,7 +119,11 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
 
   const periodo = getPeriodoRange(selectedMonth, customRange);
 
-  const { transacoes, isLoading, refetch } = useLancamentos(tipo, periodo);
+  const { transacoes, isLoading, refetch } = useLancamentos(
+    tipo,
+    periodo,
+    tipoData,
+  );
   const { contas, categorias, fornecedores } = useDadosFiltros(tipo);
 
   const transacoesIds = useMemo(
@@ -135,8 +146,8 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
   );
 
   const transacoesAgrupadas = useMemo(
-    () => agruparPorData(transacoesFiltradas),
-    [transacoesFiltradas],
+    () => agruparPorData(transacoesFiltradas, colunaDataFiltro(tipoData)),
+    [transacoesFiltradas, tipoData],
   );
   const datasOrdenadas = useMemo(
     () => ordenarDatasDesc(transacoesAgrupadas),
@@ -167,6 +178,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
     statusFilter,
     selectedMonth,
     customRange,
+    tipoData,
   ]);
 
   const toggleGrupo = useCallback((dataKey: string) => {
@@ -271,6 +283,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
     setConciliacaoStatusFilter("all");
     setSelectedMonth(new Date());
     setCustomRange(null);
+    setTipoData(TIPO_DATA_FILTRO_DEFAULT);
   };
 
   const handleExportar = () => {
@@ -341,12 +354,6 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end flex-wrap">
-          <MonthPicker
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-            customRange={customRange}
-            onCustomRangeChange={setCustomRange}
-          />
           <FiltrosSheet
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
@@ -362,6 +369,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
             setFornecedorId={setFornecedorFilter}
             status={statusFilter}
             setStatus={setStatusFilter}
+            statusLocked={tipoData === "pagamento"}
             conciliacaoStatus={conciliacaoStatusFilter}
             setConciliacaoStatus={setConciliacaoStatusFilter}
             contas={contas || []}
@@ -396,18 +404,25 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
 
       {/* Filtros ativos */}
       <div className="flex flex-wrap gap-2 mt-3">
-        <Badge variant="outline" className="gap-1.5">
-          <Calendar className="w-3 h-3" />
-          {customRange
-            ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(
-                customRange.to,
-                "dd/MM/yyyy",
-              )}`
-            : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
-        </Badge>
-        {customRange && (
-          <FiltroBadge label="Período customizado" onClear={() => setCustomRange(null)} />
-        )}
+        <MonthPicker
+          selectedMonth={selectedMonth}
+          onMonthChange={setSelectedMonth}
+          customRange={customRange}
+          onCustomRangeChange={setCustomRange}
+          variant="pill"
+        />
+        <TipoDataFiltroSelect
+          value={tipoData}
+          onValueChange={(v) => {
+            setTipoData(v);
+            // useLancamentos já força status='pago' na query em modo
+            // Pagamento — reseta o filtro de Status local pra não filtrar
+            // de novo (client-side) sobre um resultado que já é só pago.
+            if (v === "pagamento") setStatusFilter("all");
+          }}
+          labelPagamento={config.tipoDataPagamentoLabel}
+          variant="pill"
+        />
         {busca && (
           <FiltroBadge label={`Busca: ${busca}`} onClear={() => setBusca("")} />
         )}
@@ -643,6 +658,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
                                 onEdit={abrirEdicao}
                                 onVerExtrato={handleVerExtrato}
                                 bordered={false}
+                                tipoData={tipoData}
                               />
                             ))}
                           </div>
@@ -663,6 +679,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
                       formatCurrency={formatCurrency}
                       onEdit={abrirEdicao}
                       onVerExtrato={handleVerExtrato}
+                      tipoData={tipoData}
                     />
                   ))}
                 </div>

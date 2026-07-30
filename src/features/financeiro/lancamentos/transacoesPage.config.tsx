@@ -19,6 +19,8 @@ export interface TransacoesPageConfig {
   vazioMensagem: string;
   exportNome: string;
   exportDataPagamentoLabel: string;
+  /** Label da opção "pagamento" no seletor de Tipo de Data (ex: "Recebimento"/"Pagamento"). */
+  tipoDataPagamentoLabel: string;
   queryKey: "entradas" | "saidas";
   arquivosTab: string;
   valorClass: string;
@@ -53,6 +55,7 @@ export const TRANSACOES_PAGE_CONFIG: Record<
     vazioMensagem: "Nenhuma entrada encontrada para o período selecionado.",
     exportNome: "Entradas",
     exportDataPagamentoLabel: "Data Recebimento",
+    tipoDataPagamentoLabel: "Recebimento",
     queryKey: "entradas",
     arquivosTab: "/financas/gerenciar-dados?tab=exportar&tipo=entrada",
     valorClass: "text-green-600",
@@ -74,6 +77,7 @@ export const TRANSACOES_PAGE_CONFIG: Record<
     vazioMensagem: "Nenhuma saída encontrada para o período selecionado.",
     exportNome: "Saidas",
     exportDataPagamentoLabel: "Data Pagamento",
+    tipoDataPagamentoLabel: "Pagamento",
     queryKey: "saidas",
     arquivosTab: "/financas/gerenciar-dados?tab=exportar&tipo=saida",
     valorClass: "text-red-600",

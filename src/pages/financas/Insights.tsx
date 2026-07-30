@@ -41,9 +41,16 @@ import {
 } from "lucide-react";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { parseLocalDate } from "@/utils/dateUtils";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
+import { TipoDataFiltroSelect } from "@/components/financas/TipoDataFiltroSelect";
 import { useHideValues } from "@/hooks/useHideValues";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
+import {
+  colunaDataFiltro,
+  TIPO_DATA_FILTRO_DEFAULT,
+  type TipoDataFiltro,
+} from "@/features/financeiro/core";
 
 const COLORS = [
   "#8B5CF6",
@@ -56,6 +63,9 @@ const COLORS = [
 
 export default function Insights() {
   const [periodo, setPeriodo] = useState<"3" | "6" | "12">("6");
+  const [tipoData, setTipoData] = useState<TipoDataFiltro>(
+    TIPO_DATA_FILTRO_DEFAULT,
+  );
   const { formatValue } = useHideValues();
   const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
 
@@ -71,9 +81,11 @@ export default function Insights() {
       filialId,
       isAllFiliais,
       periodo,
+      tipoData,
     ],
     queryFn: async () => {
       if (!igrejaId) return [];
+      const colunaPeriodo = colunaDataFiltro(tipoData);
       let query = supabase
         .from("transacoes_financeiras")
         .select(
@@ -86,9 +98,14 @@ export default function Insights() {
         )
         .eq("tipo", "saida")
         .eq("igreja_id", igrejaId)
-        .gte("data_vencimento", dataInicial.toISOString())
-        .lte("data_vencimento", dataFinal.toISOString())
-        .order("data_vencimento", { ascending: true });
+        .gte(colunaPeriodo, dataInicial.toISOString())
+        .lte(colunaPeriodo, dataFinal.toISOString())
+        .order(colunaPeriodo, { ascending: true });
+      if (colunaPeriodo === "data_pagamento") {
+        // Data de Caixa: paid-only — mesma semântica já aplicada em
+        // Dashboard/Contas/useLancamentos.
+        query = query.eq("status", "pago");
+      }
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
@@ -100,8 +117,11 @@ export default function Insights() {
     enabled: !loading && !!igrejaId,
   });
 
-  // Processar dados para insights
-  const insights = transacoes ? processarInsights(transacoes) : null;
+  // Processar dados para insights — mesmo eixo de data usado na busca acima,
+  // senão a tendência mensal/anomalias atribuem a transação ao mês errado.
+  const insights = transacoes
+    ? processarInsights(transacoes, colunaDataFiltro(tipoData))
+    : null;
 
   if (isLoading) {
     return (
@@ -147,6 +167,11 @@ export default function Insights() {
               <SelectItem value="12">Último ano</SelectItem>
             </SelectContent>
           </Select>
+          <TipoDataFiltroSelect
+            value={tipoData}
+            onValueChange={setTipoData}
+            labelPagamento="Pagamento"
+          />
         </div>
       </div>
 
@@ -485,9 +510,10 @@ export default function Insights() {
                           <span>{anomalia.fornecedor || "Sem fornecedor"}</span>
                           <span>•</span>
                           <span>
-                            {format(new Date(anomalia.data), "dd/MM/yyyy", {
-                              locale: ptBR,
-                            })}
+                            {anomalia.data &&
+                              format(anomalia.data, "dd/MM/yyyy", {
+                                locale: ptBR,
+                              })}
                           </span>
                           <span>•</span>
                           <span className="text-destructive font-medium">
@@ -512,11 +538,25 @@ type TransacaoFinanceira = {
   valor: number;
   descricao?: string;
   data_vencimento: string | Date;
+  data_pagamento?: string | Date | null;
   fornecedor?: { nome?: string } | null;
   categoria?: { nome?: string } | null;
 };
 
-function processarInsights(transacoes: TransacaoFinanceira[]) {
+// PostgreSQL DATE ("YYYY-MM-DD") vira meia-noite UTC com `new Date(string)`
+// puro — em fusos a oeste de UTC (Brasil) isso volta um dia no horário
+// local, jogando a transação pro mês anterior na tendência/anomalias.
+function resolverDataLocal(
+  valor: string | Date | null | undefined,
+): Date | undefined {
+  if (!valor) return undefined;
+  return typeof valor === "string" ? parseLocalDate(valor) : valor;
+}
+
+function processarInsights(
+  transacoes: TransacaoFinanceira[],
+  coluna: "data_vencimento" | "data_pagamento" = "data_vencimento",
+) {
   const totalGasto = transacoes.reduce((acc, t) => acc + (t.valor || 0), 0);
   const mediaTransacao = totalGasto / (transacoes.length || 1);
 
@@ -575,9 +615,9 @@ function processarInsights(transacoes: TransacaoFinanceira[]) {
   // Gastos mensais
   const mesesMap = new Map<string, number>();
   transacoes.forEach((t) => {
-    const mes = format(new Date(t.data_vencimento), "MMM/yyyy", {
-      locale: ptBR,
-    });
+    const dataRef = resolverDataLocal(t[coluna]);
+    if (!dataRef) return;
+    const mes = format(dataRef, "MMM/yyyy", { locale: ptBR });
     mesesMap.set(mes, (mesesMap.get(mes) || 0) + (t.valor || 0));
   });
 
@@ -611,7 +651,7 @@ function processarInsights(transacoes: TransacaoFinanceira[]) {
       descricao: t.descricao,
       valor: t.valor,
       fornecedor: t.fornecedor?.nome,
-      data: t.data_vencimento,
+      data: resolverDataLocal(t[coluna]),
       desvio: t.valor / mediaTransacao,
     }))
     .sort((a, b) => b.valor - a.valor);

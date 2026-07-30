@@ -27,6 +27,10 @@ interface FiltrosSheetProps {
   setFornecedorId?: (value: string) => void;
   status: string;
   setStatus: (value: string) => void;
+  /** true quando o Tipo de Data selecionado (Pagamento) já força
+   * status='pago' na query — trava o Select pra não sugerir uma combinação
+   * que a busca ignora silenciosamente. */
+  statusLocked?: boolean;
   conciliacaoStatus?: string;
   setConciliacaoStatus?: (value: string) => void;
   
@@ -58,6 +62,7 @@ export function FiltrosSheet({
   setFornecedorId,
   status,
   setStatus,
+  statusLocked = false,
   contas,
   categorias,
   fornecedores,
@@ -170,7 +175,7 @@ export function FiltrosSheet({
           {/* Status */}
           <div className="space-y-2">
             <Label htmlFor="status" className="text-sm font-semibold">Status</Label>
-            <Select value={status} onValueChange={setStatus}>
+            <Select value={status} onValueChange={setStatus} disabled={statusLocked}>
               <SelectTrigger id="status">
                 <SelectValue placeholder="Todos os status" />
               </SelectTrigger>
@@ -181,6 +186,11 @@ export function FiltrosSheet({
                 <SelectItem value="atrasado">Atrasado</SelectItem>
               </SelectContent>
             </Select>
+            {statusLocked && (
+              <p className="text-xs text-muted-foreground">
+                Data de Caixa mostra somente {statusPagoLabel.toLowerCase()}s.
+              </p>
+            )}
           </div>
 
           {/* Status de Conciliação */}

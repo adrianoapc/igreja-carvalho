@@ -14,7 +14,10 @@ import {
   getStatusColorDynamic,
   getStatusDisplay,
   isPagamentoDinheiro,
+  colunaDataFiltro,
+  TIPO_DATA_FILTRO_DEFAULT,
   type TransacaoResumo,
+  type TipoDataFiltro,
 } from "@/features/financeiro/core";
 
 /**
@@ -29,6 +32,7 @@ export interface LancamentoCardTransacao extends TransacaoResumo {
   valor: number | string;
   status: string;
   data_vencimento: string;
+  data_pagamento?: string | null;
   conciliacao_status?: string | null;
   conferido_manual?: boolean | null;
   forma_pagamento?: string | null;
@@ -55,6 +59,9 @@ interface LancamentoCardProps {
     },
   ) => void;
   bordered?: boolean;
+  /** Eixo de data usado pra buscar o período (TransacoesPage) — decide se o
+   * card mostra vencimento ou pagamento no bloco de data compacto. */
+  tipoData?: TipoDataFiltro;
 }
 
 const CONCILIACAO_BADGES: Record<string, { label: string; className: string }> =
@@ -85,6 +92,7 @@ export function LancamentoCard({
   onEdit,
   onVerExtrato,
   bordered = true,
+  tipoData = TIPO_DATA_FILTRO_DEFAULT,
 }: LancamentoCardProps) {
   const conciliacaoStatus =
     transacao.conciliacao_status ||
@@ -95,7 +103,11 @@ export function LancamentoCard({
     isDinheiro &&
     !!transacao.conferido_manual;
   const conciliacaoBadge = CONCILIACAO_BADGES[conciliacaoStatus];
-  const dataVencimento = new Date(transacao.data_vencimento + "T00:00:00");
+  // Mesmo eixo usado pra buscar o período — senão o card mostra vencimento
+  // mesmo quando a lista foi filtrada/ordenada por pagamento (Data de Caixa).
+  const dataExibidaStr =
+    transacao[colunaDataFiltro(tipoData)] || transacao.data_vencimento;
+  const dataExibida = new Date(dataExibidaStr + "T00:00:00");
 
   return (
     <div
@@ -107,10 +119,10 @@ export function LancamentoCard({
       {/* Data compacta */}
       <div className="flex-shrink-0 text-center w-12 md:w-14">
         <div className="text-xs md:text-sm font-bold text-foreground">
-          {format(dataVencimento, "dd", { locale: ptBR })}
+          {format(dataExibida, "dd", { locale: ptBR })}
         </div>
         <div className="text-[10px] md:text-xs text-muted-foreground uppercase">
-          {format(dataVencimento, "MMM", { locale: ptBR })}
+          {format(dataExibida, "MMM", { locale: ptBR })}
         </div>
       </div>
 

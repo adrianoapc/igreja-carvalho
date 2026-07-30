@@ -3,6 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import type { PeriodoRange } from "../lib/periodo";
+import {
+  colunaDataFiltro,
+  TIPO_DATA_FILTRO_DEFAULT,
+  type TipoDataFiltro,
+} from "../model/types";
 
 /**
  * Leitura unificada de lançamentos por tipo (F2 do roadmap ADR-029).
@@ -20,8 +25,13 @@ const SELECT_LANCAMENTOS = `
   solicitacao_reembolso:solicitacao_reembolso_id(status)
 `;
 
-export function useLancamentos(tipo: "entrada" | "saida", periodo: PeriodoRange) {
+export function useLancamentos(
+  tipo: "entrada" | "saida",
+  periodo: PeriodoRange,
+  tipoData: TipoDataFiltro = TIPO_DATA_FILTRO_DEFAULT,
+) {
   const { igrejaId, filialId, isAllFiliais, loading } = useAuthContext();
+  const coluna = colunaDataFiltro(tipoData);
 
   const { data: transacoes, isLoading, refetch } = useQuery({
     queryKey: [
@@ -31,6 +41,7 @@ export function useLancamentos(tipo: "entrada" | "saida", periodo: PeriodoRange)
       isAllFiliais,
       periodo.inicio,
       periodo.fim,
+      tipoData,
     ],
     queryFn: async () => {
       if (!igrejaId) return [];
@@ -39,9 +50,15 @@ export function useLancamentos(tipo: "entrada" | "saida", periodo: PeriodoRange)
         .select(SELECT_LANCAMENTOS)
         .eq("tipo", tipo)
         .eq("igreja_id", igrejaId)
-        .gte("data_vencimento", periodo.inicio)
-        .lte("data_vencimento", periodo.fim)
-        .order("data_vencimento", { ascending: false });
+        .gte(coluna, periodo.inicio)
+        .lte(coluna, periodo.fim)
+        .order(coluna, { ascending: false });
+      if (coluna === "data_pagamento") {
+        // Data de Caixa: paid-only — uma transação paga e depois cancelada
+        // mantém data_pagamento preenchida (fin_alterar_status_lancamento
+        // não a limpa), então sem isso continuaria contando como caixa.
+        query = query.eq("status", "pago");
+      }
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }

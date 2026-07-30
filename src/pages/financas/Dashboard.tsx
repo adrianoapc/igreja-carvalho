@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
   TrendingUp,
@@ -14,7 +13,14 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { callFinRpc } from "@/features/financeiro/core";
+import {
+  callFinRpc,
+  colunaDataFiltro,
+  TIPO_DATA_FILTRO_DEFAULT,
+  type TipoDataFiltro,
+} from "@/features/financeiro/core";
+import { TipoDataFiltroSelect } from "@/components/financas/TipoDataFiltroSelect";
+import { MonthPicker } from "@/components/financas/MonthPicker";
 import {
   startOfMonth,
   endOfMonth,
@@ -66,6 +72,9 @@ export default function Dashboard() {
   const [contaId, setContaId] = useState("all");
   const [categoriaId, setCategoriaId] = useState("all");
   const [status, setStatus] = useState("all");
+  const [tipoData, setTipoData] = useState<TipoDataFiltro>(
+    TIPO_DATA_FILTRO_DEFAULT,
+  );
 
   const mesAtual = new Date();
   const mesAnterior = subMonths(mesAtual, 1);
@@ -139,9 +148,11 @@ export default function Dashboard() {
       contaId,
       categoriaId,
       status,
+      tipoData,
     ],
     queryFn: async () => {
       if (!igrejaId) return [];
+      const colunaPeriodo = colunaDataFiltro(tipoData);
       let query = supabase
         .from("transacoes_financeiras")
         .select(
@@ -152,8 +163,8 @@ export default function Dashboard() {
         `,
         )
         .eq("igreja_id", igrejaId)
-        .gte("data_vencimento", dateRange.inicio)
-        .lte("data_vencimento", dateRange.fim);
+        .gte(colunaPeriodo, dateRange.inicio)
+        .lte(colunaPeriodo, dateRange.fim);
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
@@ -164,7 +175,14 @@ export default function Dashboard() {
       if (categoriaId !== "all") {
         query = query.eq("categoria_id", categoriaId);
       }
-      if (status !== "all") {
+      if (colunaPeriodo === "data_pagamento") {
+        // Data de Caixa: mesma semântica paid-only do comparativo (mês
+        // anterior, fin_resumo_periodo p_eixo='pagamento') — status='pago'
+        // sempre, ignorando o filtro de Status da tela. Sem isso, uma
+        // transação paga e depois cancelada (que mantém data_pagamento
+        // preenchida) entraria no total de caixa como se ainda valesse.
+        query = query.eq("status", "pago");
+      } else if (status !== "all") {
         query = query.eq("status", status);
       }
 
@@ -185,13 +203,22 @@ export default function Dashboard() {
 
   // Totais do mês anterior agregados no servidor (fin_resumo_periodo,
   // F2.5/ADR-029) — só o comparativo precisa deles, não das linhas cruas.
+  // p_eixo acompanha o mesmo Tipo de Data do período atual (tipoData),
+  // senão o comparativo mistura vencimento x pagamento entre os dois meses.
   const { data: resumoMesAnterior } = useQuery({
-    queryKey: ["dashboard-mes-anterior", igrejaId, filialId, isAllFiliais],
+    queryKey: [
+      "dashboard-mes-anterior",
+      igrejaId,
+      filialId,
+      isAllFiliais,
+      tipoData,
+    ],
     queryFn: async () => {
       const resultado = await callFinRpc("fin_resumo_periodo", {
         p_inicio: formatLocalDate(startOfMonthLocal(mesAnterior)),
         p_fim: formatLocalDate(endOfMonthLocal(mesAnterior)),
         p_filial_id: !isAllFiliais && filialId ? filialId : null,
+        p_eixo: tipoData,
       });
       return resultado as unknown as {
         tipo: string;
@@ -461,6 +488,7 @@ export default function Dashboard() {
               setCategoriaId={setCategoriaId}
               status={status}
               setStatus={setStatus}
+              statusLocked={tipoData === "pagamento"}
               contas={contas || []}
               categorias={categorias || []}
               onLimpar={() => {
@@ -469,6 +497,7 @@ export default function Dashboard() {
                 setContaId("all");
                 setCategoriaId("all");
                 setStatus("all");
+                setTipoData(TIPO_DATA_FILTRO_DEFAULT);
               }}
               onAplicar={() => {}}
             />
@@ -477,15 +506,25 @@ export default function Dashboard() {
 
         {/* Period Badge */}
         <div className="flex flex-wrap gap-2 mt-3">
-          <Badge variant="outline" className="gap-1.5">
-            <Calendar className="w-3 h-3" />
-            {customRange
-              ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(
-                  customRange.to,
-                  "dd/MM/yyyy",
-                )}`
-              : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
-          </Badge>
+          <MonthPicker
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+            customRange={customRange}
+            onCustomRangeChange={setCustomRange}
+            variant="pill"
+          />
+          <TipoDataFiltroSelect
+            value={tipoData}
+            onValueChange={(v) => {
+              setTipoData(v);
+              // Data de Caixa força status='pago' na query — reseta o
+              // filtro de Status pra não mostrar uma seleção incompatível
+              // (Pendente/Atrasado) que a busca ignoraria silenciosamente.
+              if (v === "pagamento") setStatus("all");
+            }}
+            labelPagamento="Data de Caixa"
+            variant="pill"
+          />
         </div>
       </div>
 

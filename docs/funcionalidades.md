@@ -502,6 +502,11 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 - **Status**: Pendente ou Pago/Recebido
 - **Confirmação de Pagamento**: Registro de juros, multas, descontos, taxas
 - **Vinculação**: Cada transação pode referenciar um ou mais fatos geradores
+- **Tipo de Data**: Entradas/Saídas, Dashboard, Contas, Insights e
+  Exportação têm um seletor "Tipo de Data" (Vencimento/Pagamento) pra
+  escolher qual data o filtro de Período usa — Vencimento continua sendo o
+  padrão em todo lugar. Ver [ADR-031](adr/ADR-031-tipo-de-data-filtro-e-regime-caixa.md)
+  e `docs/arquitetura-financeiro.md` §9.20.
 
 ### 2.3 Relatório de Ofertas
 
@@ -515,7 +520,9 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 - **Dashboard Geral**: Visão consolidada de receitas e despesas
 - **Dashboard de Ofertas**: Análise específica de ofertas por período
 - **Projeção Financeira**: 12 meses histórico + 6 meses projetado
-- **DRE**: Demonstrativo de Resultado do Exercício anual por competência
+- **DRE**: Demonstrativo de Resultado do Exercício anual por competência,
+  com seletor de Regime (Caixa/Competência) — o Regime de Caixa agrupa
+  pela data de pagamento, não só filtra status pago (§9.20)
 - **Insights**: Análises e tendências baseadas em histórico
 
 ### 2.5 Funcionalidades Avançadas
@@ -524,7 +531,9 @@ As telas de manutenção financeira foram modernizadas com layout tabular consis
 - **Processamento de Notas Fiscais**: IA (Gemini) extrai dados de NF automaticamente
 - **Reconciliação Bancária**: Comparação automática entre lançamentos e extrato bancário. Modo Inteligente (matching por score) e a navegação por abas da tela de Reconciliação são responsivos (celular/tablet) desde jul/2026 — ver `docs/arquitetura-financeiro.md` §9.8; Modo Clássico e Histórico ainda pendentes de adaptação mobile. O "Lançamento Rápido" do Modo Inteligente mostra o tipo (entrada/saída) e filtra a categoria por ele, e a lista de transações pendentes exibe a conta de cada item — correções pós-F7 de jul/2026, ver §9.11
 - **Sistema de Aprendizado**: Auto-sugestão de categoria/fornecedor baseada em histórico
-- **Exportação**: Excel com todos os dados filtrados e formatados
+- **Exportação**: Excel com todos os dados filtrados e formatados, com
+  seletor de Tipo de Data e colunas de Ano/Mês/CNPJ/Competência no início
+  do arquivo (§9.20)
 
 ### 2.6 Formas de Pagamento
 

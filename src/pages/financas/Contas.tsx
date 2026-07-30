@@ -53,7 +53,13 @@ import {
 } from "@/utils/dateUtils";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
+import { TipoDataFiltroSelect } from "@/components/financas/TipoDataFiltroSelect";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
+import {
+  colunaDataFiltro,
+  TIPO_DATA_FILTRO_DEFAULT,
+  type TipoDataFiltro,
+} from "@/features/financeiro/core";
 
 export default function Contas() {
   const navigate = useNavigate();
@@ -73,6 +79,14 @@ export default function Contas() {
     from: Date;
     to: Date;
   } | null>(null);
+  const [tipoData, setTipoData] = useState<TipoDataFiltro>(
+    TIPO_DATA_FILTRO_DEFAULT,
+  );
+  // Eixo de data usado pra agrupar/exibir por dia (lista agrupada, calendário)
+  // — precisa acompanhar o mesmo eixo usado pra buscar (colunaDataFiltro),
+  // senão um lançamento com vencimento em junho e pagamento em julho some do
+  // calendário de julho ou aparece em junho mesmo filtrando por pagamento.
+  const colunaData = colunaDataFiltro(tipoData);
   const [agruparPorData, setAgruparPorData] = useState(false);
   const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(
     new Set(),
@@ -230,9 +244,11 @@ export default function Contas() {
       selectedContaIds,
       selectedMonth,
       customRange,
+      tipoData,
     ],
     queryFn: async () => {
       if (!igrejaId) return [];
+      const colunaPeriodo = colunaDataFiltro(tipoData);
       let query = supabase
         .from("transacoes_financeiras")
         .select(
@@ -244,9 +260,15 @@ export default function Contas() {
         `,
         )
         .eq("igreja_id", igrejaId)
-        .gte("data_vencimento", startDate)
-        .lte("data_vencimento", endDate)
-        .order("data_vencimento", { ascending: false });
+        .gte(colunaPeriodo, startDate)
+        .lte(colunaPeriodo, endDate)
+        .order(colunaPeriodo, { ascending: false });
+      if (colunaPeriodo === "data_pagamento") {
+        // Data de Caixa: paid-only, mesma semântica do Dashboard/DRE —
+        // uma transação paga e depois cancelada mantém data_pagamento
+        // preenchida (20260728170000), então continuaria aparecendo aqui.
+        query = query.eq("status", "pago");
+      }
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
@@ -271,15 +293,20 @@ export default function Contas() {
       isAllFiliais,
       selectedMonth,
       customRange,
+      tipoData,
     ],
     queryFn: async () => {
       if (!igrejaId) return [];
+      const colunaPeriodo = colunaDataFiltro(tipoData);
       let query = supabase
         .from("transacoes_financeiras")
         .select("conta_id, tipo, valor, status")
         .eq("igreja_id", igrejaId)
-        .gte("data_vencimento", startDate)
-        .lte("data_vencimento", endDate);
+        .gte(colunaPeriodo, startDate)
+        .lte(colunaPeriodo, endDate);
+      if (colunaPeriodo === "data_pagamento") {
+        query = query.eq("status", "pago");
+      }
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
@@ -432,7 +459,9 @@ export default function Contas() {
     if (!transacoes) return {};
     return transacoes.reduce(
       (acc, t) => {
-        const data = t.data_vencimento || "sem-data";
+        const data =
+          (t as Record<string, string | null | undefined>)[colunaData] ||
+          "sem-data";
         if (!acc[data]) {
           acc[data] = [];
         }
@@ -441,7 +470,7 @@ export default function Contas() {
       },
       {} as Record<string, typeof transacoes>,
     );
-  }, [transacoes]);
+  }, [transacoes, colunaData]);
 
   // Ordenar datas (mais recentes primeiro)
   const datasOrdenadas = useMemo(() => {
@@ -512,9 +541,9 @@ export default function Contas() {
               </div>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <p className="text-xs text-muted-foreground">
-                  {t.data_vencimento &&
+                  {t[colunaData] &&
                     format(
-                      new Date(t.data_vencimento + "T00:00:00"),
+                      new Date(`${t[colunaData]}T00:00:00`),
                       "dd/MM/yyyy",
                       { locale: ptBR },
                     )}
@@ -562,14 +591,15 @@ export default function Contas() {
   const renderTransactionListGrouped = (
     filteredTransacoes: TransacaoLista[],
   ) => {
-    // Agrupar transações filtradas por data de vencimento
+    // Agrupar transações filtradas pelo eixo de data selecionado (colunaData)
     const gruposFiltrados = filteredTransacoes.reduce(
       (acc, t) => {
+        const valor = t[colunaData];
         const data =
-          typeof t.data_vencimento === "string"
-            ? t.data_vencimento
-            : t.data_vencimento
-              ? t.data_vencimento.toISOString().split("T")[0]
+          typeof valor === "string"
+            ? valor
+            : valor
+              ? valor.toISOString().split("T")[0]
               : "sem-data";
         if (!acc[data]) {
           acc[data] = [];
@@ -798,21 +828,25 @@ export default function Contas() {
       </div>
 
       {/* Filtro de Período Global */}
-      <div className="flex items-center justify-between">
-        <Badge variant="outline" className="gap-1.5">
-          <Calendar className="w-3 h-3" />
-          {customRange
-            ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(
-                customRange.to,
-                "dd/MM/yyyy",
-              )}`
-            : format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
-        </Badge>
+      <div className="flex flex-wrap items-center gap-2">
         <MonthPicker
           selectedMonth={selectedMonth}
           onMonthChange={setSelectedMonth}
           customRange={customRange}
           onCustomRangeChange={setCustomRange}
+          variant="pill"
+        />
+        <TipoDataFiltroSelect
+          value={tipoData}
+          onValueChange={(v) => {
+            setTipoData(v);
+            // As duas queries de período já forçam status='pago' em modo
+            // Data de Caixa — reseta o filtro de Status pra não mostrar
+            // uma seleção (Pendente) incompatível com o resultado.
+            if (v === "pagamento") setStatusFilter("all");
+          }}
+          labelPagamento="Data de Caixa"
+          variant="pill"
         />
       </div>
 
@@ -1107,6 +1141,7 @@ export default function Contas() {
                   onValueChange={(value: "all" | "pago" | "pendente") =>
                     setStatusFilter(value)
                   }
+                  disabled={colunaData === "data_pagamento"}
                 >
                   <SelectTrigger className="w-[160px] h-9">
                     <SelectValue placeholder="Status" />
@@ -1178,7 +1213,7 @@ export default function Contas() {
                     dataInicio={formatLocalDate(customRange.from)}
                     dataFim={formatLocalDate(customRange.to)}
                     dadosPorDia={transacoesFiltradas?.reduce((acc: Record<string, any[]>, t: any) => {
-                      const data = t.data_vencimento || "sem-data";
+                      const data = t[colunaData] || "sem-data";
                       if (!acc[data]) acc[data] = [];
                       acc[data].push(t);
                       return acc;
@@ -1189,7 +1224,7 @@ export default function Contas() {
                     ano={selectedMonth.getFullYear()}
                     mes={selectedMonth.getMonth()}
                     dadosPorDia={transacoesFiltradas?.reduce((acc: Record<string, any[]>, t: any) => {
-                      const data = t.data_vencimento || "sem-data";
+                      const data = t[colunaData] || "sem-data";
                       if (!acc[data]) acc[data] = [];
                       acc[data].push(t);
                       return acc;
@@ -1211,7 +1246,7 @@ export default function Contas() {
                     dataInicio={formatLocalDate(customRange.from)}
                     dataFim={formatLocalDate(customRange.to)}
                     dadosPorDia={transacoesFiltradas?.filter((t) => t.tipo === "entrada").reduce((acc: Record<string, any[]>, t: any) => {
-                      const data = t.data_vencimento || "sem-data";
+                      const data = t[colunaData] || "sem-data";
                       if (!acc[data]) acc[data] = [];
                       acc[data].push(t);
                       return acc;
@@ -1222,7 +1257,7 @@ export default function Contas() {
                     ano={selectedMonth.getFullYear()}
                     mes={selectedMonth.getMonth()}
                     dadosPorDia={transacoesFiltradas?.filter((t) => t.tipo === "entrada").reduce((acc: Record<string, any[]>, t: any) => {
-                      const data = t.data_vencimento || "sem-data";
+                      const data = t[colunaData] || "sem-data";
                       if (!acc[data]) acc[data] = [];
                       acc[data].push(t);
                       return acc;
@@ -1250,7 +1285,7 @@ export default function Contas() {
                     dataInicio={formatLocalDate(customRange.from)}
                     dataFim={formatLocalDate(customRange.to)}
                     dadosPorDia={transacoesFiltradas?.filter((t) => t.tipo === "saida").reduce((acc: Record<string, any[]>, t: any) => {
-                      const data = t.data_vencimento || "sem-data";
+                      const data = t[colunaData] || "sem-data";
                       if (!acc[data]) acc[data] = [];
                       acc[data].push(t);
                       return acc;
@@ -1261,7 +1296,7 @@ export default function Contas() {
                     ano={selectedMonth.getFullYear()}
                     mes={selectedMonth.getMonth()}
                     dadosPorDia={transacoesFiltradas?.filter((t) => t.tipo === "saida").reduce((acc: Record<string, any[]>, t: any) => {
-                      const data = t.data_vencimento || "sem-data";
+                      const data = t[colunaData] || "sem-data";
                       if (!acc[data]) acc[data] = [];
                       acc[data].push(t);
                       return acc;

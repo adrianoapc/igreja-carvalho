@@ -200,9 +200,34 @@ Fevereiro/2025: -1.000,00
 
 ---
 
+## Regime de Caixa vs Competência (get_dre_anual, jul/2026)
+
+O seletor "Regime" da tela de DRE não troca só o filtro de `status` — a
+partir de [ADR-031](../adr/ADR-031-tipo-de-data-filtro-e-regime-caixa.md)
+ele também troca o **eixo de data** usado pra agrupar/filtrar por ano-mês.
+Antes, os dois regimes agrupavam por `data_competencia`; um lançamento
+pago em julho mas com competência em maio aparecia em maio mesmo no
+regime de Caixa.
+
+```mermaid
+flowchart TD
+    Regime{Regime selecionado}
+    Regime -->|Caixa| Caixa["status = 'pago' E\ndata_pagamento no período\n(eixo: data_pagamento)"]
+    Regime -->|Competência| Comp["status <> 'cancelado' E\ndata_competencia no período\n(eixo: data_competencia)"]
+    Caixa --> DRE[get_dre_anual agrupa por mês\ndo eixo escolhido]
+    Comp --> DRE
+```
+
+Mesma regra "paid-only" do eixo Pagamento é usada no comparativo "mês
+anterior" do Dashboard (`fin_resumo_periodo p_eixo='pagamento'`) e nas
+listagens em modo Data de Caixa (Entradas/Saídas, Contas) — uma transação
+paga e depois cancelada mantém `data_pagamento` preenchida, então sem o
+`status='pago'` explícito ela continuaria contando como caixa.
+
 ## Referências
 
 - **Decisão Arquitetural**: [ADR-001 - Separação Fato Gerador vs Caixa vs DRE](../adr/ADR-001-separacao-fato-gerador-caixa-dre.md)
+- **Regime de Caixa (eixo de data)**: [ADR-031 - Tipo de Data e Regime de Caixa](../adr/ADR-031-tipo-de-data-filtro-e-regime-caixa.md)
 - **Funcionalidades Detalhadas**: [Módulo Financeiro](../funcionalidades.md#2-módulo-financeiro)
 - **Guia do Usuário**: [Manual - Seção Financeiro](../manual-usuario.md#4-módulo-financeiro)
 - **Fluxo Macro**: [Diagrama de Fluxo Financeiro](fluxo-financeiro.md)
