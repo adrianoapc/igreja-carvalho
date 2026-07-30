@@ -16,6 +16,8 @@ import {
   Layers,
   Percent,
   Tag,
+  ArrowDown,
+  ArrowUp,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,16 +47,18 @@ import {
 } from "@/lib/exportUtils";
 import {
   agruparPorData,
-  ordenarDatasDesc,
+  ordenarDatas,
   getPeriodoRange,
   getStatusDisplay,
   useLancamentos,
   useDadosFiltros,
   useConciliacaoMap,
+  somarEncargos,
   TIPO_DATA_FILTRO_DEFAULT,
   colunaDataFiltro,
   type TipoDataFiltro,
 } from "@/features/financeiro/core";
+import { EncargoBadges } from "@/components/financas/EncargoBadges";
 import { TRANSACOES_PAGE_CONFIG } from "./transacoesPage.config";
 import { LancamentoCard } from "./components/LancamentoCard";
 import { LancamentosSkeleton } from "./components/LancamentosSkeleton";
@@ -103,6 +107,8 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
   // Visões
   const [agrupar, setAgrupar] = useState(false);
   const [visaoCalendario, setVisaoCalendario] = useState(false);
+  const [visaoValor, setVisaoValor] = useState<"bruto" | "liquido">("bruto");
+  const [ordemData, setOrdemData] = useState<"asc" | "desc">("desc");
   const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(
     new Set(),
   );
@@ -154,9 +160,23 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
     [transacoesFiltradas, tipoData],
   );
   const datasOrdenadas = useMemo(
-    () => ordenarDatasDesc(transacoesAgrupadas),
-    [transacoesAgrupadas],
+    () => ordenarDatas(transacoesAgrupadas, ordemData),
+    [transacoesAgrupadas, ordemData],
   );
+
+  // Lista (não-agrupada): a query já vem ordenada desc pela coluna de data,
+  // mas o botão de ordenação precisa poder inverter sem refazer a query —
+  // reordena client-side sobre o mesmo eixo usado pra buscar (tipoData).
+  const transacoesOrdenadas = useMemo(() => {
+    const coluna = colunaDataFiltro(tipoData);
+    return [...(transacoesFiltradas || [])].sort((a, b) => {
+      const dataA = String(a[coluna] || a.data_vencimento || "");
+      const dataB = String(b[coluna] || b.data_vencimento || "");
+      return ordemData === "asc"
+        ? dataA.localeCompare(dataB)
+        : dataB.localeCompare(dataA);
+    });
+  }, [transacoesFiltradas, tipoData, ordemData]);
 
   const {
     currentPage,
@@ -168,7 +188,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
     startIndex,
     endIndex,
     totalItems,
-  } = usePagination(transacoesFiltradas, { pageSize: config.pageSize });
+  } = usePagination(transacoesOrdenadas, { pageSize: config.pageSize });
 
   useEffect(() => {
     goToPage(1);
@@ -510,7 +530,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
       {/* Lista / Agrupado / Calendário */}
       <Card className="shadow-soft">
         <CardHeader className="p-4 md:p-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle className="text-lg md:text-xl">
               {visaoCalendario
                 ? config.calendarioTitulo
@@ -518,8 +538,65 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
                   ? config.agrupadoTitulo
                   : config.listaTitulo}
             </CardTitle>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <TooltipProvider>
+                <div className="flex items-center gap-0.5 border rounded-md p-0.5">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={visaoValor === "bruto" ? "default" : "ghost"}
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setVisaoValor("bruto")}
+                      >
+                        Bruto
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Valor nominal do título</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={
+                          visaoValor === "liquido" ? "default" : "ghost"
+                        }
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setVisaoValor("liquido")}
+                      >
+                        Líquido
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Valor efetivamente {config.totalLabelPago.toLowerCase()}{" "}
+                      (com desconto, taxa, juros e multa)
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                {!visaoCalendario && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setOrdemData((o) => (o === "desc" ? "asc" : "desc"))
+                        }
+                      >
+                        {ordemData === "desc" ? (
+                          <ArrowDown className="w-4 h-4" />
+                        ) : (
+                          <ArrowUp className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {ordemData === "desc"
+                        ? "Mais recente primeiro (clique p/ inverter)"
+                        : "Mais antiga primeiro (clique p/ inverter)"}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -599,10 +676,19 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
                 <div className="space-y-3 p-4">
                   {datasOrdenadas.map((dataKey) => {
                     const grupo = transacoesAgrupadas[dataKey];
-                    const totalGrupo = grupo.reduce(
+                    const totalGrupoBruto = grupo.reduce(
                       (sum, t) => sum + Number(t.valor),
                       0,
                     );
+                    const totalGrupoLiquido = grupo.reduce(
+                      (sum, t) => sum + Number(t.valor_liquido ?? t.valor),
+                      0,
+                    );
+                    const totalGrupo =
+                      visaoValor === "liquido"
+                        ? totalGrupoLiquido
+                        : totalGrupoBruto;
+                    const encargosGrupo = somarEncargos(grupo);
                     const isExpandido = gruposExpandidos.has(dataKey);
 
                     return (
@@ -637,6 +723,13 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
                             </div>
                           </div>
                           <div className="text-right">
+                            {visaoValor === "liquido" && (
+                              <EncargoBadges
+                                totais={encargosGrupo}
+                                formatCurrency={formatCurrency}
+                                className="justify-end mb-1"
+                              />
+                            )}
                             <div
                               className={`text-base font-bold ${config.valorClass}`}
                             >
@@ -659,6 +752,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
                                 onVerExtrato={handleVerExtrato}
                                 bordered={false}
                                 tipoData={tipoData}
+                                visaoValor={visaoValor}
                               />
                             ))}
                           </div>
@@ -680,6 +774,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
                       onEdit={abrirEdicao}
                       onVerExtrato={handleVerExtrato}
                       tipoData={tipoData}
+                      visaoValor={visaoValor}
                     />
                   ))}
                 </div>

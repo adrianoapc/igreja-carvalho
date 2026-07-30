@@ -2297,6 +2297,101 @@ o caminho de export real e único é `ExportarTab.tsx`.
 
 `npx tsc`: 63 baseline, 0 novos.
 
+### 9.25 Toggle Bruto/Líquido + badges de composição + ordenar por data (jul/2026)
+
+Extensão direta do §9.24: não bastava ter os campos de desconto/taxa/juros/
+multa nos totais do topo — o usuário queria poder alternar, lançamento a
+lançamento, entre o valor nominal do título (bruto) e o que efetivamente
+foi pago/recebido (líquido), com um resumo visual de por que os dois
+diferem. Pedido em 3 partes, na mesma conversa:
+
+1. Botão Bruto/Líquido no cabeçalho da Lista/Agrupada/Calendário (Entradas
+   e Saídas), badges de composição (Desconto/Taxa/Juros/Multa) antes do
+   valor quando em modo Líquido.
+2. O código do lançamento (6 primeiros chars do id, copiável) sai de onde
+   estava (botão destacado à direita da descrição) e vai pro fim do texto
+   da descrição, liberando espaço pros badges.
+3. Botão de ordenar por data (mais recente/mais antiga primeiro) na Lista
+   e na Agrupada.
+
+**Decisões de UX fechadas com o usuário antes de implementar** (AskUserQuestion):
+Bruto é o padrão ao abrir a tela (Líquido é opt-in); lançamento sem nenhum
+encargo não mostra badge nenhum no modo Líquido (bruto == líquido, nada a
+explicar); o código do lançamento mantém o mesmo estilo, só reposicionado.
+
+**Novo módulo compartilhado** — `core/lib/encargos.ts` (puro, sem React,
+respeita a regra "core não importa de módulo nenhum") com `somarEncargos`,
+`encargosAtivos` e `temEncargo` operando sobre `{ desconto,
+taxas_administrativas, juros, multas }`; e `components/financas/
+EncargoBadges.tsx` (apresentacional, consome o core) — usado por
+`LancamentoCard`, pelos totais de grupo em `TransacoesPage` e pelos 4
+calendários (Entradas/Saídas × Mês/Timeline). Um componente só, 6 pontos de
+uso — a alternativa era repetir a mesma lógica de composição em 6 arquivos
+diferentes, exatamente o tipo de duplicação cliente-a-cliente que rendeu
+bug em rodadas anteriores desta sessão.
+
+**`LancamentoCard.tsx`**: novo prop `visaoValor?: "bruto" | "liquido"`
+(default `"bruto"`) controla `valorExibido` e, em modo líquido, renderiza
+`<EncargoBadges>` acima do valor (right-aligned) — que retorna `null`
+sozinho quando não há nenhum encargo, então a regra "sem badge quando não
+há o que explicar" cai de graça sem `if` duplicado no call site. Descrição
+virou `<h3 className="flex items-baseline gap-1.5">` com o texto (`flex-1
+min-w-0 truncate`) e o botão de ID como filho — sai do canto direito da
+linha do título e passa a ficar logo depois do texto, mesmo estilo
+monoespaçado/copiável, só com opacidade reduzida (`text-muted-foreground/70`)
+já que agora divide espaço com a descrição.
+
+**`TransacoesPage.tsx`**: dois estados novos, `visaoValor` e `ordemData`
+(`"asc" | "desc"`, default `"desc"` — mesmo sentido que a query já usa).
+Botão Bruto/Líquido é um segmented-control de 2 `Button` dentro de uma
+borda comum (não é `ToggleGroup` do design system — o padrão já usado nesta
+tela pra Lista/Agrupar/Calendário é `Button` + `Tooltip`, mantido por
+consistência). Botão de ordenar (`ArrowDown`/`ArrowUp`) só aparece fora da
+visão Calendário (grade de dias não tem uma noção linear de "ordem" pra
+inverter). Ordenação implementada client-side — `transacoesOrdenadas`
+(novo `useMemo`) reordena `transacoesFiltradas` pela mesma coluna de data
+usada pra buscar o período (`colunaDataFiltro(tipoData)`, comparação de
+string ISO `yyyy-MM-dd`, sem parsing de `Date`) e alimenta a paginação;
+pra Agrupada, `ordenarDatasDesc` virou `ordenarDatas(grupos, ordem)`
+(único caller, generalização direta, sem wrapper). Totais de grupo
+(Agrupada) ganharam o mesmo toggle: `totalGrupo` alterna bruto/líquido e
+badges de composição (soma de todos os lançamentos do dia) aparecem acima
+do total quando em modo Líquido.
+
+**Calendários (`SaidasCalendario`/`SaidasTimelineCalendario`/
+`EntradasCalendario`/`EntradasTimelineCalendario`, 4 arquivos quase
+idênticos, sem componente compartilhado — decisão herdada, não revisitada
+aqui)**: sem toggle (não fazia sentido nesse layout) — sempre mostra os
+dois números. Na célula do dia (grade do mês ou timeline), valor líquido
+aparece como uma segunda linha discreta abaixo do valor bruto, **só quando
+diferem** (mesma regra de "nada a explicar, nada a mostrar" da Lista). No
+modal "Detalhes do dia", cada lançamento e o "Total do Dia" ganharam um
+`<EncargoBadges bruto=... liquido=... totais=.../>` — aí sim sempre com
+Bruto e Líquido explícitos (não só a diferença), porque o pedido explícito
+foi literal: "Bruto / Líquido / Descontos / Taxas / Multa / Juros" — só
+renderizado quando existe pelo menos 1 encargo (`temEncargo`), pra não
+duplicar "Bruto R$X / Líquido R$X" idênticos na maioria dos lançamentos.
+`EntradasCalendario`/`EntradasTimelineCalendario` somam entrada e saída
+separadamente pra achar o líquido do dia (`totalEntradasLiquido -
+totalSaidasLiquido`) — mesmo padrão redundante que o bruto já usava (essas
+telas só recebem transações de um tipo por vez, o split por `t.tipo` é
+defensivo/pré-existente, não alterado aqui).
+
+**Ajuste de tipos**: `Transacao` (`hooks/useTransacoesFiltro.ts`) ganhou os
+5 campos (`valor_liquido`, `taxas_administrativas`, `multas`, `juros`,
+`desconto`) como propriedades nomeadas — já chegavam via `[key: string]:
+any` e funcionavam em runtime, mas `somarEncargos(grupo)` falhava no
+"weak type" check do TS (`EncargoCampos` só tem campos opcionais; o TS
+exige pelo menos 1 propriedade em comum *declarada*, índice não conta).
+
+`npx tsc`: 63 baseline, 0 novos. `npx eslint` nos 10 arquivos tocados: os
+9 erros de `no-explicit-any` pré-existentes (props `dadosPorDia:
+Record<string, Array<any>>` dos calendários, `[key: string]: any` de
+`Transacao`) continuam nos mesmos arquivos, confirmado por diff antes/depois
+via `git stash` — nenhum novo. Sem ambiente de browser disponível nesta
+sessão pra teste visual — só verificação estática (tsc + eslint + leitura
+cuidadosa do diff completo).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

@@ -12,6 +12,7 @@ export * from "./model/types";
 export * from "./lib/status";
 export * from "./lib/agrupamento";
 export * from "./lib/periodo";
+export * from "./lib/encargos";
 export * from "./api/finRpc";
 export * from "./api/lancamentos.api";
 export * from "./api/transferencias.api";

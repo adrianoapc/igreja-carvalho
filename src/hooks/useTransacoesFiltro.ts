@@ -4,6 +4,11 @@ export interface Transacao {
   id: string;
   descricao: string;
   valor: number | string;
+  valor_liquido?: number | string | null;
+  taxas_administrativas?: number | string | null;
+  multas?: number | string | null;
+  juros?: number | string | null;
+  desconto?: number | string | null;
   data_vencimento: string;
   conta_id?: string;
   categoria_id?: string;

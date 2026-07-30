@@ -9,6 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { somarEncargos, temEncargo } from "@/features/financeiro/core";
+import { EncargoBadges } from "@/components/financas/EncargoBadges";
 
 interface SaidasTimelineCalendarioProps {
   dataInicio: string; // yyyy-MM-dd
@@ -45,6 +47,10 @@ export function SaidasTimelineCalendario({
                 (sum, t) => sum + Number(t.valor),
                 0
               );
+              const totalLiquido = transacoes.reduce(
+                (sum, t) => sum + Number(t.valor_liquido ?? t.valor),
+                0
+              );
 
               return (
                 <button
@@ -61,8 +67,15 @@ export function SaidasTimelineCalendario({
                         {format(data, "EEE", { locale: ptBR }).toUpperCase()}
                       </div>
                       {total > 0 && (
-                        <div className="text-xs font-semibold text-red-600 mt-1">
-                          {formatValue(total)}
+                        <div>
+                          <div className="text-xs font-semibold text-red-600 mt-1">
+                            {formatValue(total)}
+                          </div>
+                          {totalLiquido !== total && (
+                            <div className="text-[9px] text-muted-foreground">
+                              Líq. {formatValue(totalLiquido)}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -104,28 +117,60 @@ export function SaidasTimelineCalendario({
 
           {diaSelecionado && diaSelecionado.transacoes.length > 0 ? (
             <div className="space-y-2">
-              {diaSelecionado.transacoes.map((t, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between text-sm border-b pb-2"
-                >
-                  <span className="text-foreground">{t.descricao}</span>
-                  <span className="font-semibold text-red-600 ml-4">
-                    {formatValue(Number(t.valor))}
-                  </span>
-                </div>
-              ))}
-              <div className="border-t pt-3 mt-3 flex items-center justify-between font-bold">
-                <span>Total do Dia</span>
-                <span className="text-lg text-red-600">
-                  {formatValue(
-                    diaSelecionado.transacoes.reduce(
-                      (sum, t) => sum + Number(t.valor),
-                      0
-                    )
-                  )}
-                </span>
-              </div>
+              {diaSelecionado.transacoes.map((t, idx) => {
+                const encargos = somarEncargos([t]);
+                const comEncargo = temEncargo(encargos);
+                return (
+                  <div key={idx} className="text-sm border-b pb-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground">{t.descricao}</span>
+                      <span className="font-semibold text-red-600 ml-4">
+                        {formatValue(Number(t.valor))}
+                      </span>
+                    </div>
+                    {comEncargo && (
+                      <EncargoBadges
+                        totais={encargos}
+                        formatCurrency={formatValue}
+                        bruto={Number(t.valor)}
+                        liquido={Number(t.valor_liquido ?? t.valor)}
+                        className="justify-end mt-1"
+                      />
+                    )}
+                  </div>
+                );
+              })}
+              {(() => {
+                const encargosDia = somarEncargos(diaSelecionado.transacoes);
+                const comEncargoDia = temEncargo(encargosDia);
+                const totalBrutoDia = diaSelecionado.transacoes.reduce(
+                  (sum, t) => sum + Number(t.valor),
+                  0
+                );
+                const totalLiquidoDia = diaSelecionado.transacoes.reduce(
+                  (sum, t) => sum + Number(t.valor_liquido ?? t.valor),
+                  0
+                );
+                return (
+                  <div className="border-t pt-3 mt-3">
+                    <div className="flex items-center justify-between font-bold">
+                      <span>Total do Dia</span>
+                      <span className="text-lg text-red-600">
+                        {formatValue(totalBrutoDia)}
+                      </span>
+                    </div>
+                    {comEncargoDia && (
+                      <EncargoBadges
+                        totais={encargosDia}
+                        formatCurrency={formatValue}
+                        bruto={totalBrutoDia}
+                        liquido={totalLiquidoDia}
+                        className="justify-end mt-1"
+                      />
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             <p className="text-center text-muted-foreground py-4">

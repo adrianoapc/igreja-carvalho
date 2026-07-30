@@ -10,6 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { somarEncargos, temEncargo } from "@/features/financeiro/core";
+import { EncargoBadges } from "@/components/financas/EncargoBadges";
 
 interface EntradasCalendarioProps {
   ano: number;
@@ -64,7 +66,10 @@ export function EntradasCalendario({ ano, mes, dadosPorDia }: EntradasCalendario
               const totalEntradas = transacoes.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + Number(t.valor), 0);
               const totalSaidas = transacoes.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + Number(t.valor), 0);
               const total = totalEntradas - totalSaidas;
-              
+              const totalEntradasLiquido = transacoes.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + Number(t.valor_liquido ?? t.valor), 0);
+              const totalSaidasLiquido = transacoes.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + Number(t.valor_liquido ?? t.valor), 0);
+              const totalLiquido = totalEntradasLiquido - totalSaidasLiquido;
+
               return (
                 <button
                   key={j}
@@ -75,8 +80,15 @@ export function EntradasCalendario({ ano, mes, dadosPorDia }: EntradasCalendario
                     <div>
                       <div className="text-lg font-bold mb-2">{dia}</div>
                       {total !== 0 && (
-                        <div className={`text-xs font-semibold ${total >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {total >= 0 ? '+' : ''}{formatValue(total)}
+                        <div>
+                          <div className={`text-xs font-semibold ${total >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {total >= 0 ? '+' : ''}{formatValue(total)}
+                          </div>
+                          {totalLiquido !== total && (
+                            <div className="text-[10px] text-muted-foreground">
+                              Líq. {totalLiquido >= 0 ? '+' : ''}{formatValue(totalLiquido)}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -107,30 +119,62 @@ export function EntradasCalendario({ ano, mes, dadosPorDia }: EntradasCalendario
 
           {diaSelecionado && diaSelecionado.transacoes.length > 0 ? (
             <div className="space-y-2">
-              {diaSelecionado.transacoes.map((t, idx) => (
-                <div key={idx} className="flex items-center justify-between text-sm border-b pb-2">
-                  <span className="text-foreground">{t.descricao}</span>
-                  <span className={`font-semibold ml-4 ${t.tipo === 'entrada' ? 'text-green-600' : 'text-red-600'}`}>
-                    {t.tipo === 'entrada' ? '+' : '-'}{formatValue(Number(t.valor))}
-                  </span>
-                </div>
-              ))}
-              <div className="border-t pt-3 mt-3 flex items-center justify-between font-bold">
-                <span>Total do Dia</span>
-                <span className={`text-lg ${(() => {
-                  const totalEntradas = diaSelecionado.transacoes.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + Number(t.valor), 0);
-                  const totalSaidas = diaSelecionado.transacoes.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + Number(t.valor), 0);
-                  const totalDia = totalEntradas - totalSaidas;
-                  return totalDia >= 0 ? 'text-green-600' : 'text-red-600';
-                })()}`}>
-                  {(() => {
-                    const totalEntradas = diaSelecionado.transacoes.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + Number(t.valor), 0);
-                    const totalSaidas = diaSelecionado.transacoes.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + Number(t.valor), 0);
-                    const totalDia = totalEntradas - totalSaidas;
-                    return (totalDia >= 0 ? '+' : '') + formatValue(totalDia);
-                  })()}
-                </span>
-              </div>
+              {diaSelecionado.transacoes.map((t, idx) => {
+                const encargos = somarEncargos([t]);
+                const comEncargo = temEncargo(encargos);
+                const bruto = Number(t.valor);
+                const liquido = Number(t.valor_liquido ?? t.valor);
+                const cor = t.tipo === 'entrada' ? 'text-green-600' : 'text-red-600';
+                const sinal = t.tipo === 'entrada' ? '+' : '-';
+                return (
+                  <div key={idx} className="text-sm border-b pb-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-foreground">{t.descricao}</span>
+                      <span className={`font-semibold ml-4 ${cor}`}>
+                        {sinal}{formatValue(bruto)}
+                      </span>
+                    </div>
+                    {comEncargo && (
+                      <EncargoBadges
+                        totais={encargos}
+                        formatCurrency={formatValue}
+                        bruto={bruto}
+                        liquido={liquido}
+                        className="justify-end mt-1"
+                      />
+                    )}
+                  </div>
+                );
+              })}
+              {(() => {
+                const totalEntradas = diaSelecionado.transacoes.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + Number(t.valor), 0);
+                const totalSaidas = diaSelecionado.transacoes.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + Number(t.valor), 0);
+                const totalDia = totalEntradas - totalSaidas;
+                const totalEntradasLiquido = diaSelecionado.transacoes.filter(t => t.tipo === 'entrada').reduce((sum, t) => sum + Number(t.valor_liquido ?? t.valor), 0);
+                const totalSaidasLiquido = diaSelecionado.transacoes.filter(t => t.tipo === 'saida').reduce((sum, t) => sum + Number(t.valor_liquido ?? t.valor), 0);
+                const totalDiaLiquido = totalEntradasLiquido - totalSaidasLiquido;
+                const encargosDia = somarEncargos(diaSelecionado.transacoes);
+                const comEncargoDia = temEncargo(encargosDia);
+                return (
+                  <div className="border-t pt-3 mt-3">
+                    <div className="flex items-center justify-between font-bold">
+                      <span>Total do Dia</span>
+                      <span className={`text-lg ${totalDia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {(totalDia >= 0 ? '+' : '') + formatValue(totalDia)}
+                      </span>
+                    </div>
+                    {comEncargoDia && (
+                      <EncargoBadges
+                        totais={encargosDia}
+                        formatCurrency={formatValue}
+                        bruto={totalDia}
+                        liquido={totalDiaLiquido}
+                        className="justify-end mt-1"
+                      />
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             <p className="text-center text-muted-foreground py-4">Nenhuma transação neste dia</p>

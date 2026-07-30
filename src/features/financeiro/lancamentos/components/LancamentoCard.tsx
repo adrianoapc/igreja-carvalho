@@ -10,11 +10,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { TransacaoActionsMenu } from "@/components/financas/TransacaoActionsMenu";
+import { EncargoBadges } from "@/components/financas/EncargoBadges";
 import {
   getStatusColorDynamic,
   getStatusDisplay,
   isPagamentoDinheiro,
   colunaDataFiltro,
+  somarEncargos,
   TIPO_DATA_FILTRO_DEFAULT,
   type TransacaoResumo,
   type TipoDataFiltro,
@@ -31,6 +33,11 @@ export interface LancamentoCardTransacao extends TransacaoResumo {
   id: string;
   descricao: string;
   valor: number | string;
+  valor_liquido?: number | string | null;
+  taxas_administrativas?: number | string | null;
+  multas?: number | string | null;
+  juros?: number | string | null;
+  desconto?: number | string | null;
   status: string;
   data_vencimento: string;
   data_pagamento?: string | null;
@@ -63,6 +70,9 @@ interface LancamentoCardProps {
   /** Eixo de data usado pra buscar o período (TransacoesPage) — decide se o
    * card mostra vencimento ou pagamento no bloco de data compacto. */
   tipoData?: TipoDataFiltro;
+  /** Bruto (valor nominal) ou líquido (valor_liquido, com desconto/taxa/
+   * juros/multa) — controla o valor exibido e os badges de composição. */
+  visaoValor?: "bruto" | "liquido";
 }
 
 const CONCILIACAO_BADGES: Record<string, { label: string; className: string }> =
@@ -94,6 +104,7 @@ export function LancamentoCard({
   onVerExtrato,
   bordered = true,
   tipoData = TIPO_DATA_FILTRO_DEFAULT,
+  visaoValor = "bruto",
 }: LancamentoCardProps) {
   const conciliacaoStatus =
     transacao.conciliacao_status ||
@@ -110,6 +121,11 @@ export function LancamentoCard({
   const dataExibidaStr =
     transacao[colunaDataFiltro(tipoData)] || transacao.data_vencimento;
   const dataExibida = new Date(dataExibidaStr + "T00:00:00");
+  const valorExibido =
+    visaoValor === "liquido"
+      ? Number(transacao.valor_liquido ?? transacao.valor)
+      : Number(transacao.valor);
+  const encargosTotais = somarEncargos([transacao]);
 
   return (
     <div
@@ -132,10 +148,8 @@ export function LancamentoCard({
 
       {/* Conteúdo */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="font-semibold text-sm md:text-base truncate flex-1">
-            {transacao.descricao}
-          </h3>
+        <h3 className="font-semibold text-sm md:text-base flex items-baseline gap-1.5">
+          <span className="truncate min-w-0 flex-1">{transacao.descricao}</span>
           <button
             type="button"
             onClick={(e) => {
@@ -143,12 +157,12 @@ export function LancamentoCard({
               navigator.clipboard.writeText(transacao.id);
               toast.success("ID copiado!");
             }}
-            className="text-[10px] font-mono text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
+            className="text-[10px] font-mono font-normal text-muted-foreground/70 hover:text-foreground px-1 rounded hover:bg-muted transition-colors flex-shrink-0"
             title="Copiar ID"
           >
             {transacao.id.substring(0, 6)}
           </button>
-        </div>
+        </h3>
         <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
           {transacao.fornecedor && (
             <>
@@ -182,11 +196,18 @@ export function LancamentoCard({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-right">
+          {visaoValor === "liquido" && (
+            <EncargoBadges
+              totais={encargosTotais}
+              formatCurrency={formatCurrency}
+              className="justify-end mb-1"
+            />
+          )}
           <div className="flex items-center gap-1.5 justify-end">
             <p
               className={`text-base md:text-lg font-bold whitespace-nowrap ${valorClass}`}
             >
-              {formatCurrency(Number(transacao.valor))}
+              {formatCurrency(valorExibido)}
             </p>
             {transacao.solicitacao_reembolso_id && (
               <TooltipProvider>
