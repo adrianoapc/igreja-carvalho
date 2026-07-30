@@ -175,7 +175,14 @@ export default function Dashboard() {
       if (categoriaId !== "all") {
         query = query.eq("categoria_id", categoriaId);
       }
-      if (status !== "all") {
+      if (colunaPeriodo === "data_pagamento") {
+        // Data de Caixa: mesma semântica paid-only do comparativo (mês
+        // anterior, fin_resumo_periodo p_eixo='pagamento') — status='pago'
+        // sempre, ignorando o filtro de Status da tela. Sem isso, uma
+        // transação paga e depois cancelada (que mantém data_pagamento
+        // preenchida) entraria no total de caixa como se ainda valesse.
+        query = query.eq("status", "pago");
+      } else if (status !== "all") {
         query = query.eq("status", status);
       }
 

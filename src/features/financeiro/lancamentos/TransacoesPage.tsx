@@ -650,6 +650,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
                                 onEdit={abrirEdicao}
                                 onVerExtrato={handleVerExtrato}
                                 bordered={false}
+                                tipoData={tipoData}
                               />
                             ))}
                           </div>
@@ -670,6 +671,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
                       formatCurrency={formatCurrency}
                       onEdit={abrirEdicao}
                       onVerExtrato={handleVerExtrato}
+                      tipoData={tipoData}
                     />
                   ))}
                 </div>
