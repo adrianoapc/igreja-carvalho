@@ -2249,6 +2249,54 @@ regressão nova.
 
 `npx tsc`: 63 baseline, 0 novos.
 
+### 9.24 Paridade bruto×líquido em Saídas + desconto de antecipação (jul/2026)
+
+Usuário apontou duas lacunas em `TransacoesPage.tsx`/`ExportarTab.tsx`,
+ambas cobertas por ADR-027 (`valor_liquido = valor + juros + multas +
+(sinal_taxa * taxas_administrativas) - desconto`) mas nunca expostas na UI
+pro lado de Saídas nem pro campo `desconto`:
+
+1. **Boleto pago antecipado tem desconto** — banco cobra menos que o valor
+   nominal do título. Esse `desconto` já é gravado pelas RPCs `fin_*` desde
+   o D-ADR-027, mas nunca apareceu em tela nem em export — usuário só via
+   taxa/juros/multa, nunca o abatimento.
+2. **Cards de bruto×líquido só existiam pra Entradas** — o gate
+   `tipo === "entrada"` escondia a separação valor-nominal × valor-líquido
+   pra Saídas, mesmo elas tendo a mesma divergência (juros/multa de atraso
+   fazem o líquido pago ser MAIOR que o nominal; desconto de antecipação faz
+   ser MENOR).
+
+**`TransacoesPage.tsx`**: removido o gate `tipo === "entrada"` de
+`valorLiquidoOuBruto`/`totalPagoLiquido`/`totalPendenteLiquido` — a mesma
+lógica de bruto×líquido (§9.15/9.16) agora se aplica a Entradas e Saídas
+igualmente, já que `valor_liquido` vem calculado certo pro tipo direto da
+RPC. Card "Taxas" virou "Taxas e Encargos" e passou a somar
+`taxas_administrativas + multas + juros` juntos (antes só a taxa
+administrativa) — do jeito que o usuário pediu ("precisamos colocar dentro
+de taxas, multas e juros tb"), restrito a `status IN ('pago','pendente')`
+(mesma ressalva do §9.16: `cancelado` mantém os campos preenchidos mas não
+deve contar). Novo card "Desconto" (ícone `Tag`, cor teal) soma `desconto`
+das mesmas transações, mostrado pros dois tipos. Grid do Resumo unificado
+em `grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6` (era
+condicional por tipo) — 6 cards fixos: total, pago/recebido, pendente,
+taxas e encargos, desconto, transferências.
+
+**`ExportarTab.tsx`**: `desconto` estava ausente da query, do tipo
+`TransacaoExportacao`, da lista `COLUNAS_DISPONIVEIS` e do
+`handleExportar` — nunca tinha sido exportável, diferente de
+`taxas_administrativas`/`multas`/`juros` que já tinham coluna própria desde
+antes. Adicionado seguindo exatamente o mesmo padrão dos três campos
+irmãos: `desconto` no `.select()`, `desconto?: number | null` no tipo,
+`{ id: "desconto", label: "Desconto" }` em `COLUNAS_DISPONIVEIS`, e
+`row.Desconto = t.desconto ?? 0` no `handleExportar`.
+
+Fora do escopo: `handleExportar` dentro de `TransacoesPage.tsx` (função
+morta, marcada `void handleExportar; // exportação via página Arquivos,
+mantido para atalho futuro`, não ligada a nenhum botão) não foi tocada —
+o caminho de export real e único é `ExportarTab.tsx`.
+
+`npx tsc`: 63 baseline, 0 novos.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

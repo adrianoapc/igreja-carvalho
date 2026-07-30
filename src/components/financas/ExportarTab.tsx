@@ -59,6 +59,7 @@ type TransacaoExportacao = {
   taxas_administrativas?: number | null;
   multas?: number | null;
   juros?: number | null;
+  desconto?: number | null;
   status: string;
   data_vencimento: string;
   data_pagamento?: string | null;
@@ -85,6 +86,7 @@ const COLUNAS_DISPONIVEIS = [
   { id: "taxas_administrativas", label: "Taxa Administrativa" },
   { id: "multas", label: "Multa" },
   { id: "juros", label: "Juros" },
+  { id: "desconto", label: "Desconto" },
   { id: "status", label: "Status" },
   { id: "data_vencimento", label: "Data Vencimento" },
   { id: "data_pagamento", label: "Data Pagamento" },
@@ -205,6 +207,7 @@ export function ExportarTab() {
           taxas_administrativas,
           multas,
           juros,
+          desconto,
           status,
           data_vencimento,
           data_pagamento,
@@ -310,6 +313,8 @@ export function ExportarTab() {
           row["Taxa Administrativa"] = t.taxas_administrativas ?? 0;
         if (colunasSelecionadas.includes("multas")) row.Multa = t.multas ?? 0;
         if (colunasSelecionadas.includes("juros")) row.Juros = t.juros ?? 0;
+        if (colunasSelecionadas.includes("desconto"))
+          row.Desconto = t.desconto ?? 0;
         if (colunasSelecionadas.includes("status")) row.Status = t.status;
         if (colunasSelecionadas.includes("data_vencimento"))
           row["Data Vencimento"] = formatDateForExport(t.data_vencimento);

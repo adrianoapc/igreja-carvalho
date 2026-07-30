@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Layers,
   Percent,
+  Tag,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -205,48 +206,44 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
     transacoesFiltradas?.filter((t) => t.transferencia_id) || [];
   const total =
     transacoesNormais.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
-  const totalPago =
-    transacoesNormais
-      .filter((t) => t.status === "pago")
-      .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
-  const totalPendente =
-    transacoesNormais
-      .filter((t) => t.status === "pendente")
-      .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
   const totalTransferencias =
     transferencias.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
 
-  // Entradas: taxa administrativa reduz o líquido do que a igreja recebe
-  // (ADR-027, §9.15 do doc de arquitetura) — Recebido/Pendente passam a
-  // refletir o líquido de verdade, e a taxa retida pela adquirente fica
-  // visível como card próprio, sem precisar abrir lançamento por
-  // lançamento. Saídas não muda (segue bruto, fora de escopo por ora).
+  // Bruto vs líquido (ADR-027, §9.15) — valor_liquido já vem calculado certo
+  // pro tipo (fin_criar_lancamento/fin_atualizar_lancamento: taxa/juros/
+  // multas somam em saída e subtraem em entrada; desconto sempre subtrai).
+  // Extensão pra Saídas (jul/2026, pedido do usuário): boleto pago
+  // antecipado tem desconto, e juros/multas de atraso fazem o líquido pago
+  // divergir do valor nominal do título — mesma lógica de bruto×líquido que
+  // já existia só pra Entradas, sem gate por tipo.
   const valorLiquidoOuBruto = (t: (typeof transacoesNormais)[number]) =>
     Number(t.valor_liquido ?? t.valor);
-  const totalPagoLiquido =
-    tipo === "entrada"
-      ? transacoesNormais
-          .filter((t) => t.status === "pago")
-          .reduce((sum, t) => sum + valorLiquidoOuBruto(t), 0)
-      : totalPago;
-  const totalPendenteLiquido =
-    tipo === "entrada"
-      ? transacoesNormais
-          .filter((t) => t.status === "pendente")
-          .reduce((sum, t) => sum + valorLiquidoOuBruto(t), 0)
-      : totalPendente;
+  const totalPagoLiquido = transacoesNormais
+    .filter((t) => t.status === "pago")
+    .reduce((sum, t) => sum + valorLiquidoOuBruto(t), 0);
+  const totalPendenteLiquido = transacoesNormais
+    .filter((t) => t.status === "pendente")
+    .reduce((sum, t) => sum + valorLiquidoOuBruto(t), 0);
   // Review Codex (P1, PR #60): valor - valor_liquido NÃO isola a taxa —
   // carrega juros/multas/desconto junto (valor_liquido = valor + juros +
-  // multas - taxas - desconto). Somar taxas_administrativas direto, que já
-  // é gravada como magnitude positiva nas RPCs fin_*. (P2): restringir a
-  // pago/pendente — status "cancelado" mantém o campo preenchido mas não
-  // deve contar (mesmo escopo de Recebido + Pendente).
-  const totalTaxas =
-    tipo === "entrada"
-      ? transacoesNormais
-          .filter((t) => t.status === "pago" || t.status === "pendente")
-          .reduce((sum, t) => sum + Number(t.taxas_administrativas || 0), 0)
-      : 0;
+  // multas ± taxas - desconto). Soma direta de cada componente, já gravado
+  // como magnitude positiva nas RPCs fin_*. Restrito a pago/pendente —
+  // status "cancelado" mantém os campos preenchidos mas não deve contar.
+  const transacoesComEncargo = transacoesNormais.filter(
+    (t) => t.status === "pago" || t.status === "pendente",
+  );
+  const totalTaxas = transacoesComEncargo.reduce(
+    (sum, t) =>
+      sum +
+      Number(t.taxas_administrativas || 0) +
+      Number(t.multas || 0) +
+      Number(t.juros || 0),
+    0,
+  );
+  const totalDesconto = transacoesComEncargo.reduce(
+    (sum, t) => sum + Number(t.desconto || 0),
+    0,
+  );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const abrirEdicao = (transacao: any) => {
@@ -471,11 +468,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
       </div>
 
       {/* Resumo */}
-      <div
-        className={`grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 ${
-          tipo === "entrada" ? "lg:grid-cols-3 xl:grid-cols-5" : "lg:grid-cols-4"
-        }`}
-      >
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
         <ResumoCard
           icone={<TotalIcone className="w-5 h-5 text-blue-600" />}
           fundo="bg-blue-100 dark:bg-blue-900/20"
@@ -494,14 +487,18 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
           label="Pendente"
           valor={formatCurrency(totalPendenteLiquido)}
         />
-        {tipo === "entrada" && (
-          <ResumoCard
-            icone={<Percent className="w-5 h-5 text-orange-600" />}
-            fundo="bg-orange-100 dark:bg-orange-900/20"
-            label="Taxas"
-            valor={formatCurrency(totalTaxas)}
-          />
-        )}
+        <ResumoCard
+          icone={<Percent className="w-5 h-5 text-orange-600" />}
+          fundo="bg-orange-100 dark:bg-orange-900/20"
+          label="Taxas e Encargos"
+          valor={formatCurrency(totalTaxas)}
+        />
+        <ResumoCard
+          icone={<Tag className="w-5 h-5 text-teal-600" />}
+          fundo="bg-teal-100 dark:bg-teal-900/20"
+          label="Desconto"
+          valor={formatCurrency(totalDesconto)}
+        />
         <ResumoCard
           icone={<ArrowLeft className="w-5 h-5 text-purple-600" />}
           fundo="bg-purple-100 dark:bg-purple-900/20"
