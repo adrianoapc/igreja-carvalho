@@ -178,6 +178,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
     statusFilter,
     selectedMonth,
     customRange,
+    tipoData,
   ]);
 
   const toggleGrupo = useCallback((dataKey: string) => {

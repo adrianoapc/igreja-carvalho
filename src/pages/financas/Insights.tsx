@@ -101,6 +101,11 @@ export default function Insights() {
         .gte(colunaPeriodo, dataInicial.toISOString())
         .lte(colunaPeriodo, dataFinal.toISOString())
         .order(colunaPeriodo, { ascending: true });
+      if (colunaPeriodo === "data_pagamento") {
+        // Data de Caixa: paid-only — mesma semântica já aplicada em
+        // Dashboard/Contas/useLancamentos.
+        query = query.eq("status", "pago");
+      }
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }

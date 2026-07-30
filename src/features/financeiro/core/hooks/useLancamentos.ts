@@ -53,6 +53,12 @@ export function useLancamentos(
         .gte(coluna, periodo.inicio)
         .lte(coluna, periodo.fim)
         .order(coluna, { ascending: false });
+      if (coluna === "data_pagamento") {
+        // Data de Caixa: paid-only — uma transação paga e depois cancelada
+        // mantém data_pagamento preenchida (fin_alterar_status_lancamento
+        // não a limpa), então sem isso continuaria contando como caixa.
+        query = query.eq("status", "pago");
+      }
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
