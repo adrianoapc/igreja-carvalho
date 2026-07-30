@@ -2202,6 +2202,53 @@ função inteira contra a última versão correta conhecida antes de assumir
 que só aquele campo foi afetado (aqui, os dois achados vieram do MESMO
 `CREATE OR REPLACE` malfeito, mas em duas rodadas de review separadas).
 
+### 9.23 Achado do `/code-review` (não corrigido nesta PR): ExportarTab perdeu o eixo Competência — e correção com 3ª opção (jul/2026)
+
+Dois agentes independentes do `/code-review` (cross-file tracer e removed-
+behavior auditor) acharam, cada um por conta própria, que `ExportarTab.tsx`
+tinha perdido a capacidade de filtrar/exportar por `data_competencia` —
+antes da PR #65 ("seletor Tipo de Data"), o export sempre filtrava por
+competência; depois, só `data_vencimento`/`data_pagamento` ficaram
+disponíveis via `TipoDataFiltroSelect`/`colunaDataFiltro` (ADR-031).
+**Confirmado que isso não veio desta PR** — já estava em `origin/main`
+antes do rebase (PR #65, já mergeada); só apareceu no `/code-review` porque
+a ferramenta rastreia efeito através de arquivos adjacentes, não só linhas
+adicionadas por este branch.
+
+Usuário pediu a correção direto: Exportar precisa das 3 opções
+(Vencimento/Pagamento/Competência). Implementado **só dentro de
+`ExportarTab.tsx`**, sem tocar no `TipoDataFiltro`/`colunaDataFiltro`/
+`TipoDataFiltroSelect` compartilhados — dois motivos, achados investigando
+o blast radius antes de mexer:
+
+1. **`TipoDataFiltroSelect` é um componente único sem lista de opções
+   parametrizável** — widening o tipo compartilhado faria a 3ª opção
+   aparecer em TODAS as 6 telas que usam o seletor (`TransacoesPage`,
+   `Contas`, `Dashboard`, `Insights`, `ExportarTab`, `LancamentoCard`), não
+   só em Exportar.
+2. **`Dashboard.tsx` manda `tipoData` direto pra `fin_resumo_periodo` como
+   `p_eixo`**, e essa RPC tem `CHECK`/`IN ('vencimento','pagamento')` — um
+   3º valor vindo do tipo compartilhado quebraria essa tela com uma
+   exceção Postgres não tratada.
+3. **ADR-031 documenta a separação "Tipo de Data" (qual coluna ordena)
+   vs. "Regime" (o que entra no relatório) como decisão deliberada**, não
+   uma omissão — misturar Competência ali confundiria os dois conceitos
+   que o ADR foi escrito pra manter separados.
+
+Local em `ExportarTab.tsx`: `TipoDataFiltroExport` (tipo local, 3 valores),
+`colunaDataFiltroExport()` (helper local), `Select` de 3 itens substituindo
+`<TipoDataFiltroSelect>`. A regra "Data de Caixa exporta só pago" (bloco
+`if (colunaPeriodo === "data_pagamento")`) não precisou de ajuste —
+Competência cai naturalmente no mesmo ramo `else` que Vencimento já usava,
+respeitando o filtro de Status normal. Mesma ressalva de `data_pagamento`
+se aplica a `data_competencia`: é nullable no banco (coluna adicionada bem
+depois de `data_vencimento`, sem backfill), então lançamentos legados sem
+competência preenchida somem silenciosamente de um export filtrado por
+esse eixo — mesmo comportamento já aceito pro eixo Pagamento, não uma
+regressão nova.
+
+`npx tsc`: 63 baseline, 0 novos.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

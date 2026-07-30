@@ -22,13 +22,25 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatLocalDate, parseLocalDate } from "@/utils/dateUtils";
 import { MonthPicker } from "@/components/financas/MonthPicker";
-import { TipoDataFiltroSelect } from "@/components/financas/TipoDataFiltroSelect";
-import {
-  getPeriodoRange,
-  colunaDataFiltro,
-  TIPO_DATA_FILTRO_DEFAULT,
-  type TipoDataFiltro,
-} from "@/features/financeiro/core";
+import { getPeriodoRange } from "@/features/financeiro/core";
+
+// Exportar tem um 3º eixo de data (Competência) que o resto do financeiro
+// não oferece — ADR-031 manteve "Tipo de Data" (Vencimento/Pagamento) e
+// "Regime" (Caixa/Competência) como conceitos ortogonais de propósito, e
+// Vencimento/Pagamento é a única RPC-facing enum (fin_resumo_periodo, usada
+// pelo Dashboard) que existe hoje — adicionar Competência ali quebraria essa
+// RPC. Exportar não chama RPC nenhuma pra isso (query PostgREST direta), daí
+// o eixo local só aqui, sem tocar no TipoDataFiltro compartilhado.
+type TipoDataFiltroExport = "vencimento" | "pagamento" | "competencia";
+const TIPO_DATA_FILTRO_EXPORT_DEFAULT: TipoDataFiltroExport = "vencimento";
+
+function colunaDataFiltroExport(
+  tipo: TipoDataFiltroExport,
+): "data_vencimento" | "data_pagamento" | "data_competencia" {
+  if (tipo === "pagamento") return "data_pagamento";
+  if (tipo === "competencia") return "data_competencia";
+  return "data_vencimento";
+}
 
 type TipoExportacao =
   | "entradas"
@@ -100,8 +112,8 @@ export function ExportarTab() {
     to: Date;
   } | null>(null);
   const periodo = getPeriodoRange(selectedMonth, customRange);
-  const [tipoData, setTipoData] = useState<TipoDataFiltro>(
-    TIPO_DATA_FILTRO_DEFAULT,
+  const [tipoData, setTipoData] = useState<TipoDataFiltroExport>(
+    TIPO_DATA_FILTRO_EXPORT_DEFAULT,
   );
   const [contaFiltro, setContaFiltro] = useState<string>("todas");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>("todas");
@@ -215,7 +227,7 @@ export function ExportarTab() {
         query = query.eq("filial_id", filialId);
       }
 
-      const colunaPeriodo = colunaDataFiltro(tipoData);
+      const colunaPeriodo = colunaDataFiltroExport(tipoData);
       query = query
         .gte(colunaPeriodo, periodo.inicio)
         .lte(colunaPeriodo, periodo.fim);
@@ -270,7 +282,7 @@ export function ExportarTab() {
         return;
       }
 
-      const colunaPeriodo = colunaDataFiltro(tipoData);
+      const colunaPeriodo = colunaDataFiltroExport(tipoData);
       const dadosExportacao = transacoes.map((t) => {
         const row: Record<string, string | number> = {};
         // parseLocalDate em vez de `new Date(string)`: "YYYY-MM-DD" seria
@@ -440,20 +452,29 @@ export function ExportarTab() {
 
             <div className="space-y-2">
               <Label>Tipo de Data</Label>
-              <TipoDataFiltroSelect
+              <Select
                 value={tipoData}
-                onValueChange={(v) => {
+                onValueChange={(v: TipoDataFiltroExport) => {
                   setTipoData(v);
                   // A query já força status='pago' em modo Pagamento —
                   // reseta o filtro de Status pra não sugerir uma seleção
                   // (Pendente/Atrasado) que a busca ignoraria.
                   if (v === "pagamento") setStatusFiltro("todos");
                 }}
-                labelPagamento={
-                  tipoExportacao === "entradas" ? "Recebimento" : "Pagamento"
-                }
-                className="w-full"
-              />
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="vencimento">Vencimento</SelectItem>
+                  <SelectItem value="pagamento">
+                    {tipoExportacao === "entradas"
+                      ? "Recebimento"
+                      : "Pagamento"}
+                  </SelectItem>
+                  <SelectItem value="competencia">Competência</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
