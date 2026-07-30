@@ -1851,6 +1851,30 @@ pendentes que ainda não tinham chegado a nenhum branch (`fin_forma_
 pagamento_fk`, `fin_conferencia_totais_getnet`, `fin_competencia_grupo_
 parcelado`) foram reconciliadas em `main` no mesmo momento.
 
+### 9.21 D12 — Campo de data digitável nos dialogs do financeiro (jul/2026)
+
+Usuário reportou UX ruim pra mexer nos campos de data dos dialogs
+(Vencimento, Competência etc.) — só popover-calendário, sem digitar, sem
+pular ano rápido. Decisão completa em
+[ADR-032](adr/ADR-032-campo-de-data-digitavel-financeiro.md).
+
+Novo `DateFieldPicker` (`src/components/financas/`): `MaskedInput`
+(`dd/mm/aaaa`, `react-imask` — já usado em telefone/CPF, sem dependência
+nova) + ícone de calendário como atalho pro mesmo `Popover`+`Calendar` de
+antes. Contrato só em `Date | undefined`, sem tocar strings — cada dialog
+manteve sua própria conversão Date↔string. Aplicado nos 8 campos de data
+única do financeiro: `TransacaoDialog` (Vencimento, Competência, Data fim
+de recorrência, Data de pagamento/recebimento), `AjusteSaldoDialog`,
+`ConfirmarPagamentoDialog`, `GetnetImportDialog` (mantém a trava de não
+aceitar data futura via `disabledDate`), `RelatorioOferta`.
+
+**1 achado de review automático (Codex, P1)**: digitar uma data completa
+mas inválida (`31/02/2026`) ou barrada por `disabledDate` mantinha o texto
+visível sem nunca atualizar o valor do form — dialog continuava
+habilitado a salvar/importar usando a data anterior enquanto exibia a
+rejeitada. Corrigido com borda de erro visual + reversão pro último valor
+válido ao perder foco.
+
 | # | Decisão | Recomendação |
 |---|---|---|
 | D1 | Camada canônica no banco (ADR-029) | Aprovar — pré-requisito de tudo |
@@ -1863,6 +1887,7 @@ parcelado`) foram reconciliadas em `main` no mesmo momento.
 | D8 | Status ENUM vs TEXT+CHECK | Padronizar na F1 (barato agora, caro depois) — inclui sanear os status de `sessoes_contagem` (CHECK × `finalizado` × StatusBadge) |
 | D9 | Workflow de reembolso | O estado `aprovado` entra no fluxo real (com ação de aprovar/rejeitar na UI e notificação) ou sai do schema? Quem aprova: `admin` (trigger atual) ou também `tesoureiro` (UI atual)? |
 | D11 | Tipo de Data (Vencimento/Pagamento) como eixo de filtro | Dois eixos ortogonais — Tipo de Data (qual coluna filtra a listagem) e Regime (o que entra no relatório) — ✅ implementado (jul/2026, ver §9.20 e [ADR-031](adr/ADR-031-tipo-de-data-filtro-e-regime-caixa.md)) |
+| D12 | Campo de data digitável nos dialogs do financeiro | `DateFieldPicker` (MaskedInput + Calendar como atalho) substitui popover-calendário-só nos 8 campos de data única — ✅ implementado (jul/2026, ver §9.21 e [ADR-032](adr/ADR-032-campo-de-data-digitavel-financeiro.md)) |
 
 ## 11. Riscos
 
