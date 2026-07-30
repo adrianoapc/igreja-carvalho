@@ -107,16 +107,23 @@ export function useDadosApoio(
   });
 
   const { data: formasPagamento } = useQuery({
-    queryKey: ["formas-pagamento-select"],
+    queryKey: ["formas-pagamento-select", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!igrejaId) return [];
+      let query = supabase
         .from("formas_pagamento")
         .select("id, nome")
         .eq("ativo", true)
+        .eq("igreja_id", igrejaId)
         .order("nome");
+      if (!isAllFiliais && filialId) {
+        query = query.eq("filial_id", filialId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !!igrejaId,
   });
 
   return {

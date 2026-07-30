@@ -2392,6 +2392,40 @@ via `git stash` — nenhum novo. Sem ambiente de browser disponível nesta
 sessão pra teste visual — só verificação estática (tsc + eslint + leitura
 cuidadosa do diff completo).
 
+### 9.26 Fix: Forma de Pagamento duplicada no dialog de lançamento (jul/2026)
+
+Usuário reportou, com print, o dropdown "Forma de pgto" do `TransacaoDialog`
+mostrando cada nome duplicado (Cartão de Débito, Cheque, Débito em conta,
+Dinheiro, PIX, Transferência Bancária — cada um 2×). Investigação inicial
+suspeitou de falta de filtro por `tipo` (entrada/saída) — **descartada
+depois de confirmar com o usuário**: `categorias_financeiras` já filtra por
+tipo corretamente (`useDadosApoio.ts`), e `formas_pagamento` nunca teve
+coluna `tipo` (catálogo único pros dois lados, por design — não é bug).
+
+Causa real, achada comparando a query de `formasPagamento` com a de
+`contas` no mesmo hook (`useDadosApoio.ts`): `contas` já filtra
+`igreja_id` + (`filial_id` quando `!isAllFiliais`), mas `formasPagamento`
+não filtrava nem `igreja_id` nem `filial_id` — buscava a tabela inteira
+(mitigado de vazamento cross-tenant só pela RLS, mas sem filtro nenhum de
+filial). Igrejas com mais de uma filial, cada uma com seu próprio cadastro
+de formas de pagamento de mesmo nome (mesmo padrão de
+`FormasPagamento.tsx`, que já filtra por filial no cadastro), acabavam
+tendo as duas linhas retornadas e exibidas juntas no dropdown do dialog.
+
+Fix: `formasPagamento` em `useDadosApoio.ts` passou a seguir exatamente o
+mesmo padrão de `contas` (mesmo arquivo, poucas linhas acima) —
+`.eq("igreja_id", igrejaId)` + `.eq("filial_id", filialId)` só quando
+`!isAllFiliais`, `enabled: !!igrejaId`, queryKey com
+`igrejaId/filialId/isAllFiliais`. Não mexeu em `useFormaPagamentoDinheiroId.ts`
+(hook relacionado, também sem filtro de filial) — esse já usa
+`.limit(1).maybeSingle()` então não duplica/quebra visualmente; resolver
+determinística mas potencialmente pra filial errada quando há mais de um
+"Dinheiro" cadastrado é um problema mais sutil, de correção do "Conferido
+Manual"/isPagamentoDinheiro, não do sintoma reportado — fica para outra
+sessão, com o mesmo cuidado.
+
+`npx tsc`: 63 baseline, 0 novos. `npx eslint` no arquivo: limpo.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
