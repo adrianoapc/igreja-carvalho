@@ -75,23 +75,35 @@ export function DateFieldPicker({
     }
   };
 
-  // Se o campo perde foco com uma data incompleta/rejeitada, volta a exibir
-  // o último valor válido — garante que texto exibido e valor salvo nunca
-  // fiquem dessincronizados além do tempo em que o usuário está digitando.
+  // Texto não representa uma data que `value` de fato assumiu: inválida/
+  // rejeitada, incompleta, ou vazia num campo obrigatório que recusou o
+  // clear (onChange(undefined) ignorado por TransacaoDialog/AjusteSaldoDialog/
+  // RelatorioOferta — `value` continua definido nesse caso).
+  const devePendencia =
+    invalido ||
+    (text.length > 0 && text.length < 10) ||
+    (text.length === 0 && !!value);
+
+  const reverterTexto = () => {
+    setText(value ? format(value, "dd/MM/yyyy") : "");
+    setInvalido(false);
+  };
+
+  // Se o campo perde foco (ou Enter tenta submeter o form) com uma data
+  // pendente, volta a exibir o último valor real — garante que texto
+  // exibido e valor salvo nunca fiquem dessincronizados além do tempo em
+  // que o usuário está digitando ativamente.
   const handleBlur = () => {
-    if (invalido || (text.length > 0 && text.length < 10)) {
-      setText(value ? format(value, "dd/MM/yyyy") : "");
-      setInvalido(false);
-      return;
-    }
-    // Campo obrigatório: limpar tudo chama onChange(undefined), mas
-    // consumidores como TransacaoDialog/AjusteSaldoDialog/RelatorioOferta
-    // ignoram undefined de propósito (`(date) => date && setX(date)`) — o
-    // valor no formulário não muda. Se `value` continua definido depois
-    // disso, é porque o clear foi recusado; volta a mostrar o valor real
-    // em vez de deixar o campo em branco mentindo sobre o que será salvo.
-    if (text.length === 0 && value) {
-      setText(format(value, "dd/MM/yyyy"));
+    if (devePendencia) reverterTexto();
+  };
+
+  // Enter dispara submit implícito do form ANTES do blur — sem isso, o
+  // form salva a data anterior enquanto a tela ainda mostra o texto
+  // rejeitado/incompleto.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && devePendencia) {
+      e.preventDefault();
+      reverterTexto();
     }
   };
 
@@ -103,6 +115,7 @@ export function DateFieldPicker({
         value={text}
         onAccept={handleAccept}
         onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
         disabled={disabled}
         className={cn(
