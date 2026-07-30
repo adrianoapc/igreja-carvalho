@@ -1,0 +1,15 @@
+stateDiagram-v2
+    [*] --> Vazio
+    Vazio --> Digitando: usuário digita
+    Digitando --> Digitando: menos de 10 dígitos (dd/mm/aaaa)
+
+    Digitando --> Valida: 10 dígitos completos
+    Valida --> Aceita: data válida\n(e não bloqueada por disabledDate)
+    Valida --> Invalida: data inválida\n(ex: 31/02/2026)\nou rejeitada por disabledDate
+
+    Aceita --> [*]: onChange(date) — valor do form atualizado
+
+    Invalida --> Invalida: mostra borda destructive\n(valor do form NÃO muda)
+    Invalida --> Vazio: perde foco → reverte pro\núltimo valor válido
+
+    Vazio --> Aceita: clique no ícone de calendário\n→ Popover/Calendar (atalho)
