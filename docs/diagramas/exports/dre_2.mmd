@@ -1,0 +1,6 @@
+flowchart TD
+    Regime{Regime selecionado}
+    Regime -->|Caixa| Caixa["status = 'pago' E\ndata_pagamento no período\n(eixo: data_pagamento)"]
+    Regime -->|Competência| Comp["status <> 'cancelado' E\ndata_competencia no período\n(eixo: data_competencia)"]
+    Caixa --> DRE[get_dre_anual agrupa por mês\ndo eixo escolhido]
+    Comp --> DRE
