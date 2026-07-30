@@ -82,6 +82,16 @@ export function DateFieldPicker({
     if (invalido || (text.length > 0 && text.length < 10)) {
       setText(value ? format(value, "dd/MM/yyyy") : "");
       setInvalido(false);
+      return;
+    }
+    // Campo obrigatório: limpar tudo chama onChange(undefined), mas
+    // consumidores como TransacaoDialog/AjusteSaldoDialog/RelatorioOferta
+    // ignoram undefined de propósito (`(date) => date && setX(date)`) — o
+    // valor no formulário não muda. Se `value` continua definido depois
+    // disso, é porque o clear foi recusado; volta a mostrar o valor real
+    // em vez de deixar o campo em branco mentindo sobre o que será salvo.
+    if (text.length === 0 && value) {
+      setText(format(value, "dd/MM/yyyy"));
     }
   };
 
@@ -108,6 +118,7 @@ export function DateFieldPicker({
             variant="ghost"
             size="sm"
             disabled={disabled}
+            aria-label="Abrir calendário"
             className="absolute right-0 top-0 h-10 w-9 p-0 text-muted-foreground hover:text-foreground hover:bg-transparent"
           >
             <CalendarIcon className="h-4 w-4" />
