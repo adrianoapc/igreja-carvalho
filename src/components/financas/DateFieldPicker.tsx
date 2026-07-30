@@ -41,6 +41,12 @@ export function DateFieldPicker({
 }: DateFieldPickerProps) {
   const [text, setText] = useState(value ? format(value, "dd/MM/yyyy") : "");
   const [open, setOpen] = useState(false);
+  // Data completa digitada (10 dígitos) mas rejeitada — inválida (ex:
+  // 31/02/2026) ou barrada por disabledDate (ex: data futura no Getnet).
+  // O texto fica visível pro usuário corrigir, mas `value` não muda — sem
+  // isso o formulário salvaria silenciosamente a data antiga enquanto
+  // mostra a data rejeitada na tela.
+  const [invalido, setInvalido] = useState(false);
   // Resync o texto quando `value` muda por fora (clique no calendário, dialog
   // trocando de transação) — ajuste de estado durante o render em vez de um
   // useEffect, seguindo o padrão recomendado pra "derivar estado de props".
@@ -48,6 +54,7 @@ export function DateFieldPicker({
   if (value !== syncedValue) {
     setSyncedValue(value);
     setText(value ? format(value, "dd/MM/yyyy") : "");
+    setInvalido(false);
   }
 
   const handleAccept = (val: string) => {
@@ -55,12 +62,26 @@ export function DateFieldPicker({
     if (val.length === 10) {
       const parsed = parse(val, "dd/MM/yyyy", new Date());
       if (isValid(parsed) && !disabledDate?.(parsed)) {
+        setInvalido(false);
         onChange(parsed);
+      } else {
+        setInvalido(true);
       }
       return;
     }
+    setInvalido(false);
     if (val.length === 0) {
       onChange(undefined);
+    }
+  };
+
+  // Se o campo perde foco com uma data incompleta/rejeitada, volta a exibir
+  // o último valor válido — garante que texto exibido e valor salvo nunca
+  // fiquem dessincronizados além do tempo em que o usuário está digitando.
+  const handleBlur = () => {
+    if (invalido || (text.length > 0 && text.length < 10)) {
+      setText(value ? format(value, "dd/MM/yyyy") : "");
+      setInvalido(false);
     }
   };
 
@@ -71,9 +92,14 @@ export function DateFieldPicker({
         mask="99/99/9999"
         value={text}
         onAccept={handleAccept}
+        onBlur={handleBlur}
         placeholder={placeholder}
         disabled={disabled}
-        className="pr-9"
+        className={cn(
+          "pr-9",
+          invalido &&
+            "border-destructive focus-visible:ring-destructive text-destructive",
+        )}
       />
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
