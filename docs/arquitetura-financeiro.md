@@ -2548,6 +2548,19 @@ dado misto (em `TransacoesPage.tsx` só chega um tipo por vez).
 `npx tsc`: 63 baseline, 0 novos. `npx eslint`: mesmos 13 problemas
 pré-existentes (confirmados via `git stash`), nenhum novo.
 
+**Follow-up (mesmo dia)**: faltou o botão de ordenar por data — usuário
+notou a ausência comparado a `TransacoesPage.tsx` (§9.25). Adicionado
+`ordemData` (`"asc"|"desc"`, default `"desc"`) com o mesmo botão
+`ArrowDown`/`ArrowUp` ao lado do toggle Bruto/Líquido, escondido na visão
+Calendário. Duas ordenações client-side existentes em `Contas.tsx`
+precisaram do parâmetro: `transacoesFiltradas` (lista "Todos", comparação
+de string ISO no eixo `colunaData`) e o sort interno de
+`renderTransactionListGrouped` (chaves de data da visão agrupada). Note
+que a função `datasOrdenadas`/`transacoesAgrupadas` (linhas ~513-537) é
+código morto — não alimenta nenhuma renderização (a agrupada de verdade é
+`renderTransactionListGrouped`, que recomputa por conta própria) —
+pré-existente, não tocado aqui.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

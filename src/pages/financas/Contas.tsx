@@ -28,6 +28,8 @@ import {
   ChevronRight,
   Layers,
   RefreshCw,
+  ArrowDown,
+  ArrowUp,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -82,6 +84,7 @@ export default function Contas() {
     string | null
   >(null);
   const [visaoValor, setVisaoValor] = useState<"bruto" | "liquido">("bruto");
+  const [ordemData, setOrdemData] = useState<"asc" | "desc">("desc");
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [customRange, setCustomRange] = useState<{
     from: Date;
@@ -492,10 +495,19 @@ export default function Contas() {
     return items;
   };
 
-  // Aplicar filtro de status
+  // Aplicar filtro de status + ordenar pelo eixo de data selecionado — a
+  // query já vem ordenada desc, mas o botão de ordenação precisa poder
+  // inverter sem refazer a busca (mesmo padrão de TransacoesPage, §9.25).
   const transacoesFiltradas = useMemo(() => {
-    return filterByStatus(transacoes);
-  }, [transacoes, statusFilter]);
+    const filtradas = filterByStatus(transacoes);
+    return [...filtradas].sort((a, b) => {
+      const dataA = String(a[colunaData] || "");
+      const dataB = String(b[colunaData] || "");
+      return ordemData === "asc"
+        ? dataA.localeCompare(dataB)
+        : dataB.localeCompare(dataA);
+    });
+  }, [transacoes, statusFilter, colunaData, ordemData]);
 
   const toggleGrupo = (dataKey: string) => {
     setGruposExpandidos((prev) => {
@@ -684,7 +696,7 @@ export default function Contas() {
     const datasFiltradas = Object.keys(gruposFiltrados).sort((a, b) => {
       if (a === "sem-data") return 1;
       if (b === "sem-data") return -1;
-      return b.localeCompare(a);
+      return ordemData === "asc" ? a.localeCompare(b) : b.localeCompare(a);
     });
 
     return (
@@ -1284,6 +1296,30 @@ export default function Contas() {
                       </TooltipContent>
                     </Tooltip>
                   </div>
+                  {!visaoCalendario && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setOrdemData((o) => (o === "desc" ? "asc" : "desc"))
+                          }
+                        >
+                          {ordemData === "desc" ? (
+                            <ArrowDown className="w-4 h-4" />
+                          ) : (
+                            <ArrowUp className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {ordemData === "desc"
+                          ? "Mais recente primeiro (clique p/ inverter)"
+                          : "Mais antiga primeiro (clique p/ inverter)"}
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
