@@ -263,6 +263,12 @@ export default function Contas() {
         .gte(colunaPeriodo, startDate)
         .lte(colunaPeriodo, endDate)
         .order(colunaPeriodo, { ascending: false });
+      if (colunaPeriodo === "data_pagamento") {
+        // Data de Caixa: paid-only, mesma semântica do Dashboard/DRE —
+        // uma transação paga e depois cancelada mantém data_pagamento
+        // preenchida (20260728170000), então continuaria aparecendo aqui.
+        query = query.eq("status", "pago");
+      }
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
@@ -298,6 +304,9 @@ export default function Contas() {
         .eq("igreja_id", igrejaId)
         .gte(colunaPeriodo, startDate)
         .lte(colunaPeriodo, endDate);
+      if (colunaPeriodo === "data_pagamento") {
+        query = query.eq("status", "pago");
+      }
       if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }

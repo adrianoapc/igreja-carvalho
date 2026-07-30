@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { parseLocalDate } from "@/utils/dateUtils";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { TipoDataFiltroSelect } from "@/components/financas/TipoDataFiltroSelect";
 import { useHideValues } from "@/hooks/useHideValues";
@@ -504,9 +505,10 @@ export default function Insights() {
                           <span>{anomalia.fornecedor || "Sem fornecedor"}</span>
                           <span>•</span>
                           <span>
-                            {format(new Date(anomalia.data), "dd/MM/yyyy", {
-                              locale: ptBR,
-                            })}
+                            {anomalia.data &&
+                              format(anomalia.data, "dd/MM/yyyy", {
+                                locale: ptBR,
+                              })}
                           </span>
                           <span>•</span>
                           <span className="text-destructive font-medium">
@@ -535,6 +537,16 @@ type TransacaoFinanceira = {
   fornecedor?: { nome?: string } | null;
   categoria?: { nome?: string } | null;
 };
+
+// PostgreSQL DATE ("YYYY-MM-DD") vira meia-noite UTC com `new Date(string)`
+// puro — em fusos a oeste de UTC (Brasil) isso volta um dia no horário
+// local, jogando a transação pro mês anterior na tendência/anomalias.
+function resolverDataLocal(
+  valor: string | Date | null | undefined,
+): Date | undefined {
+  if (!valor) return undefined;
+  return typeof valor === "string" ? parseLocalDate(valor) : valor;
+}
 
 function processarInsights(
   transacoes: TransacaoFinanceira[],
@@ -598,9 +610,9 @@ function processarInsights(
   // Gastos mensais
   const mesesMap = new Map<string, number>();
   transacoes.forEach((t) => {
-    const mes = format(new Date(t[coluna] as string | Date), "MMM/yyyy", {
-      locale: ptBR,
-    });
+    const dataRef = resolverDataLocal(t[coluna]);
+    if (!dataRef) return;
+    const mes = format(dataRef, "MMM/yyyy", { locale: ptBR });
     mesesMap.set(mes, (mesesMap.get(mes) || 0) + (t.valor || 0));
   });
 
@@ -634,7 +646,7 @@ function processarInsights(
       descricao: t.descricao,
       valor: t.valor,
       fornecedor: t.fornecedor?.nome,
-      data: t[coluna],
+      data: resolverDataLocal(t[coluna]),
       desvio: t.valor / mediaTransacao,
     }))
     .sort((a, b) => b.valor - a.valor);

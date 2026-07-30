@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
+import { parseLocalDate } from '@/utils/dateUtils';
 
 /**
  * Export data to Excel file
@@ -85,13 +86,25 @@ export function exportToCSV(data: Record<string, unknown>[], filename: string) {
   document.body.removeChild(link);
 }
 
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 /**
  * Format date for export
+ *
+ * Colunas PostgreSQL DATE puras ("YYYY-MM-DD", ex: data_vencimento,
+ * data_competencia) viram meia-noite UTC com `new Date(string)` — em fusos
+ * a oeste de UTC (Brasil) isso volta um dia no horário local. Só essas
+ * strings "date-only" passam por parseLocalDate; timestamptz completo
+ * (ex: pessoas.data_primeira_visita) e Date já concretos seguem o caminho
+ * original — `new Date()` já converte esses corretamente pro fuso local.
  */
 export function formatDateForExport(date: string | Date | null): string {
   if (!date) return '';
   try {
-    return format(new Date(date), 'dd/MM/yyyy');
+    const isDateOnly = typeof date === 'string' && DATE_ONLY_PATTERN.test(date);
+    const parsed = isDateOnly ? parseLocalDate(date as string) : new Date(date);
+    if (!parsed) return '';
+    return format(parsed, 'dd/MM/yyyy');
   } catch {
     return '';
   }
