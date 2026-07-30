@@ -369,6 +369,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
             setFornecedorId={setFornecedorFilter}
             status={statusFilter}
             setStatus={setStatusFilter}
+            statusLocked={tipoData === "pagamento"}
             conciliacaoStatus={conciliacaoStatusFilter}
             setConciliacaoStatus={setConciliacaoStatusFilter}
             contas={contas || []}
@@ -412,7 +413,13 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
         />
         <TipoDataFiltroSelect
           value={tipoData}
-          onValueChange={setTipoData}
+          onValueChange={(v) => {
+            setTipoData(v);
+            // useLancamentos já força status='pago' na query em modo
+            // Pagamento — reseta o filtro de Status local pra não filtrar
+            // de novo (client-side) sobre um resultado que já é só pago.
+            if (v === "pagamento") setStatusFilter("all");
+          }}
           labelPagamento={config.tipoDataPagamentoLabel}
           variant="pill"
         />

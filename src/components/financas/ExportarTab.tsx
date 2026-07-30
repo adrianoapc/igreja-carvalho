@@ -215,7 +215,14 @@ export function ExportarTab() {
         .gte(colunaPeriodo, periodo.inicio)
         .lte(colunaPeriodo, periodo.fim);
 
-      if (statusFiltro !== "todos") {
+      if (colunaPeriodo === "data_pagamento") {
+        // Data de Caixa: paid-only — mesma semântica já aplicada em
+        // Dashboard/Contas/useLancamentos/Insights. Uma transação paga e
+        // depois cancelada mantém data_pagamento preenchida
+        // (20260728170000_fin_taxa_entrada_subtrai_liquido.sql), então sem
+        // isso o export sairia com lançamentos que não valem mais.
+        query = query.eq("status", "pago");
+      } else if (statusFiltro !== "todos") {
         if (statusFiltro === "pago") {
           query = query.eq("status", "pago");
         } else if (statusFiltro === "pendente") {
@@ -395,6 +402,7 @@ export function ExportarTab() {
               <Select
                 value={statusFiltro}
                 onValueChange={(v) => setStatusFiltro(v as StatusFiltro)}
+                disabled={tipoData === "pagamento"}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -406,6 +414,11 @@ export function ExportarTab() {
                   <SelectItem value="atrasado">Atrasados</SelectItem>
                 </SelectContent>
               </Select>
+              {tipoData === "pagamento" && (
+                <p className="text-xs text-muted-foreground">
+                  Data de Caixa exporta somente pagos.
+                </p>
+              )}
             </div>
           </div>
 
@@ -424,7 +437,13 @@ export function ExportarTab() {
               <Label>Tipo de Data</Label>
               <TipoDataFiltroSelect
                 value={tipoData}
-                onValueChange={setTipoData}
+                onValueChange={(v) => {
+                  setTipoData(v);
+                  // A query já força status='pago' em modo Pagamento —
+                  // reseta o filtro de Status pra não sugerir uma seleção
+                  // (Pendente/Atrasado) que a busca ignoraria.
+                  if (v === "pagamento") setStatusFiltro("todos");
+                }}
                 labelPagamento={
                   tipoExportacao === "entradas" ? "Recebimento" : "Pagamento"
                 }

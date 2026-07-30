@@ -838,7 +838,13 @@ export default function Contas() {
         />
         <TipoDataFiltroSelect
           value={tipoData}
-          onValueChange={setTipoData}
+          onValueChange={(v) => {
+            setTipoData(v);
+            // As duas queries de período já forçam status='pago' em modo
+            // Data de Caixa — reseta o filtro de Status pra não mostrar
+            // uma seleção (Pendente) incompatível com o resultado.
+            if (v === "pagamento") setStatusFilter("all");
+          }}
           labelPagamento="Data de Caixa"
           variant="pill"
         />
@@ -1135,6 +1141,7 @@ export default function Contas() {
                   onValueChange={(value: "all" | "pago" | "pendente") =>
                     setStatusFilter(value)
                   }
+                  disabled={colunaData === "data_pagamento"}
                 >
                   <SelectTrigger className="w-[160px] h-9">
                     <SelectValue placeholder="Status" />

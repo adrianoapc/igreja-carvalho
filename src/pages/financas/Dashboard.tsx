@@ -488,6 +488,7 @@ export default function Dashboard() {
               setCategoriaId={setCategoriaId}
               status={status}
               setStatus={setStatus}
+              statusLocked={tipoData === "pagamento"}
               contas={contas || []}
               categorias={categorias || []}
               onLimpar={() => {
@@ -514,7 +515,13 @@ export default function Dashboard() {
           />
           <TipoDataFiltroSelect
             value={tipoData}
-            onValueChange={setTipoData}
+            onValueChange={(v) => {
+              setTipoData(v);
+              // Data de Caixa força status='pago' na query — reseta o
+              // filtro de Status pra não mostrar uma seleção incompatível
+              // (Pendente/Atrasado) que a busca ignoraria silenciosamente.
+              if (v === "pagamento") setStatus("all");
+            }}
             labelPagamento="Data de Caixa"
             variant="pill"
           />
