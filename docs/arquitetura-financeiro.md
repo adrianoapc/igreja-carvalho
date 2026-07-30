@@ -471,7 +471,7 @@ flowchart TD
     EDGES[Edges de integração<br/>getnet-sftp, santander, pix] -->|service role + p_contexto| CORE
 
     subgraph CORE FINANCEIRO — Postgres
-        CORE[RPCs canônicas fin_*<br/>fin_criar_lancamento · fin_atualizar_lancamento<br/>fin_alterar_status_lancamento · fin_excluir_lancamento<br/>fin_criar_transferencia · fin_ingerir_extratos<br/>fin_confirmar_conciliacao · fin_desconciliar<br/>fin_gerar_candidatos_conciliacao<br/>fin_lancar_sessao · fin_pagar_reembolso · fin_ajustar_saldo]
+        CORE[RPCs canônicas fin_*<br/>fin_criar_lancamento · fin_atualizar_lancamento<br/>fin_alterar_status_lancamento · fin_excluir_lancamento<br/>fin_alterar_competencia_grupo<br/>fin_criar_transferencia · fin_ingerir_extratos<br/>fin_confirmar_conciliacao · fin_desconciliar<br/>fin_gerar_candidatos_conciliacao<br/>fin_lancar_sessao · fin_pagar_reembolso · fin_ajustar_saldo]
         CORE --> T[(transacoes_financeiras<br/>transferencias_contas<br/>extratos_bancarios<br/>conciliacoes_*)]
         T --> TRG[triggers saldo · RLS leitura · auditoria]
     end
@@ -1880,14 +1880,256 @@ válido ao perder foco.
 | D1 | Camada canônica no banco (ADR-029) | Aprovar — pré-requisito de tudo |
 | D2 | Padrão `features/` no frontend | Financeiro inaugura; demais domínios depois |
 | D3 | Modelo de vínculo de conciliação | (a) manter 3 estruturas via RPC agora; (b) modelo único N:M `conciliacoes`+`conciliacao_itens` como evolução. FK física em `transacao_vinculada_id` após saneamento |
-| D4 | Imutabilidade | Editar/excluir lançamento conciliado? Parcela do meio? A RPC precisa de resposta |
+| D4 | Imutabilidade | Editar/excluir lançamento conciliado? Parcela do meio? A RPC precisa de resposta — exclusão resolvida desde a F1 (escopo `este_e_futuras`); edição de competência da parcela do meio resolvida por D10 (jul/2026) |
 | D5 | Getnet tipo 1 vs tipo 5 | Tipo 5 como verdade do espelho, só novos períodos — ✅ implementado na F6 (opt-in via `config.espelho_tipo5_desde`) |
 | D6 | Recorrência/parcelamento | Materializar tudo na criação (parcelado); job mensal (recorrente) |
 | D7 | Efeitos colaterais (alertas) | Fila no banco lida por edge — bot e front geram os mesmos alertas |
 | D8 | Status ENUM vs TEXT+CHECK | Padronizar na F1 (barato agora, caro depois) — inclui sanear os status de `sessoes_contagem` (CHECK × `finalizado` × StatusBadge) |
 | D9 | Workflow de reembolso | O estado `aprovado` entra no fluxo real (com ação de aprovar/rejeitar na UI e notificação) ou sai do schema? Quem aprova: `admin` (trigger atual) ou também `tesoureiro` (UI atual)? |
+| D10 | Competência de grupo em lançamentos parcelados | `fin_criar_lancamento` (D6) já materializa todas as parcelas com a mesma `data_competencia`; `fin_atualizar_lancamento` recusa divergir a competência de uma parcela isolada (`FIN_COMPETENCIA_GRUPO`) — sincronização explícita via `fin_alterar_competencia_grupo` — ✅ implementado (jul/2026, ver §9.19) |
 | D11 | Tipo de Data (Vencimento/Pagamento) como eixo de filtro | Dois eixos ortogonais — Tipo de Data (qual coluna filtra a listagem) e Regime (o que entra no relatório) — ✅ implementado (jul/2026, ver §9.20 e [ADR-031](adr/ADR-031-tipo-de-data-filtro-e-regime-caixa.md)) |
 | D12 | Campo de data digitável nos dialogs do financeiro | `DateFieldPicker` (MaskedInput + Calendar como atalho) substitui popover-calendário-só nos 8 campos de data única — ✅ implementado (jul/2026, ver §9.21 e [ADR-032](adr/ADR-032-campo-de-data-digitavel-financeiro.md)) |
+
+### 9.17 Importação do Recebível Extrato Detalhado (portal Getnet) — Fase A (jul/2026)
+
+O SFTP da Getnet ficou indisponível num período (set-nov/2025), sem o arquivo
+EDI (layout V10.1) que alimenta `getnet_*`/`extratos_bancarios` hoje. O
+usuário baixou manualmente do **portal** Getnet o CSV "Recebível Extrato
+Detalhado" — único arquivo indispensável entre os 4 formatos alternativos do
+portal: sozinho cobre tanto o nível de venda (bruto/taxa/líquido/NSU/
+autorização/parcelas) quanto o mecanismo de cessão/antecipação (via
+`Contrato Registradora`), que nenhum outro arquivo do portal revela.
+
+Esta fase (A) só **importa e agrupa** — vínculo com extrato bancário e
+lançamento do deságio de antecipação como saída ficam para a Fase B, depois
+de validar a importação com dado real.
+
+**Tabelas novas** (padrão RLS `fin_*`: `igreja_id` + `filial_id` recortados +
+`user_filial_access`, **não** o padrão antigo `get_current_user_igreja_id()`/
+`has_role()` de `getnet_resumo`/`getnet_financeiro_resumo` — ver
+`[[feedback-fin-rpc-security-checklist]]`):
+
+- **`getnet_recebivel_lancamentos`** — uma linha por linha do CSV (exceto
+  `Subtotal`, derivável por soma). `dedupe_key` = `md5` das colunas naturais
+  da linha (vencimento + bandeira + tipo_lançamento + lançamento + NSU +
+  valor_líquido + data_venda) **+ contador de ocorrência dentro do lote de
+  import** — mesmo padrão do dedupe Santander (commit `5adc3f0`, §9.13) e do
+  `external_id` `file:...#occ` do `ImportarExtratosTab`. Necessário porque o
+  CSV real tem linhas `Saldo Anterior` genuinamente duplicadas (confirmado:
+  mesma data+bandeira+valor 0,00 repetida 2x no mesmo arquivo) — sem
+  contador, a segunda seria descartada como falso duplicado.
+- **`getnet_antecipacao_lotes`** — um row por `Contrato Registradora`, upsert
+  automático durante a importação (`Valor Atual Do Contrato` é fixo repetido
+  em toda linha do mesmo contrato). `UNIQUE (igreja_id, contrato_registradora)`
+  — **desvio deliberado** do desenho original (`UNIQUE` global): evita que o
+  upsert via `SECURITY DEFINER` (que bypassa RLS) atualize a linha de outro
+  tenant caso dois números de contrato colidam entre igrejas diferentes.
+
+**RPC `fin_importar_recebivel_getnet(p_integracao_id, p_linhas, p_contexto)`**
+— valida tenant/filial da integração (deve ser `provedor='getnet'`), insere
+deduplicado (`ON CONFLICT DO NOTHING`), upsert de lote por contrato (sem
+tocar `status`, pra não reverter progresso da Fase B num reimport), 1 job em
+`fin_extrato_ingestao_jobs` (reaproveitada; `origem='getnet_recebivel_portal'`
+— exigiu relaxar `conta_id` pra nullable nessa tabela, já que um lote da
+Getnet não tem conta bancária associada). Isolamento por linha (`BEGIN...
+EXCEPTION`) igual `fin_ingerir_extratos` — uma linha malformada não derruba o
+lote inteiro.
+
+**Achado durante a calibração contra CSV real do usuário**: o portal usa o
+valor literal `"0"` em `Contrato Registradora` como sentinel de "sem
+contrato" (visto em linhas `Pagamento Realizado`/`Valor Liquidado (R$)`) —
+não é um contrato de verdade. A RPC normaliza `"0"` para `NULL` (mesma regra
+de `""`), senão o upsert criaria um lote fantasma `contrato_registradora='0'`
+compartilhado por todas as igrejas que importassem essa linha.
+
+**Parser client-side** (`ImportarRecebivelGetnetTab.tsx`, ao lado do
+`ImportarExtratosTab` genérico em Gerenciar Dados): **não reaproveita a lib
+`xlsx`** como o desenho original previa — o CSV real do portal Getnet é
+**ISO-8859-1 (Latin-1), não UTF-8**; decodificar como UTF-8 corrompe todo
+campo acentuado (`LANÇAMENTO`, `VALOR LÍQUIDO` etc.) antes mesmo de tentar
+mapear coluna. O componente decodifica via `TextDecoder("iso-8859-1")` e
+faz `split(";")` manual — o layout real tem 26 colunas fixas, sem aspas/
+escaping (confirmado contra os 2 CSVs reais do usuário), então não precisa
+do parser CSV completo da lib. Cabeçalho validado por comparação exata
+(normalizada) contra as 26 colunas esperadas — rejeita o arquivo se a Getnet
+mudar o layout, em vez de importar com colunas erradas silenciosamente.
+Campo `parcelas` fica como texto bruto (`"1 de 7"`, não quebrado em
+atual/total — a coluna do portal mistura os dois conceitos numa string só,
+ambíguo demais pra normalizar nesta fase sem mais exemplos reais).
+
+**Verificação**: `npx tsc --noEmit`: 62 erros (baseline, nenhum novo).
+Harness Docker (`postgres:15` standalone) com 6 cenários: idempotência de
+`Saldo Anterior` duplicada dentro do lote, reimport idempotente (0 inseridos
+na 2ª rodada), upsert de lote sem duplicar por contrato + sentinel `"0"`
+ignorado, rejeição de integração de outro tenant (`FIN_FK`), rejeição de
+integração não-Getnet (`FIN_VALIDACAO`), RLS bloqueando `SELECT` cross-tenant
+e `INSERT` direto (só a RPC escreve). Reprodução isolada em Node do parser
+contra os 2 CSVs reais do usuário (arquivos de maio/2025 e setembro/2025):
+217 linhas parseadas, 66 `Subtotal` ignoradas, valores batendo linha a linha
+com o que já tinha sido conferido manualmente na investigação — venda de
+R$100 em 18/05/2025 → R$97,91 cedidos, lote de 30/09/2025 (contrato
+`2025093000995438317`) → R$1.523,81 em 7 linhas, deságio R$168,62
+(consistente com o valor depositado real de R$1.355,19 no extrato bancário,
+já importado via API Santander).
+
+**Fase B implementada em seguida, mesma sessão** — ver §9.18.
+
+### 9.18 FK real de forma de pagamento + Fase B do Recebível Getnet (jul/2026)
+
+Ao planejar a Fase B (vínculo do lote de antecipação com o extrato bancário +
+conferência de totais por período), a "conferência de totais" precisava
+somar **entradas via cartão** — e não havia jeito confiável de identificar
+isso: `transacoes_financeiras.forma_pagamento` sempre foi texto solto, nunca
+uma FK real pra `formas_pagamento.id`. Usuário confirmou: corrigir a causa
+raiz antes de construir o card em cima dela.
+
+**`forma_pagamento_id uuid` (FK real)** — migration
+`20260729130000_fin_forma_pagamento_fk.sql`. 4 escritores gravavam formatos
+incompatíveis na coluna texto antiga: `fin_lancar_sessao`/`TransacaoDialog.tsx`
+→ `formas_pagamento.id::text` (válido, mas como texto); `fin_pagar_reembolso`
+→ `'pix'|'dinheiro'|'transferencia'` (vocabulário de preferência, CHECK
+próprio, **fora de escopo** — conceito diferente de "qual formas_pagamento foi
+usado"); `fin_criar_transferencia` → string fixa `'Transferência Bancária'`;
+`chatbot-financeiro` (edge function) → rótulo em Português exato. Consequência
+real, não hipotética: `fin_ofertas_periodo` só resolvia nome pras linhas com
+UUID; `isPagamentoDinheiro` (frontend) fazia `.includes("dinheiro")` e só
+batia pros rótulos; a tela de edição de transação perdia o valor original ao
+reabrir linhas gravadas por bot/reembolso (Select não achava o item).
+
+Coluna nova mantém a texto antiga (não dropada — ainda é a única fonte de
+verdade pra `fin_pagar_reembolso`/parte de `fin_criar_transferencia`, e
+fallback de exibição pras linhas não mapeadas). Backfill tenant-scoped em 2
+passes (UUID-como-texto; rótulo case-insensitive, cobrindo tanto o rótulo
+exato do bot quanto o minúsculo do reembolso numa query só) — sem recorte
+por `igreja_id` seria bug cross-tenant real, já que `formas_pagamento` não
+tem `UNIQUE(igreja_id, nome)`. `fin_criar_lancamento`/`fin_atualizar_
+lancamento` passam a validar `forma_pagamento_id` via `fin_validar_fk_tenant`
+(antes um id de outro tenant passava batido — regressão real coberta no
+harness) e resolvem rótulo sem id explícito quando só vier texto (cobre o
+chatbot sem tocar na edge function). `fin_lancar_sessao` passa a gravar as
+duas colunas. `fin_ofertas_periodo` simplifica o join (sem `::text`) — exigiu
+`DROP FUNCTION` antes do `CREATE OR REPLACE` por mudança de tipo de retorno.
+Leitores heurísticos corrigidos: novo hook `useFormaPagamentoDinheiroId`
+resolve o id do "Dinheiro" da igreja uma vez; `isPagamentoDinheiro` compara
+id, não mais substring; exports (`ExportarTab.tsx`/`TransacoesPage.tsx`)
+mostram o nome resolvido via embed, com o texto legado só como fallback.
+
+**Fase B do Recebível Getnet** (migrations `20260729120000`/`20260729140000`):
+- `fin_vincular_lote_antecipacao(p_lote_id, p_extrato_bancario_id)` — grava
+  o vínculo manual, calcula o deságio (`valor_atual_contrato - extrato.valor`,
+  nunca persistido, sempre recalculado em leitura), recusa trocar o vínculo
+  depois do lançamento criado. Tela `LotesAntecipacaoTab.tsx` (aba "Lotes de
+  Antecipação" dentro de Reconciliação Bancária): `VincularExtratoLoteDialog`
+  sugere candidatos por proximidade de data (`data_contratacao_contrato` ±
+  30 dias) + descrição contendo "antecipa"/"getnet", sem auto-selecionar — a
+  escolha final é sempre manual, mesmo padrão de `VincularTransacaoDialog`.
+- `fin_lancar_desagio_antecipacao(p_lote_id, p_categoria_id, p_conta_id)` —
+  chama `fin_criar_lancamento` de verdade (não um INSERT direto — é a
+  primeira chamada SQL-a-SQL da porta única neste repo), `tipo='saida'`,
+  `status='pago'` imediato (o dinheiro já saiu na antecipação), descrição
+  referenciando o Contrato Registradora. Recusa relançar (`FIN_JA_LANCADO`)
+  se `lancamento_desagio_id` já preenchido — idempotente por rejeição, não
+  por no-op silencioso. `LancarDesagioDialog.tsx` deixa o tesoureiro escolher
+  conta/categoria de saída (sem categoria hardcoded — sugestão do plano era
+  "Custo de Antecipação de Recebíveis", criável na tela de categorias já
+  existente).
+- `fin_conferencia_totais_getnet(p_conta_id, p_data_inicio, p_data_fim)` —
+  só leitura, sem `fin_registrar_auditoria`. `Σ Oferta bruto (forma_pagamento
+  classificada como cartão, nome ILIKE '%cart%') − Σ MDR − Σ deságio lançado
+  no período = esperado no banco`, comparado contra `Σ Banco creditado`
+  (`extratos_bancarios`, mesma conta/período). Não decide a causa da
+  diferença — só torna o gap visível, card em `ConferenciaTotaisGetnetCard.tsx`
+  (topo da aba, reaproveita `MonthPicker`/`getPeriodoRange`). Classificação
+  "cartão" por nome (não por `taxa_administrativa > 0`, que pegaria boleto
+  com taxa se algum dia existir) — só ficou confiável depois da FK real
+  acima; antes não dava pra confiar no join.
+
+**Verificação**: `npx tsc --noEmit`: 62 baseline, 0 novos. Harness Docker
+(`postgres:15` standalone) com 6 cenários: backfill correto nos 4 padrões
+históricos (UUID-texto, rótulo maiúsculo, rótulo minúsculo, texto livre não-
+mapeável fica NULL) + isolamento de tenant (2 igrejas com "PIX" cada, sem
+vazamento cross-tenant); `fin_criar_lancamento` grava `forma_pagamento_id`
+válido e rejeita id de outro tenant (`FIN_FK`, regressão real antes não
+coberta); `fin_atualizar_lancamento` sincroniza as duas colunas e rejeita
+patch cross-tenant; `fin_lancar_sessao` grava as duas colunas consistentes;
+`fin_ofertas_periodo` resolve `forma_nome` via join sem cast; Fase B ponta-a-
+ponta com o exemplo real já validado (contrato `2025093000995438317`,
+R$1.523,81 − R$1.355,19 = R$168,62 de deságio) — vínculo calcula o deságio
+certo, `fin_lancar_desagio_antecipacao` cria o lançamento via
+`fin_criar_lancamento` de verdade, recusa relançar, e
+`fin_conferencia_totais_getnet` soma os 4 componentes corretamente.
+
+### 9.19 D10 — Competência de grupo em lançamentos parcelados (jul/2026)
+
+Usuário colou uma avaliação externa questionando se, numa compra parcelada
+(ex.: equipamento em 10x), o DRE por Competência deveria diluir o valor ao
+longo dos meses (competência = vencimento de cada parcela) ou concentrar o
+valor cheio no mês do fato gerador (competência compartilhada por todas as
+parcelas). Investigação no código, antes de decidir qualquer direção,
+mostrou que o alicerce já existia: `fin_criar_lancamento` (D6, F1) já
+materializa as N parcelas com a mesma `data_competencia` (mesmo `p_extras`
+reaproveitado em todas as iterações do loop) e `get_dre_anual(p_regime=
+'competencia')` já agrega por `data_competencia` incluindo `pendente` — ou
+seja, a leitura já entrega o resultado desejado desde que os dados fiquem
+consistentes. O gap real (não coberto por nenhuma RPC até então): **edição**
+não propagava. `fin_atualizar_lancamento` fazia `UPDATE` só na linha
+editada — mudar a competência da parcela 5/10 não atualizava as parcelas
+1-4/6-10, e `reclass-transacoes` tinha o mesmo problema (bloqueava só por
+conciliada, nunca verificava parcelas irmãs fora da seleção). Decisão
+confirmada com o usuário: endurecer o modelo existente (reaproveitar
+`lancamento_pai_id`), não migrar para uma entidade "Documento Financeiro"
+separada; imobilizado/depreciação de equipamentos ficou fora de escopo
+(decisão de produto futura, independente desta).
+
+**Migration `20260729150000_fin_competencia_grupo_parcelado.sql`**:
+
+- `fin_atualizar_lancamento` (CREATE OR REPLACE): bloqueia com erro nomeado
+  `FIN_COMPETENCIA_GRUPO` quando `p_patch` contém `data_competencia` e o
+  lançamento é `tipo_lancamento='parcelado'` com `lancamento_pai_id` setado
+  ou `total_parcelas > 1` — a menos que o patch traga
+  `_permitir_divergencia_competencia: true` (escape hatch para renegociação
+  pontual de uma parcela; não exposto na UI, só via chamada direta). Regra
+  restrita a `parcelado` — `recorrente` mantém competência própria por
+  ocorrência, sem bloqueio (validado no harness).
+- **Nova RPC `fin_alterar_competencia_grupo(p_lancamento_id, p_nova_competencia,
+  p_contexto)`**: resolve `v_pai := COALESCE(lancamento_pai_id, id)` (mesmo
+  padrão de `fin_excluir_lancamento`), rejeita se `tipo_lancamento <>
+  'parcelado'`, rejeita se qualquer parcela do grupo já estiver conciliada
+  (lista os ids no erro), atualiza `data_competencia` de todas as parcelas
+  numa única transação, audita snapshot antes/depois, e avisa (warning, não
+  bloqueia) quando alguma parcela afetada já está `status='pago'` — a
+  competência pode retroagir sobre um período de DRE já reportado.
+- `reclass-transacoes/index.ts`: antes do bloqueio existente por campo
+  conciliado, se `data_competencia` está em `updateFields`, calcula os
+  "pais" das transações-alvo `tipo_lancamento='parcelado'`, busca o grupo
+  completo de cada um e compara com a seleção. Havendo irmã fora da
+  seleção, recusa com 409 `GRUPO_PARCELADO_INCOMPLETO` (payload com
+  `ids_irmas_faltantes`) sem aplicar nada — mesmo espírito de "recusar e
+  informar" do bloqueio de conciliada, sem expandir a seleção por conta
+  própria.
+- Frontend: `TransacaoResumo` ganhou `tipo_lancamento`/`lancamento_pai_id`/
+  `numero_parcela`/`total_parcelas` (colunas que já vinham do `select("*")`
+  de `useLancamentos.ts`, sem query nova); `LancamentoCard.tsx` mostra badge
+  "Parcela X/Y"; `lancamentos.api.ts` ganhou o wrapper
+  `alterarCompetenciaGrupo`; `TransacaoDialog.tsx` detecta
+  `FIN_COMPETENCIA_GRUPO` no catch do submit e oferece um `AlertDialog` de
+  confirmação antes de sincronizar o grupo; `Reclassificacao.tsx` passou a
+  ler o corpo JSON de `error.context` (Response não consumida da
+  `FunctionsHttpError`) para exibir a mensagem estruturada de erros 409
+  nomeados (cobre `GRUPO_PARCELADO_INCOMPLETO` e, de bônus, o
+  `TRANSACAO_CONCILIADA` pré-existente, que tinha o mesmo problema de
+  mensagem genérica).
+
+**Verificação**: harness Docker (`postgres:15` standalone com stubs de
+`auth.*`/tenant, não replay das migrations reais) com 7 cenários cobrindo
+o bloqueio isolado, a sincronização completa do grupo, o bloqueio por
+parcela conciliada, a rejeição de `tipo_lancamento='unico'`, a exceção de
+`recorrente`, o escape hatch e isolamento de tenant — todos OK. Lógica de
+detecção de grupo incompleto do `reclass-transacoes` isolada em Node (5
+cenários: seleção parcial bloqueia, grupo completo aplica, dois grupos
+simultâneos aplicam, patch sem `data_competencia` não aciona a checagem,
+lançamento único nunca aciona) — mesmo padrão já usado no repo para lógica
+pura de gate (PR #59/#63), sem harness SQL por não haver SQL nesse trecho.
 
 ## 11. Riscos
 

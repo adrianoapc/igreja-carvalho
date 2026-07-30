@@ -33,7 +33,18 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   criarLancamento,
   atualizarLancamento,
+  alterarCompetenciaGrupo,
 } from "@/features/financeiro/core";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useDadosApoio } from "@/features/financeiro/core/hooks/useDadosApoio";
 
 // Helper para converter string ISO (YYYY-MM-DD) para Date no timezone local
@@ -86,6 +97,7 @@ interface TransacaoDialogProps {
     base_ministerial_id?: string | null;
     fornecedor_id?: string | null;
     forma_pagamento?: string | null;
+    forma_pagamento_id?: string | null;
     observacoes?: string | null;
     tipo_lancamento?: "unico" | "recorrente" | "parcelado";
     anexo_url?: string | null;
@@ -133,6 +145,14 @@ export function TransacaoDialog({
   const [valorLiquido, setValorLiquido] = useState("");
   const [dataVencimento, setDataVencimento] = useState<Date>(new Date());
   const [dataCompetencia, setDataCompetencia] = useState<Date>(new Date());
+  // D10: quando fin_atualizar_lancamento recusa editar a competência de uma
+  // parcela isolada de um grupo parcelado, oferece sincronizar o grupo todo
+  // via fin_alterar_competencia_grupo em vez de só mostrar um erro genérico.
+  const [confirmarSincronizarGrupo, setConfirmarSincronizarGrupo] = useState<{
+    lancamentoId: string;
+    novaCompetencia: string;
+  } | null>(null);
+  const [sincronizandoGrupo, setSincronizandoGrupo] = useState(false);
   const [contaId, setContaId] = useState("");
   const [categoriaId, setCategoriaId] = useState("none");
   const [subcategoriaId, setSubcategoriaId] = useState("none");
@@ -215,7 +235,7 @@ export function TransacaoDialog({
         subcategoria_id: transacao.subcategoria_id,
         centro_custo_id: transacao.centro_custo_id,
         fornecedor_id: transacao.fornecedor_id,
-        forma_pagamento: transacao.forma_pagamento,
+        forma_pagamento_id: transacao.forma_pagamento_id,
       });
 
       setContaId(transacao.conta_id ? String(transacao.conta_id) : "none");
@@ -245,7 +265,7 @@ export function TransacaoDialog({
       setCentroCustoId(transacao.centro_custo_id || "none");
       setBaseMinisterialId(transacao.base_ministerial_id || "none");
       setFornecedorId(transacao.fornecedor_id || "none");
-      setFormaPagamento(transacao.forma_pagamento || "");
+      setFormaPagamento(transacao.forma_pagamento_id || "");
       setObservacoes(transacao.observacoes || "");
       setTipoLancamento(transacao.tipo_lancamento || "unico");
       setAnexoUrl(transacao.anexo_url || "");
@@ -348,10 +368,13 @@ export function TransacaoDialog({
         forceApply,
       );
 
-      const { data: transacoes, error } = await supabase
+      // forma_pagamento_id ainda não consta nos tipos gerados de types.ts
+      // (regenerar com `supabase gen types` após o deploy da migration).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: transacoes, error } = await (supabase as any)
         .from("transacoes_financeiras")
         .select(
-          "categoria_id, subcategoria_id, centro_custo_id, base_ministerial_id, conta_id, forma_pagamento",
+          "categoria_id, subcategoria_id, centro_custo_id, base_ministerial_id, conta_id, forma_pagamento_id",
         )
         .eq("fornecedor_id", fornecedorIdParam)
         .not("categoria_id", "is", null)
@@ -389,9 +412,9 @@ export function TransacaoDialog({
             (baseMinisterialFreq[t.base_ministerial_id] || 0) + 1;
         if (t.conta_id)
           contaFreq[t.conta_id] = (contaFreq[t.conta_id] || 0) + 1;
-        if (t.forma_pagamento)
-          formaPagamentoFreq[t.forma_pagamento] =
-            (formaPagamentoFreq[t.forma_pagamento] || 0) + 1;
+        if (t.forma_pagamento_id)
+          formaPagamentoFreq[t.forma_pagamento_id] =
+            (formaPagamentoFreq[t.forma_pagamento_id] || 0) + 1;
       });
 
       const getMaisFrequente = (freq: Record<string, number>) => {
@@ -888,7 +911,7 @@ export function TransacaoDialog({
             : null,
         fornecedor_id:
           fornecedorId && fornecedorId !== "none" ? fornecedorId : null,
-        forma_pagamento:
+        forma_pagamento_id:
           formaPagamento && formaPagamento !== "none" ? formaPagamento : null,
         data_competencia: formatLocalDate(dataCompetencia),
         data_pagamento:
@@ -990,6 +1013,21 @@ export function TransacaoDialog({
       onOpenChange(false);
       resetForm();
     } catch (error: unknown) {
+      // D10: parcela de um lançamento parcelado recusou divergir de
+      // competência das irmãs — oferece sincronizar o grupo em vez de só
+      // mostrar o erro (mesmo padrão de tratamento nomeado já usado para
+      // FIN_CONCILIADO em HistoricoExtratos.tsx).
+      if (
+        transacao?.id &&
+        error instanceof Error &&
+        error.message.includes("FIN_COMPETENCIA_GRUPO")
+      ) {
+        setConfirmarSincronizarGrupo({
+          lancamentoId: String(transacao.id),
+          novaCompetencia: formatLocalDate(dataCompetencia)!,
+        });
+        return;
+      }
       toast.error(
         error instanceof Error
           ? error.message
@@ -998,6 +1036,32 @@ export function TransacaoDialog({
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSincronizarCompetenciaGrupo = async () => {
+    if (!confirmarSincronizarGrupo) return;
+    setSincronizandoGrupo(true);
+    try {
+      const resultado = await alterarCompetenciaGrupo(
+        confirmarSincronizarGrupo.lancamentoId,
+        confirmarSincronizarGrupo.novaCompetencia,
+      );
+      resultado.warnings?.forEach((w) => toast.info(w));
+      toast.success("Competência sincronizada em todas as parcelas do lançamento!");
+      queryClient.invalidateQueries({ queryKey: ["entradas"] });
+      queryClient.invalidateQueries({ queryKey: ["saidas"] });
+      setConfirmarSincronizarGrupo(null);
+      onOpenChange(false);
+      resetForm();
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Erro ao sincronizar competência do grupo",
+      );
+    } finally {
+      setSincronizandoGrupo(false);
     }
   };
 
@@ -1660,6 +1724,37 @@ export function TransacaoDialog({
         imageZoom={imageZoom}
         setImageZoom={setImageZoom}
       />
+      <AlertDialog
+        open={!!confirmarSincronizarGrupo}
+        onOpenChange={(open) => !open && setConfirmarSincronizarGrupo(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sincronizar competência do grupo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta parcela faz parte de um lançamento parcelado — todas as
+              parcelas compartilham a mesma competência (D10). Aplicar a nova
+              competência a esta parcela isolada divergiria do grupo. Deseja
+              aplicar a nova competência a TODAS as parcelas deste
+              lançamento?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={sincronizandoGrupo}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={sincronizandoGrupo}
+              onClick={(e) => {
+                e.preventDefault();
+                handleSincronizarCompetenciaGrupo();
+              }}
+            >
+              {sincronizandoGrupo ? "Sincronizando..." : "Sincronizar grupo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -388,6 +388,60 @@ Deno.serve(async (req) => {
       }
     }
 
+    // D10: mudar data_competencia por linha, quando a linha pertence a um
+    // lançamento parcelado (fin_criar_lancamento materializa a competência
+    // igual em todas as parcelas na criação — ver migration
+    // 20260729150000), só é seguro se TODAS as parcelas irmãs também
+    // estiverem na seleção — senão o grupo diverge silenciosamente.
+    // Mesmo espírito do bloqueio acima: recusa e informa, não expande a
+    // seleção por conta própria (o usuário pode ter excluído uma parcela do
+    // filtro por outro motivo). Não se aplica a tipo_lancamento='recorrente'
+    // (cada ocorrência tem competência própria por natureza).
+    if ("data_competencia" in updateFields) {
+      const paisAlvo = Array.from(
+        new Set(
+          transacoes
+            .filter((t) => t.tipo_lancamento === "parcelado")
+            .map((t) => t.lancamento_pai_id ?? t.id),
+        ),
+      );
+
+      if (paisAlvo.length > 0) {
+        const { data: grupoCompleto, error: grupoError } = await supabase
+          .from("transacoes_financeiras")
+          .select("id")
+          .eq("igreja_id", igreja_id)
+          .or(
+            paisAlvo
+              .map((pai) => `lancamento_pai_id.eq.${pai},id.eq.${pai}`)
+              .join(","),
+          );
+        if (grupoError) throw grupoError;
+
+        const idsAlvo = new Set(transacoes.map((t) => t.id));
+        const irmasForaDaSelecao = (grupoCompleto ?? []).filter(
+          (t) => !idsAlvo.has(t.id),
+        );
+
+        if (irmasForaDaSelecao.length > 0) {
+          return new Response(
+            JSON.stringify({
+              error: "GRUPO_PARCELADO_INCOMPLETO",
+              message:
+                `${irmasForaDaSelecao.length} parcela(s) irmã(s) do mesmo lançamento parcelado não estão nesta seleção. ` +
+                "Alterar a competência de só algumas parcelas divergiria do grupo. " +
+                "Selecione todas as parcelas do grupo, ou use a ação de sincronizar competência do lançamento.",
+              ids_irmas_faltantes: irmasForaDaSelecao.map((t) => t.id),
+            }),
+            {
+              status: 409,
+              headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+            },
+          );
+        }
+      }
+    }
+
     const alvoIds = transacoes.map((t) => t.id);
 
     // Criar job

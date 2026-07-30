@@ -15,7 +15,9 @@ export interface LancamentoExtras {
   centro_custo_id?: string | null;
   base_ministerial_id?: string | null;
   fornecedor_id?: string | null;
+  /** @deprecated usar forma_pagamento_id (FK real, ADR-029) */
   forma_pagamento?: string | null;
+  forma_pagamento_id?: string | null;
   data_competencia?: string | null;
   data_pagamento?: string | null;
   status?: "pendente" | "pago";
@@ -119,5 +121,22 @@ export function alternarConferenciaManual(
   return callFinRpc("fin_alternar_conferencia_manual", {
     p_id: id,
     p_conferido: conferido,
+  });
+}
+
+/**
+ * Sincroniza data_competencia em TODAS as parcelas de um lançamento
+ * parcelado numa única operação (D10). Contrapartida de
+ * fin_atualizar_lancamento recusar divergência de competência dentro de um
+ * grupo parcelado — usar quando fin_atualizar_lancamento retornar o erro
+ * nomeado FIN_COMPETENCIA_GRUPO.
+ */
+export function alterarCompetenciaGrupo(
+  lancamentoId: string,
+  novaCompetencia: string, // YYYY-MM-DD
+): Promise<FinResultado> {
+  return callFinRpc("fin_alterar_competencia_grupo", {
+    p_lancamento_id: lancamentoId,
+    p_nova_competencia: novaCompetencia,
   });
 }

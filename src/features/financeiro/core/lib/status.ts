@@ -49,5 +49,7 @@ export const getStatusColorDynamic = (transacao: TransacaoResumo) => {
   return BADGE_ATRASADO;
 };
 
-export const isPagamentoDinheiro = (forma?: string | null) =>
-  (forma || "").toLowerCase().includes("dinheiro");
+export const isPagamentoDinheiro = (
+  formaPagamentoId?: string | null,
+  formaDinheiroId?: string | null,
+) => !!formaPagamentoId && formaPagamentoId === formaDinheiroId;

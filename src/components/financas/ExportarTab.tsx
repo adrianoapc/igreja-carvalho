@@ -53,6 +53,7 @@ type TransacaoExportacao = {
   data_competencia?: string | null;
   observacoes?: string | null;
   forma_pagamento?: string | null;
+  forma?: { nome: string } | null;
   conta?: { nome: string } | null;
   categoria?: { nome: string } | null;
   subcategoria?: { nome: string } | null;
@@ -178,7 +179,10 @@ export function ExportarTab() {
         return [];
 
       const tipo = tipoExportacao === "entradas" ? "entrada" : "saida";
-      let query = supabase
+      // forma_pagamento_id ainda não consta nos tipos gerados de types.ts
+      // (regenerar com `supabase gen types` após o deploy da migration).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let query = (supabase as any)
         .from("transacoes_financeiras")
         .select(
           `
@@ -200,7 +204,8 @@ export function ExportarTab() {
           subcategoria:subcategoria_id(nome),
           fornecedor:fornecedor_id(nome, cpf_cnpj),
           base_ministerial:base_ministerial_id(titulo),
-          centro_custo:centro_custo_id(nome)
+          centro_custo:centro_custo_id(nome),
+          forma:forma_pagamento_id(nome)
         `,
         )
         .eq("tipo", tipo)
@@ -311,7 +316,7 @@ export function ExportarTab() {
         if (colunasSelecionadas.includes("centro_custo"))
           row["Centro de Custo"] = t.centro_custo?.nome || "";
         if (colunasSelecionadas.includes("forma_pagamento"))
-          row["Forma Pagamento"] = t.forma_pagamento || "";
+          row["Forma Pagamento"] = t.forma?.nome || t.forma_pagamento || "";
         if (colunasSelecionadas.includes("observacoes"))
           row.Observações = t.observacoes || "";
 

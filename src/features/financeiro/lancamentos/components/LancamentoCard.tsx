@@ -19,6 +19,7 @@ import {
   type TransacaoResumo,
   type TipoDataFiltro,
 } from "@/features/financeiro/core";
+import { useFormaPagamentoDinheiroId } from "@/features/financeiro/core/hooks/useFormaPagamentoDinheiroId";
 
 /**
  * Card de lançamento compartilhado por Entradas e Saídas (F2/ADR-029).
@@ -35,7 +36,7 @@ export interface LancamentoCardTransacao extends TransacaoResumo {
   data_pagamento?: string | null;
   conciliacao_status?: string | null;
   conferido_manual?: boolean | null;
-  forma_pagamento?: string | null;
+  forma_pagamento_id?: string | null;
   solicitacao_reembolso_id?: string | null;
   categoria?: { nome: string; cor?: string | null } | null;
   conta?: { nome: string } | null;
@@ -97,7 +98,8 @@ export function LancamentoCard({
   const conciliacaoStatus =
     transacao.conciliacao_status ||
     (conciliacaoMap.get(transacao.id) ? "conciliado_extrato" : "nao_conciliado");
-  const isDinheiro = isPagamentoDinheiro(transacao.forma_pagamento);
+  const formaDinheiroId = useFormaPagamentoDinheiroId();
+  const isDinheiro = isPagamentoDinheiro(transacao.forma_pagamento_id, formaDinheiroId);
   const isConferidoManual =
     conciliacaoStatus === "nao_conciliado" &&
     isDinheiro &&
@@ -205,6 +207,17 @@ export function LancamentoCard({
             )}
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1 mt-1">
+            {transacao.tipo_lancamento === "parcelado" &&
+              !!transacao.total_parcelas &&
+              transacao.total_parcelas > 1 && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] md:text-xs"
+                  title="Parcela deste lançamento — competência compartilhada com as demais (D10)"
+                >
+                  Parcela {transacao.numero_parcela}/{transacao.total_parcelas}
+                </Badge>
+              )}
             <Badge
               className={`text-[10px] md:text-xs ${getStatusColorDynamic(transacao)}`}
             >

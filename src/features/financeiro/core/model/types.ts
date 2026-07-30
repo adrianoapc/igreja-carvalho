@@ -18,4 +18,8 @@ export function colunaDataFiltro(
 export interface TransacaoResumo {
   status: string;
   data_vencimento?: string | Date | null;
+  tipo_lancamento?: string | null;
+  lancamento_pai_id?: string | null;
+  numero_parcela?: number | null;
+  total_parcelas?: number | null;
 }

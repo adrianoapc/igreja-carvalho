@@ -9,7 +9,7 @@ export interface Transacao {
   categoria_id?: string;
   fornecedor_id?: string;
   status: string;
-  forma_pagamento?: string;
+  forma_pagamento_id?: string | null;
   conferido_manual?: boolean;
   conciliacao_status?: string;
   [key: string]: any;
@@ -29,7 +29,8 @@ export interface FiltrosTransacao {
 export function useTransacoesFiltro(
   transacoes: Transacao[] | undefined,
   filtros: FiltrosTransacao,
-  conciliacaoMap?: ConciliacaoMap
+  conciliacaoMap?: ConciliacaoMap,
+  formaDinheiroId?: string | null,
 ) {
   return useMemo(() => {
     if (!transacoes) return [];
@@ -62,7 +63,8 @@ export function useTransacoesFiltro(
       const conciliacao = t.conciliacao_status || (conciliacaoMap && conciliacaoMap.get(t.id) ? "conciliado_extrato" : "nao_conciliado");
       if (conciliacaoStatus !== "all") {
         if (conciliacaoStatus === "conferido_manual") {
-          if (!(conciliacao === "nao_conciliado" && t.forma_pagamento?.toLowerCase().includes("dinheiro") && t.conferido_manual)) {
+          const isDinheiro = !!formaDinheiroId && t.forma_pagamento_id === formaDinheiroId;
+          if (!(conciliacao === "nao_conciliado" && isDinheiro && t.conferido_manual)) {
             return false;
           }
         } else if (conciliacao !== conciliacaoStatus) {

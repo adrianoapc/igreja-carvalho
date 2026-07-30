@@ -165,7 +165,35 @@ const ReclassificacaoPage = () => {
       toast.success("Job de reclassificação iniciado");
     } catch (err) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : "Erro ao reclassificar");
+      let mensagem =
+        err instanceof Error ? err.message : "Erro ao reclassificar";
+
+      // Erros nomeados (409) do edge chegam em error.context (Response não
+      // consumida) — supabase-js não expõe o corpo em err.message. Cobre
+      // GRUPO_PARCELADO_INCOMPLETO (D10) e o TRANSACAO_CONCILIADA já
+      // existente com a mesma mecânica.
+      const context = (err as { context?: Response })?.context;
+      if (context && typeof context.json === "function") {
+        try {
+          const body = await context.json();
+          if (typeof body?.message === "string") {
+            mensagem = body.message;
+          }
+          if (
+            body?.error === "GRUPO_PARCELADO_INCOMPLETO" &&
+            Array.isArray(body?.ids_irmas_faltantes)
+          ) {
+            mensagem +=
+              body.ids_irmas_faltantes.length > 0
+                ? ` (${body.ids_irmas_faltantes.length} parcela(s) faltante(s))`
+                : "";
+          }
+        } catch {
+          // corpo não é JSON válido; mantém a mensagem genérica do erro
+        }
+      }
+
+      toast.error(mensagem);
     } finally {
       setLoading(false);
     }

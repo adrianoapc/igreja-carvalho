@@ -30,6 +30,7 @@ import { TablePagination } from "@/components/ui/table-pagination";
 import { useHideValues } from "@/hooks/useHideValues";
 import { HideValuesToggle } from "@/components/financas/HideValuesToggle";
 import { useTransacoesFiltro } from "@/hooks/useTransacoesFiltro";
+import { useFormaPagamentoDinheiroId } from "@/features/financeiro/core/hooks/useFormaPagamentoDinheiroId";
 import { formatLocalDate } from "@/utils/dateUtils";
 import { TransacaoDialog } from "@/components/financas/TransacaoDialog";
 import { ExtratoDetalheDrawer } from "@/components/financas/ExtratoDetalheDrawer";
@@ -131,6 +132,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
     [transacoes],
   );
   const conciliacaoMap = useConciliacaoMap(transacoesIds);
+  const formaDinheiroId = useFormaPagamentoDinheiroId();
 
   const transacoesFiltradas = useTransacoesFiltro(
     transacoes,
@@ -143,6 +145,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
       conciliacaoStatus: conciliacaoStatusFilter,
     },
     conciliacaoMap,
+    formaDinheiroId,
   );
 
   const transacoesAgrupadas = useMemo(
@@ -255,7 +258,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
       centro_custo_id: transacao.centro_custo_id ?? "none",
       base_ministerial_id: transacao.base_ministerial_id ?? "none",
       conta_id: transacao.conta_id ?? "",
-      forma_pagamento: transacao.forma_pagamento ?? "",
+      forma_pagamento_id: transacao.forma_pagamento_id ?? "",
     });
     setDialogOpen(true);
   };
@@ -309,7 +312,7 @@ export function TransacoesPage({ tipo }: { tipo: "entrada" | "saida" }) {
         Fornecedor: t.fornecedor?.nome || "",
         "Base Ministerial": t.base_ministerial?.titulo || "",
         "Centro de Custo": t.centro_custo?.nome || "",
-        "Forma Pagamento": t.forma_pagamento || "",
+        "Forma Pagamento": t.forma?.nome || t.forma_pagamento || "",
         Observações: t.observacoes || "",
       }));
 

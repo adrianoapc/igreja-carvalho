@@ -22,7 +22,8 @@ const SELECT_LANCAMENTOS = `
   base_ministerial:base_ministerial_id(titulo),
   centro_custo:centro_custo_id(nome),
   fornecedor:fornecedor_id(nome, id),
-  solicitacao_reembolso:solicitacao_reembolso_id(status)
+  solicitacao_reembolso:solicitacao_reembolso_id(status),
+  forma:forma_pagamento_id(nome)
 `;
 
 export function useLancamentos(
@@ -45,7 +46,10 @@ export function useLancamentos(
     ],
     queryFn: async () => {
       if (!igrejaId) return [];
-      let query = supabase
+      // forma_pagamento_id ainda não consta nos tipos gerados de types.ts
+      // (regenerar com `supabase gen types` após o deploy da migration).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let query = (supabase as any)
         .from("transacoes_financeiras")
         .select(SELECT_LANCAMENTOS)
         .eq("tipo", tipo)
