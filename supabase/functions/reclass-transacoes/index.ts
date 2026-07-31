@@ -414,20 +414,33 @@ Deno.serve(async (req) => {
         // antes da checagem de irmãs rodar (achado do /code-review). Divide
         // em lotes fixos pra manter cada requisição num tamanho seguro.
         const PAIS_POR_LOTE = 100;
+        // PostgREST limita linhas por resposta (db-max-rows) mesmo sem
+        // .limit() explícito — 100 grupos com muitas parcelas cada pode
+        // facilmente passar disso, e um corte silencioso aqui faria
+        // irmasForaDaSelecao ficar vazio por engano se as irmãs que faltam
+        // caírem justo na página cortada (achado do /code-review sobre o
+        // fix anterior). Pagina com .range() até uma página vir mais curta
+        // que PAGE_SIZE — não depende de conhecer o limite exato do server.
+        const PAGE_SIZE = 500;
         const grupoCompleto: { id: string }[] = [];
         for (let i = 0; i < paisAlvo.length; i += PAIS_POR_LOTE) {
           const lotePais = paisAlvo.slice(i, i + PAIS_POR_LOTE);
-          const { data, error: grupoError } = await supabase
-            .from("transacoes_financeiras")
-            .select("id")
-            .eq("igreja_id", igreja_id)
-            .or(
-              lotePais
-                .map((pai) => `lancamento_pai_id.eq.${pai},id.eq.${pai}`)
-                .join(","),
-            );
-          if (grupoError) throw grupoError;
-          grupoCompleto.push(...(data ?? []));
+          const filtroOr = lotePais
+            .map((pai) => `lancamento_pai_id.eq.${pai},id.eq.${pai}`)
+            .join(",");
+          let offset = 0;
+          while (true) {
+            const { data, error: grupoError } = await supabase
+              .from("transacoes_financeiras")
+              .select("id")
+              .eq("igreja_id", igreja_id)
+              .or(filtroOr)
+              .range(offset, offset + PAGE_SIZE - 1);
+            if (grupoError) throw grupoError;
+            grupoCompleto.push(...(data ?? []));
+            if (!data || data.length < PAGE_SIZE) break;
+            offset += PAGE_SIZE;
+          }
         }
 
         const idsAlvo = new Set(transacoes.map((t) => t.id));

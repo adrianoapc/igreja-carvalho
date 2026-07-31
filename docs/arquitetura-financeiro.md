@@ -3209,6 +3209,26 @@ exata na pós-fix (saldo volta a 0 nos dois casos).
 
 `npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
 
+### 9.44 17ª rodada de review: paginação faltando no batching de §9.42
+
+Mesmo ciclo, sobre o commit de §9.43. 1 novo, real — segunda camada do
+mesmo achado de §9.42: dividir `paisAlvo` em lotes de 100 resolveu o
+tamanho da URL, mas cada lote ainda podia retornar mais linhas do que o
+limite de resposta do PostgREST (`db-max-rows`, aplicado mesmo sem
+`.limit()` explícito) — 100 grupos parcelados com muitas parcelas cada
+soma rápido. Um corte silencioso na resposta faria `irmasForaDaSelecao`
+ficar vazio por engano se as parcelas irmãs faltantes caírem
+precisamente na página cortada, deixando passar uma sincronização de
+competência que viola o invariante de grupo completo (D10) — o próprio
+bug que essa checagem existe pra prevenir.
+
+Fix: cada lote de 100 pais passa a paginar com `.range()` (páginas de
+500) até uma página vir mais curta que o tamanho da página — não depende
+de conhecer o limite exato configurado no servidor, só do padrão
+"página incompleta = acabou".
+
+Deno edge function — checado com `deno check` (limpo).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
