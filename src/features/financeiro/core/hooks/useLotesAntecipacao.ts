@@ -21,6 +21,7 @@ export interface LoteAntecipacao {
     valor: number;
     data_transacao: string;
     descricao: string;
+    filial_id: string | null;
   } | null;
 }
 
@@ -34,7 +35,7 @@ export function useLotesAntecipacao() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let query = (supabase.from as any)("getnet_antecipacao_lotes")
         .select(
-          "id, filial_id, contrato_registradora, instituicao_negociadora, data_contratacao_contrato, valor_atual_contrato, extrato_bancario_id, lancamento_desagio_id, status, extratos_bancarios(valor, data_transacao, descricao)",
+          "id, filial_id, contrato_registradora, instituicao_negociadora, data_contratacao_contrato, valor_atual_contrato, extrato_bancario_id, lancamento_desagio_id, status, extratos_bancarios(valor, data_transacao, descricao, filial_id)",
         )
         .eq("igreja_id", igrejaId)
         .order("data_contratacao_contrato", { ascending: false });

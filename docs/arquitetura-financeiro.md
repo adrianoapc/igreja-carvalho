@@ -2655,6 +2655,56 @@ bug" de "ajuste legítimo antigo" sem mais dados).
 pré-existentes em todos os arquivos tocados (confirmado via `git stash`),
 nenhum novo.
 
+### 9.30 Fix pós-`/code-review`: lote global de antecipação deixava passar deságio cross-filial
+
+Rodada de `/code-review` (não Codex) sobre o commit de §9.29 achou um
+loophole real que os 6 fixes anteriores não cobriam: `fin_lancar_
+desagio_antecipacao` só validava a conta contra `getnet_antecipacao_
+lotes.filial_id` — mas esse campo é nullable ("lote global", quando a
+integração não amarra a uma filial fixa). Nesse caso a validação inteira
+era pulada: lote global vinculado a um extrato da filial B (aceito, nada
+pra cruzar ainda) podia depois ter o deságio lançado numa conta da filial
+C — nada validava B contra C, e o lançamento final gravava
+`filial_id=NULL` (o do lote), não o da filial que o dinheiro realmente
+passou.
+
+**Fix** (`20260731110000_fin_desagio_filial_lote_global.sql`):
+`fin_lancar_desagio_antecipacao` passa a validar a conta contra a filial
+do **extrato já vinculado** (`v_extrato.filial_id`), não a do lote —
+cobre os dois casos: lote com filial (extrato já é garantidamente da
+mesma, por causa do fix de §9.29) e lote global (o extrato concreto
+escolhido é quem ancora a filial real do fluxo). O lançamento final grava
+`filial_id = COALESCE(extrato.filial_id, conta.filial_id)`, nunca mais o
+`filial_id` cru do lote.
+
+**Segunda rodada do `/code-review` sobre esse mesmo fix** achou mais uma:
+o frontend (`LancarDesagioDialog.tsx`) replicava a regra caindo pra
+`lote.filial_id` quando a do extrato vinha NULL — divergindo do backend
+(que só olha o extrato, nunca o lote). Isso vira bug de verdade porque
+`getnet_antecipacao_lotes.filial_id` nunca teve FK real (diferente de
+`extratos_bancarios.filial_id`/`contas.filial_id`, que já tinham `ON
+DELETE SET NULL`): deletar uma filial depois de um lote vinculado a um
+extrato dela zera extrato/contas por cascade, mas deixava o lote com um
+UUID solto (dangling) — o frontend filtrava contas por esse UUID morto,
+dropdown sempre vazio, mesmo o backend aceitando qualquer conta nesse
+caso. Fix duplo: `ALTER TABLE getnet_antecipacao_lotes ADD CONSTRAINT
+... REFERENCES filiais(id) ON DELETE SET NULL` (raiz do problema — agora
+o lote nunca fica com UUID morto) + frontend para de cair pro
+`lote.filial_id`, usa só `lote.extratos_bancarios?.filial_id`, espelhando
+o backend à risca.
+
+Harness Docker estendido (`harness_pos_review_tests.sql`, T10-T13): lote
+global vincula com extrato de qualquer filial (T10); deságio numa conta
+de filial diferente da do extrato é rejeitado (T11); com a conta certa,
+aceita e grava a filial do extrato, não NULL (T12); deletar a filial
+depois do vínculo zera `getnet_antecipacao_lotes.filial_id` via FK (T13a)
+e o backend segue aceitando qualquer conta quando a filial do extrato já
+é NULL, consistente com o que o frontend corrigido passaria a filtrar —
+nada, sem UUID fantasma (T13b). 13/13 cenários (T1-T9 de §9.29 + T10-T13)
+OK.
+
+`npx tsc`: 63 baseline, 0 novos. `npx eslint`: limpo nos arquivos tocados.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

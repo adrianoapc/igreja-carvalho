@@ -34,17 +34,25 @@ export function LancarDesagioDialog({ open, onOpenChange, lote, onLancado }: Lan
 
   const desagio = calcularDesagio(lote) ?? 0;
 
+  // Filial efetiva do fluxo é a do extrato JÁ VINCULADO ao lote — não a do
+  // lote em si. Espelha fin_lancar_desagio_antecipacao (20260731110000) à
+  // risca: o backend só olha extrato.filial_id, nunca lote.filial_id.
+  // Cair pra lote.filial_id aqui (versão anterior) divergia do backend numa
+  // situação real: getnet_antecipacao_lotes.filial_id não tem FK (diferente
+  // de extratos_bancarios/contas, que têm ON DELETE SET NULL) — deletar uma
+  // filial depois do vínculo zera o filial_id do extrato/contas mas deixa o
+  // do lote como UUID solto; usá-lo aqui filtraria contas por um valor que
+  // não bate com nenhuma (dropdown vazio), mesmo o backend aceitando
+  // qualquer conta nesse caso (achado do /code-review).
+  const filialEfetivaLote = lote.extratos_bancarios?.filial_id ?? null;
+
   const { data: contas = [] } = useQuery({
-    queryKey: ["contas-desagio", igrejaId, filialId, isAllFiliais, lote.filial_id],
+    queryKey: ["contas-desagio", igrejaId, filialId, isAllFiliais, filialEfetivaLote],
     queryFn: async () => {
       if (!igrejaId) return [];
       let query = supabase.from("contas").select("id, nome").eq("ativo", true).eq("igreja_id", igrejaId).order("nome");
-      // Lote com filial definida só aceita conta da mesma filial
-      // (fin_lancar_desagio_antecipacao valida isso no backend desde
-      // 20260731100000) — escopa por ela sempre, independente da visão
-      // "todas as filiais". Lote sem filial (global) segue o seletor normal.
-      if (lote.filial_id) {
-        query = query.eq("filial_id", lote.filial_id);
+      if (filialEfetivaLote) {
+        query = query.eq("filial_id", filialEfetivaLote);
       } else if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }
