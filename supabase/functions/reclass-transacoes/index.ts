@@ -430,11 +430,18 @@ Deno.serve(async (req) => {
             .join(",");
           let offset = 0;
           while (true) {
+            // .order("id") é obrigatório aqui: SQL não garante ordem
+            // estável entre requisições .range() separadas sem um ORDER BY
+            // determinístico — sem isso, páginas podiam se sobrepor ou
+            // pular linhas, e uma irmã pulada faria a checagem de grupo
+            // completo passar por engano (achado do /code-review sobre o
+            // fix anterior).
             const { data, error: grupoError } = await supabase
               .from("transacoes_financeiras")
               .select("id")
               .eq("igreja_id", igreja_id)
               .or(filtroOr)
+              .order("id")
               .range(offset, offset + PAGE_SIZE - 1);
             if (grupoError) throw grupoError;
             grupoCompleto.push(...(data ?? []));

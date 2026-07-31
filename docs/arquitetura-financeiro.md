@@ -3229,6 +3229,46 @@ de conhecer o limite exato configurado no servidor, só do padrão
 
 Deno edge function — checado com `deno check` (limpo).
 
+### 9.45 18ª rodada de review: 2 follow-ups reais + 1 thread antiga esquecida
+
+Sobre o commit de §9.44, mais uma thread que sobrou de rodadas bem
+anteriores (nunca tinha sido respondida/resolvida — escapou do
+fluxo por não estar ancorada num dos commits HEAD checados nas rodadas
+anteriores):
+
+0. `useFormaPagamentoDinheiroId.ts` — comentário de 2026-07-31T12:03,
+   já corrigido desde 35da158 (sessão anterior a esta): a query já
+   retorna TODOS os ids "Dinheiro" da igreja (`ilike` + sem `.limit(1)`),
+   não só o mais antigo. Confirmado por leitura direta, sem código novo
+   — só resposta e resolução da thread.
+
+1. `VincularExtratoLoteDialog.tsx` — mesma classe do achado de §9.44: a
+   busca de extratos candidatos (`extratos_bancarios`) não paginava.
+   Pra lote sem `data_contratacao_contrato` (§9.40 removeu o filtro de
+   data nesse caso), a busca varre todo o histórico de créditos — fácil
+   passar do teto de 1000 linhas do PostgREST, cortando a resposta em
+   silêncio; como o filtro de texto é aplicado client-side sobre o que
+   já veio, um crédito antigo válido fora da primeira página nunca
+   seria encontrado. Fix: mesma paginação por `.range()`, mas com um
+   detalhe a mais que o de §9.44 não precisava — o builder do
+   supabase-js não é seguro reexecutar após o primeiro `await` (cada
+   página anterior já tinha disparado o fetch), então virou uma fábrica
+   `montarQuery()` que recria os mesmos filtros a cada página, com
+   `.order("id")` adicional como desempate estável de `data_transacao`
+   entre páginas.
+
+2. `reclass-transacoes/index.ts` — no fix de paginação de §9.44 (as
+   próprias requisições `.range()` que resolveram o corte de linhas),
+   faltava um `.order()` determinístico. SQL não garante ordem estável
+   entre requisições `LIMIT/OFFSET` separadas sem `ORDER BY` — páginas
+   podiam se sobrepor ou pular linhas, e uma irmã pulada fazia a
+   checagem de grupo completo (D10) passar por engano, o mesmo risco que
+   a paginação de §9.44 tentou fechar. Fix: `.order("id")` antes de cada
+   `.range()`.
+
+`npx tsc`: 63 baseline, 0 novos. Deno edge function checada com
+`deno check` (limpo).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

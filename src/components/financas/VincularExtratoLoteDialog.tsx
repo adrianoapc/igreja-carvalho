@@ -91,37 +91,60 @@ export function VincularExtratoLoteDialog({
     queryFn: async () => {
       if (!igrejaId) return [];
 
-      let query = supabase
-        .from("extratos_bancarios")
-        .select("id, data_transacao, descricao, valor")
-        .eq("igreja_id", igrejaId)
-        .eq("tipo", "credito")
-        .order("data_transacao", { ascending: false });
-      // Sem data_contratacao_contrato (import histórico sem essa coluna
-      // preenchida), dataAncora cai pra hoje — aplicar a janela ±5/+30 dias
-      // em torno de "hoje" excluiria o crédito real de um contrato antigo.
-      // Sem âncora confiável, não filtra por data: busca por texto + score
-      // (que já degrada sozinho sem dataAncora útil) seguem disponíveis pra
-      // achar manualmente (achado do /code-review).
-      if (lote.data_contratacao_contrato) {
-        query = query.gte("data_transacao", dateWindow.inicio).lte("data_transacao", dateWindow.fim);
-      }
-      // Lote com filial definida só pode vincular extrato da mesma filial
-      // (fin_vincular_lote_antecipacao valida isso no backend desde
-      // 20260731100000) — escopa por ela sempre, independente da visão
-      // "todas as filiais". Lote sem filial (global) segue o seletor normal.
-      if (lote.filial_id) {
-        query = query.eq("filial_id", lote.filial_id);
-      } else if (!isAllFiliais && filialId) {
-        // Lote global: fin_vincular_lote_antecipacao checa has_filial_access
-        // contra a filial do EXTRATO nesse caso (COALESCE(lote.filial_id,
-        // extrato.filial_id)) — extrato da própria filial ou compartilhado
-        // (filial_id NULL) passam; eq() sozinho excluiria os compartilhados.
-        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
-      }
+      // Fábrica em vez de um builder reaproveitado: PostgrestFilterBuilder
+      // não é seguro reexecutar após o primeiro await, então cada página do
+      // loop abaixo precisa da sua própria instância com os mesmos filtros.
+      const montarQuery = () => {
+        let q = supabase
+          .from("extratos_bancarios")
+          .select("id, data_transacao, descricao, valor")
+          .eq("igreja_id", igrejaId)
+          .eq("tipo", "credito")
+          .order("data_transacao", { ascending: false })
+          .order("id", { ascending: false });
+        // Sem data_contratacao_contrato (import histórico sem essa coluna
+        // preenchida), dataAncora cai pra hoje — aplicar a janela ±5/+30 dias
+        // em torno de "hoje" excluiria o crédito real de um contrato antigo.
+        // Sem âncora confiável, não filtra por data: busca por texto + score
+        // (que já degrada sozinho sem dataAncora útil) seguem disponíveis pra
+        // achar manualmente (achado do /code-review).
+        if (lote.data_contratacao_contrato) {
+          q = q.gte("data_transacao", dateWindow.inicio).lte("data_transacao", dateWindow.fim);
+        }
+        // Lote com filial definida só pode vincular extrato da mesma filial
+        // (fin_vincular_lote_antecipacao valida isso no backend desde
+        // 20260731100000) — escopa por ela sempre, independente da visão
+        // "todas as filiais". Lote sem filial (global) segue o seletor normal.
+        if (lote.filial_id) {
+          q = q.eq("filial_id", lote.filial_id);
+        } else if (!isAllFiliais && filialId) {
+          // Lote global: fin_vincular_lote_antecipacao checa has_filial_access
+          // contra a filial do EXTRATO nesse caso (COALESCE(lote.filial_id,
+          // extrato.filial_id)) — extrato da própria filial ou compartilhado
+          // (filial_id NULL) passam; eq() sozinho excluiria os compartilhados.
+          q = q.or(`filial_id.eq.${filialId},filial_id.is.null`);
+        }
+        return q;
+      };
 
-      const { data: extratos, error } = await query;
-      if (error) throw error;
+      // PostgREST corta resposta sem paginação (teto documentado de 1000
+      // linhas) — pra lote sem data_contratacao_contrato a busca varre TODO
+      // o histórico de créditos (achado de §9.40 acima), então facilmente
+      // passa disso; sem paginar, o crédito real ficaria fora da página
+      // trazida e o filtro de texto (client-side) nunca o encontraria
+      // (achado do /code-review). Pagina com .range() até uma página vir
+      // mais curta que PAGE_SIZE — .order("id") garante desempate estável
+      // entre páginas quando duas linhas têm a mesma data_transacao.
+      const PAGE_SIZE = 500;
+      const extratos: { id: string; data_transacao: string; descricao: string; valor: number }[] = [];
+      let offset = 0;
+      while (true) {
+        const { data, error } = await montarQuery().range(offset, offset + PAGE_SIZE - 1);
+        if (error) throw error;
+        extratos.push(...(data ?? []));
+        if (!data || data.length < PAGE_SIZE) break;
+        offset += PAGE_SIZE;
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: outrosLotes } = await (supabase.from as any)("getnet_antecipacao_lotes")
