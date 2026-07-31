@@ -3416,6 +3416,58 @@ Mesmo ciclo, sobre o commit de §9.47. 2 novos, ambos reais:
 `npx tsc`: 63 baseline, 0 novos. Deno edge function checada com
 `deno check` (limpo).
 
+### 9.49 22ª rodada de review: 2 P2 corrigidos; o P1 (3º da série "linha legada") em análise separada
+
+Mesmo ciclo, sobre o commit de §9.48. 3 novos — 2 P2 já corrigidos aqui, o
+P1 é o TERCEIRO achado da mesma classe "linha paga legada" (§9.47 DELETE
+via `fin_excluir_lancamento`, §9.48 DELETE via `undo-import`, agora UPDATE
+via "Marcar como Pendente") — tratado à parte por levantar uma decisão de
+escopo (patch pontual vs. fix na raiz do trigger), alinhada com o usuário
+antes de agir.
+
+1. **`ImportarRecebivelGetnetTab.tsx`** (P2) — `parseLinha` preenche
+   índices fora do array com `celulas[idx] ?? ""` → `null`; uma linha
+   truncada ou com um `;` a mais (deslocando colunas) nunca era rejeitada
+   por contagem de células, só produzia campos `null` que a RPC de
+   importação aceita — a linha malformada entrava como "importada com
+   sucesso", poluindo os dados do lote em silêncio. Fix: valida
+   `celulas.length === HEADER_ESPERADO.length` antes de chamar
+   `parseLinha`; linhas com contagem errada são descartadas, contadas
+   à parte de "subtotal ignorado", e sinalizadas com um alerta
+   destrutivo + toast (não é um caso normal como o subtotal, é sinal de
+   arquivo malformado).
+
+2. **`LotesAntecipacaoTab.tsx` / `fin_conferencia_totais_getnet`** (P2)
+   — depois do deságio lançado, a despesa paga gerada podia ser revertida
+   (pendente/cancelada) pelo menu normal de transações
+   (`TransacaoActionsMenu`) sem nada sincronizar o lote de volta: ficava
+   travado em `lancamento_criado` sem ação de relink/relançar na aba, E
+   `fin_conferencia_totais_getnet` continuava somando essa despesa (a
+   query só filtra `lote.status = 'lancamento_criado'`, nunca checa o
+   status atual da transação referenciada).
+
+   Fix (`20260731180000_fin_lote_antecipacao_sincroniza_reversao.sql`):
+   trigger novo em `transacoes_financeiras` — linha com
+   `origem_registro='getnet_antecipacao_desagio'` que estava paga e deixa
+   de estar (`UPDATE` pago→não-pago) reseta o lote correspondente pra
+   `status='vinculado'` (mantém `extrato_bancario_id`, só limpa
+   `lancamento_desagio_id`) — `LotesAntecipacaoTab` volta a oferecer
+   "Corrigir vínculo"/"Lançar como saída" naturalmente, e a conferência
+   para de contar o lote. Branch `DELETE` incluído por simetria mas hoje
+   inalcançável na prática (`lancamento_desagio_id` referencia
+   `transacoes_financeiras(id)` sem `ON DELETE`, migration
+   `20260729100000` — qualquer `DELETE` de linha ainda referenciada falha
+   na própria FK antes do trigger); mantido como defesa em profundidade,
+   testado isoladamente no harness (schema de teste sem essa FK, só pra
+   validar a lógica do trigger em si). 4 cenários no harness: revert
+   pago→pendente (reseta), transação sem essa origem (regressão, não
+   mexe), delete de paga com essa origem (reseta, testado sem a FK real),
+   `UPDATE OF status` disparado mas valor final continua `'pago'`
+   (regressão, não mexe).
+
+`npx tsc`: 63 baseline, 0 novos (item 1). Migration do item 2 validada
+via harness Docker dedicado.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

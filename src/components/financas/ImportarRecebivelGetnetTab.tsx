@@ -169,6 +169,7 @@ export function ImportarRecebivelGetnetTab() {
   const [fileName, setFileName] = useState<string>("");
   const [linhas, setLinhas] = useState<RecebivelGetnetLinha[]>([]);
   const [subtotalIgnoradas, setSubtotalIgnoradas] = useState(0);
+  const [linhasInvalidas, setLinhasInvalidas] = useState(0);
   const [formatoReconhecido, setFormatoReconhecido] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -198,6 +199,7 @@ export function ImportarRecebivelGetnetTab() {
   const limparPreview = () => {
     setLinhas([]);
     setSubtotalIgnoradas(0);
+    setLinhasInvalidas(0);
     setFormatoReconhecido(null);
     setFileName("");
   };
@@ -243,6 +245,7 @@ export function ImportarRecebivelGetnetTab() {
       setFormatoReconhecido(true);
 
       let ignoradas = 0;
+      let invalidas = 0;
       const parsed: RecebivelGetnetLinha[] = [];
       for (const linhaTexto of todasLinhas.slice(1)) {
         const celulas = splitCsvLine(linhaTexto);
@@ -254,11 +257,27 @@ export function ImportarRecebivelGetnetTab() {
           continue;
         }
 
+        // Linha truncada ou com ";" a mais desloca/faltam células — parseLinha
+        // preenche o que falta com null (celulas[idx] ?? ""), e a RPC de
+        // importação aceita esses campos como null, então a linha entraria
+        // como "importada com sucesso" mesmo malformada, poluindo os dados
+        // em silêncio (achado do /code-review). Rejeita ANTES do parse.
+        if (celulas.length !== HEADER_ESPERADO.length) {
+          invalidas++;
+          continue;
+        }
+
         parsed.push(parseLinha(celulas));
       }
 
       setLinhas(parsed);
       setSubtotalIgnoradas(ignoradas);
+      setLinhasInvalidas(invalidas);
+      if (invalidas > 0) {
+        toast.warning(
+          `${invalidas} linha(s) com número de colunas inesperado foram descartadas — confira o arquivo original.`,
+        );
+      }
       toast.success(
         `${parsed.length} linha(s) reconhecida(s)` +
           (ignoradas > 0 ? ` · ${ignoradas} subtotal(is) ignorado(s)` : ""),
@@ -390,6 +409,17 @@ export function ImportarRecebivelGetnetTab() {
                   .
                 </AlertDescription>
               </Alert>
+
+              {linhasInvalidas > 0 && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    {linhasInvalidas} linha(s) descartada(s) por ter um número de
+                    colunas diferente do esperado (arquivo truncado ou com ";"
+                    inesperado) — confira o arquivo original antes de importar.
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <div className="space-y-2">
                 <h4 className="font-medium text-xs">
