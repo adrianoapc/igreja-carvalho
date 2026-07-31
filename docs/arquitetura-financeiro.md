@@ -2837,6 +2837,42 @@ pertencimento em Set — sem harness dedicado, mesmo critério de escopo já
 usado nesta sessão pra fixes puramente de lógica TS de baixa
 complexidade).
 
+### 9.34 8ª rodada de review: vínculo lote↔extrato não era concurrency-safe
+
+Mesmo ciclo de review, rodada seguinte. 11 dos 12 comentários eram
+repetição (`useTransacoesFiltro.ts:72` não voltou — a linha mudou de
+verdade no commit de §9.33, então o Codex parou de ancorar comentário
+nela). 1 real, verificado por leitura direta:
+
+`fin_vincular_lote_antecipacao` trava a linha do LOTE (`FOR UPDATE WHERE
+id = p_lote_id`) e faz um `EXISTS` pra checar se o extrato já está
+vinculado a outro lote — mas isso não trava nada no EXTRATO. Duas
+chamadas concorrentes vinculando **lotes diferentes** ao **mesmo
+extrato** travam linhas de lote diferentes, então nenhuma bloqueia a
+outra: os dois `EXISTS` rodam antes de qualquer `UPDATE` comitar, os dois
+passam, os dois committam — o mesmo crédito bancário vira antecipação de
+2 lotes, e lançar os 2 deságios conta o mesmo dinheiro duas vezes.
+Clássico TOCTOU (time-of-check-to-time-of-use); o `EXISTS` sozinho nunca
+fecha esse tipo de janela, só uma constraint no banco fecha de verdade.
+
+Fix (`20260731140000_fin_lote_extrato_unique.sql`): índice único parcial
+em `extrato_bancario_id` (parcial porque a coluna é nullable — lotes
+ainda não vinculados podem ter `NULL` à vontade, só valores não-nulos
+precisam ser únicos). O `EXISTS` continua ali como fast-path (evita ida
+ao banco pro caso comum, sem corrida), mas quem garante de verdade é o
+índice; o `UPDATE` final ganha um handler de `unique_violation`
+convertendo o erro técnico do Postgres na mesma mensagem `FIN_VALIDACAO`
+amigável que o `EXISTS` já dava.
+
+Harness Docker (T18): confirma o fast-path via RPC (regressão) e, mais
+importante, simula a corrida de verdade fazendo um `UPDATE` direto
+(bypassando o `EXISTS` da RPC) tentando duplicar `extrato_bancario_id` —
+sem concorrência real de duas conexões, mas validando que a garantia que
+realmente importa (a constraint do banco) rejeita mesmo quando a camada
+de aplicação é contornada. 18/18 cenários no total desta sequência.
+
+`npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
