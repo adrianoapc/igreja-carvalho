@@ -3468,6 +3468,54 @@ antes de agir.
 `npx tsc`: 63 baseline, 0 novos (item 1). Migration do item 2 validada
 via harness Docker dedicado.
 
+### 9.50 P1 de §9.49 — fix na raiz: trigger de saldo para de somar/subtrair, sempre recalcula
+
+3ª ocorrência da mesma classe de bug em 3 rodadas seguidas (§9.47 DELETE
+via `fin_excluir_lancamento`, §9.48 DELETE via `undo-import`, §9.49 UPDATE
+via "Marcar como Pendente") — sempre a mesma causa raiz: `atualizar_saldo_
+conta()` fazia matemática INCREMENTAL, e todo branch que "desfaz" um
+movimento assume que ele foi de fato aplicado quando a linha ficou paga.
+Verdade só pra linhas cujo INSERT rodou com o trigger já cobrindo INSERT
+(desde `20260731100000`); uma linha paga criada antes disso por um
+escritor de INSERT-direto (`fin_lancar_sessao`, `fin_pagar_reembolso`)
+nunca teve seu movimento aplicado — qualquer tentativa de desfazê-lo
+corrompia o saldo. 2 patches pontuais já não bastavam; decisão explícita
+do usuário foi resolver na raiz em vez de continuar caçando o próximo
+caminho.
+
+Fix (`20260731190000_fin_saldo_conta_sempre_recalcula.sql`): o trigger
+NUNCA MAIS soma/subtrai incrementalmente. Qualquer evento envolvendo linha
+paga (INSERT pago, DELETE de paga, UPDATE onde `OLD.status='pago' OU
+NEW.status='pago'` — cobre transição de status nos dois sentidos E edição
+de valor/conta/tipo mantendo status pago) recalcula a(s) conta(s)
+afetada(s) DO ZERO via um helper interno novo
+(`_fin_recalcular_saldo_conta_raw`, sem `fin_resolver_contexto` —
+propositalmente sem exigir contexto/permissão, já que roda de dentro do
+trigger disparado por qualquer caller incluindo service_role sem
+`p_contexto`; sem grant pra `authenticated`/`anon`/`service_role`, só
+acessível via ownership de dentro de outra função `SECURITY DEFINER`).
+Elimina a classe de bug inteira, permanentemente, em qualquer caminho
+atual ou futuro — não depende mais de nenhuma suposição sobre o que um
+INSERT anterior aplicou. Custo: uma `SUM` por evento em vez de O(1);
+aceitável na escala esperada (transações por conta de uma igreja).
+
+Consequência: os patches pontuais de §9.47 (`fin_excluir_lancamento`
+chamando `fin_recalcular_saldo_conta` explicitamente) e §9.48
+(`undo-import` fazendo o mesmo em loop) ficaram redundantes — removidos
+nesta mesma migration/commit pra não recalcular a mesma conta 2x à toa.
+
+Harness Docker dedicado, 8 checagens em 2 rodadas (trigger antigo só pro
+setup da linha legada, depois trocado pelo novo): T1 reproduz o cenário
+exato do P1 desta rodada (unpay de linha legada — saldo correto, não mais
+corrompido); T2 insert+delete de linha nova (regressão); T3 edição de
+valor numa linha que continua paga, sem duplicar nem perder a diferença;
+T4 troca de `conta_id` numa linha paga — as DUAS contas recalculadas
+corretamente; T5 pendente→pago normal; T6 pendente editada e excluída não
+mexe no saldo. Todas bateram exatamente com o esperado.
+
+`npx tsc`/`deno check`: 0 novos (mudança 100% backend + simplificação do
+`undo-import`).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
