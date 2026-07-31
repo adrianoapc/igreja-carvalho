@@ -24,6 +24,7 @@ type Lancamento = {
   data_pagamento: string | null;
   origem_registro: string | null;
   forma_pagamento_id?: string | null;
+  forma_pagamento?: string | null;
   conferido_manual?: boolean | null;
   categoria: { nome: string } | null;
   forma: { nome: string } | null;
@@ -70,7 +71,7 @@ export default function SessaoLancamentos() {
         .from("transacoes_financeiras")
         .select(
           `id, valor, data_vencimento, data_pagamento, origem_registro,
-           forma_pagamento_id, conferido_manual,
+           forma_pagamento_id, forma_pagamento, conferido_manual,
            categoria:categoria_id(nome),
            forma:forma_pagamento_id(nome),
            conta:conta_id(nome)`,
@@ -166,7 +167,7 @@ export default function SessaoLancamentos() {
                     const isConciliado = conciliacaoMap.get(l.id);
                     const isConferidoManual =
                       !isConciliado &&
-                      isPagamentoDinheiro(l.forma_pagamento_id, formaDinheiroId) &&
+                      isPagamentoDinheiro(l.forma_pagamento_id, formaDinheiroId, l.forma_pagamento) &&
                       !!l.conferido_manual;
 
                     return (

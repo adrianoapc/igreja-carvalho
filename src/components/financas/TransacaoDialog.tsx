@@ -952,7 +952,13 @@ export function TransacaoDialog({
         // salvar SEM tocar no campo, manda forma_pagamento_id:null — a RPC
         // vê a chave presente e zera também o texto legado forma_pagamento
         // (Codex P2), apagando um dado que o usuário nunca pediu pra mudar.
+        // "" (nunca tocado) e "none" (escolha explícita de "Não
+        // especificado") colapsam pro mesmo formaPagamentoId=null — sem
+        // checar o estado bruto, a limpeza explícita numa transação já
+        // legada (ambos null) também era tratada como "sem mudança" e
+        // silenciosamente ignorada (achado do /code-review).
         const formaPagamentoMudou =
+          formaPagamento === "none" ||
           formaPagamentoId !== (transacao.forma_pagamento_id || null);
         const patchAtualizar = {
           ...camposComuns,

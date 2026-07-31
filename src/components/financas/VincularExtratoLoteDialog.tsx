@@ -96,9 +96,16 @@ export function VincularExtratoLoteDialog({
         .select("id, data_transacao, descricao, valor")
         .eq("igreja_id", igrejaId)
         .eq("tipo", "credito")
-        .gte("data_transacao", dateWindow.inicio)
-        .lte("data_transacao", dateWindow.fim)
         .order("data_transacao", { ascending: false });
+      // Sem data_contratacao_contrato (import histórico sem essa coluna
+      // preenchida), dataAncora cai pra hoje — aplicar a janela ±5/+30 dias
+      // em torno de "hoje" excluiria o crédito real de um contrato antigo.
+      // Sem âncora confiável, não filtra por data: busca por texto + score
+      // (que já degrada sozinho sem dataAncora útil) seguem disponíveis pra
+      // achar manualmente (achado do /code-review).
+      if (lote.data_contratacao_contrato) {
+        query = query.gte("data_transacao", dateWindow.inicio).lte("data_transacao", dateWindow.fim);
+      }
       // Lote com filial definida só pode vincular extrato da mesma filial
       // (fin_vincular_lote_antecipacao valida isso no backend desde
       // 20260731100000) — escopa por ela sempre, independente da visão

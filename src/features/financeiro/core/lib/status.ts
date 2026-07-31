@@ -52,4 +52,13 @@ export const getStatusColorDynamic = (transacao: TransacaoResumo) => {
 export const isPagamentoDinheiro = (
   formaPagamentoId?: string | null,
   formasDinheiroIds?: ReadonlySet<string>,
-) => !!formaPagamentoId && !!formasDinheiroIds?.has(formaPagamentoId);
+  formaPagamentoTexto?: string | null,
+) =>
+  (!!formaPagamentoId && !!formasDinheiroIds?.has(formaPagamentoId)) ||
+  // Fallback pro texto legado: escritores fora do escopo da FK
+  // (fin_pagar_reembolso, fin_criar_transferencia parcialmente — ver
+  // 20260729130000) nunca preenchem forma_pagamento_id, só o texto.
+  // Comparar só por id perde a detecção de "Dinheiro" pra esses casos
+  // (achado do /code-review).
+  (!formaPagamentoId &&
+    (formaPagamentoTexto || "").toLowerCase().includes("dinheiro"));

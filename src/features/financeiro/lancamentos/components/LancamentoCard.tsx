@@ -44,6 +44,7 @@ export interface LancamentoCardTransacao extends TransacaoResumo {
   conciliacao_status?: string | null;
   conferido_manual?: boolean | null;
   forma_pagamento_id?: string | null;
+  forma_pagamento?: string | null;
   solicitacao_reembolso_id?: string | null;
   categoria?: { nome: string; cor?: string | null } | null;
   conta?: { nome: string } | null;
@@ -110,7 +111,7 @@ export function LancamentoCard({
     transacao.conciliacao_status ||
     (conciliacaoMap.get(transacao.id) ? "conciliado_extrato" : "nao_conciliado");
   const formaDinheiroId = useFormaPagamentoDinheiroId();
-  const isDinheiro = isPagamentoDinheiro(transacao.forma_pagamento_id, formaDinheiroId);
+  const isDinheiro = isPagamentoDinheiro(transacao.forma_pagamento_id, formaDinheiroId, transacao.forma_pagamento);
   const isConferidoManual =
     conciliacaoStatus === "nao_conciliado" &&
     isDinheiro &&

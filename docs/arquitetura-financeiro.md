@@ -3070,6 +3070,58 @@ Getnet — decisão explícita do usuário):**
 
 `npx tsc`: 63 baseline, 0 novos.
 
+### 9.40 13ª rodada de review: 4 achados novos, todos reais
+
+Mesmo ciclo, sobre o commit de §9.39. 4 novos, os 4 confirmados por
+leitura direta e corrigidos:
+
+1. **`TransacaoDialog.tsx`** — `formaPagamentoMudou` comparava só o
+   `formaPagamentoId` derivado (`""` sem tocar e `"none"` explícito
+   colapsam pro mesmo `null`). Numa transação legada sem
+   `forma_pagamento_id` mapeado, selecionar explicitamente "Não
+   especificado" também resultava em `null`, então a comparação achava
+   "sem mudança" e omitia `forma_pagamento_id` do patch — a RPC nunca via
+   a chave, o texto legado (`forma_pagamento`) ficava intocado, e a UI
+   reportava sucesso sem ter limpado nada. Fix: `formaPagamentoMudou`
+   passa a ser `true` sempre que o estado bruto do Select for `"none"`
+   (só acontece por ação explícita do usuário — o carregamento inicial
+   nunca seta esse valor), além da comparação por id já existente.
+
+2. **`LotesAntecipacaoTab.tsx`** — lote `vinculado` só oferecia "Lançar
+   como saída"; se o extrato escolhido estava errado, ou gerava deságio
+   não-positivo (rejeitado por `fin_lancar_desagio_antecipacao`), não
+   havia como corrigir o vínculo pela UI — apesar do backend
+   (`fin_vincular_lote_antecipacao`) permitir trocar o vínculo
+   livremente até `lancamento_criado`. Fix: botão "Corrigir vínculo"
+   adicionado ao lado de "Lançar como saída" nesse status, reabrindo
+   `VincularExtratoLoteDialog`.
+
+3. **`status.ts`** — `isPagamentoDinheiro` foi migrada nesta PR de
+   heurística por texto (`forma.toLowerCase().includes("dinheiro")`)
+   pra comparação por `forma_pagamento_id`, mas `fin_pagar_reembolso` é
+   um escritor explicitamente fora do escopo da FK (documentado na
+   própria migration `20260729130000`: "mantida como legado/fallback...
+   pros escritores fora de escopo") — só grava o texto
+   `forma_pagamento='dinheiro'`, nunca o id. Sem fallback, todo
+   reembolso pago em dinheiro parava de ser reconhecido como "Dinheiro"
+   em `LancamentoCard`, `SessaoLancamentos` e no filtro de conferência
+   manual (`useTransacoesFiltro`). Fix: `isPagamentoDinheiro` ganha um
+   3º parâmetro opcional (texto legado) e cai pro fallback de substring
+   só quando `formaPagamentoId` é nulo; os 3 call sites passam o campo
+   `forma_pagamento` (que `SessaoLancamentos.tsx` nem buscava no
+   `select` — adicionado).
+
+4. **`VincularExtratoLoteDialog.tsx`** — sem
+   `data_contratacao_contrato` (import histórico sem essa coluna
+   preenchida), `dataAncora` caía pra "hoje", e a janela fixa
+   `hoje-5..hoje+30` excluía qualquer crédito de um contrato antigo —
+   sem controle de data na UI pra compensar, o lote ficava impossível de
+   vincular. Fix: filtro de data só é aplicado quando
+   `data_contratacao_contrato` existe; sem âncora confiável, a busca por
+   texto (já existente) fica sem filtro de data nenhum.
+
+`npx tsc`: 63 baseline, 0 novos.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

@@ -113,9 +113,19 @@ export function LotesAntecipacaoTab() {
                         </Button>
                       )}
                       {lote.status === "vinculado" && (
-                        <Button size="sm" variant="destructive" onClick={() => setLoteLancando(lote)}>
-                          <TrendingDown className="w-3.5 h-3.5 mr-1" /> Lançar como saída
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          {/* fin_vincular_lote_antecipacao permite trocar o
+                              vínculo até o deságio ser lançado — mantém a
+                              ação disponível pro caso de extrato errado ou
+                              deságio não-positivo rejeitado pela RPC de
+                              lançamento (achado do /code-review). */}
+                          <Button size="sm" variant="outline" onClick={() => setLoteVinculando(lote)}>
+                            <Link2 className="w-3.5 h-3.5 mr-1" /> Corrigir vínculo
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => setLoteLancando(lote)}>
+                            <TrendingDown className="w-3.5 h-3.5 mr-1" /> Lançar como saída
+                          </Button>
+                        </div>
                       )}
                       {lote.status === "lancamento_criado" && (
                         <span className="text-xs text-muted-foreground">Concluído</span>
