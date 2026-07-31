@@ -2989,6 +2989,39 @@ Mesmo ciclo, sobre o commit de §9.36. 2 novos, ambos reais:
 
 `npx tsc`: 63 baseline, 0 novos.
 
+### 9.38 12ª rodada de review: mais 2 dropdowns excluindo registro global
+
+Mesmo ciclo, sobre o commit de §9.37. 2 novos, mesma classe de bug (`.eq
+("filial_id", filialId)` excluindo `filial_id IS NULL`), confirmados
+antes de corrigir:
+
+1. `VincularExtratoLoteDialog.tsx:109` — ao vincular um lote GLOBAL
+   (`lote.filial_id IS NULL`) num extrato, a lista de extratos candidatos
+   filtrava só pela filial atual, excluindo extratos compartilhados.
+   Confirmado contra o backend: `fin_vincular_lote_antecipacao`
+   (20260731140000) checa `has_filial_access(v_igreja,
+   COALESCE(v_lote.filial_id, v_extrato.filial_id))` — pra lote global,
+   isso é o acesso à filial do EXTRATO, que passa tanto pra extrato da
+   própria filial quanto pra global.
+
+2. `ConferenciaTotaisGetnetCard.tsx:37` — dropdown de conta pro card de
+   conferência de totais Getnet excluía contas compartilhadas. Confirmado
+   contra `fin_conferencia_totais_getnet` (20260729140000): a RPC só
+   valida `fin_validar_fk_tenant` (tenant), sem nenhuma restrição de
+   filial — o filtro do frontend era mais restritivo que a RPC.
+
+Fix nos dois: mesmo `.or("filial_id.eq.<uuid>,filial_id.is.null")` já
+usado em §9.35/9.36/9.37.
+
+Verificação de escopo: grep de `.eq("filial_id"` nos demais arquivos
+tocados por esta PR encontrou 1 ocorrência a mais dentro do diff
+(`ExportarTab.tsx:177`), mas é o mesmo código pré-existente apenas
+realocado por um refactor desta PR (aparece como remoção em uma posição
+e adição idêntica em outra no `git diff main...HEAD`) — não é lógica nova
+introduzida por esta PR, mesmo critério de "fora de escopo" de §9.36.
+
+`npx tsc`: 63 baseline, 0 novos.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

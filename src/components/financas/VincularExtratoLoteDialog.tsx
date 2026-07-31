@@ -106,7 +106,11 @@ export function VincularExtratoLoteDialog({
       if (lote.filial_id) {
         query = query.eq("filial_id", lote.filial_id);
       } else if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
+        // Lote global: fin_vincular_lote_antecipacao checa has_filial_access
+        // contra a filial do EXTRATO nesse caso (COALESCE(lote.filial_id,
+        // extrato.filial_id)) — extrato da própria filial ou compartilhado
+        // (filial_id NULL) passam; eq() sozinho excluiria os compartilhados.
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
       }
 
       const { data: extratos, error } = await query;

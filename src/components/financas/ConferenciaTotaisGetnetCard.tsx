@@ -34,7 +34,10 @@ export function ConferenciaTotaisGetnetCard() {
     queryFn: async () => {
       if (!igrejaId) return [];
       let query = supabase.from("contas").select("id, nome").eq("ativo", true).eq("igreja_id", igrejaId).order("nome");
-      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      // Conta compartilhada (filial_id NULL) é visível em qualquer filial
+      // (mesma convenção de RLS de sempre) e fin_conferencia_totais_getnet
+      // não restringe por filial — eq() sozinho excluiria as compartilhadas.
+      if (!isAllFiliais && filialId) query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
       const { data, error } = await query;
       if (error) throw error;
       return data;
