@@ -117,7 +117,10 @@ export function useDadosApoio(
         .eq("igreja_id", igrejaId)
         .order("nome");
       if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
+        // Forma de pagamento criada em "Todas as filiais" (filial_id NULL) é
+        // compartilhada — RLS já trata assim via has_filial_access (OR
+        // _filial_id IS NULL); eq() sozinho a excluiria indevidamente.
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
       }
       const { data, error } = await query;
       if (error) throw error;

@@ -40,7 +40,10 @@ export function useLotesAntecipacao() {
         .eq("igreja_id", igrejaId)
         .order("data_contratacao_contrato", { ascending: false });
       if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
+        // Lotes globais (filial_id NULL) são aceitos pelo backend em
+        // qualquer filial (fin_vincular_lote_antecipacao) — eq() sozinho os
+        // excluiria da visão de uma filial específica.
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
       }
       const { data, error } = await query;
       if (error) throw error;

@@ -2907,6 +2907,42 @@ na PR. 2 achados novos e reais, verificados por leitura direta:
 Mudança 100% frontend, sem migration nova. `npx tsc`: 63 baseline, 0 novos
 nos dois arquivos.
 
+### 9.36 10ª rodada de review: mesmo padrão de filtro de filial em mais 2 hooks
+
+Mesmo ciclo, sobre o commit de §9.35. 26 dos 28 comentários retornados pela
+API eram os 13 threads de §9.35 (já resolvidas, a API de comments as lista
+de novo independente do estado de resolução) mais as próprias 13 respostas.
+2 novos, mesma classe de bug do item 2 de §9.35 — filtro `.eq("filial_id",
+filialId)` excluindo registro global (`filial_id IS NULL`) que deveria
+ficar visível em qualquer filial:
+
+1. `useLotesAntecipacao.ts:43` — lista de lotes de antecipação Getnet, na
+   visão de uma filial específica, excluía lotes globais
+   (`getnet_antecipacao_lotes.filial_id IS NULL`) que o backend
+   (`fin_vincular_lote_antecipacao`, §9.30) aceita vincular a qualquer
+   extrato do tenant — tesoureiro de filial não conseguia nem ver o lote
+   pra iniciar o fluxo.
+
+2. `useDadosApoio.ts:120` — lista de formas de pagamento pro
+   `TransacaoDialog`, mesma exclusão para formas criadas em "Todas as
+   filiais" (`filial_id NULL`). Confirmado via RLS antes de corrigir
+   (`has_filial_access`, migration `20260105153404`: `... OR _filial_id IS
+   NULL`) — RLS já trata `filial_id NULL` como compartilhado; o filtro do
+   frontend era mais restritivo que a política real.
+
+Fix nos dois: troca `.eq("filial_id", filialId)` por
+`.or("filial_id.eq.<uuid>,filial_id.is.null")`.
+
+Achado extra (não corrigido, fora de escopo): grep por
+`.eq("filial_id"` no restante do código mostra ~150 outras ocorrências do
+mesmo padrão, em módulos fora do diff desta PR (Kids, Pessoas, Eventos,
+Voluntariado, Escalas etc.) — não faz parte deste PR nem foi sinalizado
+pelo Codex (só comenta linhas do diff). Candidato a uma varredura dedicada
+futura, não desta sessão.
+
+Mudança 100% frontend, sem migration nova. `npx tsc`: 63 baseline, 0 novos
+nos dois arquivos.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
