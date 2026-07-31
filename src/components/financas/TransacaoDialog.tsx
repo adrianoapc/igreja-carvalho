@@ -151,6 +151,10 @@ export function TransacaoDialog({
   const [confirmarSincronizarGrupo, setConfirmarSincronizarGrupo] = useState<{
     lancamentoId: string;
     novaCompetencia: string;
+    // Competência ANTES da sincronização — usada pra reverter o grupo
+    // inteiro se o reaplicar do patchRestante falhar (compensação, já que
+    // as duas RPCs não rodam na mesma transação de banco).
+    competenciaAnterior: string | null;
     // Resto do patch (descrição, valor, forma de pagamento etc.) que a RPC
     // recusou junto por causa do bloqueio de competência — reaplicado após
     // sincronizar o grupo, senão essas edições se perdem silenciosamente
@@ -1000,6 +1004,7 @@ export function TransacaoDialog({
             setConfirmarSincronizarGrupo({
               lancamentoId: String(transacao.id),
               novaCompetencia: competenciaFormatada!,
+              competenciaAnterior: transacao.data_competencia ?? null,
               patchRestante,
             });
             return;
@@ -1102,10 +1107,42 @@ export function TransacaoDialog({
       // junto com a mudança de competência — sincronizar o grupo não pode
       // jogar fora as outras edições pedidas no mesmo submit (Codex P1).
       if (Object.keys(confirmarSincronizarGrupo.patchRestante).length > 0) {
-        await atualizarLancamento(
-          confirmarSincronizarGrupo.lancamentoId,
-          confirmarSincronizarGrupo.patchRestante,
-        );
+        try {
+          await atualizarLancamento(
+            confirmarSincronizarGrupo.lancamentoId,
+            confirmarSincronizarGrupo.patchRestante,
+          );
+        } catch (patchError: unknown) {
+          // As duas RPCs não rodam na mesma transação de banco — se o
+          // resto do patch falhar (ex.: FK apagada ou transação conciliada
+          // nesse meio-tempo), a competência do grupo INTEIRO já foi
+          // commitada pela chamada acima. Compensa revertendo o grupo pra
+          // competência anterior em vez de deixar a mudança de competência
+          // aplicada sem o resto das edições pedidas no mesmo submit
+          // (achado do /code-review).
+          const msgBase =
+            patchError instanceof Error
+              ? patchError.message
+              : "Erro ao salvar as demais alterações";
+          if (confirmarSincronizarGrupo.competenciaAnterior) {
+            try {
+              await alterarCompetenciaGrupo(
+                confirmarSincronizarGrupo.lancamentoId,
+                confirmarSincronizarGrupo.competenciaAnterior,
+              );
+              toast.error(`${msgBase} — competência do grupo revertida, nada foi alterado.`);
+            } catch {
+              toast.error(
+                `${msgBase} — a competência do grupo já foi alterada e NÃO pôde ser revertida automaticamente. Confira manualmente.`,
+              );
+            }
+          } else {
+            toast.error(
+              `${msgBase} — a competência do grupo já foi alterada e não há valor anterior conhecido pra reverter. Confira manualmente.`,
+            );
+          }
+          return;
+        }
       }
 
       toast.success("Competência sincronizada em todas as parcelas do lançamento!");

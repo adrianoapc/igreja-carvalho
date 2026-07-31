@@ -3122,6 +3122,33 @@ leitura direta e corrigidos:
 
 `npx tsc`: 63 baseline, 0 novos.
 
+### 9.41 14ª rodada de review: sincronizar competência de grupo não era atômico
+
+Mesmo ciclo, sobre o commit de §9.40. 1 novo, real: `handleSincronizar
+CompetenciaGrupo` chama duas RPCs em sequência — `alterarCompetenciaGrupo`
+(muda a competência de TODAS as parcelas do grupo) e, se `patchRestante`
+não estiver vazio, `atualizarLancamento` (reaplica o resto do patch
+original: descrição, valor, forma de pagamento etc. — ver D10/§9.19). As
+duas não rodam na mesma transação de banco; se a segunda falhar (FK
+apagada ou transação conciliada concorrentemente, por exemplo), a
+competência do grupo inteiro já tinha sido commitada pela primeira, mas o
+resto das edições pedidas no mesmo submit se perdia — o catch só mostrava
+um erro genérico, sem meio de desfazer o que já tinha sido salvo.
+
+Fix (compensação, não transação real — as duas RPCs continuam
+independentes): o estado `confirmarSincronizarGrupo` passa a guardar
+`competenciaAnterior` (capturada de `transacao.data_competencia` no
+momento em que o bloqueio `FIN_COMPETENCIA_GRUPO` é detectado). Se
+`atualizarLancamento` falhar depois da competência já ter sido
+sincronizada, tenta reverter o grupo pra `competenciaAnterior` via uma
+segunda chamada a `alterarCompetenciaGrupo` — sucesso ou falha do
+revert, o toast final deixa claro pro usuário se ficou tudo desfeito ou
+se precisa conferir manualmente (não há como isso passar despercebido em
+qualquer um dos 3 desfechos possíveis: tudo certo, revertido, ou
+precisa de conferência manual).
+
+`npx tsc`: 63 baseline, 0 novos.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
