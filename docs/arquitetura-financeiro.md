@@ -2873,6 +2873,40 @@ de aplicação é contornada. 18/18 cenários no total desta sequência.
 
 `npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
 
+### 9.35 9ª rodada de review: total agrupado ignorava toggle líquido + conta global excluída no deságio
+
+Mesmo ciclo de review, sobre o commit de §9.34. 13 dos 15 comentários eram
+repetição de achados já corrigidos em commits anteriores desta mesma PR
+(inclusive 2 casos — FK órfã em `20260731110000` e índice único em
+`20260731140000` — onde a "correção" é reconhecer que não há risco real:
+a tabela `getnet_antecipacao_lotes` e a função vulnerável nasceram nesta
+mesma PR ainda não deployada, então não existe dado de produção que possa
+ter passado pela janela de corrida antes da constraint existir). Todas as
+13 threads stale foram respondidas com o commit onde já haviam sido
+corrigidas (ou a razão de não haver risco real) e marcadas como resolvidas
+na PR. 2 achados novos e reais, verificados por leitura direta:
+
+1. `Contas.tsx` → `renderTransactionListGrouped` (visão agrupada por data)
+   calculava o total do grupo e o valor de cada linha expandida sempre com
+   `Number(t.valor)` (bruto), ignorando o toggle Bruto/Líquido —
+   `valorEfetivo(t)` (que usa `valor_liquido` quando `visaoValor ===
+   "liquido"`) já existia e era usado corretamente na lista não-agrupada
+   (`renderTransactionList`), só não tinha sido aplicado na agrupada. Fix:
+   troca `Number(t.valor)` por `valorEfetivo(t)` nos 3 branches do total
+   (só-entrada, só-saída, misto) e no valor individual da linha expandida.
+
+2. `LancarDesagioDialog.tsx` → dropdown de conta filtrava com
+   `.eq("filial_id", filialEfetivaLote)` quando o extrato vinculado tinha
+   filial — em SQL, `NULL` nunca é igual a nada, então contas globais
+   (`filial_id IS NULL`) desapareciam do dropdown mesmo o backend
+   (`fin_lancar_desagio_antecipacao`, §9.30) aceitando explicitamente
+   conta global nesse caso (só rejeita quando `v_conta_filial IS NOT NULL
+   AND` diverge). Fix: troca por `.or("filial_id.eq.<uuid>,filial_id.is.null")`
+   pra incluir as globais, espelhando a regra do backend.
+
+Mudança 100% frontend, sem migration nova. `npx tsc`: 63 baseline, 0 novos
+nos dois arquivos.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

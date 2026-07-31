@@ -52,7 +52,10 @@ export function LancarDesagioDialog({ open, onOpenChange, lote, onLancado }: Lan
       if (!igrejaId) return [];
       let query = supabase.from("contas").select("id, nome").eq("ativo", true).eq("igreja_id", igrejaId).order("nome");
       if (filialEfetivaLote) {
-        query = query.eq("filial_id", filialEfetivaLote);
+        // Backend (fin_lancar_desagio_antecipacao) aceita a conta da mesma
+        // filial OU global (filial_id NULL) — eq() sozinho excluiria as
+        // globais, já que NULL nunca é igual a um UUID em SQL.
+        query = query.or(`filial_id.eq.${filialEfetivaLote},filial_id.is.null`);
       } else if (!isAllFiliais && filialId) {
         query = query.eq("filial_id", filialId);
       }

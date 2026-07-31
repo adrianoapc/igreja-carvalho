@@ -716,12 +716,12 @@ export default function Contas() {
 
           if (temEntradas && !temSaidas) {
             // Só entradas - mostrar total positivo em verde
-            totalGrupo = grupo.reduce((sum, t) => sum + Number(t.valor), 0);
+            totalGrupo = grupo.reduce((sum, t) => sum + valorEfetivo(t), 0);
             corTotal = "text-green-600";
             prefixo = "+";
           } else if (temSaidas && !temEntradas) {
             // Só saídas - mostrar total positivo em vermelho (o contexto já indica que é saída)
-            totalGrupo = grupo.reduce((sum, t) => sum + Number(t.valor), 0);
+            totalGrupo = grupo.reduce((sum, t) => sum + valorEfetivo(t), 0);
             corTotal = "text-red-600";
             prefixo = "-";
           } else {
@@ -729,7 +729,7 @@ export default function Contas() {
             totalGrupo = grupo.reduce(
               (sum, t) =>
                 sum +
-                (t.tipo === "entrada" ? Number(t.valor) : -Number(t.valor)),
+                (t.tipo === "entrada" ? valorEfetivo(t) : -valorEfetivo(t)),
               0,
             );
             corTotal = totalGrupo >= 0 ? "text-green-600" : "text-red-600";
@@ -835,7 +835,7 @@ export default function Contas() {
                           }`}
                         >
                           {t.tipo === "entrada" ? "+" : "-"}{" "}
-                          {formatCurrency(Number(t.valor))}
+                          {formatCurrency(valorEfetivo(t))}
                         </p>
                       </div>
                     </div>
