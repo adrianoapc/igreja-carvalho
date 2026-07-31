@@ -407,16 +407,28 @@ Deno.serve(async (req) => {
       );
 
       if (paisAlvo.length > 0) {
-        const { data: grupoCompleto, error: grupoError } = await supabase
-          .from("transacoes_financeiras")
-          .select("id")
-          .eq("igreja_id", igreja_id)
-          .or(
-            paisAlvo
-              .map((pai) => `lancamento_pai_id.eq.${pai},id.eq.${pai}`)
-              .join(","),
-          );
-        if (grupoError) throw grupoError;
+        // O job aceita até 5000 transações (limite abaixo); num lote com
+        // muitos grupos parcelados distintos, paisAlvo pode ter centenas/
+        // milhares de entradas — um único .or() com 2 predicados UUID por
+        // pai gera uma URL de centenas de KB e é rejeitada pelo gateway
+        // antes da checagem de irmãs rodar (achado do /code-review). Divide
+        // em lotes fixos pra manter cada requisição num tamanho seguro.
+        const PAIS_POR_LOTE = 100;
+        const grupoCompleto: { id: string }[] = [];
+        for (let i = 0; i < paisAlvo.length; i += PAIS_POR_LOTE) {
+          const lotePais = paisAlvo.slice(i, i + PAIS_POR_LOTE);
+          const { data, error: grupoError } = await supabase
+            .from("transacoes_financeiras")
+            .select("id")
+            .eq("igreja_id", igreja_id)
+            .or(
+              lotePais
+                .map((pai) => `lancamento_pai_id.eq.${pai},id.eq.${pai}`)
+                .join(","),
+            );
+          if (grupoError) throw grupoError;
+          grupoCompleto.push(...(data ?? []));
+        }
 
         const idsAlvo = new Set(transacoes.map((t) => t.id));
         const irmasForaDaSelecao = (grupoCompleto ?? []).filter(

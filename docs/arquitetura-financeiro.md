@@ -3149,6 +3149,25 @@ precisa de conferência manual).
 
 `npx tsc`: 63 baseline, 0 novos.
 
+### 9.42 15ª rodada de review: checagem de grupo parcelado sem lote em massa
+
+Mesmo ciclo, sobre o commit de §9.41. 1 novo, real:
+`reclass-transacoes/index.ts` (job de reclassificação em massa, aceita
+até 5000 transações) — ao alterar `data_competencia`, a checagem de
+"todas as parcelas irmãs estão na seleção" (D10, §9.19) montava um único
+`.or()` com 2 predicados UUID (`lancamento_pai_id.eq.<id>,id.eq.<id>`)
+por grupo parcelado distinto (`paisAlvo`). Um lote grande com muitos
+grupos parcelados diferentes gera uma URL de centenas de KB, rejeitada
+pelo gateway antes da checagem — nem a query de irmãs nem o update
+chegam a rodar, o job falha inteiro sem mensagem útil.
+
+Fix: `paisAlvo` dividido em lotes fixos de 100 antes de montar cada
+`.or()`, resultados unidos em `grupoCompleto` — mesma lógica e mesmo
+resultado final, só bounded por requisição.
+
+Deno edge function, fora do `npx tsc` do projeto principal — checado com
+`deno check supabase/functions/reclass-transacoes/index.ts` (limpo).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
