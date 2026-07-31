@@ -2943,6 +2943,52 @@ futura, não desta sessão.
 Mudança 100% frontend, sem migration nova. `npx tsc`: 63 baseline, 0 novos
 nos dois arquivos.
 
+### 9.37 11ª rodada de review: extrato global pulava o check de acesso à conta
+
+Mesmo ciclo, sobre o commit de §9.36. 2 novos, ambos reais:
+
+1. **`fin_lancar_desagio_antecipacao`** (última versão: 20260731120000) —
+   `has_filial_access(v_igreja, v_extrato.filial_id)` recebia a filial do
+   EXTRATO. Quando o extrato vinculado ao lote é global (`filial_id NULL`
+   — conta compartilhada), `has_filial_access` retorna `true` pra
+   QUALQUER usuário do tenant (mesma convenção de sempre: registro global
+   é compartilhado). E como o check de compatibilidade logo abaixo só
+   roda quando `v_extrato.filial_id IS NOT NULL`, ele também era pulado
+   nesse caso — nada validava que a CONTA escolhida (`p_conta_id`)
+   pertence a uma filial que o chamador realmente acessa. Um tesoureiro
+   da filial A que soubesse o UUID de uma conta da filial B conseguia
+   lançar o deságio nela diretamente via RPC (`SECURITY DEFINER` bypassa
+   RLS), desde que o lote estivesse vinculado a um extrato global.
+
+   Fix (`20260731150000_fin_desagio_filial_efetiva_extrato_global.sql`):
+   busca `v_conta_filial` ANTES do guard de acesso e checa
+   `has_filial_access(v_igreja, COALESCE(v_extrato.filial_id,
+   v_conta_filial))` — extrato com filial mantém o comportamento
+   original; extrato global passa a validar acesso contra a filial da
+   CONTA escolhida.
+
+   Harness Docker dedicado (schema mínimo reconstruído do zero — os
+   arquivos de sessões anteriores não sobreviveram no scratchpad; stubs
+   de `has_filial_access`/`fin_resolver_contexto` controlados por GUC de
+   sessão em vez de JWT real). 5 cenários rodados 2x (função pré-fix e
+   pós-fix, mesmos dados): T1/T2 (extrato com filial, conta mesma/outra
+   filial — regressão, comportamento idêntico nas duas versões) e T4/T5
+   (extrato global, conta própria/global — regressão, sempre sucede).
+   T3 (extrato global, conta de outra filial — o exploit) sucede
+   indevidamente na versão pré-fix e é corretamente rejeitado
+   (`FIN_TENANT: sem acesso à filial deste lote/extrato`) na pós-fix.
+
+2. **`LancarDesagioDialog.tsx`** — o fix de §9.35 (contas globais no
+   dropdown) só cobria o branch `filialEfetivaLote` truthy; o `else`
+   (extrato global, `filialEfetivaLote` null) ainda filtrava com
+   `.eq("filial_id", filialId)` puro, excluindo contas globais do mesmo
+   jeito. Mesma correção: `.or("filial_id.eq.<uuid>,filial_id.is.null")`
+   também nesse branch — espelha a regra efetiva do backend após o fix
+   do item 1 (extrato global valida contra a filial da conta, que pode
+   ser a própria filial do usuário OU global).
+
+`npx tsc`: 63 baseline, 0 novos.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

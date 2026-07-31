@@ -57,7 +57,9 @@ export function LancarDesagioDialog({ open, onOpenChange, lote, onLancado }: Lan
         // globais, já que NULL nunca é igual a um UUID em SQL.
         query = query.or(`filial_id.eq.${filialEfetivaLote},filial_id.is.null`);
       } else if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
+        // Extrato do lote é global (filialEfetivaLote null) — mesmo raciocínio
+        // acima: conta da filial atual OU global, nunca só eq().
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
       }
       const { data, error } = await query;
       if (error) throw error;
