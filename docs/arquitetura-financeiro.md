@@ -2705,6 +2705,60 @@ OK.
 
 `npx tsc`: 63 baseline, 0 novos. `npx eslint`: limpo nos arquivos tocados.
 
+### 9.31 3 achados reais na 5ª rodada de review (Codex): saldo pago→pago, autorização de filial, contexto não repassado
+
+Mesmo ciclo de `/code-review` do §9.30, rodada seguinte, sobre o commit do
+fix anterior. 6 dos 9 comentários eram repetição do que já estava
+corrigido (mesmos 3 stale de sempre — competência, forma_pagamento legada,
+`useMemo` deps — confirmados de novo por leitura direta; mais os 2
+achados já mitigados de §9.29/9.28 — reversão pós-deploy, ajuste manual
+legado — que o Codex não tem como enxergar resolvidos porque a mitigação
+vive noutro arquivo/é uma decisão de produto, não uma mudança de código
+que o diff mostra). 3 eram reais, verificados por leitura direta antes de
+corrigir (`20260731120000_fin_pos_review_pr67_fixes3.sql`):
+
+1. **`atualizar_saldo_conta()` não cobria pago→pago.** O trigger (mesmo já
+   com o fix de §9.29 pra INSERT) só tratava as transições pendente↔pago —
+   editar valor/desconto/taxas/conta de uma transação que **continua**
+   `pago` (ex.: corrigir um valor digitado errado em algo já confirmado,
+   via `TransacaoDialog`) mudava `valor_liquido` na linha mas não tocava
+   `contas.saldo_atual`, que ficava desatualizado silenciosamente. Fix:
+   terceiro branch (`OLD.status='pago' AND NEW.status='pago'`) desfaz o
+   movimento antigo (conta/tipo/valor de antes) e aplica o novo — cobre
+   tanto o caso comum (mesma conta, valor mudou) quanto o mais raro
+   (conta_id ou tipo trocados mantendo pago).
+2. **`fin_vincular_lote_antecipacao`/`fin_lancar_desagio_antecipacao` não
+   verificavam acesso à filial do chamador** — só igreja_id. Sendo
+   `SECURITY DEFINER` (bypassa RLS), um tesoureiro restrito a uma filial
+   que soubesse o UUID de um lote/extrato de outra conseguia agir nele
+   direto via RPC, ignorando a segmentação de filial da UI — mesma classe
+   de gap que `fin_importar_recebivel_getnet` já cobria (e que o checklist
+   de `[[feedback-fin-rpc-security-checklist]]` prevê). Fix: os dois
+   ganharam `has_filial_access(v_igreja, filial_efetiva)` — filial do lote
+   quando definida, senão a do extrato (mesmo conceito de "filial efetiva"
+   de §9.30).
+3. **`fin_lancar_desagio_antecipacao` passava `NULL` pro `p_contexto` da
+   chamada aninhada a `fin_criar_lancamento`**, em vez do `v_ctx` já
+   resolvido. Sem efeito hoje (só tem call-site via UI/web, onde
+   `fin_resolver_contexto(NULL,...)` recalcula do zero sem problema), mas
+   quebraria um caller service-role (bot/edge) futuro — `fin_resolver_
+   contexto` exige `p_contexto` não-nulo nesse canal. Bug pré-existente
+   (a chamada já vinha assim antes desta PR), barato de corrigir já que a
+   função estava sendo tocada mesmo.
+
+Harness Docker estendido (T14-T16): editar valor de uma transação já paga
+rebalanceia o saldo pelo delta (T14); trocar `conta_id` mantendo pago move
+o saldo da conta antiga pra nova (T15); tesoureiro com `get_jwt_filial_id()`
+setado pra uma filial é rejeitado tentando vincular lote de outra e segue
+liberado pra vincular lote da própria (T16 — precisou de um pequeno stub
+novo no harness, `get_jwt_filial_id()` lendo de uma GUC setável por teste,
+já que o stub original do `harness2_schema.sql` retornava `NULL` fixo
+= acesso irrestrito sempre, incapaz de exercitar o caminho de rejeição).
+16/16 cenários no total (T1-T13 de §9.29/9.30 + T14-T16).
+
+`npx tsc`: 63 baseline, 0 novos (mudança 100% backend, nenhum arquivo TS
+tocado nesta rodada).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
