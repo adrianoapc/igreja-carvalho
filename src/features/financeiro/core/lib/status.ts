@@ -51,5 +51,5 @@ export const getStatusColorDynamic = (transacao: TransacaoResumo) => {
 
 export const isPagamentoDinheiro = (
   formaPagamentoId?: string | null,
-  formaDinheiroId?: string | null,
-) => !!formaPagamentoId && formaPagamentoId === formaDinheiroId;
+  formasDinheiroIds?: ReadonlySet<string>,
+) => !!formaPagamentoId && !!formasDinheiroIds?.has(formaPagamentoId);

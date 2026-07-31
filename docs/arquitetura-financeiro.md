@@ -2800,6 +2800,43 @@ cenários no total desta sequência de fixes pós-review.
 
 `npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
 
+### 9.33 7ª rodada de review: `useFormaPagamentoDinheiroId` só resolvia uma forma "Dinheiro" por igreja
+
+Mesmo ciclo de review, rodada seguinte. 12 dos 13 comentários eram
+repetição do que já estava corrigido em commits anteriores (§9.28-9.32).
+1 real, verificado por leitura direta antes de corrigir:
+
+`useFormaPagamentoDinheiroId` resolvia só a forma de pagamento "Dinheiro"
+mais antiga da igreja (`.order("created_at").limit(1)`), mas
+`formas_pagamento` pode ter uma linha "Dinheiro" por filial (mesmo padrão
+de duplicação já visto em §9.26 — a causa raiz ali era outra, falta de
+filtro de igreja/filial, mas o CONCEITO de "mais de um Dinheiro por
+igreja" é o mesmo). Igrejas com "Dinheiro" cadastrado por filial faziam
+`isPagamentoDinheiro` nunca bater pras transações que não usassem
+especificamente a forma mais antiga — "Conferido Manual" ficava invisível
+e o filtro correspondente excluía essas linhas silenciosamente, em
+`LancamentoCard`, `SessaoLancamentos` e `useTransacoesFiltro`. Achado
+antecipado já em §9.26 ("resolver determinística mas potencialmente pra
+filial errada... fica para outra sessão") — corrigido agora.
+
+Fix: `useFormaPagamentoDinheiroId` passa a retornar um `Set<string>` com
+TODOS os ids "Dinheiro" da igreja (não só o mais antigo);
+`isPagamentoDinheiro` (core/lib/status.ts) passa a checar pertencimento no
+Set em vez de igualdade com um id único. Aproveitado pra também matar a
+duplicação que `useTransacoesFiltro.ts` já tinha (reimplementava o mesmo
+`isDinheiro` inline em vez de chamar o helper compartilhado) — agora
+importa e usa `isPagamentoDinheiro` direto.
+
+`npx tsc`: 63 baseline, 0 novos — os 3 call-sites (`LancamentoCard`,
+`SessaoLancamentos`, `TransacoesPage`→`useTransacoesFiltro`) só passam a
+variável adiante, sem precisar de edição própria, o tipo `Set<string>`
+flui de ponta a ponta. `npx eslint`: mesmos 2 erros pré-existentes
+(confirmados via `git stash`), nenhum novo. Verificado por leitura
+cuidadosa da lógica (mudança pequena e mecânica — igualdade vira
+pertencimento em Set — sem harness dedicado, mesmo critério de escopo já
+usado nesta sessão pra fixes puramente de lógica TS de baixa
+complexidade).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { isPagamentoDinheiro } from "@/features/financeiro/core";
 
 export interface Transacao {
   id: string;
@@ -35,7 +36,7 @@ export function useTransacoesFiltro(
   transacoes: Transacao[] | undefined,
   filtros: FiltrosTransacao,
   conciliacaoMap?: ConciliacaoMap,
-  formaDinheiroId?: string | null,
+  formasDinheiroIds?: ReadonlySet<string>,
 ) {
   return useMemo(() => {
     if (!transacoes) return [];
@@ -68,7 +69,7 @@ export function useTransacoesFiltro(
       const conciliacao = t.conciliacao_status || (conciliacaoMap && conciliacaoMap.get(t.id) ? "conciliado_extrato" : "nao_conciliado");
       if (conciliacaoStatus !== "all") {
         if (conciliacaoStatus === "conferido_manual") {
-          const isDinheiro = !!formaDinheiroId && t.forma_pagamento_id === formaDinheiroId;
+          const isDinheiro = isPagamentoDinheiro(t.forma_pagamento_id, formasDinheiroIds);
           if (!(conciliacao === "nao_conciliado" && isDinheiro && t.conferido_manual)) {
             return false;
           }
@@ -78,5 +79,5 @@ export function useTransacoesFiltro(
       }
       return true;
     });
-  }, [transacoes, filtros, conciliacaoMap, formaDinheiroId]);
+  }, [transacoes, filtros, conciliacaoMap, formasDinheiroIds]);
 }
