@@ -3168,6 +3168,47 @@ resultado final, só bounded por requisição.
 Deno edge function, fora do `npx tsc` do projeto principal — checado com
 `deno check supabase/functions/reclass-transacoes/index.ts` (limpo).
 
+### 9.43 16ª rodada de review: exclusão de lançamento pago deixava resíduo de saldo
+
+Mesmo ciclo, sobre o commit de §9.42. 1 novo, real e diretamente causado
+por uma mudança desta própria PR: `20260731100000` (§9.29) estendeu o
+trigger `trigger_atualizar_saldo_conta` pra cobrir `AFTER INSERT` (além
+de `UPDATE OF status`), pra RPCs que criam lançamento já `'pago'` direto
+(`fin_lancar_sessao`, `fin_pagar_reembolso`,
+`fin_lancar_desagio_antecipacao` desta mesma PR) moverem
+`contas.saldo_atual` corretamente na criação.
+
+Efeito colateral não percebido: `fin_excluir_lancamento` sempre fez
+`DELETE` físico de linha paga (só emite warning, não bloqueia — decisão
+deliberada de antes desta PR, documentada e mitigada pelo botão
+"Recalcular Saldo"). Antes de `20260731100000`, deletar uma transação
+paga criada via INSERT direto era neutro pro saldo (o trigger nunca
+tinha movido nada nesse INSERT). Depois, o INSERT passou a mover — mas o
+trigger nunca ganhou um branch de `DELETE`, então excluir essa mesma
+transação paga passou a deixar sempre um resíduo real no saldo (mesma
+classe de drift que o warning já alertava, só que agora acontece
+sistematicamente pra qualquer lançamento pago recém-criado excluído, não
+só num caso raro).
+
+Fix (`20260731160000_fin_saldo_conta_reversao_delete.sql`): trigger
+ganha branch `TG_OP = 'DELETE'` desfazendo o movimento
+(`OLD.tipo`/`OLD.valor_liquido`) quando a linha excluída estava paga —
+mesmo raciocínio do branch "pago → pendente/cancelado" já existente.
+Trigger recriado incluindo `DELETE` no evento. Warning de
+`fin_excluir_lancamento` removido (deixou de ser verdade: saldo agora É
+recalculado automaticamente na exclusão de linha paga).
+
+Harness Docker dedicado (schema mínimo: só `contas` + `transacoes_
+financeiras` + o trigger em si, sem as RPCs — testa o trigger
+diretamente via INSERT/DELETE crus). 4 cenários, 2 rodadas (trigger
+pré-fix e pós-fix, mesmos dados): T1 (insert entrada paga → saldo sobe)
+e T3 (delete de transação pendente não mexe no saldo) idênticos nas
+duas rodadas. T2 (delete de entrada paga) e T4 (insert+delete de saída
+paga) confirmam o bug na pré-fix (saldo fica com resíduo) e a correção
+exata na pós-fix (saldo volta a 0 nos dois casos).
+
+`npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
