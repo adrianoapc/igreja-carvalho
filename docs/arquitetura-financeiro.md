@@ -3307,6 +3307,75 @@ deixava mais uma consulta parecida exposta:
 
 `npx tsc`: 63 baseline, 0 novos.
 
+### 9.47 20ª rodada de review: 1º P1 real desde a varredura de paginação
+
+Mesmo ciclo, sobre o commit de §9.46. 3 novos — 2 P1, 1 P2, todos reais:
+
+1. **Limpeza de filial órfã ainda tarde demais** (P1) — §9.35 e §9.39 já
+   tinham discutido essa mesma constraint (`getnet_antecipacao_lotes_
+   filial_id_fkey`, `20260731110000`) e concluído "sem risco real hoje".
+   O achado novo não contesta isso — aponta que, MESMO SEM risco hoje, a
+   limpeza "rede de segurança" ficou em `20260731130000`, DUAS migrations
+   DEPOIS do `ADD CONSTRAINT` que ela deveria proteger; se a premissa
+   "sem risco" um dia deixar de valer, a limpeza nunca seria alcançada
+   (a sequência pararia no próprio `ADD CONSTRAINT` antes de chegar
+   nela). Fix: `UPDATE ... SET filial_id = NULL WHERE NOT EXISTS (...)`
+   movido pra dentro de `20260731110000`, imediatamente antes do `ADD
+   CONSTRAINT`; removido de `20260731130000` (editar uma migration já
+   escrita NESTA MESMA PR ainda não deployada é seguro — não existe
+   histórico de produção pra preservar).
+
+2. **`fin_excluir_lancamento` reverte movimento que uma linha legada
+   nunca teve** (P1) — o branch `DELETE` do trigger (§9.43) assume que o
+   `INSERT` da linha aplicou o movimento. Verdade só pra linhas criadas
+   DEPOIS de `20260731100000` (quando o trigger passou a cobrir INSERT).
+   Uma linha paga criada ANTES disso por um escritor de INSERT-direto
+   (`fin_lancar_sessao`, `fin_pagar_reembolso`) nunca teve seu movimento
+   aplicado pelo trigger antigo — excluir essa linha agora desfaz um
+   movimento que nunca existiu, na direção OPOSTA. Sem marcador nas
+   linhas existentes pra distinguir "legada" de "nova".
+
+   Fix (`20260731170000_fin_saldo_recalculo_delete_e_snapshot_
+   competencia.sql`): em vez de tentar identificar linhas legadas,
+   `fin_excluir_lancamento` chama `fin_recalcular_saldo_conta(conta_id,
+   true)` depois do `DELETE` de uma linha que estava paga. Recalcular do
+   zero (`saldo_inicial + Σ pagas restantes`) é autoritativo e não
+   depende de nenhuma suposição sobre o que o trigger aplicou
+   historicamente — vira no-op pro caso novo (trigger já tinha acertado)
+   e corrige o caso legado (trigger errou).
+
+   Harness Docker dedicado: simula uma linha legada aplicando o trigger
+   ANTIGO (só `UPDATE`) no INSERT (saldo fica 0, confirmando que o
+   INSERT não moveu nada) e só DEPOIS troca pro trigger novo (com
+   `DELETE`) antes de excluir — reproduz o resíduo (-100 em vez de 0) na
+   versão pré-fix de `fin_excluir_lancamento`, confirma a correção
+   (saldo volta a 0) na pós-fix, e 2 regressões (linha nova
+   paga/excluída, linha pendente excluída) sem mudança de comportamento.
+
+3. **Compensação de competência não restaura parcelas individualmente**
+   (P2, sobre o fix de §9.41) — `handleSincronizarCompetenciaGrupo`
+   guarda só a competência da PARCELA EDITADA como `competenciaAnterior`
+   e reaplica esse único valor a TODAS as parcelas se precisar reverter.
+   Pra um grupo LEGADO que já tinha competências divergentes entre as
+   parcelas antes desta ação (exatamente o público que a sincronização
+   existe pra atender), isso não restaura cada parcela pro seu valor
+   original — e a mensagem "nada foi alterado" fica falsa nesse caso.
+
+   Fix: `fin_alterar_competencia_grupo` já calculava `v_snapshot`
+   (competência de cada parcela ANTES da sincronização) só pra
+   auditoria — passou a devolver `snapshot_antes` no retorno também.
+   Frontend usa isso pra saber se o grupo já era uniforme (revert de
+   verdade, mesma mensagem de antes) ou já divergente (mensagem honesta:
+   sincronizado de volta pra um valor único, mas não dá pra restaurar o
+   valor individual de cada parcela sem uma RPC dedicada — restaurar
+   linha a linha via `fin_atualizar_lancamento` disparia o próprio
+   `FIN_COMPETENCIA_GRUPO` no meio do caminho). Testado via harness
+   Docker: grupo com competências divergentes (`2026-01-01`/
+   `2026-02-01`) confirma que `snapshot_antes` retorna os dois valores
+   originais corretamente.
+
+`npx tsc`: 63 baseline, 0 novos (item 3 frontend + 2 RPCs backend).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

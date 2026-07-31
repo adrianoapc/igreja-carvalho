@@ -1102,6 +1102,19 @@ export function TransacaoDialog({
       );
       resultado.warnings?.forEach((w) => toast.info(w));
 
+      // snapshot_antes = competência de cada parcela ANTES desta sincronização
+      // — usado só se precisar compensar abaixo, pra saber se um "reverter pra
+      // competenciaAnterior" seria um revert de verdade (grupo já era
+      // uniforme) ou só mais uma sincronização forçada (grupo legado já
+      // divergente entre as parcelas — o próprio caso que esta ação existe
+      // pra resolver; achado do /code-review).
+      const snapshotAntes = (resultado.snapshot_antes ?? null) as
+        | { id: string; data_competencia: string | null }[]
+        | null;
+      const grupoJaEraUniforme =
+        !snapshotAntes ||
+        new Set(snapshotAntes.map((s) => s.data_competencia)).size <= 1;
+
       // Reaplica o resto do patch original (descrição, valor, forma de
       // pagamento etc.) que a recusa FIN_COMPETENCIA_GRUPO tinha descartado
       // junto com a mudança de competência — sincronizar o grupo não pode
@@ -1130,7 +1143,19 @@ export function TransacaoDialog({
                 confirmarSincronizarGrupo.lancamentoId,
                 confirmarSincronizarGrupo.competenciaAnterior,
               );
-              toast.error(`${msgBase} — competência do grupo revertida, nada foi alterado.`);
+              // Restaurar cada parcela pro seu valor INDIVIDUAL original
+              // exigiria uma RPC dedicada (fin_atualizar_lancamento rejeitaria
+              // no meio do caminho com o mesmo FIN_COMPETENCIA_GRUPO que essa
+              // tela inteira existe pra contornar) — o revert aqui só
+              // consegue sincronizar todo mundo pra um valor único de novo.
+              // Se o grupo já era uniforme antes, isso é um revert de
+              // verdade; se já era divergente (legado), é só mais uma
+              // sincronização forçada — a mensagem reflete qual dos dois.
+              toast.error(
+                grupoJaEraUniforme
+                  ? `${msgBase} — competência do grupo revertida, nada foi alterado.`
+                  : `${msgBase} — competência sincronizada de volta pra ${confirmarSincronizarGrupo.competenciaAnterior}, mas este grupo já tinha competências divergentes entre as parcelas ANTES desta ação — não foi possível restaurar o valor individual de cada uma. Confira manualmente se necessário.`,
+              );
             } catch {
               toast.error(
                 `${msgBase} — a competência do grupo já foi alterada e NÃO pôde ser revertida automaticamente. Confira manualmente.`,

@@ -154,6 +154,18 @@ $$;
 -- Mesmo padrão de extratos_bancarios.filial_id/contas.filial_id — sem isso
 -- o lote pode ficar com um UUID de filial deletada, divergindo do que
 -- extrato/conta (que já têm ON DELETE SET NULL) passam a ter.
+--
+-- Limpeza de filial_id órfão ANTES do ADD CONSTRAINT (não depois — Postgres
+-- valida todas as linhas existentes ao rodar o ALTER TABLE, então uma limpeza
+-- só duas migrations depois nunca seria alcançada se essa validação
+-- falhasse: a sequência de migrations pararia bem aqui. Redundante com a rede
+-- de segurança original (a tabela nasce nesta mesma sequência, sem risco real
+-- hoje), mas a ordem importa se essa premissa um dia deixar de valer — achado
+-- do /code-review.
+UPDATE public.getnet_antecipacao_lotes
+   SET filial_id = NULL
+ WHERE filial_id IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM public.filiais WHERE id = getnet_antecipacao_lotes.filial_id);
 
 ALTER TABLE public.getnet_antecipacao_lotes
   ADD CONSTRAINT getnet_antecipacao_lotes_filial_id_fkey

@@ -27,9 +27,11 @@
 --    real agora: a tabela nasce nesta mesma sequência de migrations
 --    (20260729100000) e o deploy é sempre atômico no merge (não existe
 --    janela entre a tabela existir em produção e a FK ser adicionada onde
---    uma filial pudesse ser deletada no meio). Mantido como rede de
---    segurança mesmo assim — barato e não muda nada quando não há linha
---    órfã (garantido hoje).
+--    uma filial pudesse ser deletada no meio). Adicionada aqui como rede de
+--    segurança mesmo assim — mas *depois* do ADD CONSTRAINT que ela
+--    protegeria, o que a tornava inútil se a premissa acima um dia deixasse
+--    de valer (achado da rodada seguinte de /code-review); movida pra
+--    20260731110000, antes da constraint.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.atualizar_saldo_conta()
@@ -111,9 +113,7 @@ BEGIN
 END;
 $function$;
 
--- ─── Rede de segurança: filial_id órfão antes da FK já existente ──────────
-
-UPDATE public.getnet_antecipacao_lotes
-   SET filial_id = NULL
- WHERE filial_id IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM public.filiais WHERE id = getnet_antecipacao_lotes.filial_id);
+-- Limpeza de filial_id órfão MOVIDA pra 20260731110000, antes do próprio
+-- ADD CONSTRAINT que ela protege — deixá-la aqui, duas migrations depois,
+-- significava que a sequência nunca a alcançaria se a validação do ALTER
+-- TABLE falhasse antes (achado do /code-review, rodada seguinte a esta).
