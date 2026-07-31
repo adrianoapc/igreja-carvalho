@@ -3269,6 +3269,44 @@ anteriores):
 `npx tsc`: 63 baseline, 0 novos. Deno edge function checada com
 `deno check` (limpo).
 
+### 9.46 19ª rodada de review: paginação alastrando + Dinheiro desativado
+
+Mesmo ciclo, sobre o commit de §9.45. 3 novos, todos reais — a mesma
+lacuna de paginação continuou aparecendo à medida que cada fix anterior
+deixava mais uma consulta parecida exposta:
+
+1. `useLotesAntecipacao.ts` — listagem principal de lotes de antecipação
+   (`LotesAntecipacaoTab`) sem paginação; igreja com mais de 1000 lotes
+   visíveis perderia os mais antigos em silêncio, sem conseguir vincular/
+   lançar contratos históricos pela aba nova. Fix: mesmo padrão de
+   `.range()` + fábrica de query + `.order("id")` como desempate (
+   `data_contratacao_contrato` pode repetir ou ser `NULL` entre lotes).
+
+2. `VincularExtratoLoteDialog.tsx` — a consulta de lotes já vinculados
+   (`jaVinculados`, usada só pra excluir extratos já ocupados da lista de
+   candidatos) também sem paginação — E sem filtro de `igreja_id`
+   nenhum (lia `getnet_antecipacao_lotes` do banco inteiro, todos os
+   tenants, o que só piorava o risco de estourar a página). Passar de
+   1000 lotes vinculados no tenant faria um extrato já ocupado continuar
+   aparecendo como candidato disponível, falhando só depois no índice
+   único do backend (§9.34) — usuário descobre um a um por tentativa e
+   erro. Fix: escopa por `igreja_id` (reduz drasticamente o teto de
+   risco sozinho) + mesma paginação por `.range()`.
+
+3. `useFormaPagamentoDinheiroId.ts` — o `.eq("ativo", true)` (adicionado
+   nesta mesma PR, §9.33) misturava dois usos diferentes: filtrar formas
+   pra um SELETOR de transação nova (onde só ativa faz sentido) com
+   DETECÇÃO de transações históricas que já apontam pra uma forma
+   "Dinheiro" (onde o estado atual de `ativo` é irrelevante — a
+   transação já foi paga daquele jeito). Desativar uma forma "Dinheiro"
+   fazia toda transação histórica com aquele FK non-null passar a ser
+   tratada como não-dinheiro, já que `isPagamentoDinheiro` só cai pro
+   fallback de texto quando o id é `null`, nunca quando é um id válido
+   mas não reconhecido. Fix: hook de detecção não filtra mais por
+   `ativo`.
+
+`npx tsc`: 63 baseline, 0 novos.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

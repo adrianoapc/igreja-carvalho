@@ -146,14 +146,30 @@ export function VincularExtratoLoteDialog({
         offset += PAGE_SIZE;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: outrosLotes } = await (supabase.from as any)("getnet_antecipacao_lotes")
-        .select("extrato_bancario_id")
-        .not("extrato_bancario_id", "is", null)
-        .neq("id", lote.id);
-      const jaVinculados = new Set(
-        (outrosLotes ?? []).map((l: { extrato_bancario_id: string }) => l.extrato_bancario_id),
-      );
+      // Mesmo risco de corte silencioso acima (>1000 lotes já vinculados
+      // no tenant): um extrato_bancario_id omitido continuaria aparecendo
+      // como candidato disponível, mas falharia no índice único do backend
+      // ao tentar vincular (achado do /code-review). Também escopa por
+      // igreja_id — antes lia getnet_antecipacao_lotes do banco inteiro,
+      // sem filtro de tenant, o que só piorava o risco de estourar a página.
+      const jaVinculados = new Set<string>();
+      let offsetLotes = 0;
+      while (true) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: outrosLotes, error: lotesError } = await (supabase.from as any)("getnet_antecipacao_lotes")
+          .select("extrato_bancario_id")
+          .eq("igreja_id", igrejaId)
+          .not("extrato_bancario_id", "is", null)
+          .neq("id", lote.id)
+          .order("id")
+          .range(offsetLotes, offsetLotes + PAGE_SIZE - 1);
+        if (lotesError) throw lotesError;
+        (outrosLotes ?? []).forEach((l: { extrato_bancario_id: string }) =>
+          jaVinculados.add(l.extrato_bancario_id),
+        );
+        if (!outrosLotes || outrosLotes.length < PAGE_SIZE) break;
+        offsetLotes += PAGE_SIZE;
+      }
 
       const disponiveis = (extratos ?? []).filter((e) => !jaVinculados.has(e.id));
       return disponiveis

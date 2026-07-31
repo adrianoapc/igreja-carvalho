@@ -21,12 +21,18 @@ export function useFormaPagamentoDinheiroId() {
     queryKey: ["forma-pagamento-dinheiro-ids", igrejaId],
     queryFn: async () => {
       if (!igrejaId) return [];
+      // Sem filtro de ativo=true: isto é detecção de transações HISTÓRICAS
+      // que já apontam pra uma forma "Dinheiro" (podendo ter sido
+      // desativada depois), não seleção de forma pra transação NOVA — uma
+      // forma desativada continua sendo Dinheiro pras transações que já a
+      // referenciam, e isPagamentoDinheiro só cai pro fallback de texto
+      // quando o id é nulo, nunca quando é um id não reconhecido (achado do
+      // /code-review).
       const { data, error } = await supabase
         .from("formas_pagamento")
         .select("id")
         .eq("igreja_id", igrejaId)
-        .ilike("nome", "dinheiro")
-        .eq("ativo", true);
+        .ilike("nome", "dinheiro");
       if (error) throw error;
       return (data ?? []).map((f) => f.id);
     },
