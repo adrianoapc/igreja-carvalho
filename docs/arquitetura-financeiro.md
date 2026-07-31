@@ -2759,6 +2759,47 @@ já que o stub original do `harness2_schema.sql` retornava `NULL` fixo
 `npx tsc`: 63 baseline, 0 novos (mudança 100% backend, nenhum arquivo TS
 tocado nesta rodada).
 
+### 9.32 6ª rodada de review: bug de sinal herdado do trigger original (nov/2025) + rede de segurança na FK
+
+Mesmo ciclo de `/code-review` de §9.29-9.31, rodada seguinte sobre o
+commit do fix anterior. 8 dos 10 comentários eram repetição (3 stale de
+sempre + 2 já mitigados fora do diff + 3 apontando pra versões antigas de
+arquivo já substituídas nos commits de §9.30/9.31 — o Codex ainda não
+tinha "visto" esses fixes quando gerou os comentários, mesmo já
+existindo). 2 reais, verificados por leitura direta
+(`20260731130000_fin_pos_review_pr67_fixes5.sql`):
+
+1. **Bug de sinal herdado do trigger original (nov/2025), nunca notado em
+   3 reescritas desta sessão.** A branch "pago → pendente/cancelado" de
+   `atualizar_saldo_conta()` desfaz o movimento testando `NEW.tipo` — mas
+   deveria testar `OLD.tipo` (o tipo que efetivamente gerou o movimento
+   quando a linha ficou paga). `fin_atualizar_lancamento` permite trocar
+   `tipo` E `status` no mesmo patch (os dois estão na allow-list): mudar
+   uma entrada paga de R$100 pra saída pendente no mesmo patch cai nessa
+   branch, mas testa o tipo NOVO ('saida') em vez do velho ('entrada') —
+   soma R$100 de novo em vez de subtrair os R$100 originais, um desvio de
+   R$200. As outras duas branches (pago novo, pago→pago — as duas escritas
+   nesta sessão) já usavam o tipo certo em cada lado; só a branch herdada
+   do código de nov/2025 tinha o bug, e ninguém reparou porque trocar
+   `tipo` e `status` juntos é raro na prática (a UI nunca faz isso — só a
+   RPC permite). Fix: troca `NEW.tipo` por `OLD.tipo` nessa branch
+   especificamente.
+2. **FK de `getnet_antecipacao_lotes.filial_id` (§9.30) sem limpeza prévia
+   de linha órfã** — se existisse uma linha com UUID de filial já
+   deletada, o `ADD CONSTRAINT` falharia (Postgres valida linhas
+   existentes). Avaliado e considerado sem risco real hoje: a tabela nasce
+   nesta mesma sequência de migrations e o deploy é sempre atômico no
+   merge (não há janela pra uma filial ser deletada "no meio"). Mantida
+   como rede de segurança mesmo assim — barato, e confirmado via harness
+   que não afeta nenhuma linha quando não há órfã (`UPDATE 0`).
+
+Harness Docker (T17): patch único trocando `tipo` (entrada→saida) e
+`status` (pago→pendente) ao mesmo tempo confirma que o saldo volta a zero
+(desfaz os R$100 originais), não sobe pra R$200 (bug antigo). 17/17
+cenários no total desta sequência de fixes pós-review.
+
+`npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
