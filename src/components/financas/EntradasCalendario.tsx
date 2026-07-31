@@ -79,7 +79,7 @@ export function EntradasCalendario({ ano, mes, dadosPorDia }: EntradasCalendario
                   <Card className="h-full p-3 flex flex-col justify-between hover:shadow-md hover:border-primary/50 transition-all">
                     <div>
                       <div className="text-lg font-bold mb-2">{dia}</div>
-                      {total !== 0 && (
+                      {(total !== 0 || totalLiquido !== 0) && (
                         <div>
                           <div className={`text-xs font-semibold ${total >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {total >= 0 ? '+' : ''}{formatValue(total)}

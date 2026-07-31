@@ -3376,6 +3376,46 @@ Mesmo ciclo, sobre o commit de §9.46. 3 novos — 2 P1, 1 P2, todos reais:
 
 `npx tsc`: 63 baseline, 0 novos (item 3 frontend + 2 RPCs backend).
 
+### 9.48 21ª rodada de review: undo-import tinha o mesmo bug de linha legada
+
+Mesmo ciclo, sobre o commit de §9.47. 2 novos, ambos reais:
+
+1. **`undo-import/index.ts`** (P1) — mesmo achado de §9.47 (linha paga
+   legada, criada antes de `20260731100000`, nunca teve o movimento
+   aplicado pelo trigger antigo), mas por um caminho DIFERENTE: essa
+   edge function desfaz um job de importação inteiro com um `DELETE`
+   direto na tabela (`transacoes_financeiras.delete().in("id", ...)`),
+   sem passar por `fin_excluir_lancamento` — o fix de §9.47 (recalcular
+   saldo após excluir linha paga) não cobre esse caminho porque não é
+   chamado por ele.
+
+   Fix: busca `conta_id`/`status` das transações ANTES do `DELETE` (não
+   dá pra saber depois), monta o conjunto de contas afetadas por pelo
+   menos uma linha PAGA, e chama a RPC `fin_recalcular_saldo_conta`
+   (service role, contexto `{igreja_id: job.igreja_id, ator_profile_id,
+   canal: 'import-undo'}`) pra cada uma depois do delete — mesma
+   estratégia autoritativa de §9.47, aplicada no nível do edge function
+   já que aqui é uma exclusão em massa multi-conta, não uma RPC por
+   linha. `deno check` limpo; lógica idêntica à já validada via harness
+   em §9.47 (só a orquestração de "quais contas recalcular" é nova,
+   sem SQL novo), harness não repetido.
+
+2. **`EntradasCalendario.tsx`** (P2) — dia com total BRUTO zero
+   (entrada e saída se cancelando, ex.: R$100 de entrada com R$10 de
+   taxa + R$100 de saída) escondia o bloco inteiro, inclusive o total
+   LÍQUIDO que não era zero (-R$10 no exemplo). Fix: gate trocado de
+   `total !== 0` pra `(total !== 0 || totalLiquido !== 0)`.
+
+   Observação (não corrigido): `SaidasCalendario.tsx`,
+   `EntradasTimelineCalendario.tsx` e `SaidasTimelineCalendario.tsx` têm
+   a mesma estrutura de card com líquido condicional, mas usam `total >
+   0` (não `total !== 0`) — uma condição logicamente diferente (também
+   esconde totais negativos, não só zero) que não foi concretamente
+   demonstrada como bug pelo review; fora de escopo desta rodada.
+
+`npx tsc`: 63 baseline, 0 novos. Deno edge function checada com
+`deno check` (limpo).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

@@ -103,6 +103,26 @@ Deno.serve(async (req) => {
 
     // Delete transactions
     if (transacaoIds.length > 0) {
+      // trigger_atualizar_saldo_conta (branch DELETE) desfaz o movimento de
+      // toda linha paga excluída assumindo que o INSERT original o aplicou —
+      // verdade só pra linhas criadas depois de 20260731100000. Um job de
+      // import concluído ANTES disso pode ter linhas pagas "legadas" cujo
+      // INSERT nunca moveu saldo (mesmo achado do fin_excluir_lancamento,
+      // §9.47 — aqui a exclusão em massa é direta na tabela, não passa por
+      // aquela RPC). Busca conta_id/status ANTES do delete (não dá pra saber
+      // depois) pra recalcular do zero as contas afetadas por linha paga.
+      const { data: contasAfetadas, error: contasError } = await supabase
+        .from("transacoes_financeiras")
+        .select("conta_id, status")
+        .in("id", transacaoIds)
+        .eq("status", "pago");
+      if (contasError) {
+        throw contasError;
+      }
+      const contaIdsParaRecalcular = Array.from(
+        new Set((contasAfetadas ?? []).map((t) => t.conta_id).filter(Boolean))
+      );
+
       const { error: deleteError } = await supabase
         .from("transacoes_financeiras")
         .delete()
@@ -110,6 +130,29 @@ Deno.serve(async (req) => {
 
       if (deleteError) {
         throw deleteError;
+      }
+
+      if (contaIdsParaRecalcular.length > 0) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("user_id", user.id)
+          .single();
+
+        const contexto = {
+          igreja_id: job.igreja_id,
+          ator_profile_id: profile?.id ?? null,
+          canal: "import-undo",
+        };
+        for (const contaId of contaIdsParaRecalcular) {
+          const { error: recalcError } = await supabase.rpc(
+            "fin_recalcular_saldo_conta",
+            { p_conta_id: contaId, p_aplicar: true, p_contexto: contexto }
+          );
+          if (recalcError) {
+            throw recalcError;
+          }
+        }
       }
     }
 
