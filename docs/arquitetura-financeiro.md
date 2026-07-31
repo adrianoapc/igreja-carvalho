@@ -3022,6 +3022,54 @@ introduzida por esta PR, mesmo critério de "fora de escopo" de §9.36.
 
 `npx tsc`: 63 baseline, 0 novos.
 
+### 9.39 Varredura proativa (sem esperar 13ª rodada): mais um dropdown de conta
+
+4 rodadas seguidas (§9.35-9.38) encontraram a mesma classe de bug em
+arquivo diferente a cada vez — pedido do usuário pra rodar a varredura
+completa de uma vez em vez de continuar reativo por rodada do Codex.
+
+Grep de `.eq("filial_id"` em todos os 34 arquivos tocados por esta PR
+encontrou mais ocorrências além das já corrigidas. Escopo discutido e
+delimitado com o usuário: corrigir só o que interage diretamente com o
+fluxo Getnet desta PR; o resto fica registrado, não corrigido nesta
+sessão (evita inflar o diff da PR com bugs pré-existentes sem relação
+com Getnet).
+
+**Corrigido:** `useDadosApoio.ts` (dropdown de conta do `TransacaoDialog`,
+linha ~29) — mesmo padrão, `.eq("filial_id", filialId)` excluía contas
+compartilhadas. Trocado por `.or("filial_id.eq.<uuid>,filial_id.is.null")`.
+
+**Registrado, não corrigido (pré-existente, sem relação direta com
+Getnet — decisão explícita do usuário):**
+- `useLancamentos.ts` (linhas 67, 103, 121, 171) — mesma classe de bug em
+  `transacoes_financeiras`/`contas`/`categorias_financeiras`/
+  `extratos_bancarios`: registro global some das listas de Entradas/
+  Saídas e dos filtros quando o usuário está numa filial específica.
+  Confirmado que `categorias_financeiras` também suporta registro global
+  (`CategoriaDialog.tsx:82` grava `filial_id: !isAllFiliais ? filialId :
+  null`) e que a RLS de `transacoes_financeiras` usa `has_filial_access`
+  (mesma convenção NULL=compartilhado).
+- `useLancamentos.ts:138` (fornecedores) — **bug diferente, não desta
+  classe**: a tabela `fornecedores` nunca recebeu coluna `filial_id`
+  (só `igreja_id`, migration `20260103150000`); o filtro
+  `.eq("filial_id", filialScope)` provavelmente falha em runtime sempre
+  que `filialScope` é truthy. Não investigado a fundo — decisão do
+  usuário foi só registrar.
+- `Contas.tsx` (linhas 135, 288, 326) — página principal de Contas: lista
+  de contas, lista de transações do período e cálculo de totais por
+  conta, todos excluindo registro global do mesmo jeito.
+- `Reclassificacao.tsx:309` + `supabase/functions/reclass-transacoes/
+  index.ts:302` — preview de busca e action de aplicar reclassificação em
+  lote, ambos com o mesmo filtro; precisariam ser corrigidos EM CONJUNTO
+  (preview e apply têm que bater, senão preview mostra transação que o
+  apply não toca — risco já documentado em memória de sessão sobre lógica
+  duplicada cliente/servidor).
+- `ExportarTab.tsx:177` (exportação CSV) — mesmo padrão; código
+  pré-existente apenas realocado por esta PR (não é lógica nova), mesmo
+  critério de fora-de-escopo de §9.36.
+
+`npx tsc`: 63 baseline, 0 novos.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
