@@ -720,8 +720,23 @@ export function TransacaoDialog({
       if (dados.centro_custo_sugerido_id)
         setCentroCustoId(dados.centro_custo_sugerido_id);
       if (dados.conta_sugerida_id) setContaId(dados.conta_sugerida_id);
-      if (dados.forma_pagamento_sugerida)
-        setFormaPagamento(dados.forma_pagamento_sugerida);
+      // forma_pagamento_sugerida vem da coluna de texto legada (ex.:
+      // "PIX"), não de um id — diferente das outras sugestões acima, que
+      // já vêm como *_id. formaPagamento agora é o valor do Select (id
+      // real ou "none"/""), então setar o texto bruto direto mandaria
+      // "PIX" como forma_pagamento_id pro backend, que falha ao tentar
+      // fazer cast pra uuid (fin_validar_fk_tenant). Mapeia pro id
+      // correspondente em formasPagamento por nome antes de aplicar; sem
+      // correspondência, não aplica (acima de discretamente quebrar
+      // com um id inválido, achado do /code-review).
+      if (dados.forma_pagamento_sugerida) {
+        const formaEncontrada = formasPagamento?.find(
+          (f) =>
+            f.nome.trim().toLowerCase() ===
+            dados.forma_pagamento_sugerida!.trim().toLowerCase(),
+        );
+        if (formaEncontrada) setFormaPagamento(formaEncontrada.id);
+      }
 
       // Se não veio fornecedor_id, buscar fornecedor existente - priorizar CNPJ/CPF
       if (

@@ -135,20 +135,26 @@ BEGIN
     RAISE EXCEPTION 'FIN_DESAGIO_ORFAO: este lançamento era o deságio de um lote de antecipação Getnet cujo vínculo já foi desfeito (revertido antes) — não pode ser marcado como pago de novo, senão o deságio seria contado duas vezes. Lance um novo deságio pelo lote em Reconciliação Bancária > Lotes de Antecipação.';
   END IF;
 
-  -- Editar valor/conta/tipo/data enquanto AINDA vinculada a um lote —
-  -- achado da rodada seguinte. Status muda sozinho é permitido aqui (é o
-  -- caminho de reverter/desvincular, tratado por outro trigger); só bloqueia
-  -- quando algum desses campos junto realmente muda.
+  -- Editar valor/conta/tipo/data/filial enquanto AINDA vinculada a um
+  -- lote — achado da rodada seguinte, e filial_id (achado de mais uma
+  -- rodada depois: TransacaoDialog sempre inclui filial_id no patch —
+  -- isAllFiliais ? null : filialId — mesmo quando o usuário não mexeu
+  -- nisso; editar um deságio vinculado a partir da visão "Todas as
+  -- filiais" convertia a despesa em global em silêncio, divergindo do
+  -- que o lote/extrato dizem). Status muda sozinho é permitido aqui (é o
+  -- caminho de reverter/desvincular, tratado por outro trigger); só
+  -- bloqueia quando algum desses campos junto realmente muda.
   IF v_lote_id IS NOT NULL AND (
        NEW.valor IS DISTINCT FROM OLD.valor
     OR NEW.valor_liquido IS DISTINCT FROM OLD.valor_liquido
     OR NEW.conta_id IS DISTINCT FROM OLD.conta_id
     OR NEW.tipo IS DISTINCT FROM OLD.tipo
+    OR NEW.filial_id IS DISTINCT FROM OLD.filial_id
     OR NEW.data_vencimento IS DISTINCT FROM OLD.data_vencimento
     OR NEW.data_competencia IS DISTINCT FROM OLD.data_competencia
     OR NEW.data_pagamento IS DISTINCT FROM OLD.data_pagamento
   ) THEN
-    RAISE EXCEPTION 'FIN_DESAGIO_VINCULADO: este lançamento é o deságio do lote % de antecipação Getnet, ainda vinculado — valor, conta, tipo e datas não podem ser editados enquanto vinculado, pra não divergir do deságio calculado a partir do contrato/extrato. Marque como pendente antes (desvincula o lote) pra poder editar, ou exclua e relance.', v_lote_id;
+    RAISE EXCEPTION 'FIN_DESAGIO_VINCULADO: este lançamento é o deságio do lote % de antecipação Getnet, ainda vinculado — valor, conta, tipo, filial e datas não podem ser editados enquanto vinculado, pra não divergir do deságio calculado a partir do contrato/extrato. Marque como pendente antes (desvincula o lote) pra poder editar, ou exclua e relance.', v_lote_id;
   END IF;
 
   RETURN NEW;
@@ -165,7 +171,7 @@ DROP TRIGGER IF EXISTS trigger_proteger_desagio_vinculado ON public.transacoes_f
 -- ainda vinculado podia ser movido de conta ou de competência sem o lote
 -- nem a conferência saberem (achado do /code-review).
 CREATE TRIGGER trigger_proteger_desagio_vinculado
-  BEFORE UPDATE OF status, valor, valor_liquido, conta_id, tipo,
+  BEFORE UPDATE OF status, valor, valor_liquido, conta_id, tipo, filial_id,
                     data_vencimento, data_competencia, data_pagamento
   ON public.transacoes_financeiras
   FOR EACH ROW

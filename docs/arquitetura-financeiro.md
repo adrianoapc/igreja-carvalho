@@ -3938,6 +3938,41 @@ fix de §9.58:
 
 `npx tsc`: 63 baseline, 0 novos.
 
+### 9.60 32ª rodada de review: filial_id fora do guard de deságio + sugestão de forma de pagamento com texto legado
+
+Mesmo ciclo, sobre o commit de §9.59 (`565624f`). 2 novos — 1 P1, 1 P2,
+ambos reais:
+
+1. **`filial_id` fora do guard de deságio vinculado** (P1,
+   `20260731200000`) — `proteger_desagio_vinculado` (§9.51/§9.53) checava
+   valor/conta/tipo/datas mas não `filial_id`. `TransacaoDialog` sempre
+   inclui `filial_id: isAllFiliais ? null : filialId` no patch (mesmo
+   sem o usuário mexer nisso) — editar um deságio ainda vinculado a
+   partir da visão "Todas as filiais" convertia a despesa gerada em
+   global em silêncio, divergindo do que o lote/extrato realmente são
+   (a mesma classe de "campo fora do guard" já vista 2 vezes nesta PR
+   pro trigger de saldo). Fix: `filial_id` entra na lista de colunas do
+   `BEFORE UPDATE OF` do trigger E na comparação `OLD`/`NEW` dentro da
+   função. Testado no harness: editar só `filial_id` numa linha vinculada
+   agora bloqueia; numa transação comum continua permitido.
+
+2. **Sugestão de forma de pagamento da nota fiscal manda texto onde
+   precisa de id** (P2, `TransacaoDialog.tsx`) — `processar-nota-fiscal`
+   retorna `forma_pagamento_sugerida` a partir da coluna de texto legada
+   (ex.: `"PIX"`) — diferente das outras sugestões (`categoria_sugerida_
+   id`, `conta_sugerida_id` etc.), que já vêm como id. `formaPagamento`
+   (estado do Select) virou um id real desde a FK do ADR-029, então
+   aplicar o texto bruto direto mandava `forma_pagamento_id: "PIX"` pro
+   backend, que falha o cast pra `uuid` em `fin_validar_fk_tenant` — a
+   transação não salvava até o usuário reselecionar manualmente. Fix:
+   mapeia o texto sugerido pro id correspondente em `formasPagamento`
+   (já carregado via `useDadosApoio`) por nome (case-insensitive) antes
+   de aplicar; sem correspondência, não aplica nada (não quebra com um
+   id inválido).
+
+`npx tsc`: 63 baseline, 0 novos. Migration do item 1 validada via harness
+Docker.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
