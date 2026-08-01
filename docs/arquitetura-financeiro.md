@@ -3747,6 +3747,43 @@ deployadas):
 
 `npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
 
+### 9.55 27ª rodada de review: FOR UPDATE conflitava com o lock da própria FK
+
+Mesmo ciclo, sobre o commit de §9.54 (`6c72910`). 1 novo, P2, sutil — sobre
+o próprio fix de concorrência de §9.51: `_fin_recalcular_saldo_conta_raw`
+usava `SELECT ... FOR UPDATE` pra travar a conta antes de somar. Todo
+`INSERT` filho em `transacoes_financeiras` retém um lock `KEY SHARE` na
+linha de `contas` referenciada (checagem da FK `conta_id`) até commitar —
+padrão do Postgres, existe justamente pra permitir inserts concorrentes
+sem se atrapalharem. `FOR UPDATE` conflita com `KEY SHARE` de OUTRA
+sessão: duas transações inserindo pago pra mesma conta ao mesmo tempo
+— cada uma já tem seu próprio `KEY SHARE` (compatíveis entre si, ambos
+adquiridos sem esperar) e depois as duas tentam subir pra `FOR UPDATE` no
+recálculo — espera circular, Postgres aborta uma como deadlock. Mesma
+classe de bug que o índice/trava determinística já vinha corrigindo, só
+que desta vez o CULPADO era o próprio lock que eu tinha acabado de
+adicionar pra resolver a corrida anterior.
+
+Fix: troca `FOR UPDATE` por `FOR NO KEY UPDATE` — mais fraco, mas ainda
+serializa quem realmente precisa escrever (`NO KEY UPDATE` conflita com
+`NO KEY UPDATE`/`UPDATE`/`SHARE`), e é justamente o modo desenhado pra ser
+compatível com `KEY SHARE` de outra sessão (essa é a razão de existir da
+distinção `NO KEY UPDATE`/`KEY SHARE` desde o Postgres 9.3: permitir
+inserts referenciando uma FK sem brigar com updates que não mexem na
+chave). Aplicado nos dois lugares com o mesmo padrão:
+`_fin_recalcular_saldo_conta_raw` (`20260731200000`) e
+`fin_recalcular_saldo_conta` (RPC pública, `20260730110000` — mesmo risco,
+corrigido por consistência mesmo sem achado específico sobre ela).
+
+Harness com 2 sessões `psql` concorrentes simulando exatamente a
+sequência de locks (não a trigger inteira — testa a interação de lock
+isoladamente): `FOR KEY SHARE` + espera + upgrade. Com `FOR UPDATE`
+(pré-fix): reproduzido o deadlock exato, uma sessão abortada. Com `FOR NO
+KEY UPDATE` (pós-fix): as duas sessões completam quase instantaneamente,
+sem espera nenhuma uma pela outra.
+
+`npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

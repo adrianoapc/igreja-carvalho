@@ -82,7 +82,19 @@ BEGIN
   -- snapshot fresco (READ COMMITTED) já enxergando o que a outra transação
   -- acabou de commitar (achado do /code-review sobre a versão anterior,
   -- que fazia tudo num único UPDATE com subquery no SET).
-  SELECT saldo_inicial INTO v_saldo_inicial FROM public.contas WHERE id = p_conta_id FOR UPDATE;
+  --
+  -- FOR NO KEY UPDATE, não FOR UPDATE: todo INSERT filho em
+  -- transacoes_financeiras já retém um lock KEY SHARE nesta linha de
+  -- contas (checagem da FK conta_id) até commitar. FOR UPDATE conflita
+  -- com KEY SHARE de OUTRA sessão — duas transações inserindo pago pra
+  -- mesma conta ao mesmo tempo: cada uma já tem seu próprio KEY SHARE (via
+  -- FK, compatíveis entre si) e depois as duas tentam subir pra FOR UPDATE
+  -- aqui — espera circular, Postgres aborta uma como deadlock. FOR NO KEY
+  -- UPDATE é compatível com KEY SHARE de outra sessão (só conflita com
+  -- outro NO KEY UPDATE/UPDATE/SHARE), então serializa só quem realmente
+  -- precisa escrever, sem brigar com o lock do INSERT em si (achado do
+  -- /code-review sobre o fix anterior).
+  SELECT saldo_inicial INTO v_saldo_inicial FROM public.contas WHERE id = p_conta_id FOR NO KEY UPDATE;
   IF NOT FOUND THEN
     RETURN;
   END IF;

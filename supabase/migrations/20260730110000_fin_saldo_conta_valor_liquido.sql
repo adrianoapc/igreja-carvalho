@@ -87,9 +87,14 @@ BEGIN
   v_ctx := public.fin_resolver_contexto(p_contexto, NULL);
   v_igreja := (v_ctx ->> 'igreja_id')::uuid;
 
+  -- FOR NO KEY UPDATE, não FOR UPDATE: compatível com o lock KEY SHARE que
+  -- todo INSERT filho em transacoes_financeiras retém nesta linha (checagem
+  -- da FK conta_id) até commitar — FOR UPDATE conflitaria com isso e abriria
+  -- o mesmo risco de deadlock já corrigido em _fin_recalcular_saldo_conta_raw
+  -- (achado do /code-review, mesmo padrão aplicado aqui por consistência).
   SELECT * INTO v_conta FROM public.contas
    WHERE id = p_conta_id AND igreja_id = v_igreja
-   FOR UPDATE;
+   FOR NO KEY UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'FIN_NAO_ENCONTRADO: conta % fora do tenant ou inexistente', p_conta_id;
   END IF;
