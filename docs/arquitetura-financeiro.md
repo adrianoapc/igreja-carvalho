@@ -3576,6 +3576,55 @@ sql`) pros dois fixes — ambos P1 sobre o mesmo par de commits, mesma
 rodada de review. `npx tsc`: 63 baseline, 0 novos (mudança 100%
 backend).
 
+### 9.52 24ª rodada de review: mais 2 achados sobre os triggers de deságio de §9.51
+
+Mesmo ciclo, sobre o commit de §9.51 (`58aae40`). 2 novos — 1 P1, 1 P2,
+ambos sobre os triggers de proteção de deságio criados na rodada anterior;
+editados diretamente nos arquivos de origem (`20260731180000`/
+`20260731200000`, ambos ainda não deployados nesta mesma PR — mesma
+prática já usada em §9.47):
+
+1. **Editar deságio ainda vinculado** (P1) — o guard de §9.51
+   (`impedir_reativar_desagio_orfao`) só bloqueava REATIVAR
+   (pendente→pago) uma linha órfã; não bloqueava editar valor/conta/
+   tipo/data de uma linha AINDA paga e vinculada a um lote
+   `lancamento_criado`. O editor comum de transação deixava mudar esses
+   campos livremente, divergindo do deságio calculado a partir do
+   contrato/extrato no lançamento original sem o lote saber — `fin_
+   conferencia_totais_getnet` propagaria o valor adulterado sem aviso
+   (lote continua `lancamento_criado`, conferência confia cegamente no
+   valor atual da transação).
+
+   Fix: função renomeada pra `proteger_desagio_vinculado` (escopo mais
+   amplo que só "órfã"), ganha um segundo check — rejeita mudar
+   `valor`/`valor_liquido`/`conta_id`/`tipo`/datas enquanto a linha
+   estiver vinculada a um lote (`FIN_DESAGIO_VINCULADO`). Mudar só o
+   `status` continua permitido (é o caminho de reverter/desvincular,
+   tratado pelo trigger de §9.49). Harness Docker, 4 cenários com os 3
+   triggers de deságio juntos (a extração parcial pro harness inicial
+   mascarou um dos triggers irmãos, corrigido aplicando o arquivo real
+   inteiro): editar valor vinculada (bloqueia), reverter status sem
+   editar mais nada (permite — desvincula o lote), editar valor DEPOIS
+   de já desvinculada/órfã (permite — vira transação comum), transação
+   sem essa origem (não afetada).
+
+2. **Branch DELETE do trigger de §9.49 era inalcançável de verdade** (P2)
+   — confirmação do que já estava documentado como suspeita no
+   comentário da migration: `getnet_antecipacao_lotes.lancamento_
+   desagio_id` não tem `ON DELETE`, então a ação "Excluir" do menu
+   comum SEMPRE falhava com erro de FK pra um deságio ainda vinculado —
+   o branch `AFTER DELETE` nunca chegava a rodar. Fix: a mesma função
+   (`sincronizar_lote_antecipacao_ao_reverter_desagio`) passa a ser
+   usada em DOIS triggers separados — `BEFORE DELETE` (desvincula o
+   lote antes da checagem de FK rodar, usando `TG_WHEN` pra diferenciar
+   dentro da mesma função) e `AFTER UPDATE OF status` (continua
+   tratando o revert pago→não-pago, sem esse problema porque `UPDATE`
+   não mexe em `id`). Validado no harness: `DELETE` de deságio vinculado
+   agora sucede (antes falhava na FK) e o lote é corretamente
+   desvinculado.
+
+`npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

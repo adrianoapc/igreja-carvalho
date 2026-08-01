@@ -21,12 +21,16 @@
 -- fin_conferencia_totais_getnet para de contar o lote (deixou de estar
 -- 'lancamento_criado').
 --
--- Branch DELETE hoje é inalcançável na prática: getnet_antecipacao_lotes.
--- lancamento_desagio_id referencia transacoes_financeiras(id) sem ON DELETE
--- (20260729100000) — qualquer DELETE de uma linha ainda referenciada por um
--- lote falha na FK antes de chegar aqui. Mantido como defesa em profundidade
--- caso essa FK mude no futuro; testado isoladamente no harness (sem a FK,
--- pra validar só a lógica do trigger).
+-- Branch DELETE precisa rodar ANTES do delete de fato, não depois: a FK de
+-- getnet_antecipacao_lotes.lancamento_desagio_id pra transacoes_financeiras
+-- (20260729100000) não tem ON DELETE, então excluir uma linha ainda
+-- referenciada por um lote falha na própria checagem de FK — um trigger
+-- AFTER DELETE nunca chegaria a rodar (achado do /code-review: a ação
+-- "Excluir" do menu ficava sempre falhando pra deságio ainda vinculado, em
+-- vez de desvincular o lote e deixar a exclusão seguir). Fix: mesma função,
+-- usada em DOIS triggers — BEFORE DELETE (desvincula antes da FK checar) e
+-- AFTER UPDATE OF status (reverte pago->não-pago, sem esse problema porque
+-- UPDATE não mexe em `id`, então não aciona a FK).
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.sincronizar_lote_antecipacao_ao_reverter_desagio()
@@ -36,7 +40,8 @@ SECURITY DEFINER
 SET search_path = public
 AS $function$
 BEGIN
-  IF TG_OP = 'DELETE' THEN
+  IF TG_WHEN = 'BEFORE' THEN
+    -- BEFORE DELETE: desvincula o lote antes da checagem de FK rodar.
     IF OLD.origem_registro = 'getnet_antecipacao_desagio' AND OLD.status = 'pago' THEN
       UPDATE public.getnet_antecipacao_lotes
          SET status = 'vinculado', lancamento_desagio_id = NULL, updated_at = now()
@@ -45,7 +50,7 @@ BEGIN
     RETURN OLD;
   END IF;
 
-  -- TG_OP = 'UPDATE' (só dispara em UPDATE OF status).
+  -- AFTER UPDATE OF status: reverte pago->não-pago.
   IF OLD.origem_registro = 'getnet_antecipacao_desagio'
      AND OLD.status = 'pago' AND NEW.status <> 'pago' THEN
     UPDATE public.getnet_antecipacao_lotes
@@ -58,7 +63,15 @@ END;
 $function$;
 
 DROP TRIGGER IF EXISTS trigger_sincronizar_lote_antecipacao_ao_reverter_desagio ON public.transacoes_financeiras;
-CREATE TRIGGER trigger_sincronizar_lote_antecipacao_ao_reverter_desagio
-  AFTER UPDATE OF status OR DELETE ON public.transacoes_financeiras
+DROP TRIGGER IF EXISTS trigger_sincronizar_lote_desagio_before_delete ON public.transacoes_financeiras;
+DROP TRIGGER IF EXISTS trigger_sincronizar_lote_desagio_after_update ON public.transacoes_financeiras;
+
+CREATE TRIGGER trigger_sincronizar_lote_desagio_before_delete
+  BEFORE DELETE ON public.transacoes_financeiras
+  FOR EACH ROW
+  EXECUTE FUNCTION public.sincronizar_lote_antecipacao_ao_reverter_desagio();
+
+CREATE TRIGGER trigger_sincronizar_lote_desagio_after_update
+  AFTER UPDATE OF status ON public.transacoes_financeiras
   FOR EACH ROW
   EXECUTE FUNCTION public.sincronizar_lote_antecipacao_ao_reverter_desagio();

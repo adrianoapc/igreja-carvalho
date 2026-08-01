@@ -43,6 +43,21 @@
 --    'getnet_antecipacao_desagio' que não é mais referenciada por nenhum
 --    lote (lancamento_desagio_id). Mensagem orienta lançar um novo deságio
 --    pelo lote em vez de tentar reaproveitar a linha órfã.
+--
+-- 3) Mesmo guard, achado seguinte (rodada seguinte de /code-review sobre
+--    este mesmo trigger): faltava o lado oposto — enquanto o deságio
+--    continua pago E vinculado a um lote 'lancamento_criado', o editor
+--    comum de transação deixava mudar valor/conta/tipo/data livremente.
+--    Isso divergiria do deságio calculado a partir do contrato/extrato no
+--    lançamento original sem o lote saber de nada, e fin_conferencia_
+--    totais_getnet propagaria o valor adulterado sem nenhum aviso — o
+--    lote continua 'lancamento_criado' e a conferência confia cegamente
+--    no valor atual da transação. Fix: mesma função (renomeada pra
+--    refletir o escopo mais amplo) também rejeita editar valor/
+--    valor_liquido/conta_id/tipo/datas enquanto a linha estiver vinculada
+--    a um lote — o único jeito de editar esses campos passa a ser
+--    reverter o status antes (o que já desvincula o lote, ver item 2/
+--    20260731180000).
 -- ============================================================================
 
 -- ─── 1. Trava a conta ANTES de somar (statements separadas) ──────────────
@@ -84,29 +99,53 @@ BEGIN
 END;
 $$;
 
--- ─── 2. Impede reativar transação de deságio órfã ─────────────────────────
+-- ─── 2. Protege integridade da transação de deságio (órfã + vinculada) ────
 
-CREATE OR REPLACE FUNCTION public.impedir_reativar_desagio_orfao()
+CREATE OR REPLACE FUNCTION public.proteger_desagio_vinculado()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $function$
+DECLARE
+  v_lote_id uuid;
 BEGIN
-  IF NEW.status = 'pago' AND OLD.status <> 'pago'
-     AND OLD.origem_registro = 'getnet_antecipacao_desagio'
-     AND NOT EXISTS (
-       SELECT 1 FROM public.getnet_antecipacao_lotes
-        WHERE lancamento_desagio_id = OLD.id
-     ) THEN
+  IF OLD.origem_registro IS DISTINCT FROM 'getnet_antecipacao_desagio' THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT id INTO v_lote_id FROM public.getnet_antecipacao_lotes
+   WHERE lancamento_desagio_id = OLD.id;
+
+  -- Reativar uma linha órfã (sem lote referenciando-a mais) — achado
+  -- original desta migration.
+  IF NEW.status = 'pago' AND OLD.status <> 'pago' AND v_lote_id IS NULL THEN
     RAISE EXCEPTION 'FIN_DESAGIO_ORFAO: este lançamento era o deságio de um lote de antecipação Getnet cujo vínculo já foi desfeito (revertido antes) — não pode ser marcado como pago de novo, senão o deságio seria contado duas vezes. Lance um novo deságio pelo lote em Reconciliação Bancária > Lotes de Antecipação.';
   END IF;
+
+  -- Editar valor/conta/tipo/data enquanto AINDA vinculada a um lote —
+  -- achado da rodada seguinte. Status muda sozinho é permitido aqui (é o
+  -- caminho de reverter/desvincular, tratado por outro trigger); só bloqueia
+  -- quando algum desses campos junto realmente muda.
+  IF v_lote_id IS NOT NULL AND (
+       NEW.valor IS DISTINCT FROM OLD.valor
+    OR NEW.valor_liquido IS DISTINCT FROM OLD.valor_liquido
+    OR NEW.conta_id IS DISTINCT FROM OLD.conta_id
+    OR NEW.tipo IS DISTINCT FROM OLD.tipo
+    OR NEW.data_vencimento IS DISTINCT FROM OLD.data_vencimento
+    OR NEW.data_competencia IS DISTINCT FROM OLD.data_competencia
+    OR NEW.data_pagamento IS DISTINCT FROM OLD.data_pagamento
+  ) THEN
+    RAISE EXCEPTION 'FIN_DESAGIO_VINCULADO: este lançamento é o deságio do lote % de antecipação Getnet, ainda vinculado — valor, conta, tipo e datas não podem ser editados enquanto vinculado, pra não divergir do deságio calculado a partir do contrato/extrato. Marque como pendente antes (desvincula o lote) pra poder editar, ou exclua e relance.', v_lote_id;
+  END IF;
+
   RETURN NEW;
 END;
 $function$;
 
 DROP TRIGGER IF EXISTS trigger_impedir_reativar_desagio_orfao ON public.transacoes_financeiras;
-CREATE TRIGGER trigger_impedir_reativar_desagio_orfao
+DROP TRIGGER IF EXISTS trigger_proteger_desagio_vinculado ON public.transacoes_financeiras;
+CREATE TRIGGER trigger_proteger_desagio_vinculado
   BEFORE UPDATE OF status ON public.transacoes_financeiras
   FOR EACH ROW
-  EXECUTE FUNCTION public.impedir_reativar_desagio_orfao();
+  EXECUTE FUNCTION public.proteger_desagio_vinculado();
