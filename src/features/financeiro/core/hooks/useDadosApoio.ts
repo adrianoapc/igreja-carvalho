@@ -39,29 +39,41 @@ export function useDadosApoio(
   });
 
   const { data: categorias } = useQuery({
-    queryKey: ["categorias-select", tipo],
+    queryKey: ["categorias-select", tipo, filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("categorias_financeiras")
         .select("id, nome")
         .eq("tipo", tipo)
         .eq("ativo", true)
         .order("nome");
+      // §9.65: sem isso, "Todas as filiais" listava categoria de QUALQUER
+      // filial — o backend (fin_validar_fk_filial) agora rejeita quem
+      // pertence a uma filial diferente da do lançamento, então sem o
+      // filtro aqui a UI deixa escolher algo que o backend vai recusar.
+      if (!isAllFiliais && filialId) {
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
   });
 
   const { data: subcategorias, isLoading: subcategoriasLoading } = useQuery({
-    queryKey: ["subcategorias-select", categoriaId, open],
+    queryKey: ["subcategorias-select", categoriaId, open, filialId, isAllFiliais],
     queryFn: async () => {
       if (!categoriaId || categoriaId === "none") return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from("subcategorias_financeiras")
         .select("id, nome")
         .eq("categoria_id", categoriaId)
         .eq("ativo", true)
         .order("nome");
+      if (!isAllFiliais && filialId) {
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -70,39 +82,51 @@ export function useDadosApoio(
   });
 
   const { data: centros } = useQuery({
-    queryKey: ["centros-select"],
+    queryKey: ["centros-select", filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("centros_custo")
         .select("id, nome")
         .eq("ativo", true)
         .order("nome");
+      if (!isAllFiliais && filialId) {
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
   });
 
   const { data: bases } = useQuery({
-    queryKey: ["bases-select"],
+    queryKey: ["bases-select", filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("bases_ministeriais")
         .select("id, titulo")
         .eq("ativo", true)
         .order("titulo");
+      if (!isAllFiliais && filialId) {
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
   });
 
   const { data: fornecedores } = useQuery({
-    queryKey: ["fornecedores-select"],
+    queryKey: ["fornecedores-select", filialId, isAllFiliais],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("fornecedores")
         .select("id, nome")
         .eq("ativo", true)
         .order("nome");
+      if (!isAllFiliais && filialId) {
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },

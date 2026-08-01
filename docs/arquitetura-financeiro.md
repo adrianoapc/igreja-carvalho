@@ -4150,6 +4150,60 @@ confirmado que NÃO regrediu com o restauro do D10, categoria de outra
 filial bloqueada no deságio, categoria global continua funcionando.
 `npx tsc`: 0 novos erros (mudança em `LancarDesagioDialog.tsx`).
 
+### 9.64 36ª rodada de review + fechamento de classe: `forma_pagamento_id` bloqueado só quando estava NO patch, não quando só `filial_id` mudava
+
+Review de 01/08 22:01 sobre o commit de §9.63 (`cfb8b18`), 1 achado real —
+mais uma vez efeito colateral do meu próprio fix: o guard de filial de
+`forma_pagamento_id` em `fin_atualizar_lancamento` (§9.62) só rodava `IF
+v_aplicar ? 'forma_pagamento_id'`. `TransacaoDialog.tsx` SEMPRE inclui
+`filial_id` no patch, mas só inclui `forma_pagamento_id` quando o usuário
+troca a forma de pagamento — editar uma transação de uma filial específica
+a partir de "Todas as filiais" SEM tocar na forma manda `filial_id: null`
+(vira global) mas OMITE `forma_pagamento_id`, mantendo a forma antiga
+(ainda presa à filial original) — reproduzindo o exato problema que o
+guard existe pra evitar, só que pelo caminho que ele não cobria.
+
+**Depois deste achado, o usuário parou o ciclo review→fix pra perguntar
+por que meu próprio review não estava achando essas coisas antes do
+Codex.** Resposta honesta, verificada: eu estava corrigindo campo por
+campo (o que o achado apontava), não generalizando o padrão.
+`transacoes_financeiras` tem **6 FKs pra catálogos filial-scoped**
+(confirmado via a lista de tabelas de `20260106120001_replicar_cadastros_
+filiais.sql`, que só replica tabela com `filial_id`): `categoria_id`,
+`subcategoria_id`, `centro_custo_id`, `base_ministerial_id`,
+`fornecedor_id`, `forma_pagamento_id`. `fin_validar_fk_tenant` valida
+tenant nos 6, nunca filial. Eu já tinha corrigido só `forma_pagamento_id`
+(§9.61-§9.64) e `categoria_id` só dentro de `fin_lancar_desagio_
+antecipacao` (§9.63) — um campo por rodada, exatamente o padrão que gerou
+4 achados seguidos na mesma classe.
+
+**Decisão do usuário: fechar a classe inteira de uma vez** em vez de
+esperar mais rodadas do Codex achando campo por campo. Fix:
+
+1. Helper novo `fin_validar_fk_filial(tabela, id, filial_efetiva)` —
+   companion de `fin_validar_fk_tenant`, reutilizável pros 6 campos.
+2. `fin_criar_lancamento`: valida os 6 campos (todos resolvidos juntos,
+   sem conceito de patch parcial — mais simples que `fin_atualizar_
+   lancamento`).
+3. `fin_atualizar_lancamento`: valida o PAR EFETIVO campo/filial pros 6
+   — o valor do patch quando presente, senão o já gravado — sempre que
+   QUALQUER um dos dois estiver no patch (generaliza a lição do achado
+   desta rodada pros outros 5 campos).
+4. `fin_lancar_desagio_antecipacao`: `categoria_id` refatorado pra usar o
+   mesmo helper em vez do `IF` inline de §9.63.
+5. Frontend (`useDadosApoio.ts`): `categorias`, `subcategorias`,
+   `centros`, `bases` e `fornecedores` ganham o mesmo filtro de filial que
+   `contas`/`formasPagamento` já tinham — sem isso a UI deixa escolher
+   algo que o backend agora rejeita.
+
+Harness Docker: os 5 campos extras (`subcategoria_id`, `centro_custo_id`,
+`base_ministerial_id`, `fornecedor_id`, `forma_pagamento_id`) de outra
+filial bloqueados em `fin_criar_lancamento`; caminho normal (mesma
+filial/global) continua funcionando; `fin_atualizar_lancamento` bloqueia
+mudar só `filial_id` com `categoria_id` retida de outra filial; editar
+campo não-filial-scoped não dispara nada indevido; D10 confirmado ainda
+intacto (regressão de §9.63 não voltou). `npx tsc`: 0 novos erros.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

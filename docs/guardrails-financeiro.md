@@ -122,17 +122,24 @@ DEFINER`:**
    service_role (§9.30).
 5. `fin_validar_fk_tenant` só garante TENANT (`igreja_id`) — NUNCA filial,
    mesmo pra tabelas que têm `filial_id` (é um validador genérico,
-   também usado em tabelas sem filial). Qualquer FK filial-scoped
-   recebida como **id explícito** (não só quando resolvida por rótulo/
-   busca) ainda precisa de `has_filial_access` ou comparação direta de
-   filial — o gap tende a aparecer justamente no caminho "óbvio" (id já
-   vem pronto do frontend, parece não precisar de mais validação).
-   Achado real: `fin_conferencia_totais_getnet` validava só tenant na
-   conta (§9.61); `fin_criar_lancamento`/`fin_atualizar_lancamento`
-   validavam só tenant no `forma_pagamento_id` explícito, mesmo já tendo
-   corrigido a resolução por RÓTULO na rodada anterior (§9.62) — dois
-   achados seguidos, mesma causa raiz, exatamente por tratar "id explícito
-   já validado por FK" como suficiente.
+   também usado em tabelas sem filial). Use `fin_validar_fk_filial(tabela,
+   id, filial_efetiva)` (§9.65) — companion pronto, cobre os 6 campos
+   filial-scoped de `transacoes_financeiras` (`categoria_id`,
+   `subcategoria_id`, `centro_custo_id`, `base_ministerial_id`,
+   `fornecedor_id`, `forma_pagamento_id`). Em RPC de PATCH parcial (como
+   `fin_atualizar_lancamento`), valide o PAR EFETIVO campo/filial (valor
+   do patch se presente, senão o já gravado) sempre que QUALQUER um dos
+   dois estiver no patch — não só quando os dois mudam juntos (achado
+   real: mudar só `filial_id` sem tocar no campo, que é exatamente o que
+   `TransacaoDialog.tsx` faz quando o usuário não troca a forma de
+   pagamento, §9.64).
+   **Lição maior (por que isso levou 4 rodadas de review pra fechar,
+   §9.61→§9.65): o padrão "campo filial-scoped sem check de filial" é uma
+   CLASSE, não um bug pontual — generalize pros campos IRMÃOS na primeira
+   vez que achar um, em vez de corrigir só o campo que o review citou.**
+   Antes de declarar um fix desse tipo "completo", pergunte: essa mesma
+   tabela/RPC tem outro campo com o mesmo formato (FK pra catálogo com
+   `filial_id`)? Se sim, corrija todos juntos.
 6. **Antes de QUALQUER `CREATE OR REPLACE FUNCTION public.fin_*`, ache a
    versão mais recente de verdade primeiro** —
    `grep -rl "CREATE OR REPLACE FUNCTION public.<nome>" supabase/
@@ -152,7 +159,7 @@ DEFINER`:**
    (`FIN_COMPETENCIA_GRUPO`) que uma migration intermediária já tinha
    adicionado.
 
-Referências: §9.30, §9.37, §9.61, §9.62, §9.63, checklist completo na
+Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.65, checklist completo na
 memória de sessão.
 
 ---
