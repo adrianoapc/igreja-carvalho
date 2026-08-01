@@ -125,6 +125,23 @@ const parseValorGetnet = (valor: string): number | null => {
   return isNaN(n) ? null : n;
 };
 
+// Célula vazia é válida (vira null em parseValorGetnet) — célula NÃO-VAZIA
+// mas malformada ("abc", "123x") precisa ser rejeitada explicitamente:
+// parseFloat aceita sufixo lixo ("123x" → 123) e NaN vira null do mesmo
+// jeito que uma célula legitimamente vazia, então parseLinha não tem como
+// distinguir "vazio de propósito" de "erro de digitação/exportação" —
+// ambos silenciosamente viram null e a linha entra como válida (achado do
+// /code-review, mesma classe do fix de contagem de colunas). Valida o
+// resultado já normalizado (mesma transformação de parseValorGetnet) em
+// vez de tentar reconhecer o formato bruto — mais robusto a variações de
+// separador de milhar do que casar a string original.
+const isValorGetnetValido = (valor: string): boolean => {
+  const str = valor.trim();
+  if (!str) return true;
+  const normalizado = str.replace(/\./g, "").replace(",", ".");
+  return /^-?\d+(\.\d+)?$/.test(normalizado);
+};
+
 const parseDataGetnet = (data: string): string | null => {
   const s = data.trim();
   const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
@@ -263,6 +280,18 @@ export function ImportarRecebivelGetnetTab() {
         // como "importada com sucesso" mesmo malformada, poluindo os dados
         // em silêncio (achado do /code-review). Rejeita ANTES do parse.
         if (celulas.length !== HEADER_ESPERADO.length) {
+          invalidas++;
+          continue;
+        }
+
+        // Célula não-vazia mas com valor monetário malformado ("abc",
+        // "123x") também vira null em silêncio no parse — rejeita a linha
+        // em vez de deixar entrar com o campo vazio por engano (achado do
+        // /code-review, rodada seguinte ao fix de contagem de colunas).
+        const temValorInvalido = CAMPO_POR_INDICE.some(
+          (campo, idx) => campo && CAMPOS_VALOR.has(campo) && !isValorGetnetValido(celulas[idx] ?? ""),
+        );
+        if (temValorInvalido) {
           invalidas++;
           continue;
         }

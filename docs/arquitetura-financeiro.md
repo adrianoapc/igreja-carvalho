@@ -3827,6 +3827,47 @@ reais:
 
 `npx tsc`: 63 baseline, 0 novos.
 
+### 9.57 29ª rodada de review: 3 achados de frontend, todos reais
+
+Mesmo ciclo, sobre o commit de §9.56 (`ffe2410`). 3 novos, todos P2, todos
+reais, mudança 100% frontend (sem migration nova):
+
+1. **`ExportarTab.tsx`** — `isLoading` (combina `entradasQuery.isLoading`
+   e `saidasQuery.isLoading`, já existia) nunca era usado no `disabled` do
+   botão "Exportar" — só checava `tiposSelecionados.length`,
+   `totalRegistros` e `colunasSelecionadas.length`. Cenário: usuário já
+   tem "entradas" carregado (50 registros) e marca "saidas" também —
+   `saidasQuery` é habilitada agora e começa a carregar, mas
+   `totalRegistros` continua 50 (soma do que já tem) até saidas
+   terminar — botão fica habilitado nessa janela, e clicar exporta um
+   Excel faltando a aba de saídas (`exportSheetsToExcel` descarta abas
+   vazias em silêncio, sem erro). Fix: `isLoading` entra no `disabled`.
+
+2. **`ImportarRecebivelGetnetTab.tsx`** — mesma classe do fix de §9.49
+   (contagem de colunas), um nível mais fundo: mesmo com a contagem de
+   células correta, uma célula monetária malformada mas não-vazia
+   ("abc", "123x") virava `null` em silêncio dentro de `parseValorGetnet`
+   (`parseFloat` aceita sufixo lixo — `"123x"` vira `123`; `NaN` vira
+   `null`, indistinguível de uma célula legitimamente vazia). Fix: nova
+   `isValorGetnetValido` valida o resultado já normalizado (mesma
+   transformação de separador de milhar/decimal do parser) contra
+   `/^-?\d+(\.\d+)?$/ ` — mais robusto que tentar casar o formato bruto.
+   Linha com qualquer campo de valor não-vazio e inválido é rejeitada
+   antes do parse, contada junto com as outras `invalidas`.
+
+3. **`TransacaoDialog.tsx`** — a compensação de competência de §9.51
+   checava `competenciaAnterior` por truthiness; quando o grupo
+   originalmente tinha `data_competencia = NULL` (legado), isso caía no
+   mesmo branch de "valor anterior desconhecido" — mas o valor NÃO era
+   desconhecido, era `null` conhecido, só que `alterarCompetenciaGrupo`
+   exige uma data não-nula (`FIN_VALIDACAO`) e nunca teria como reverter
+   pra esse estado de qualquer jeito. Fix: checagem explícita
+   `=== null` em vez de truthiness, com uma mensagem própria e honesta
+   pro caso ("competência original era vazia, não é possível restaurar
+   automaticamente") em vez de reusar o texto genérico de "desconhecido".
+
+`npx tsc`: 63 baseline, 0 novos.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

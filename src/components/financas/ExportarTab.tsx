@@ -824,7 +824,8 @@ export function ExportarTab() {
           disabled={
             tiposSelecionados.length === 0 ||
             totalRegistros === 0 ||
-            colunasSelecionadas.length === 0
+            colunasSelecionadas.length === 0 ||
+            isLoading
           }
           size="lg"
           className="bg-gradient-primary"

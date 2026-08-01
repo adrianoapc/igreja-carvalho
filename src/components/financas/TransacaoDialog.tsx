@@ -1137,7 +1137,20 @@ export function TransacaoDialog({
             patchError instanceof Error
               ? patchError.message
               : "Erro ao salvar as demais alterações";
-          if (confirmarSincronizarGrupo.competenciaAnterior) {
+          if (confirmarSincronizarGrupo.competenciaAnterior === null) {
+            // Competência original do grupo era NULA (nunca setada) —
+            // alterarCompetenciaGrupo exige uma data não-nula
+            // (FIN_VALIDACAO), então não tem como reverter pra esse estado
+            // via essa RPC. Diferente de "valor anterior desconhecido": o
+            // valor É conhecido (null), só não é restaurável por esse
+            // caminho — nem tenta, mensagem honesta direto (achado do
+            // /code-review: a checagem por truthiness antes tratava null
+            // igual a "desconhecido" e caía neste mesmo texto sem
+            // distinguir os dois casos).
+            toast.error(
+              `${msgBase} — a competência original das parcelas era vazia e não é possível restaurar isso automaticamente (a sincronização exige uma data). O grupo ficou com a competência ${confirmarSincronizarGrupo.novaCompetencia}. Confira manualmente se necessário.`,
+            );
+          } else {
             try {
               await alterarCompetenciaGrupo(
                 confirmarSincronizarGrupo.lancamentoId,
@@ -1161,10 +1174,6 @@ export function TransacaoDialog({
                 `${msgBase} — a competência do grupo já foi alterada e NÃO pôde ser revertida automaticamente. Confira manualmente.`,
               );
             }
-          } else {
-            toast.error(
-              `${msgBase} — a competência do grupo já foi alterada e não há valor anterior conhecido pra reverter. Confira manualmente.`,
-            );
           }
           return;
         }
