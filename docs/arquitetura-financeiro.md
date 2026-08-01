@@ -3784,6 +3784,49 @@ sem espera nenhuma uma pela outra.
 
 `npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
 
+### 9.56 28ª rodada de review: query key sem contexto + mais um deadlock por ordem indefinida
+
+Mesmo ciclo, sobre o commit de §9.55 (`6f9f9c6`). 2 novos, ambos P2, ambos
+reais:
+
+1. **`ConferenciaTotaisGetnetCard.tsx`** — `contaId` (estado local) nunca
+   era resetado ao trocar de igreja/filial com o card montado, e a
+   queryKey de `totais` não incluía `igrejaId`/`filialId`/`isAllFiliais`.
+   `fin_conferencia_totais_getnet` só valida `igreja_id` (não filial, achado
+   já registrado em §9.39) — trocar de FILIAL mantendo a mesma igreja não
+   geraria nem erro: continuaria mostrando os totais da conta antiga (de
+   outra filial) em silêncio. Fix: `useEffect` reseta `contaId` quando
+   `igrejaId`/`filialId`/`isAllFiliais` mudam; contexto também entra na
+   queryKey por segurança adicional.
+
+2. **Mais um deadlock por ordem indefinida** (`20260731210000`, trigger de
+   §9.54) — os 3 loops de `atualizar_saldo_conta_lote()` usavam `SELECT
+   DISTINCT conta_id` sem `ORDER BY`. Postgres não garante NENHUMA ordem
+   pra `DISTINCT`; duas operações em lote concorrentes (dois jobs de
+   reclassificação, ou um bulk update disputando com `fin_criar_
+   transferencia`) tocando as MESMAS contas em ordens diferentes podiam
+   travar uma na outra — cada `_fin_recalcular_saldo_conta_raw` retém o
+   lock da conta até commitar, mesmo padrão de deadlock já corrigido em
+   `fin_criar_transferencia` (§9.53), agora reaparecendo no trigger que
+   nasceu justamente da rodada seguinte àquele fix. Fix: `ORDER BY
+   conta_id` nos 3 loops (INSERT/DELETE/UPDATE), mesma ordem determinística
+   já usada na RPC de transferência.
+
+   Tentei reproduzir o deadlock exato com 2 sessões `psql` concorrentes e
+   ordem de linha invertida entre elas, mas o `DISTINCT` do Postgres
+   produziu a MESMA ordem nas duas sessões neste ambiente por acaso — não
+   deu pra forçar deterministicamente sem instrumentar o trigger com um
+   `pg_sleep` só de teste (o que fiz: confirma bloqueio consistente de ~6s,
+   sem deadlock, quando as duas sessões calham de processar na mesma
+   ordem). Validação foca no que é verificável com certeza: `ORDER BY
+   conta_id` produz ordem ascendente determinística independente da ordem
+   de entrada (testado diretamente), e a correção em lote continua
+   funcionando (regressão). O mecanismo em si (ordem determinística evita
+   espera circular) já tinha sido validado com sessões concorrentes reais
+   no fix análogo de `fin_criar_transferencia` (§9.53).
+
+`npx tsc`: 63 baseline, 0 novos.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

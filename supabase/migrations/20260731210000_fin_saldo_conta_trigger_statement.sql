@@ -47,9 +47,17 @@ AS $function$
 DECLARE
   v_conta_id uuid;
 BEGIN
+  -- ORDER BY conta_id em todos os 3 loops (não só o de UPDATE): duas
+  -- operações em lote concorrentes tocando as MESMAS contas em ordens
+  -- diferentes (SELECT DISTINCT sozinho não garante ordem nenhuma) podiam
+  -- travar uma na outra — cada _fin_recalcular_saldo_conta_raw retém o
+  -- lock da conta até commitar, então uma pega A e espera B enquanto a
+  -- outra pega B e espera A. Mesma ordem determinística já usada em
+  -- fin_criar_transferencia (achado do /code-review).
   IF TG_OP = 'INSERT' THEN
     FOR v_conta_id IN
       SELECT DISTINCT conta_id FROM new_table WHERE status = 'pago' AND conta_id IS NOT NULL
+       ORDER BY conta_id
     LOOP
       PERFORM public._fin_recalcular_saldo_conta_raw(v_conta_id);
     END LOOP;
@@ -59,6 +67,7 @@ BEGIN
   IF TG_OP = 'DELETE' THEN
     FOR v_conta_id IN
       SELECT DISTINCT conta_id FROM old_table WHERE status = 'pago' AND conta_id IS NOT NULL
+       ORDER BY conta_id
     LOOP
       PERFORM public._fin_recalcular_saldo_conta_raw(v_conta_id);
     END LOOP;
@@ -75,6 +84,7 @@ BEGIN
       SELECT conta_id FROM new_table WHERE status = 'pago'
     ) afetadas
     WHERE conta_id IS NOT NULL
+    ORDER BY conta_id
   LOOP
     PERFORM public._fin_recalcular_saldo_conta_raw(v_conta_id);
   END LOOP;

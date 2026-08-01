@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +27,14 @@ export function ConferenciaTotaisGetnetCard() {
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
 
+  // fin_conferencia_totais_getnet só valida igreja_id, não filial — trocar
+  // de igreja/filial com o card montado sem limpar contaId faria continuar
+  // mostrando os totais da conta antiga (de outra filial) em silêncio, já
+  // que o RPC nem rejeitaria a chamada (achado do /code-review).
+  useEffect(() => {
+    setContaId("");
+  }, [igrejaId, filialId, isAllFiliais]);
+
   const periodo = getPeriodoRange(selectedMonth, customRange);
 
   const { data: contas = [] } = useQuery({
@@ -46,7 +54,7 @@ export function ConferenciaTotaisGetnetCard() {
   });
 
   const { data: totais, isLoading } = useQuery({
-    queryKey: ["conferencia-totais-getnet", contaId, periodo.inicio, periodo.fim],
+    queryKey: ["conferencia-totais-getnet", igrejaId, filialId, isAllFiliais, contaId, periodo.inicio, periodo.fim],
     queryFn: () => conferenciaTotaisGetnet(contaId, periodo.inicio, periodo.fim),
     enabled: !!contaId,
   });
