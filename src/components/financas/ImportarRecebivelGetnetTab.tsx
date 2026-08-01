@@ -149,6 +149,16 @@ const parseDataGetnet = (data: string): string | null => {
   return `${m[3]}-${m[2]}-${m[1]}`;
 };
 
+// Mesmo raciocínio de isValorGetnetValido: célula de data não-vazia mas
+// fora do formato esperado (ex.: "31-07-2026" em vez de "31/07/2026")
+// virava null em silêncio — indistinguível de uma célula vazia — e a
+// linha entrava como válida mesmo faltando uma data (achado do
+// /code-review, mesma rodada do fix de valor monetário).
+const isDataGetnetValida = (data: string): boolean => {
+  const s = data.trim();
+  return !s || /^\d{2}\/\d{2}\/\d{4}$/.test(s);
+};
+
 // Parser da linha crua (array de 26 células já decodificadas) → objeto
 // RecebivelGetnetLinha. Datas/valores são convertidos; demais campos
 // permanecem texto bruto (ex.: "parcelas" fica "1 de 7", não é quebrado em
@@ -292,6 +302,16 @@ export function ImportarRecebivelGetnetTab() {
           (campo, idx) => campo && CAMPOS_VALOR.has(campo) && !isValorGetnetValido(celulas[idx] ?? ""),
         );
         if (temValorInvalido) {
+          invalidas++;
+          continue;
+        }
+
+        // Mesmo problema pra data ("31-07-2026" em vez de "31/07/2026") —
+        // vira null em silêncio, indistinguível de célula vazia.
+        const temDataInvalida = CAMPO_POR_INDICE.some(
+          (campo, idx) => campo && CAMPOS_DATA.has(campo) && !isDataGetnetValida(celulas[idx] ?? ""),
+        );
+        if (temDataInvalida) {
           invalidas++;
           continue;
         }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -325,6 +325,21 @@ export function ExportarTab() {
     enabled: !!igrejaId && tiposConceito.length > 0,
   });
 
+  // Trocar "Tipo de Dados" (ex.: Entradas -> só Saídas) muda quais
+  // categorias são opção válida (`categorias` acima), mas não removia
+  // sozinho os ids que ficaram selecionados e não são mais uma opção
+  // visível — viravam um filtro invisível (`.in("categoria_id", [...])`
+  // na query, achado do /code-review) que ninguém consegue desmarcar pela
+  // UI e zera os resultados sem explicação.
+  useEffect(() => {
+    setCategoriasSelecionadas((atual) => {
+      const idsValidos = new Set(categorias.map((c) => c.id));
+      const filtradas = atual.filter((id) => idsValidos.has(id));
+      return filtradas.length === atual.length ? atual : filtradas;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categorias]);
+
   // Query de dados de exportação — uma por tipo funcional, pra poder gerar
   // uma aba por tipo no Excel sem misturar entrada/saída na mesma busca.
   const entradasQuery = useQuery<TransacaoExportacao[]>({
@@ -390,6 +405,13 @@ export function ExportarTab() {
   const isLoading =
     (tiposSelecionados.includes("entradas") && entradasQuery.isLoading) ||
     (tiposSelecionados.includes("saidas") && saidasQuery.isLoading);
+  // Query com erro também não pode deixar exportar: handleExportar troca
+  // dados ausentes por [], e exportSheetsToExcel descarta aba vazia em
+  // silêncio — geraria um Excel incompleto com toast de sucesso mesmo
+  // uma das buscas tendo falhado (achado do /code-review).
+  const isError =
+    (tiposSelecionados.includes("entradas") && entradasQuery.isError) ||
+    (tiposSelecionados.includes("saidas") && saidasQuery.isError);
 
   const totalRegistros =
     (tiposSelecionados.includes("entradas")
@@ -693,6 +715,15 @@ export function ExportarTab() {
                 Selecione ao menos um Tipo de Dados para exportar.
               </AlertDescription>
             </Alert>
+          ) : isError ? (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Erro ao carregar os dados de um dos tipos selecionados —
+                exportar agora geraria um Excel incompleto. Tente recarregar
+                a página.
+              </AlertDescription>
+            </Alert>
           ) : isLoading ? (
             <div className="text-center py-8 text-muted-foreground">
               Carregando dados...
@@ -825,7 +856,8 @@ export function ExportarTab() {
             tiposSelecionados.length === 0 ||
             totalRegistros === 0 ||
             colunasSelecionadas.length === 0 ||
-            isLoading
+            isLoading ||
+            isError
           }
           size="lg"
           className="bg-gradient-primary"

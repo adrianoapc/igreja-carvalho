@@ -3868,6 +3868,42 @@ reais, mudança 100% frontend (sem migration nova):
 
 `npx tsc`: 63 baseline, 0 novos.
 
+### 9.58 30ª rodada de review: 3 achados, mesma linha de §9.57
+
+Mesmo ciclo, sobre o commit de §9.57 (`4793934`). 3 novos, todos P2, todos
+reais, mudança 100% frontend:
+
+1. **`ImportarRecebivelGetnetTab.tsx`** — mesma classe do fix de valor
+   monetário (§9.57), agora pra data: célula não-vazia mas fora do
+   formato esperado (`"31-07-2026"` em vez de `"31/07/2026"`) virava
+   `null` em silêncio dentro de `parseDataGetnet`, indistinguível de
+   célula vazia. Fix: `isDataGetnetValida` (mesmo padrão de
+   `isValorGetnetValido`) valida contra `/^\d{2}\/\d{2}\/\d{4}$/`; linha
+   com qualquer campo de `CAMPOS_DATA` não-vazio e inválido é rejeitada
+   antes do parse, junto com as outras `invalidas`.
+
+2. **`ExportarTab.tsx` — categoria órfã** — trocar "Tipo de Dados" (ex.:
+   Entradas → só Saídas) recalcula as opções de categoria (`categorias`,
+   já filtradas por tipo), mas não removia sozinho os ids que ficaram
+   selecionados e não são mais uma opção visível — viravam um filtro
+   `.in("categoria_id", [...])` invisível (a categoria não aparece mais
+   pra desmarcar) que zera os resultados sem explicação. Fix: `useEffect`
+   reconcilia `categoriasSelecionadas` toda vez que `categorias` muda,
+   removendo ids que não são mais opção válida.
+
+3. **`ExportarTab.tsx` — export com query com erro** — o fix de `isLoading`
+   de §9.57 não cobria o caso de uma query FALHAR (não só demorar):
+   `isLoading` vira `false` quando a query termina, com erro ou sem, e
+   `totalRegistros` continua positivo (soma do que a OUTRA query, bem
+   sucedida, trouxe) — botão ficava habilitado, `handleExportar`
+   substitui a query com erro por `[]`, e `exportSheetsToExcel` descarta
+   silenciosamente a aba vazia, com toast de sucesso mesmo assim. Fix:
+   novo `isError` (mesmo padrão de `isLoading`, combinando `entradasQuery.
+   isError`/`saidasQuery.isError`) entra no `disabled` do botão, com um
+   alerta destrutivo visível no preview explicando o motivo.
+
+`npx tsc`: 63 baseline, 0 novos.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
