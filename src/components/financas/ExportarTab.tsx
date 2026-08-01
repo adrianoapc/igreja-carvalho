@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useFilialId } from "@/hooks/useFilialId";
 import {
@@ -323,6 +323,12 @@ export function ExportarTab() {
       return data;
     },
     enabled: !!igrejaId && tiposConceito.length > 0,
+    // tiposConceito muda a queryKey (ex.: adicionar Saídas com Entradas já
+    // selecionado) — sem manter os dados anteriores, `categorias` cai pra
+    // [] (fallback do destructuring) durante o refetch, e o efeito de
+    // reconciliação abaixo limparia até categoria ainda válida por engano
+    // (achado do /code-review sobre o fix da rodada anterior).
+    placeholderData: keepPreviousData,
   });
 
   // Trocar "Tipo de Dados" (ex.: Entradas -> só Saídas) muda quais

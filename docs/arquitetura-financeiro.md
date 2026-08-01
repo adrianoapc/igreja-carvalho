@@ -3904,6 +3904,40 @@ reais, mudança 100% frontend:
 
 `npx tsc`: 63 baseline, 0 novos.
 
+### 9.59 31ª rodada de review: mesma classe de "estado não resetado" nos mesmos 2 arquivos
+
+Mesmo ciclo, sobre o commit de §9.58 (`3d5ad11`). 2 novos, ambos P2, ambos
+reais — um é a mesma classe de bug de contexto-não-resetado já vista em
+§9.56 (agora noutro componente), o outro é uma REGRESSÃO do meu próprio
+fix de §9.58:
+
+1. **`ImportarRecebivelGetnetTab.tsx`** — `integracaoId` nunca era
+   resetado ao trocar de igreja com a aba montada (mesma classe do
+   achado de `ConferenciaTotaisGetnetCard.tsx` em §9.56). Preview de CSV
+   já processado continuava com o botão de importar habilitado, mas
+   `fin_importar_recebivel_getnet` rejeitaria a integração por estar
+   fora do tenant novo; e escolher uma integração válida da igreja nova
+   ainda importaria o PREVIEW retido da igreja antiga. Fix: `useEffect`
+   reseta `integracaoId` e chama `limparPreview()` quando `igrejaId`
+   muda.
+
+2. **`ExportarTab.tsx` — regressão do fix de categoria órfã (§9.58)** —
+   o `useEffect` que reconcilia `categoriasSelecionadas` contra
+   `categorias` reage a QUALQUER mudança de `categorias`, inclusive a
+   transição transitória: trocar `tiposConceito` (ex.: adicionar Saídas
+   com Entradas já selecionado) muda a `queryKey` da query de
+   categorias, e sem manter dados anteriores `categorias` cai pro
+   fallback `[]` do destructuring ENQUANTO a nova busca carrega — meu
+   próprio efeito via essa lista vazia transitória e limpava até a
+   categoria "Entrada" ainda válida, ampliando sem querer as duas
+   queries de exportação. Fix: `placeholderData: keepPreviousData` na
+   query de categorias — mantém a lista anterior visível durante o
+   refetch, então o efeito de reconciliação só vê a lista `[]` transitória
+   se não houver mesmo nenhum dado anterior (primeiro carregamento), não
+   mais a cada troca de tipo.
+
+`npx tsc`: 63 baseline, 0 novos.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

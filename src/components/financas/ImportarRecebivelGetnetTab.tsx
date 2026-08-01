@@ -231,6 +231,17 @@ export function ImportarRecebivelGetnetTab() {
     setFileName("");
   };
 
+  // Trocar de igreja com a aba montada mantinha integracaoId da igreja
+  // anterior — botão de importar continuava habilitado com um CSV já
+  // processado, mas fin_importar_recebivel_getnet rejeitaria a integração
+  // por estar fora do tenant; e escolher uma integração nova ainda
+  // importaria o preview retido da igreja antiga (achado do /code-review).
+  useEffect(() => {
+    setIntegracaoId("");
+    limparPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [igrejaId]);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
