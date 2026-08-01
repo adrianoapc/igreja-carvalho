@@ -3683,6 +3683,70 @@ nesta mesma PR):
 
 `npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
 
+### 9.54 26ª rodada de review: duplicata já lançada + trigger de saldo vira statement-level
+
+Mesmo ciclo, sobre o commit de §9.53 (`5bdabea`). 2 novos — 1 P1, 1 P2,
+ambos editados diretamente nas migrations de origem (ainda não
+deployadas):
+
+1. **Reconciliação de duplicata não cobria deságio já lançado** (P1,
+   `20260731140000`) — a reconciliação de §9.53 (mantém o lote mais
+   antigo, devolve os demais pra `pendente_vinculo`) preservava
+   `lancamento_desagio_id` e a transação paga quando a DUPLICATA já
+   tinha avançado até `lancamento_criado`. Efeitos: a despesa continuava
+   afetando o saldo mas sumia da conferência (só soma lote
+   `lancamento_criado`); e depois de revincular o lote (agora `pendente_
+   vinculo`), `fin_lancar_desagio_antecipacao` rejeitaria relançar
+   porque o `lancamento_desagio_id` antigo continuava não-nulo
+   (`FIN_JA_LANCADO`) — fluxo travado. Fix: antes da limpeza genérica,
+   um bloco reverte a transação paga de qualquer duplicata que já tenha
+   `lancamento_criado` e recalcula a conta afetada inline (fórmula de
+   `fin_recalcular_saldo_conta` aplicada direto — esta migration roda
+   ANTES do fix que torna o recálculo sempre correto, `20260731190000`,
+   então não dá pra contar com qual versão do trigger de saldo está
+   ativa neste ponto da sequência). Testado no harness: duplicata com
+   deságio pago (-50 na conta) revertida corretamente, conta volta a 0,
+   `lancamento_desagio_id` limpo, índice único criado com sucesso.
+
+2. **Trigger de saldo recalculava linha por linha, não por lote** (P2,
+   nova migration `20260731210000`) — job de reclassificação em massa
+   (até 5000 transações) ou `undo-import` em lote disparavam o trigger
+   `FOR EACH ROW` uma vez POR LINHA; cada disparo fazia uma `SUM`
+   completa sobre todo o histórico pago da conta mais um `SELECT FOR
+   UPDATE` — para N linhas na mesma conta, N recálculos redundantes
+   (só o último importa), podendo causar timeout/lock contention e
+   abortar um job válido. Achado extra descoberto ao investigar: o
+   antigo `UPDATE OF status` também deixava passar uma reclassificação
+   que muda só `conta_id` sem tocar `status` — o mesmo gap já fechado em
+   `proteger_desagio_vinculado` (§9.53), mas nunca replicado pro trigger
+   de saldo.
+
+   Fix: trigger sai de `FOR EACH ROW` pra `FOR EACH STATEMENT`, usando
+   transition tables (`REFERENCING OLD TABLE`/`NEW TABLE`, PG10+) pra
+   coletar as contas afetadas pela statement INTEIRA de uma vez e
+   recalcular cada conta DISTINTA uma única vez — 3 triggers separados
+   (INSERT só tem `NEW TABLE`, DELETE só `OLD TABLE`, UPDATE os dois),
+   porque a cláusula `REFERENCING` precisa bater exatamente com o que
+   cada operação disponibiliza. Descoberta no meio do caminho: Postgres
+   não permite combinar transition tables com `UPDATE OF <coluna>`
+   ("transition tables cannot be specified for triggers with column
+   lists") — o trigger de UPDATE passou a disparar em QUALQUER update
+   (sem lista de colunas), com o filtro `status='pago'` em
+   `old_table`/`new_table` decidindo sozinho quais contas merecem
+   recálculo; isso resolve o gap de `conta_id` de graça, sem precisar
+   enumerar colunas.
+
+   Harness com 8 cenários: 3 regressões unitárias (insert/update/delete
+   de linha única), bulk insert de 3 linhas numa conta numa única
+   statement, bulk update de status em 2 linhas numa única statement,
+   reclassificação movendo `conta_id` de uma linha paga sem `status` no
+   `SET` (as duas contas recalculadas certo), update de campo não
+   relacionado não quebra nem muda saldo, e reversão de uma linha com
+   saldo "corrompido" manualmente confirma que o recálculo é sempre
+   autoritativo (ignora o valor anterior, reconstrói da fonte).
+
+`npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

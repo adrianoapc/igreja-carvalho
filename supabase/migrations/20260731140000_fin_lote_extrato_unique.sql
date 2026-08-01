@@ -31,7 +31,57 @@
 -- vinculado (o vínculo original, presumivelmente o correto) e devolve os
 -- demais pra pendente_vinculo (não deleta nada, tesoureiro revisa
 -- manualmente qual extrato cada um realmente deveria ter).
+--
+-- Achado da rodada SEGUINTE sobre este mesmo reconciliador: se a duplicata
+-- já tivesse ido além de 'vinculado' — chegado a 'lancamento_criado', com
+-- um deságio de verdade lançado (transação paga) — a limpeza genérica
+-- acima preservava lancamento_desagio_id e a transação paga. Efeitos: (1)
+-- a despesa continuava afetando o saldo mas sumia da conferência (que só
+-- soma lote com status='lancamento_criado'); (2) depois de revincular o
+-- lote (agora pendente_vinculo), fin_lancar_desagio_antecipacao rejeitaria
+-- relançar porque lancamento_desagio_id antigo ainda não-nulo
+-- (FIN_JA_LANCADO) — fluxo travado. Fix: reverte a transação paga da
+-- duplicata pra pendente e recalcula a conta afetada diretamente aqui
+-- (fórmula de fin_recalcular_saldo_conta aplicada inline — esta migration
+-- roda ANTES do fix que torna o trigger de saldo sempre correto,
+-- 20260731190000, então não dá pra contar com qual versão do trigger está
+-- ativa neste ponto da sequência) ANTES da limpeza genérica do lote.
 -- ============================================================================
+
+DO $$
+DECLARE
+  v_tx record;
+BEGIN
+  FOR v_tx IN
+    SELECT t.id AS tx_id, t.conta_id
+      FROM public.getnet_antecipacao_lotes lote
+      JOIN public.transacoes_financeiras t ON t.id = lote.lancamento_desagio_id
+     WHERE t.status = 'pago'
+       AND lote.id IN (
+         SELECT id FROM (
+           SELECT id, row_number() OVER (
+             PARTITION BY extrato_bancario_id ORDER BY created_at ASC, id ASC
+           ) AS posicao
+             FROM public.getnet_antecipacao_lotes
+            WHERE extrato_bancario_id IS NOT NULL
+         ) dup WHERE posicao > 1
+       )
+  LOOP
+    UPDATE public.transacoes_financeiras
+       SET status = 'pendente', updated_at = now()
+     WHERE id = v_tx.tx_id;
+
+    UPDATE public.contas c
+       SET saldo_atual = COALESCE(c.saldo_inicial, 0) + COALESCE((
+             SELECT SUM(CASE WHEN tp.tipo = 'entrada' THEN COALESCE(tp.valor_liquido, tp.valor)
+                              ELSE -COALESCE(tp.valor_liquido, tp.valor) END)
+               FROM public.transacoes_financeiras tp
+              WHERE tp.conta_id = v_tx.conta_id AND tp.status = 'pago'
+           ), 0),
+           updated_at = now()
+     WHERE c.id = v_tx.conta_id;
+  END LOOP;
+END $$;
 
 WITH duplicados AS (
   SELECT id,
@@ -42,7 +92,8 @@ WITH duplicados AS (
    WHERE extrato_bancario_id IS NOT NULL
 )
 UPDATE public.getnet_antecipacao_lotes lote
-   SET extrato_bancario_id = NULL, status = 'pendente_vinculo', updated_at = now()
+   SET extrato_bancario_id = NULL, lancamento_desagio_id = NULL,
+       status = 'pendente_vinculo', updated_at = now()
   FROM duplicados d
  WHERE lote.id = d.id AND d.posicao > 1;
 
