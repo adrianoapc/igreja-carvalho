@@ -3516,6 +3516,66 @@ mexe no saldo. Todas bateram exatamente com o esperado.
 `npx tsc`/`deno check`: 0 novos (mudança 100% backend + simplificação do
 `undo-import`).
 
+### 9.51 23ª rodada de review: 2 P1 sobre os fixes de §9.49/§9.50 — corrida no recálculo + deságio órfão reativável
+
+Mesmo ciclo, sobre os 2 commits mais recentes (§9.49 e §9.50). 2 novos,
+ambos P1, ambos reais, cada um sobre um fix desta mesma sessão:
+
+1. **Corrida em `_fin_recalcular_saldo_conta_raw`** — a versão de §9.50
+   fazia `UPDATE contas SET saldo_atual = (SELECT SUM(...) ...)` num
+   único statement. A subquery do `SET` usa o snapshot de QUANDO ESSE
+   UPDATE COMEÇOU (READ COMMITTED); esperar a trava de outra transação
+   concorrente recalculando a MESMA conta só re-checa (EvalPlanQual) as
+   colunas da própria linha de `contas`, não dá um snapshot novo pra
+   subquery sobre `transacoes_financeiras`. Duas transações inserindo
+   pago pra mesma conta ao mesmo tempo: a segunda espera a trava da
+   primeira, mas quando prossegue ainda soma com o snapshot de ANTES de
+   esperar — sobrescreve `saldo_atual` com uma soma que nasce sem um dos
+   dois movimentos.
+
+   Fix: trava a conta (`SELECT ... FOR UPDATE`) numa statement SEPARADA
+   antes da soma — depois que a espera termina, a soma (statement nova)
+   pega um snapshot fresco, já vendo o que a outra transação commitou.
+   Mesmo padrão que `fin_recalcular_saldo_conta` (RPC pública) já usava
+   desde `20260710120000`; só o helper interno novo tinha colapsado tudo
+   num único `UPDATE`.
+
+   Harness Docker com 2 sessões `psql` concorrentes de verdade (uma em
+   background, `pg_sleep(3)` segurando a trava antes de commitar; a
+   outra inicia ~1s depois, bloqueia na trava, e só prossegue quando a
+   primeira libera): reproduziu o bug na versão pré-fix (saldo final
+   -30 em vez de 70 — o movimento de +100 da primeira sessão sumiu) e
+   confirmou a correção exata (70) na pós-fix.
+
+2. **Deságio órfão reativável** — o trigger de §9.49 reseta o LOTE
+   quando sua despesa é revertida, mas a transação original continua
+   existindo, com `origem_registro='getnet_antecipacao_desagio'`,
+   disponível pro "Marcar como Pago" comum. Como `fin_lancar_desagio_
+   antecipacao` sempre cria a transação JÁ paga (`fin_criar_lancamento`
+   com `status='pago'` no INSERT — nunca passa por pendente→pago na
+   criação), a ÚNICA forma de uma linha dessa origem fazer a transição
+   pendente/cancelado→pago é justamente essa reativação órfã. Sem
+   guarda, dava pra pagar de novo a transação órfã E lançar um deságio
+   NOVO pelo lote (já resetado pra `vinculado`) — deságio contado duas
+   vezes, e `fin_conferencia_totais_getnet` só vê o novo.
+
+   Fix: trigger `BEFORE UPDATE OF status` novo — rejeita reativar
+   (pendente/cancelado→pago) uma linha `origem_registro=
+   'getnet_antecipacao_desagio'` que não é mais referenciada por
+   nenhum lote, com mensagem `FIN_DESAGIO_ORFAO` orientando a lançar um
+   novo deságio pelo lote em vez de reaproveitar a linha órfã.
+
+   Harness Docker, 3 cenários: transação órfã (bloqueia, mensagem
+   correta), transação da mesma origem mas AINDA referenciada por um
+   lote — caso defensivo que não deveria ocorrer na prática, mas
+   confirma que o guard não trava cegamente por origem sozinha (permite
+   corretamente), e transação comum sem essa origem (não afetada).
+
+Migration única (`20260731200000_fin_saldo_lock_e_impede_desagio_orfao.
+sql`) pros dois fixes — ambos P1 sobre o mesmo par de commits, mesma
+rodada de review. `npx tsc`: 63 baseline, 0 novos (mudança 100%
+backend).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
