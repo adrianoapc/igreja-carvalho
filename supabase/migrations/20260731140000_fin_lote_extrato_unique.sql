@@ -22,7 +22,29 @@
 -- amigável que o EXISTS já dava pro caso comum (sem corrida) — o EXISTS
 -- continua ali como fast-path (evita ida ao banco pro caso óbvio), o
 -- índice é quem garante de verdade.
+--
+-- Reconciliação antes do índice (achado do /code-review, rodada seguinte):
+-- se esta instância já tiver sofrido a corrida que este índice fecha, dois
+-- lotes podem já compartilhar o mesmo extrato_bancario_id não-nulo — o
+-- CREATE UNIQUE INDEX abortaria a migration antes mesmo do índice existir
+-- pra prevenir novos casos. Mantém o lote com created_at mais antigo
+-- vinculado (o vínculo original, presumivelmente o correto) e devolve os
+-- demais pra pendente_vinculo (não deleta nada, tesoureiro revisa
+-- manualmente qual extrato cada um realmente deveria ter).
 -- ============================================================================
+
+WITH duplicados AS (
+  SELECT id,
+         row_number() OVER (
+           PARTITION BY extrato_bancario_id ORDER BY created_at ASC, id ASC
+         ) AS posicao
+    FROM public.getnet_antecipacao_lotes
+   WHERE extrato_bancario_id IS NOT NULL
+)
+UPDATE public.getnet_antecipacao_lotes lote
+   SET extrato_bancario_id = NULL, status = 'pendente_vinculo', updated_at = now()
+  FROM duplicados d
+ WHERE lote.id = d.id AND d.posicao > 1;
 
 CREATE UNIQUE INDEX IF NOT EXISTS getnet_antecipacao_lotes_extrato_unique
   ON public.getnet_antecipacao_lotes (extrato_bancario_id)

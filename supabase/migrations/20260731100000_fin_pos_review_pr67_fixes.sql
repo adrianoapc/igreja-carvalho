@@ -129,6 +129,19 @@ BEGIN
   PERFORM public.fin_validar_fk_tenant('categorias_financeiras', NULLIF(p_extras ->> 'categoria_saida_id','')::uuid, v_igreja);
   PERFORM public.fin_validar_fk_tenant('categorias_financeiras', NULLIF(p_extras ->> 'categoria_entrada_id','')::uuid, v_igreja);
 
+  -- Trava as duas contas em ordem determinística (por id) ANTES de
+  -- qualquer INSERT pago — sem isso, duas transferências concorrentes em
+  -- direções opostas (A->B e B->A) podiam deadlockar: cada uma prende sua
+  -- conta de origem via o trigger de saldo do primeiro INSERT pago e
+  -- espera a de destino, que a outra já prendeu. Postgres detecta e aborta
+  -- uma das duas transferências, mesmo sendo as duas válidas (achado do
+  -- /code-review). Ordenar por id garante que as duas chamadas concorrentes
+  -- tentam travar na MESMA ordem, eliminando a espera circular.
+  PERFORM 1 FROM public.contas
+   WHERE id IN (p_conta_origem_id, p_conta_destino_id)
+   ORDER BY id
+     FOR UPDATE;
+
   SELECT nome INTO v_nome_origem FROM public.contas WHERE id = p_conta_origem_id;
   SELECT nome INTO v_nome_destino FROM public.contas WHERE id = p_conta_destino_id;
 

@@ -3625,6 +3625,64 @@ prática já usada em §9.47):
 
 `npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
 
+### 9.53 25ª rodada de review: dedup antes do índice + guard vazando por reclass + deadlock em transferências opostas
+
+Mesmo ciclo, sobre o commit de §9.52 (`ba55d15`). 3 novos — 2 P1, 1 P2,
+os 3 editados diretamente nas migrations de origem (ainda não deployadas
+nesta mesma PR):
+
+1. **Dedup antes do índice único** (P1, `20260731140000`) — mesmo
+   raciocínio de "sem risco hoje" já contestado em rodadas anteriores
+   (§9.35/§9.39/§9.51 sobre a FK de filial): se esta instância já tivesse
+   sofrido a corrida que este índice existe pra fechar, dois lotes podiam
+   compartilhar o mesmo `extrato_bancario_id` não-nulo, e o `CREATE
+   UNIQUE INDEX` abortaria a migration antes mesmo do índice (e do
+   handler de `unique_violation` da RPC) existirem — justamente nas
+   instalações que mais precisam do fix. Decisão desta rodada: parar de
+   reargumentar "sem risco hoje" e só tornar a migration robusta de
+   verdade. Fix: `UPDATE` de reconciliação antes do índice — mantém o
+   lote com `created_at` mais antigo vinculado, devolve os demais pra
+   `pendente_vinculo` (não deleta nada, tesoureiro revisa manualmente).
+   Testado no harness: 2 lotes com o mesmo extrato (datas diferentes) →
+   o mais antigo mantém o vínculo, o outro volta a `pendente_vinculo`, e
+   o `CREATE UNIQUE INDEX` sucede.
+
+2. **Guard de deságio vazava por reclassificação em massa** (P1,
+   `20260731200000`) — o trigger de §9.52 disparava só em `UPDATE OF
+   status`, mas `reclass-transacoes/index.ts` monta o `UPDATE` só com os
+   campos que o usuário escolheu reclassificar (ex.: só `conta_id`, sem
+   `status` no `SET`) — o guard inteiro nunca disparava por esse
+   caminho, deixando mover um deságio ainda vinculado de conta/
+   competência sem o lote nem a conferência saberem. Fix: `UPDATE OF`
+   passa a listar TODAS as colunas que a função realmente checa
+   (`status, valor, valor_liquido, conta_id, tipo, data_vencimento,
+   data_competencia, data_pagamento`), não só `status`. Testado no
+   harness simulando exatamente o padrão de update do reclass (só
+   `conta_id`, só `data_competencia`, sem `status`) — ambos agora
+   bloqueados; mudar um campo fora da lista (`categoria_id`) continua
+   permitido.
+
+3. **Deadlock em transferências concorrentes de direções opostas** (P2,
+   `20260731100000`) — `fin_criar_transferencia` trava as contas na
+   ORDEM DE INSERÇÃO (saída primeiro, entrada depois) via o trigger de
+   saldo do primeiro `INSERT` pago de cada uma. Duas transferências
+   concorrentes A→B e B→A: cada uma trava sua própria origem e espera a
+   outra (que a segunda transação já travou como sua origem) — espera
+   circular, Postgres detecta e aborta uma das duas, mesmo sendo ambas
+   válidas. Fix: trava as duas contas em ORDEM DETERMINÍSTICA (por `id`)
+   numa única `SELECT ... FOR UPDATE` logo no início da RPC, antes de
+   qualquer `INSERT` pago — as duas direções passam a tentar travar na
+   MESMA ordem, eliminando a espera circular.
+
+   Harness com 2 sessões `psql` concorrentes de verdade: reproduzido o
+   deadlock exato com a ordem de travas antiga (locks diretos simulando
+   a ordem de inserção original — sessão B abortada com "deadlock
+   detected"); confirmado que a ordem determinística faz a segunda
+   sessão apenas ESPERAR (não deadlockar) e completar com sucesso assim
+   que a primeira libera.
+
+`npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

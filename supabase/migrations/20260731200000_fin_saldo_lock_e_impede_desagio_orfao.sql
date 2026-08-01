@@ -145,7 +145,16 @@ $function$;
 
 DROP TRIGGER IF EXISTS trigger_impedir_reativar_desagio_orfao ON public.transacoes_financeiras;
 DROP TRIGGER IF EXISTS trigger_proteger_desagio_vinculado ON public.transacoes_financeiras;
+-- UPDATE OF lista TODAS as colunas que a função checa, não só status —
+-- reclass-transacoes/index.ts (reclassificação em massa) monta o UPDATE só
+-- com os campos que o usuário escolheu reclassificar (ex.: só conta_id ou
+-- só data_competencia, sem status no SET); com o trigger disparando só em
+-- UPDATE OF status, esse caminho bypassava o guard inteiro — um deságio
+-- ainda vinculado podia ser movido de conta ou de competência sem o lote
+-- nem a conferência saberem (achado do /code-review).
 CREATE TRIGGER trigger_proteger_desagio_vinculado
-  BEFORE UPDATE OF status ON public.transacoes_financeiras
+  BEFORE UPDATE OF status, valor, valor_liquido, conta_id, tipo,
+                    data_vencimento, data_competencia, data_pagamento
+  ON public.transacoes_financeiras
   FOR EACH ROW
   EXECUTE FUNCTION public.proteger_desagio_vinculado();
