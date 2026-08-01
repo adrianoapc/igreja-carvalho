@@ -3979,6 +3979,66 @@ ambos reais:
 `npx tsc`: 63 baseline, 0 novos. Migration do item 1 validada via harness
 Docker.
 
+### 9.61 33ª rodada de review: conta de outra filial na conferência Getnet + rótulo de forma de pagamento ignora filial + FK sem ON DELETE
+
+Rodada sem comentários linha-a-linha — os 3 achados vieram só no corpo da
+review (`@codex review` de 01/08 12:21). Todos reais, verificados por
+leitura direta e depois harness Docker (réplica fiel de `has_filial_access`/
+`get_jwt_filial_id`/JWT, não só os stubs simplificados de rodadas
+anteriores — o achado P1 só reproduz pelo canal **web** (JWT), o
+`service_role`/bot não passa pelo mesmo gate):
+
+1. **`fin_conferencia_totais_getnet` sem check de filial** (P1,
+   `20260729140000`) — validava `p_conta_id` só com `fin_validar_fk_tenant`
+   (checa `igreja_id`, nunca `filial_id`). Sendo `SECURITY DEFINER`
+   (bypassa RLS), um tesoureiro restrito a uma filial que soubesse o UUID
+   de uma conta de OUTRA filial da mesma igreja lia os totais agregados
+   (oferta bruto, MDR, deságio, banco creditado) daquela conta — mesma
+   classe do bug já corrigido em `fin_lancar_desagio_antecipacao`
+   (§9.19/20260731150000). Fix: `has_filial_access` contra a filial da
+   conta, igual ao padrão já estabelecido. Reproduzido ANTES do fix
+   (versão sem o check retornava os totais pro tesoureiro da filial A
+   pedindo a conta da filial B) e confirmado bloqueado DEPOIS, os dois
+   pelo canal JWT/web real (não só service_role).
+
+2. **`fin_criar_lancamento` resolve rótulo de forma de pagamento sem
+   considerar filial** (P2, `20260729130000`) — a resolução por nome (sem
+   `forma_pagamento_id` explícito, caminho do bot) buscava só por
+   `igreja_id + lower(nome)`, ignorando que `formas_pagamento` aceita uma
+   linha por filial além de uma global (mesmo padrão já documentado em
+   `useFormaPagamentoDinheiroId`, achado de §9.23). Uma igreja com
+   "Dinheiro" cadastrado em 2 filiais podia ter uma transação da filial A
+   silenciosamente resolvida pra forma da filial B (a mais antiga ativa).
+   O backfill da mesma migration (passo 2b, `DISTINCT ON (igreja_id,
+   lower(nome))`) tinha o mesmo problema, agravado: só pode ter 1
+   candidato por nome pra igreja INTEIRA, não tem como respeitar filial
+   nenhuma. Fix: RPC e backfill passam a restringir e priorizar por
+   filial — candidato da MESMA filial primeiro, senão global, nunca uma
+   filial diferente da do lançamento; backfill reescrito como subquery
+   correlacionada (1 linha por vez) rodando de novo inclusive sobre linhas
+   que o backfill anterior já tinha preenchido errado.
+
+3. **FK `forma_pagamento_id` sem `ON DELETE` explícito** (P2,
+   `20260729130000`) — herdava o default `NO ACTION`, diferente de toda
+   outra FK pra `formas_pagamento` no schema (`forma_pagamento_contas` usa
+   `CASCADE`). `CASCADE` seria pior aqui (apagaria a transação); `NO
+   ACTION` quebrava silenciosamente o fluxo já existente de
+   `FormasPagamento.tsx`: excluir uma forma referenciada por qualquer
+   transação (mesmo histórica) passou a falhar com violação de FK, onde
+   antes (coluna não existia) sempre funcionava. Fix: `ON DELETE SET
+   NULL` — exclui a forma, mantém a transação (nome legado preservado em
+   `forma_pagamento`, texto).
+
+Harness Docker: réplica completa de `has_role`/`get_jwt_igreja_id`/
+`get_jwt_filial_id`/`has_filial_access`/`fin_resolver_contexto` (os dois
+ramos, JWT via `SET request.jwt.claims` + `app.test_uid`, e service_role),
+não só stubs simplificados — necessário porque o achado P1 é especificamente
+sobre o canal JWT, que rodadas anteriores não tinham exercitado à parte do
+service_role. 4 cenários confirmados: bloqueio cross-filial (P1),
+permissão na própria filial (P1), resolução de rótulo respeitando filial
+tanto pra lançamento novo quanto pro backfill corretivo (P2), delete com
+`SET NULL` (P2). `npx tsc`: não roda (mudança só em SQL).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
