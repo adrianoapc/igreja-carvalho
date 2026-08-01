@@ -120,8 +120,22 @@ DEFINER`:**
 4. Ao passar `p_contexto` pra uma RPC aninhada, **repassar o `v_ctx` já
    resolvido**, nunca `NULL` — resolver de novo pode falhar pra
    service_role (§9.30).
+5. `fin_validar_fk_tenant` só garante TENANT (`igreja_id`) — NUNCA filial,
+   mesmo pra tabelas que têm `filial_id` (é um validador genérico,
+   também usado em tabelas sem filial). Qualquer FK filial-scoped
+   recebida como **id explícito** (não só quando resolvida por rótulo/
+   busca) ainda precisa de `has_filial_access` ou comparação direta de
+   filial — o gap tende a aparecer justamente no caminho "óbvio" (id já
+   vem pronto do frontend, parece não precisar de mais validação).
+   Achado real: `fin_conferencia_totais_getnet` validava só tenant na
+   conta (§9.61); `fin_criar_lancamento`/`fin_atualizar_lancamento`
+   validavam só tenant no `forma_pagamento_id` explícito, mesmo já tendo
+   corrigido a resolução por RÓTULO na rodada anterior (§9.62) — dois
+   achados seguidos, mesma causa raiz, exatamente por tratar "id explícito
+   já validado por FK" como suficiente.
 
-Referências: §9.30, §9.37, checklist completo na memória de sessão.
+Referências: §9.30, §9.37, §9.61, §9.62, checklist completo na memória de
+sessão.
 
 ---
 
@@ -396,6 +410,41 @@ apagado.
 
 ---
 
+## J. `ON DELETE SET NULL` — cuidado ao adicionar numa FK existente
+
+Adicionar `ON DELETE SET NULL` a uma FK que já era usada em JOINs ou como
+elo de agrupamento tem efeitos colaterais fáceis de não perceber — os dois
+achados abaixo apareceram na MESMA rodada de review, ambos efeito colateral
+de um `ON DELETE SET NULL` legítimo adicionado na rodada anterior (§9.62).
+
+1. **FK usada num INNER JOIN pra classificar/agregar linhas**: quando o FK
+   vira `NULL` (registro referenciado excluído), o INNER JOIN descarta a
+   linha inteira da agregação — silenciosamente, sem erro. Se existe um
+   campo texto legado paralelo (nome/rótulo gravado no momento da
+   transação), troque pra `LEFT JOIN` e classifique por
+   `COALESCE(fk.campo, tabela.campo_legado)` (§9.62,
+   `fin_conferencia_totais_getnet`).
+2. **FK usada como elo de agrupamento** (ex.: `lancamento_pai_id`
+   apontando pro id da própria primeira parcela, sem uma coluna de grupo
+   estável e separada): excluir a linha-raiz orfaneia TODAS as linhas do
+   grupo de uma vez. Antes de excluir uma raiz, reparenteie as
+   sobreviventes pra uma nova raiz explicitamente — nunca deixe o `SET
+   NULL` "resolver sozinho" (§9.62, `fin_excluir_lancamento`).
+3. **Armadilha de `NOT IN`/`<>` com coluna nullable num `WHERE` de
+   exclusão/inclusão**: `coluna NOT IN (...)` é `NULL` — não `TRUE` — pra
+   qualquer linha com `coluna IS NULL`, e `WHERE` descarta linhas cujo
+   predicado é `NULL`. Um bug assim pode ficar invisível por MESES (era o
+   caso de `conciliacao_status NOT IN (...)` em `fin_excluir_lancamento`,
+   presente desde a criação da função) porque o caminho "tudo NULL" é o
+   comum, não o raro. Ao escrever ou revisar `NOT IN`/`<>` sobre coluna
+   nullable, teste explicitamente o cenário `NULL` no harness — não só o
+   cenário com valor preenchido. Prefira `col IS NULL OR col NOT IN
+   (...)` quando `NULL` deve contar como "não está na lista" (§9.62).
+
+Referências: §9.62.
+
+---
+
 ## Como usar este documento
 
 - **Antes de escrever uma query nova que filtra por `filial_id`**: seção A.
@@ -413,6 +462,8 @@ apagado.
   de CSV novo)**: seção H.
 - **Antes de planejar uma fase nova (o que vira uma PR, quando abrir,
   quando rodar `@codex review`)**: seção I.
+- **Antes de adicionar `ON DELETE SET NULL` numa FK existente (ou revisar
+  uma migration que faz isso)**: seção J.
 
 Encontrou um padrão novo numa rodada de review que não está aqui? Adicione
 uma seção (ou um item numa seção existente) citando o `§9.NN`

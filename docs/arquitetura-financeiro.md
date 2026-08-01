@@ -4039,6 +4039,74 @@ permissão na própria filial (P1), resolução de rótulo respeitando filial
 tanto pra lançamento novo quanto pro backfill corretivo (P2), delete com
 `SET NULL` (P2). `npx tsc`: não roda (mudança só em SQL).
 
+### 9.62 34ª rodada de review: `ON DELETE SET NULL` mordendo os próprios fixes de §9.61 + grupo de parcelas órfão
+
+Review de 01/08 17:32 sobre o commit de §9.61 (`b423301`), desta vez com
+comentários linha-a-linha de verdade (diferente da rodada anterior). Os 3
+achados são efeitos colaterais diretos dos meus próprios fixes de §9.61 —
+todos reais, verificados por leitura direta e depois harness Docker:
+
+1. **`fin_conferencia_totais_getnet` some com transações de cartão
+   excluídas** (P1) — o `ON DELETE SET NULL` novo (§9.61, item 3) tem um
+   efeito colateral aqui: o `JOIN` (INNER) com `formas_pagamento` pra
+   classificar "cartão" (`fp.nome ILIKE '%cart%'`) descarta da soma
+   qualquer transação cuja forma tenha sido excluída depois
+   (`forma_pagamento_id` virou `NULL`, INNER JOIN não casa `NULL`) —
+   excluir uma forma "Cartão de Crédito" antiga fazia a própria RPC de
+   conferência subestimar silenciosamente `oferta_bruto`/`taxa_mdr` de
+   períodos passados. Fix: `LEFT JOIN` + classifica por
+   `COALESCE(fp.nome, t.forma_pagamento)` — cai pro texto legado (nunca
+   apagado) quando o FK não existe mais.
+
+2. **`fin_criar_lancamento`/`fin_atualizar_lancamento`: `forma_pagamento_id`
+   EXPLÍCITO não valida filial** (P2) — o fix de §9.61 (item 2) só cobriu
+   a resolução por RÓTULO; quando o id vem explícito (caminho normal do
+   frontend), só validava tenant. Em "Todas as filiais",
+   `useDadosApoio.ts:110-129` lista formas de TODAS as filiais sem
+   filtro, e a transação criada nessa visão nasce com `filial_id NULL`
+   (global) — selecionar a forma de uma filial específica cria uma
+   transação global referenciando metadado privado de uma filial: outra
+   filial vê a transação (é global) mas RLS esconde a forma dela. Fix:
+   mesma regra do rótulo (global ou mesma filial, nunca outra) aplicada
+   também ao id explícito — em `fin_criar_lancamento` E
+   `fin_atualizar_lancamento` (só o primeiro foi citado pelo achado; o
+   segundo tinha a mesma causa raiz e foi corrigido junto, pra não repetir
+   o achado numa rodada futura).
+
+3. **Excluir a parcela raiz orfaneia o grupo inteiro** (P2) —
+   `lancamento_pai_id` é `ON DELETE SET NULL` (20260710120000). Excluir a
+   raiz (`somente_este` ou `este_e_futuras`) desliga TODAS as irmãs de uma
+   vez (todas apontavam pra ela); uma edição de competência subsequente
+   em qualquer irmã sobrevivente chega em `fin_alterar_competencia_grupo`
+   com `lancamento_pai_id NULL`, trata a própria linha como grupo de 1,
+   atualiza só ela e reporta sucesso — as outras, também órfãs, divergem
+   de novo em silêncio. Fix: `fin_excluir_lancamento`, antes de excluir
+   uma raiz com irmãs sobreviventes, promove a sobrevivente de menor
+   `data_vencimento` a nova raiz (`lancamento_pai_id := NULL`) e reaponta
+   as demais pra ela.
+
+   **Achado próprio, não citado pelo review**: testando o fix acima no
+   harness, `este_e_futuras` nunca removia as parcelas futuras de
+   verdade — só a linha de `p_id`. Causa: `conciliacao_status NOT IN
+   ('conciliado_extrato','conciliado_bot')` é `NULL` (não `TRUE`) pra
+   qualquer linha com `conciliacao_status IS NULL` (o caso comum, toda
+   transação não conciliada), e `WHERE` descarta linhas cujo predicado é
+   `NULL` — clássica armadilha de `NOT IN` com coluna nullable. Bug
+   pré-existente em `fin_excluir_lancamento` desde 20260731170000, não
+   introduzido por este fix, mas corrigido junto (mesma função, bem ao
+   lado do reparenting) — `conciliacao_status IS NULL OR ... NOT IN
+   (...)`.
+
+Harness Docker: 6 cenários — LEFT JOIN preserva o total após excluir a
+forma (P1), id explícito de outra filial bloqueado em `fin_criar_
+lancamento` E `fin_atualizar_lancamento` (P2), reparenting confirmado
+(nova raiz assume `lancamento_pai_id NULL`, irmã restante reapontada, e
+`fin_alterar_competencia_grupo` a partir de QUALQUER membro sincroniza o
+grupo inteiro de novo), `este_e_futuras` removendo raiz+futuras de verdade
+depois do fix do `NOT IN`, e 2 regressões (grupo de 1 sem irmãs não
+quebra; excluir parcela do MEIO preserva a raiz das demais). `npx tsc`:
+não roda (mudança só em SQL).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
