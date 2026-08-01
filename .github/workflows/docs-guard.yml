@@ -44,7 +44,7 @@ jobs:
           # --------------------------------
           DOCS_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/' || true)
           DIAGRAM_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/diagramas/' || true)
-          TEXT_DOC_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/(manual-usuario\.md|funcionalidades\.md|produto/|01-Arquitetura/|adr/)' || true)
+          TEXT_DOC_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/(manual-usuario\.md|funcionalidades\.md|produto/|01-Arquitetura/|adr/|arquitetura-financeiro\.md|guardrails-financeiro\.md)' || true)
 
           # --------------------------------
           # Module path mapping (REAL paths)

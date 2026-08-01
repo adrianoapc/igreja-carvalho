@@ -7,6 +7,12 @@
 > devem ser formalizadas como **ADR-029 (camada canônica de lançamentos no
 > banco)** e **ADR-030 (conciliação transacional e motor único de score)**.
 
+> **Antes de escrever código novo no financeiro**, consulte
+> [`docs/guardrails-financeiro.md`](guardrails-financeiro.md) — checklist
+> obrigatório extraído das rodadas de review desta PR (filial compartilhada,
+> RPC `SECURITY DEFINER`, trigger de saldo, locks/concorrência, harness).
+> Resumo curto também no `CLAUDE.md` da raiz do repo.
+
 ---
 
 ## 1. Diagnóstico resumido
