@@ -69,16 +69,28 @@ export function LancarDesagioDialog({ open, onOpenChange, lote, onLancado }: Lan
   });
 
   const { data: categorias = [] } = useQuery({
-    queryKey: ["categorias-saida-desagio", igrejaId],
+    queryKey: ["categorias-saida-desagio", igrejaId, filialId, isAllFiliais, filialEfetivaLote],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from("categorias_financeiras")
         .select("id, nome")
         .eq("tipo", "saida")
         .eq("ativo", true)
         .eq("igreja_id", igrejaId)
         .order("nome");
+      // Mesmo raciocínio da query de contas acima: sem isso, "Todas as
+      // filiais" listava categoria de QUALQUER filial — selecionar uma da
+      // filial errada criava uma transação global referenciando metadado
+      // privado de outra filial, invisível via RLS pra quem estivesse nela
+      // (achado do /code-review; fin_lancar_desagio_antecipacao agora
+      // rejeita esse caso no backend também).
+      if (filialEfetivaLote) {
+        query = query.or(`filial_id.eq.${filialEfetivaLote},filial_id.is.null`);
+      } else if (!isAllFiliais && filialId) {
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },

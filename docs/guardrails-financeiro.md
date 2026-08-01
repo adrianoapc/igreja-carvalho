@@ -133,9 +133,27 @@ DEFINER`:**
    corrigido a resolução por RÓTULO na rodada anterior (§9.62) — dois
    achados seguidos, mesma causa raiz, exatamente por tratar "id explícito
    já validado por FK" como suficiente.
+6. **Antes de QUALQUER `CREATE OR REPLACE FUNCTION public.fin_*`, ache a
+   versão mais recente de verdade primeiro** —
+   `grep -rl "CREATE OR REPLACE FUNCTION public.<nome>" supabase/
+   migrations/*.sql | sort`, pegue o ÚLTIMO da lista, leia o arquivo
+   INTEIRO, e edite a partir dele. Nunca reaproveite uma cópia mental de
+   uma leitura anterior na mesma sessão (mesmo que pareça recente) — uma
+   migration intermediária pode ter corrigido algo que sua cópia mental
+   não tem, e seu `CREATE OR REPLACE` apaga a correção sem ninguém notar
+   até a próxima rodada de review. Achado real (2 vezes nesta mesma PR,
+   a segunda sou eu mesmo cometendo o erro que a primeira documentava):
+   `20260730100000` corrige exatamente esse padrão em
+   `fin_atualizar_lancamento` (um `CREATE OR REPLACE` baseado numa cópia
+   antiga tinha apagado `forma_pagamento_id` e o sinal de taxa); na
+   rodada seguinte de fixes desta mesma sessão (§9.62→§9.63), o mesmo
+   erro se repetiu — um `CREATE OR REPLACE` na MESMA função, baseado
+   numa cópia anterior na conversa, apagou o guard D10
+   (`FIN_COMPETENCIA_GRUPO`) que uma migration intermediária já tinha
+   adicionado.
 
-Referências: §9.30, §9.37, §9.61, §9.62, checklist completo na memória de
-sessão.
+Referências: §9.30, §9.37, §9.61, §9.62, §9.63, checklist completo na
+memória de sessão.
 
 ---
 

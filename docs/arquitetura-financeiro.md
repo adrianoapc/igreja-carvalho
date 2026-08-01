@@ -4107,6 +4107,49 @@ depois do fix do `NOT IN`, e 2 regressões (grupo de 1 sem irmãs não
 quebra; excluir parcela do MEIO preserva a raiz das demais). `npx tsc`:
 não roda (mudança só em SQL).
 
+### 9.63 35ª rodada de review: eu mesmo derrubei o guard D10 + categoria do deságio sem filial
+
+Review de 01/08 19:29 sobre o commit de §9.62 (`4898ccf`). 2 achados, 1 é
+uma **regressão que eu mesmo introduzi** na rodada anterior:
+
+1. **P1 — REGRESSÃO PRÓPRIA**: ao adicionar o guard de filial no
+   `forma_pagamento_id` explícito de `fin_atualizar_lancamento` (§9.62),
+   usei como base a versão de `20260729130000` sem checar se havia versão
+   mais recente — havia DUAS: `20260729150000` (D10, bloqueio
+   `FIN_COMPETENCIA_GRUPO` contra editar competência de parcela isolada
+   num grupo parcelado) e `20260730100000` (reincorpora `forma_pagamento_
+   id` + sinal de taxa que o `CREATE OR REPLACE` do D10 tinha derrubado
+   sem perceber — **a mesma classe de bug que acabei de cometer,
+   documentada no cabeçalho daquela própria migration**). Meu
+   `CREATE OR REPLACE` apagou o D10 de novo: editar a competência de uma
+   parcela isolada voltou a suceder silenciosamente, sem sincronizar as
+   irmãs.
+
+   Fix: parte de `20260730100000` (a versão mais recente de verdade,
+   com D4+D10+forma_pagamento_id+sinal de taxa) como base, adiciona só o
+   guard de filial por cima. Virou item novo no guardrail (seção B):
+   antes de QUALQUER `CREATE OR REPLACE` numa função `fin_*`,
+   `grep -rl "CREATE OR REPLACE FUNCTION public.<nome>" supabase/
+   migrations/*.sql | sort` pra achar a versão mais recente de verdade —
+   nunca reaproveitar uma cópia mental de leitura anterior na mesma
+   sessão.
+
+2. **P2 — `fin_lancar_desagio_antecipacao`: categoria sem filial** —
+   mesma classe de §9.61/§9.62 (id explícito só validado por tenant).
+   `LancarDesagioDialog.tsx` listava categorias de TODAS as filiais em
+   "Todas as filiais" (a query de `contas`, logo acima no mesmo arquivo,
+   já filtrava; a de `categorias` não). Fix: RPC valida a filial da
+   categoria contra a filial EFETIVA do lançamento (extrato, com
+   fallback pra conta — `v_filial_lancamento`, calculada mais cedo pra
+   isso); frontend ganha o mesmo filtro `.or(filial_id.eq.X,
+   filial_id.is.null)` que `contas` já tinha.
+
+Harness Docker: D10 confirmado restaurado (editar competência de parcela
+isolada volta a bloquear), guard de filial do `forma_pagamento_id`
+confirmado que NÃO regrediu com o restauro do D10, categoria de outra
+filial bloqueada no deságio, categoria global continua funcionando.
+`npx tsc`: 0 novos erros (mudança em `LancarDesagioDialog.tsx`).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
