@@ -168,9 +168,18 @@ DEFINER`:**
    numa cópia anterior na conversa, apagou o guard D10
    (`FIN_COMPETENCIA_GRUPO`) que uma migration intermediária já tinha
    adicionado.
+7. **RPC que materializa VÁRIAS linhas relacionadas num `FOR ... LOOP`
+   (parcelas, ocorrências): todo campo que devia ser IGUAL entre elas
+   precisa ser calculado UMA VEZ, fora do loop** — nunca dentro, mesmo
+   que o fallback pareça inofensivo. Achado real: `fin_criar_lancamento`
+   calculava `data_competencia` como `COALESCE(explícito, v_venc)`
+   DENTRO do loop de parcelas — `v_venc` avança por iteração, então cada
+   parcela nascia com uma competência própria, violando o invariante "1
+   competência por grupo" que o guard D10 (`fin_atualizar_lancamento`)
+   só protege depois de criado, não no nascimento (§9.67).
 
-Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, checklist completo na
-memória de sessão.
+Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.67, checklist
+completo na memória de sessão.
 
 ---
 

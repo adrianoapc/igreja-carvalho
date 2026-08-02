@@ -4323,6 +4323,48 @@ de resolução de forma por rótulo).
 
 `npx tsc`: 0 novos erros.
 
+### 9.67 39ª rodada de review: parcelas nascem com competência divergente (D10 protegia o depois, não o nascimento)
+
+Review de 02/08 01:21 sobre o commit de §9.66 (`f86185b`), 1 achado real:
+
+**P2 — `fin_criar_lancamento`, sem `p_extras.data_competencia`
+explícito, dava uma `data_competencia` DIFERENTE pra cada parcela** — o
+`COALESCE((p_extras ->> 'data_competencia')::date, v_venc)` rodava DENTRO
+do loop de parcelas, e `v_venc` avança 1 mês por iteração. Um grupo
+parcelado já nascia com competências divergentes entre as parcelas —
+exatamente o que o guard D10 (`FIN_COMPETENCIA_GRUPO`,
+`fin_atualizar_lancamento`, §9.29-ish) existe pra impedir, só que o D10
+só protege contra divergir DEPOIS de criado; nada garantia que o grupo
+nascia sincronizado. `TransacaoDialog.tsx` (única UI que chama esta RPC
+hoje) sempre manda `data_competencia` explícito, então o caminho quebrado
+só afetava chamadores que omitem o campo (bot, integrações futuras) — mas
+`fin_criar_lancamento` é a porta única (ADR-029), precisa ser seguro pra
+qualquer chamador.
+
+Fix: `v_data_competencia_base` calculada UMA VEZ antes do loop
+(`COALESCE(explícito, p_data_vencimento)` — a data da parcela 1, não a de
+cada parcela), usada pra TODAS as parcelas quando `tipo_lancamento =
+'parcelado'`. `unico`/`recorrente` mantêm o comportamento anterior (nesta
+função eles nunca de fato iteram mais de uma vez hoje, já que
+`v_total_parcelas` só é setado pra `parcelado` — o `CASE` deixa a regra
+explícita mesmo assim, caso a função cresça no futuro pra materializar
+ocorrências recorrentes em lote, onde cada ocorrência LEGITIMAMENTE quer
+sua própria competência pela data de vencimento).
+
+**Varredura proativa** (mesmo pedido do usuário, §9.65/§9.66): grep de
+todo `FOR ... LOOP` com `INSERT INTO transacoes_financeiras` no schema —
+só `fin_lancar_sessao` (itens de uma sessão de contagem, cada item
+LEGITIMAMENTE distinto, não parcelas da mesma compra — não é a mesma
+classe) e `fin_criar_lancamento` (o corrigido aqui) fazem isso.
+`fin_pagar_reembolso` não tem loop. Nenhuma outra função materializa um
+grupo de linhas que deveriam compartilhar um campo e não compartilham —
+classe fechada.
+
+Harness Docker: 3 cenários — parcelado sem competência explícita agora
+compartilha 1 única competência (a da parcela 1) entre as 3 parcelas;
+parcelado COM competência explícita continua usando o valor explícito em
+todas; `unico` sem regressão. `npx tsc`: 0 novos erros.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
