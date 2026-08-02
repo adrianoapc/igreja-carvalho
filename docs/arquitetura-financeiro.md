@@ -4513,6 +4513,50 @@ mesma decisão de §9.65/§9.69). Classe fechada dentro do escopo desta PR.
 
 `npx tsc`: 0 novos erros.
 
+### 9.71 43ª rodada de review: backfill de forma_pagamento sobrescrevia id válido + upload sobrevivia à troca de igreja
+
+Review de 02/08 02:41 sobre o commit de §9.70 (`13f60b8f`), 2 achados —
+os dois efeito colateral de fixes anteriores DESTA sessão.
+
+1. **P1 — backfill corretivo (§9.61) sobrescrevia `forma_pagamento_id`
+   já válido** — o backfill reprocessava TODA linha com texto legado
+   preenchido, comparando o candidato resolvido por RÓTULO+FILIAL contra
+   o id já gravado, e sobrescrevia sempre que divergiam — mesmo quando o
+   id atual já era perfeitamente válido. 2 cenários reais quebravam:
+   (a) forma renomeada depois da transação — a busca por nome não acha
+   mais candidato, `melhor.forma_id` fica `NULL`, e o UPDATE zera um id
+   que era correto; (b) duas formas compatíveis compartilhando o nome
+   histórico — a ordenação podia trocar um id válido por outro
+   (também válido, mas diferente do originalmente gravado) sem motivo
+   real. Fix: só re-resolve quando o id está `NULL` (nunca resolvido) OU
+   provadamente incompatível (aponta pra uma filial ESPECÍFICA diferente
+   da transação — o bug real que o backfill existe pra corrigir); nunca
+   mais sobrescreve um id já global ou já compatível com a filial da
+   transação.
+
+   Testado no harness: 4 cenários — forma renomeada preserva o id
+   antigo; 2 formas com nome duplicado preservam o id já gravado (não
+   troca pro "melhor" candidato por ordenação); id provadamente
+   incompatível (filial errada) continua sendo corrigido; id nunca
+   resolvido continua sendo resolvido. Migration não tinha sido aplicada
+   em nenhum ambiente real ainda (branch não deployada) — sem dado pra
+   recuperar, só a lógica precisava ser corrigida antes de rodar de
+   verdade.
+
+2. **P2 — `uploadTokenRef` (§9.69) não avançava ao trocar de igreja** —
+   o `useEffect` que limpa o preview quando `igrejaId` muda chamava
+   `limparPreview()`, mas não incrementava o token — trocar de igreja
+   enquanto uma leitura (`arrayBuffer`) ainda estava pendente deixava o
+   handler antigo passar no check de token (só avançava ao selecionar
+   OUTRO arquivo) e repopular `linhas` com o arquivo da igreja anterior
+   sob o contexto novo; se a igreja nova tivesse 1 única integração
+   (auto-selecionada), dava pra importar o arquivo errado. Fix: o
+   incremento do token entra dentro do próprio `limparPreview` — cobre
+   automaticamente todo lugar que já chama essa função (troca de igreja,
+   header não reconhecido, arquivo vazio), não só a troca de arquivo.
+
+`npx tsc`: 0 novos erros.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

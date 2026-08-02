@@ -258,6 +258,15 @@ export function ImportarRecebivelGetnetTab() {
   }, [integracoes, integracaoId]);
 
   const limparPreview = () => {
+    // Invalida qualquer upload ainda em voo (arrayBuffer pendente) — sem
+    // isso, trocar de igreja/filial enquanto uma leitura está pendente
+    // limpava o preview aqui, mas o handler antigo ainda passava no check
+    // de token (só era avançado ao selecionar OUTRO arquivo) e
+    // repopulava linhas com o arquivo da igreja anterior sob o contexto
+    // novo — se a igreja nova tiver 1 única integração (auto-selecionada),
+    // dava pra importar o arquivo errado sem perceber (achado do
+    // /code-review, evidência nova depois do fix de §9.69).
+    uploadTokenRef.current++;
     setLinhas([]);
     setSubtotalIgnoradas(0);
     setLinhasInvalidas(0);
