@@ -292,7 +292,16 @@ export function ImportarRecebivelGetnetTab() {
       toast.error(`Arquivo maior que ${MAX_FILE_SIZE_MB}MB`);
       return;
     }
-    const meuToken = ++uploadTokenRef.current;
+    // Limpa o preview ANTERIOR antes de começar a ler o novo arquivo — sem
+    // isso, selecionar um 2º arquivo enquanto o botão Importar já estava
+    // habilitado (1º arquivo já processado) deixava `linhas` com os dados
+    // do 1º arquivo, mas `fileName` já mostrando o 2º; clicar Importar
+    // nessa janela envia o arquivo ERRADO. O token de §9.69 evita uma
+    // leitura antiga sobrescrever uma mais nova quando as duas terminam,
+    // mas não limpa um preview já COMPLETO enquanto a nova leitura ainda
+    // está em voo (achado do /code-review, evidência nova).
+    limparPreview();
+    const meuToken = uploadTokenRef.current;
     setFileName(file.name);
 
     try {

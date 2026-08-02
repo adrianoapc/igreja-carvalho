@@ -93,7 +93,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.fin_diagnosticar_drift_saldo(jsonb) IS
-  'Diagnóstico só-leitura: lista contas cujo saldo_atual diverge da fórmula (saldo_inicial + Σ transações pagas). Rodar ANTES de deployar a cadeia de trigger "sempre recalcula" (20260731190000+) num ambiente com dados históricos reais — cada linha retornada precisa de revisão manual (ajuste legítimo → dobrar em saldo_inicial; drift real → investigar). Ver docs/arquitetura-financeiro.md §9.72.';
+  'Diagnóstico só-leitura: lista contas cujo saldo_atual diverge da fórmula (saldo_inicial + Σ transações pagas). Ferramenta de monitoramento CONTÍNUO pós-deploy — NÃO serve como gate de pré-deploy desta PR (ela só existe a partir desta migration, várias migrations depois do trigger "sempre recalcula" já estar ativo e do backfill de forma_pagamento_id já ter apagado qualquer drift histórico). O passo 0 de pré-deploy de verdade é a query standalone documentada em docs/arquitetura-financeiro.md §9.77, rodada manualmente ANTES de iniciar supabase db push.';
 
 GRANT EXECUTE ON FUNCTION public.fin_diagnosticar_drift_saldo(jsonb) TO authenticated, service_role;
 REVOKE ALL ON FUNCTION public.fin_diagnosticar_drift_saldo(jsonb) FROM anon;

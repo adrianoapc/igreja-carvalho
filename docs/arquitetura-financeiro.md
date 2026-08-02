@@ -4844,6 +4844,86 @@ continua bloqueado.
 
 `npx tsc`: 0 novos erros (mudança só em SQL).
 
+### 9.77 49ª rodada de review: o "passo 0" de §9.72 é tarde demais dentro do próprio deploy + preview antigo sobrevive à seleção de um novo arquivo
+
+Review de 02/08 18:14 sobre o commit de §9.76 (`9d905861`), 2 achados.
+
+1. **P1 — o runbook de §9.72 não funciona na prática, pelo mesmo motivo
+   de §9.73 (E: "defesas precisam vir ANTES do que protegem"), só que
+   numa escala maior** — `fin_diagnosticar_drift_saldo` só é CRIADA na
+   migration `20260731330000`, mas o trigger "sempre recalcula" já está
+   ATIVO desde `20260731210000`, muito antes. O backfill de `forma_
+   pagamento_id` (`20260731220000`) faz um `UPDATE transacoes_
+   financeiras` que não mexe em `status`, mas o trigger da statement
+   (sem `OF <colunas>`, dispara em QUALQUER `UPDATE`) recalcula o saldo
+   de toda conta com pelo menos uma linha PAGA tocada pelo backfill —
+   ou seja, `db push` desta PR, aplicado numa única leva de migrations
+   pendentes (como o Supabase CLI realmente aplica), já APAGA o drift
+   histórico na migration `220000`, **11 migrations antes** (`220000` →
+   `330000`) da função de diagnóstico existir pra alguém rodar. "Rodar `fin_diagnosticar_
+   drift_saldo` antes do deploy" é logicamente impossível — a função só
+   existe DEPOIS que o próprio deploy já destruiu o que ela deveria
+   diagnosticar.
+
+   **Por que isso não dá pra corrigir com mais uma migration**: uma
+   migration não consegue "pausar" o `db push` no meio pra um humano
+   decidir algo — todas as migrations pendentes rodam na mesma leva,
+   sem intervenção possível entre elas. Mover a CRIAÇÃO da função pra
+   uma migration com timestamp mais cedo (antes de `210000`) resolveria
+   a ORDEM, mas não resolve o problema de fundo: mesmo criada mais cedo,
+   nada IMPEDE o `db push` de continuar direto pras migrations
+   seguintes sem esperar revisão humana.
+
+   Fix real: o diagnóstico de pré-deploy não pode viver dentro da
+   sequência de migrations desta PR — precisa ser uma query STANDALONE,
+   fora do `supabase/migrations/`, rodada manualmente (SQL Editor do
+   Supabase ou `psql` direto) no ambiente-alvo **antes de sequer
+   iniciar** `supabase db push` pra esta branch. Adicionada ao runbook
+   de deploy (abaixo) como o único "passo 0" que realmente funciona.
+   `fin_diagnosticar_drift_saldo` continua existindo como ferramenta de
+   monitoramento CONTÍNUO pós-deploy (útil pra detectar drift de
+   ajustes futuros fora do ledger), só deixou de ser vendida como gate
+   de pré-deploy desta PR especificamente.
+
+   **Runbook de deploy — passo 0 (rodar ANTES de `supabase db push`,
+   fora de qualquer migration)**:
+   ```sql
+   SELECT
+     c.id AS conta_id, c.nome AS conta_nome,
+     c.saldo_atual AS saldo_atual_registrado,
+     v_calc.saldo_calculado AS saldo_calculado_formula,
+     c.saldo_atual - v_calc.saldo_calculado AS diferenca
+   FROM contas c
+   CROSS JOIN LATERAL (
+     SELECT COALESCE(c.saldo_inicial, 0) + COALESCE(SUM(
+              CASE WHEN t.tipo = 'entrada' THEN COALESCE(t.valor_liquido, t.valor)
+                   ELSE -COALESCE(t.valor_liquido, t.valor) END
+            ), 0) AS saldo_calculado
+       FROM transacoes_financeiras t
+      WHERE t.conta_id = c.id AND t.status = 'pago'
+   ) v_calc
+   WHERE c.saldo_atual IS DISTINCT FROM v_calc.saldo_calculado
+   ORDER BY abs(c.saldo_atual - v_calc.saldo_calculado) DESC;
+   ```
+   Toda linha retornada exige decisão manual (ajuste legítimo → dobra a
+   diferença em `saldo_inicial`; drift real → investiga) **antes** de
+   rodar `supabase db push` pra esta branch nesse ambiente.
+
+2. **P2 — preview antigo sobrevive à seleção de um novo arquivo**
+   (`ImportarRecebivelGetnetTab.tsx`) — "evidência nova" sobre o fix de
+   token de §9.69: o token evita que uma leitura ANTIGA sobrescreva uma
+   MAIS NOVA quando as duas terminam fora de ordem, mas não limpa um
+   preview já COMPLETO enquanto a leitura do arquivo de substituição
+   ainda está em voo. Selecionar um 2º arquivo enquanto o botão
+   Importar já estava habilitado (1º arquivo já processado) deixava
+   `linhas` com os dados do 1º arquivo, `fileName` já mostrando o 2º —
+   clicar Importar nessa janela envia o arquivo errado. Fix:
+   `limparPreview()` roda ANTES do `await file.arrayBuffer()`, não só
+   depois — o preview fica vazio (botão desabilitado) durante toda a
+   janela de leitura do novo arquivo, não só quando ela conclui.
+
+`npx tsc`: 0 novos erros.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
@@ -4877,9 +4957,16 @@ continua bloqueado.
   mesma lista de pendências, não nos "8 nunca tocados", porque já foi
   reescrita nesta sessão por outro motivo.
 - **Passo 0 obrigatório antes de deployar a cadeia "sempre recalcula" de
-  saldo** (§9.72) — rodar `fin_diagnosticar_drift_saldo` em qualquer
-  ambiente com dados históricos reais e revisar manualmente toda conta
-  retornada (ajuste legado legítimo → dobra em `saldo_inicial`; drift
-  real → investiga) ANTES do deploy. Sem isso, a próxima transação paga
-  comum numa conta com ajuste manual histórico (feito fora de
-  `fin_ajustar_saldo`) apaga esse ajuste em silêncio.
+  saldo** (§9.72, corrigido em §9.77) — a versão original deste risco
+  dizia "rode a RPC `fin_diagnosticar_drift_saldo` antes do deploy", mas
+  essa RPC só é criada na migration `20260731330000`, DEPOIS que o
+  trigger "sempre recalcula" (ativo desde `210000`) já apaga o drift via
+  o backfill de `forma_pagamento_id` (`220000`) — rodar a RPC "antes do
+  deploy" é logicamente impossível (ela não existe até o próprio deploy
+  já ter destruído o que ela deveria diagnosticar). **O passo 0 de
+  verdade é a query STANDALONE documentada em §9.77**, rodada
+  manualmente (SQL Editor/`psql`) ANTES de sequer iniciar `supabase db
+  push` pra esta branch — nunca uma RPC que a própria migration cria.
+  Sem isso, a próxima transação paga comum numa conta com ajuste manual
+  histórico (feito fora de `fin_ajustar_saldo`) apaga esse ajuste em
+  silêncio, já nas primeiras migrations do deploy.

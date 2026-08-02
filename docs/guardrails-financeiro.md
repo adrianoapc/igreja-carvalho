@@ -401,7 +401,26 @@ PRIMEIRO, a correção operava sobre dado que ela mesma já tinha destruído,
 e não conseguia recuperar nada (achado do /code-review, §9.73). Fix
 definitivo: editar a migration original, remover a "correção" inútil.
 
-Referências: §9.35, §9.39, §9.51, §9.53, §9.73.
+**Uma ferramenta de diagnóstico "rode antes do deploy" que é CRIADA
+dentro da mesma leva de migrations que ela deveria auditar não funciona
+como gate — o Supabase CLI aplica todas as migrations pendentes numa
+tacada só, sem pausa pra decisão humana entre elas.** Se a migration que
+poderia apagar um dado importante roda ANTES da migration que cria a
+RPC de diagnóstico desse mesmo dado, "rode a RPC antes do deploy" é
+logicamente impossível — ela não existe até o próprio deploy já ter
+rodado a parte destrutiva. Não dá pra corrigir isso com mais uma
+migration (mover a criação da RPC pra mais cedo na sequência resolve a
+ORDEM, mas nada impede o `db push` de continuar direto sem esperar
+revisão humana). **O diagnóstico de pré-deploy precisa ser uma query
+STANDALONE, fora de `supabase/migrations/`, documentada no runbook pra
+rodar manualmente antes de sequer iniciar `db push`** — nunca uma RPC
+que a própria leva de migrations cria. Achado real: `fin_diagnosticar_
+drift_saldo` (§9.72) só é criada na migration `330000`, mas o trigger
+que ela deveria proteger contra já está ativo desde `210000`, e o
+backfill de `220000` (11 migrations antes) já dispara o recálculo que
+apaga o drift (§9.77).
+
+Referências: §9.35, §9.39, §9.51, §9.53, §9.73, §9.77.
 
 ---
 
