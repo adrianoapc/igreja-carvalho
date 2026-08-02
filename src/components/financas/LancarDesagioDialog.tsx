@@ -50,7 +50,12 @@ export function LancarDesagioDialog({ open, onOpenChange, lote, onLancado }: Lan
     queryKey: ["contas-desagio", igrejaId, filialId, isAllFiliais, filialEfetivaLote],
     queryFn: async () => {
       if (!igrejaId) return [];
-      let query = supabase.from("contas").select("id, nome").eq("ativo", true).eq("igreja_id", igrejaId).order("nome");
+      let query = supabase
+        .from("contas")
+        .select("id, nome, filial_id")
+        .eq("ativo", true)
+        .eq("igreja_id", igrejaId)
+        .order("nome");
       if (filialEfetivaLote) {
         // Backend (fin_lancar_desagio_antecipacao) aceita a conta da mesma
         // filial OU global (filial_id NULL) — eq() sozinho excluiria as
@@ -68,8 +73,22 @@ export function LancarDesagioDialog({ open, onOpenChange, lote, onLancado }: Lan
     enabled: open && !!igrejaId,
   });
 
+  const contaSelecionada = contas.find((c) => c.id === contaId);
+  // Mesma regra do backend: COALESCE(extrato.filial_id, conta.filial_id) —
+  // quando o extrato é global, a filial efetiva passa a ser a da CONTA
+  // escolhida. `filialEfetivaConhecida` distingue "ainda não sei" (nenhuma
+  // conta escolhida) de "sei que é global" (conta escolhida É global,
+  // filial_id null) — um `??` encadeado direto colapsaria os dois casos
+  // no mesmo fallback pro contexto da view, exatamente o achado do
+  // /code-review (extrato global + "Todas as filiais" não recalculava a
+  // partir da conta escolhida quando ela também era global).
+  const filialEfetivaConhecida = Boolean(filialEfetivaLote) || Boolean(contaId);
+  const filialEfetivaCategoria = filialEfetivaLote
+    ? filialEfetivaLote
+    : (contaSelecionada?.filial_id ?? null);
+
   const { data: categorias = [] } = useQuery({
-    queryKey: ["categorias-saida-desagio", igrejaId, filialId, isAllFiliais, filialEfetivaLote],
+    queryKey: ["categorias-saida-desagio", igrejaId, filialId, isAllFiliais, filialEfetivaConhecida, filialEfetivaCategoria],
     queryFn: async () => {
       if (!igrejaId) return [];
       let query = supabase
@@ -85,9 +104,17 @@ export function LancarDesagioDialog({ open, onOpenChange, lote, onLancado }: Lan
       // privado de outra filial, invisível via RLS pra quem estivesse nela
       // (achado do /code-review; fin_lancar_desagio_antecipacao agora
       // rejeita esse caso no backend também).
-      if (filialEfetivaLote) {
-        query = query.or(`filial_id.eq.${filialEfetivaLote},filial_id.is.null`);
+      if (filialEfetivaConhecida) {
+        // Filial efetiva conhecida (extrato ou conta escolhida): restringe
+        // pra ela + global, OU só global quando a filial efetiva É null
+        // (conta escolhida também é global — sem isso cairia no ramo
+        // "sem filtro" abaixo e voltaria a listar qualquer filial).
+        query = filialEfetivaCategoria
+          ? query.or(`filial_id.eq.${filialEfetivaCategoria},filial_id.is.null`)
+          : query.is("filial_id", null);
       } else if (!isAllFiliais && filialId) {
+        // Nenhuma conta escolhida ainda — contexto da view como palpite
+        // razoável; assim que uma conta for escolhida, o ramo acima assume.
         query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
       }
       const { data, error } = await query;

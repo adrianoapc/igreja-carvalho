@@ -4204,6 +4204,84 @@ mudar só `filial_id` com `categoria_id` retida de outra filial; editar
 campo não-filial-scoped não dispara nada indevido; D10 confirmado ainda
 intacto (regressão de §9.63 não voltou). `npx tsc`: 0 novos erros.
 
+### 9.65 37ª rodada de review: lock de transferência sem `NO KEY UPDATE`, validação de valor Getnet ainda ingênua, categoria do deságio não recalcula pela conta
+
+Review de 01/08 22:31 sobre o commit de §9.64 (`3d89e70`). 3 achados,
+nenhum novo bug de classe — os 3 são "evidência nova" sobre fixes já
+existentes desta mesma PR:
+
+1. **P2 — `fin_criar_transferencia` sem `FOR NO KEY UPDATE`**
+   (`20260731100000`) — o lock determinístico das 2 contas (evita deadlock
+   entre transferências concorrentes em direções opostas, achado de rodada
+   bem anterior) usava `FOR UPDATE`. Os 2 INSERTs pagos logo depois
+   disparam o trigger de saldo, e qualquer INSERT comum em
+   `transacoes_financeiras` (dentro OU fora da transferência) já retém
+   `KEY SHARE` na conta via checagem de FK — `FOR UPDATE` conflita com
+   `KEY SHARE` de outra sessão, mesma classe já corrigida em
+   `_fin_recalcular_saldo_conta_raw` (§9.28ish) e `fin_recalcular_saldo_
+   conta` (20260730110000), só não replicada aqui ainda. Fix: `FOR NO KEY
+   UPDATE`. Grep sistemático confirmou que não sobrava mais nenhum outro
+   `FOR UPDATE` vivo sobre `contas` no schema (só uma versão ANTIGA,
+   morta, já substituída por `CREATE OR REPLACE` posterior).
+
+   Harness: 2 sessões `psql` reais confirmam o mecanismo — sessão A abre
+   uma transação com um INSERT pendente (retém só `KEY SHARE` via FK) e
+   segura com `pg_sleep(5)`; sessão B chama `fin_criar_transferencia`
+   envolvendo a mesma conta. Com `FOR UPDATE` (pré-fix), B bloqueia e só
+   completa depois de ~4s (esperando A); com `FOR NO KEY UPDATE` (pós-fix),
+   B completa em ~0,1s, sem esperar A. A serialização original (2
+   transferências concorrentes em direções opostas não deadlockar) também
+   reconfirmada com 2 sessões reais rodando de verdade em paralelo — as
+   duas completam com sucesso. **Não reproduzido**: a interleaving EXATA
+   de 3 pontas que o achado descreve (KEY SHARE da FK + upgrade pro NO KEY
+   UPDATE do trigger da MESMA sessão, com uma segunda sessão em FOR UPDATE
+   se intrometendo bem no meio, dentro da janela de um único statement) —
+   forçar esse timing exigiria atrasar artificialmente a execução do
+   trigger no meio do INSERT; o fix é correto por construção (mesma regra
+   de compatibilidade de lock já provada nos outros dois casos), mas essa
+   interleaving específica não foi isolada à parte.
+
+2. **P2 — validação de valor Getnet ainda aceitava formato corrompido**
+   (`ImportarRecebivelGetnetTab.tsx`) — "evidência nova" sobre o fix de
+   §9.49/§9.57/§9.58: `isValorGetnetValido` removia TODOS os pontos antes
+   de validar, deixando `"1.2.3"` passar como `"123"` e um `"12.34"`
+   mal-formatado (brasileiro nunca usa ponto pra 2 casas decimais) virar
+   `"1234"` em silêncio. Fix: valida o formato BRUTO
+   (`/^-?\d{1,3}(\.\d{3})*(,\d+)?$/` — milhar agrupado de EXATAMENTE 3
+   dígitos, decimal com vírgula) em vez do resultado já normalizado.
+
+3. **P2 — categoria do deságio não recalculava pela CONTA quando o
+   extrato é global** (`LancarDesagioDialog.tsx`) — o fix de §9.64 (item
+   3, RPC) cobria a validação no backend, mas o frontend só recalculava a
+   filial efetiva a partir do extrato do lote ou do contexto da VIEW,
+   nunca da CONTA de fato selecionada no formulário — quando o extrato é
+   global e o usuário está em "Todas as filiais", escolher uma conta da
+   filial A e depois uma categoria da filial B passava pela UI mas era
+   rejeitado pelo backend (`fin_validar_fk_filial`). Fix: query de
+   `contas` passa a trazer `filial_id`; nova variável
+   `filialEfetivaConhecida` distingue "nenhuma conta escolhida ainda"
+   (usa o contexto da view como palpite) de "conta escolhida É global"
+   (filtra só categoria global — sem essa distinção, um `??` encadeado
+   colapsaria os dois casos no mesmo fallback pro contexto da view).
+
+**Varredura proativa** (pedido explícito do usuário: achar outros padrões
+da mesma classe antes que o Codex precise apontar um por um):
+- Grep de `FOR UPDATE` sobre `contas` em todas as migrations: só a
+  instância corrigida acima estava viva; nenhuma outra pendência.
+- Grep do padrão "remove pontos antes de validar" (`parseValor`/
+  `isValor*Valido`) em outros parsers de importação financeira:
+  `ImportarTab.tsx`/`ImportarExtratosTab.tsx` (importador genérico de
+  extrato bancário, fora do escopo desta PR — não tocados pelo Getnet)
+  têm uma variação da mesma classe (auto-detecção BR/US por posição do
+  último separador, sem uma função de validação separada — valor
+  malformado vira `0` em silêncio via `isNaN(n) ? 0 : n`, nem sequer
+  bloqueia a linha). **Não corrigido aqui** — são arquivos de PRs
+  anteriores (#47/#53), fora do diff desta PR; misturar esse fix aqui
+  violaria a regra "1 fase = 1 PR" (seção I). Fica registrado como known
+  issue pra uma sessão futura dedicada a eles.
+
+`npx tsc`: 0 novos erros.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

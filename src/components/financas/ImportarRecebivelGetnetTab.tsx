@@ -131,15 +131,20 @@ const parseValorGetnet = (valor: string): number | null => {
 // jeito que uma célula legitimamente vazia, então parseLinha não tem como
 // distinguir "vazio de propósito" de "erro de digitação/exportação" —
 // ambos silenciosamente viram null e a linha entra como válida (achado do
-// /code-review, mesma classe do fix de contagem de colunas). Valida o
-// resultado já normalizado (mesma transformação de parseValorGetnet) em
-// vez de tentar reconhecer o formato bruto — mais robusto a variações de
-// separador de milhar do que casar a string original.
+// /code-review, mesma classe do fix de contagem de colunas).
+//
+// Valida o formato BRUTO brasileiro (milhar agrupado de 3 em 3 com ponto,
+// decimal com vírgula) em vez do resultado já normalizado — a versão
+// anterior removia TODOS os pontos antes de validar, o que deixava
+// "1.2.3" passar como "123" (múltiplos pontos == corrompido, não é
+// milhar de verdade) e um "12.34" mal-formatado (brasileiro nunca usa
+// ponto pra 2 casas decimais) virar "1234" em silêncio — achado do
+// /code-review, evidência nova depois do fix anterior. `\.\d{3}` exige
+// EXATAMENTE 3 dígitos por grupo de milhar, o que rejeita os dois casos.
 const isValorGetnetValido = (valor: string): boolean => {
   const str = valor.trim();
   if (!str) return true;
-  const normalizado = str.replace(/\./g, "").replace(",", ".");
-  return /^-?\d+(\.\d+)?$/.test(normalizado);
+  return /^-?\d{1,3}(\.\d{3})*(,\d+)?$/.test(str);
 };
 
 const parseDataGetnet = (data: string): string | null => {

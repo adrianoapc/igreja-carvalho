@@ -123,7 +123,7 @@ DEFINER`:**
 5. `fin_validar_fk_tenant` só garante TENANT (`igreja_id`) — NUNCA filial,
    mesmo pra tabelas que têm `filial_id` (é um validador genérico,
    também usado em tabelas sem filial). Use `fin_validar_fk_filial(tabela,
-   id, filial_efetiva)` (§9.65) — companion pronto, cobre os 6 campos
+   id, filial_efetiva)` (§9.64) — companion pronto, cobre os 6 campos
    filial-scoped de `transacoes_financeiras` (`categoria_id`,
    `subcategoria_id`, `centro_custo_id`, `base_ministerial_id`,
    `fornecedor_id`, `forma_pagamento_id`). Em RPC de PATCH parcial (como
@@ -134,7 +134,7 @@ DEFINER`:**
    `TransacaoDialog.tsx` faz quando o usuário não troca a forma de
    pagamento, §9.64).
    **Lição maior (por que isso levou 4 rodadas de review pra fechar,
-   §9.61→§9.65): o padrão "campo filial-scoped sem check de filial" é uma
+   §9.61→§9.64): o padrão "campo filial-scoped sem check de filial" é uma
    CLASSE, não um bug pontual — generalize pros campos IRMÃOS na primeira
    vez que achar um, em vez de corrigir só o campo que o review citou.**
    Antes de declarar um fix desse tipo "completo", pergunte: essa mesma
@@ -159,7 +159,7 @@ DEFINER`:**
    (`FIN_COMPETENCIA_GRUPO`) que uma migration intermediária já tinha
    adicionado.
 
-Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.65, checklist completo na
+Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, checklist completo na
 memória de sessão.
 
 ---
