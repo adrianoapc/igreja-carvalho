@@ -4365,6 +4365,77 @@ compartilha 1 única competência (a da parcela 1) entre as 3 parcelas;
 parcelado COM competência explícita continua usando o valor explícito em
 todas; `unico` sem regressão. `npx tsc`: 0 novos erros.
 
+### 9.68 40ª rodada de review + descoberta maior: `fin_vincular_lote_antecipacao` só valida filial do NOVO vínculo, e a varredura acha o mesmo buraco em ~10 RPCs core pré-existentes
+
+Review de 02/08 01:34 sobre o commit de §9.67 (`802cf1d`), 1 achado — mas a
+varredura proativa que ele disparou é o achado mais importante desta PR
+inteira.
+
+**O achado do review (P1)**: `fin_vincular_lote_antecipacao` valida acesso
+de filial só contra o NOVO extrato (`COALESCE(v_lote.filial_id, v_extrato.
+filial_id)`). Quando o lote é GLOBAL e já está vinculado a um extrato da
+filial A, um tesoureiro restrito à filial B — que enxerga o lote global
+normalmente — podia REVINCULAR esse lote pra um extrato da filial B sem
+nunca ter acesso checado contra a filial A, cujo vínculo estava
+sobrescrevendo (muda o deságio calculado, "rouba" a posse do fluxo de
+reconciliação de A). Fix: ao trocar um vínculo já existente, valida
+também a filial efetiva do vínculo ATUAL, não só do novo. Testado no
+harness (canal JWT/web real): revincular bloqueado; vínculo inicial (lote
+ainda sem extrato) continua funcionando.
+
+**A varredura**: pedido do usuário (3ª vez, mesma pergunta) — "veja se
+não há outros padrões com o mesmo comportamento de erro". Esse achado é
+"só valida o NOVO estado, nunca o ATUAL" — mas ao procurar esse padrão
+especificamente em `fin_atualizar_lancamento` (a RPC mais usada do
+módulo, PATCH genérico de transação), a resposta foi pior do que "só o
+novo estado": **nenhum estado é validado, nunca foi, desde a criação
+original da função (`20260710120000`)**. `grep -c has_filial_access` em
+cada função `fin_*` (versão mais recente de cada uma) confirma que isto
+NÃO é um problema isolado — é sistêmico em praticamente todo o CORE
+financeiro anterior a esta PR:
+
+| RPC | Opera em | `has_filial_access`? |
+|---|---|---|
+| `fin_atualizar_lancamento` | transação (patch genérico) | **Nunca teve** |
+| `fin_excluir_lancamento` | transação (exclui) | **Nunca teve** |
+| `fin_alterar_status_lancamento` | transação ("Marcar como Pago") | **Nunca teve** |
+| `fin_alterar_competencia_grupo` | grupo de parcelas | **Nunca teve** |
+| `fin_criar_transferencia` | 2 contas | **Nunca teve** |
+| `fin_estornar_transferencia` | transferência | **Nunca teve** |
+| `fin_ajustar_saldo` | conta (ajuste direto de saldo!) | **Nunca teve** |
+| `fin_recalcular_saldo_conta` | conta (recalcula/sobrescreve saldo) | **Nunca teve** |
+| `fin_confirmar_conciliacao` | transação + extrato | **Nunca teve** |
+| `fin_desconciliar` | transação | **Nunca teve** |
+| `fin_alternar_conferencia_manual` | transação | **Nunca teve** |
+| `fin_marcar_extrato_ignorado` | extrato | **Nunca teve** |
+| `fin_vincular_lote_antecipacao` | lote+extrato | Parcial (corrigido aqui) |
+
+Ou seja: hoje, qualquer usuário com papel `admin`/`tesoureiro` (mesmo
+restrito a UMA filial na UI) consegue, via essas RPCs `SECURITY DEFINER`
+(que bypassam RLS por definição), editar/excluir/marcar como pago/
+transferir/ajustar saldo de QUALQUER transação ou conta do TENANT
+INTEIRO, de qualquer filial — a restrição de filial que a UI aplica é
+só um filtro de conveniência, não uma fronteira de segurança de verdade
+nessas RPCs.
+
+**Por que não foi corrigido nesta mesma leva**: das ~13 RPCs acima, só
+`fin_vincular_lote_antecipacao` faz parte do diff desta PR (Fase B do
+Getnet). As outras ~12 são do CORE financeiro, criadas em fases
+anteriores (F0-F7, já mergeadas e em produção) — corrigir todas aqui
+violaria a regra "1 fase = 1 PR" (guardrail seção I) E, mais importante,
+é uma mudança de comportamento de autorização em RPCs já em produção,
+que merece harness, teste e review DEDICADOS, não bundlada numa PR que já
+tem 80+ threads de review sobre um assunto diferente (Getnet). Fica
+registrado aqui como o achado de segurança mais sério identificado nesta
+sessão inteira — ação recomendada: nova fase dedicada, prioridade alta,
+adicionando `has_filial_access` (mesmo padrão já usado em
+`fin_conferencia_totais_getnet`/`fin_criar_lancamento`/`fin_lancar_
+desagio_antecipacao`) em cada uma dessas RPCs, testada com harness real
+(canal JWT/web, não só service_role — o gap só se manifesta nesse
+canal).
+
+`npx tsc`: 0 novos erros (mudança só em SQL, escopo desta rodada).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
@@ -4376,3 +4447,19 @@ todas; `unico` sem regressão. `npx tsc`: 0 novos erros.
   snapshot baseline antes da F1.
 - **Paridade na convivência** (F3) → monitorar divergências via audit log
   enquanto a flag antiga existir.
+- **~12 RPCs `SECURITY DEFINER` do CORE (pré-existentes, em produção)
+  sem NENHUM check de `has_filial_access`** (§9.68) — `fin_atualizar_
+  lancamento`, `fin_excluir_lancamento`, `fin_alterar_status_lancamento`,
+  `fin_alterar_competencia_grupo`, `fin_criar_transferencia`,
+  `fin_estornar_transferencia`, `fin_ajustar_saldo`, `fin_recalcular_
+  saldo_conta`, `fin_confirmar_conciliacao`, `fin_desconciliar`,
+  `fin_alternar_conferencia_manual`, `fin_marcar_extrato_ignorado`. Um
+  tesoureiro restrito a UMA filial consegue editar/excluir/pagar/
+  transferir/ajustar saldo de QUALQUER transação/conta do tenant
+  inteiro. **Risco de segurança mais sério identificado nesta sessão —
+  prioridade alta pra uma fase dedicada**, fora desta PR (nenhuma delas
+  faz parte do diff do Getnet, exceto `fin_vincular_lote_antecipacao`,
+  já corrigida). Fix: mesmo padrão já usado em `fin_conferencia_totais_
+  getnet`/`fin_criar_lancamento` — `has_filial_access` contra a filial
+  EFETIVA do recurso sendo operado, testado no canal JWT/web real (o
+  gap só se manifesta lá, não em service_role).
