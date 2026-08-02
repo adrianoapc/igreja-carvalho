@@ -4802,6 +4802,48 @@ concorrente de terceiros). Classe fechada.
 
 `npx tsc`: 0 novos erros.
 
+### 9.76 48ª rodada de review: reverter pagamento de deságio vinculado ficava impossível — a própria mensagem de erro orientava um caminho que o mesmo guard bloqueava
+
+Review de 02/08 16:34 sobre o commit de §9.75 (`c8a0f17d`), 1 achado real.
+
+`proteger_desagio_vinculado` (trigger `BEFORE UPDATE`, §9.19/§9.51/§9.53)
+bloqueia editar `valor`/`conta`/`tipo`/`filial`/datas (inclusive
+`data_pagamento`) enquanto o deságio ainda está vinculado a um lote — e a
+própria mensagem de erro orienta: "Marque como pendente antes (desvincula
+o lote) pra poder editar". Só que "Reverter pagamento"
+(`fin_alterar_status_lancamento`, não tocada por esta PR) faz `UPDATE
+... SET status = 'pendente', data_pagamento = NULL, ...` numa SÓ
+statement — muda `status` E `data_pagamento` JUNTOS. O guard não
+distinguia "editar `data_pagamento` com `status` igual" (deve bloquear,
+o caso real que a proteção existe pra evitar) de "`data_pagamento`
+sendo limpo COMO CONSEQUÊNCIA do `status` sair de `pago`" (deve ser
+permitido — é o próprio caminho que a mensagem de erro recomenda).
+Resultado: seguir a orientação da mensagem disparava a MESMA exceção de
+novo.
+
+Mais grave: `proteger_desagio_vinculado` é `BEFORE UPDATE`; quem
+realmente desvincula o lote (`sincronizar_lote_antecipacao_ao_reverter_
+desagio`, §9.53) é `AFTER UPDATE OF status`. A exceção do trigger
+`BEFORE` aborta a `UPDATE` inteira antes do `AFTER` sequer rodar —
+"Reverter pagamento" de um deságio vinculado ficava impossível de fazer
+pela UI normal, sem nenhum caminho de saída.
+
+Fix: a checagem de `data_pagamento` só bloqueia quando ele muda SEM o
+`status` também sair de `'pago'` — `data_pagamento` virando `NULL`
+junto com `status` deixando de ser `'pago'` (a assinatura exata de
+"Reverter pagamento") passa a ser permitido; qualquer outra mudança de
+`data_pagamento` continua bloqueada.
+
+Harness Docker: reproduzido o bug (UPDATE idêntico ao de `fin_alterar_
+status_lancamento` falhando com `FIN_DESAGIO_VINCULADO` antes do fix);
+pós-fix, a mesma UPDATE funciona e o lote é confirmado desvinculado
+(`status='vinculado'`, `lancamento_desagio_id=NULL`) pelo trigger
+`AFTER`. 2 regressões: editar `valor` com deságio vinculado continua
+bloqueado; editar `data_pagamento` pra OUTRA data (sem mudar `status`)
+continua bloqueado.
+
+`npx tsc`: 0 novos erros (mudança só em SQL).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
