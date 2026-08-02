@@ -192,9 +192,21 @@ DEFINER`:**
    Toda RPC nova que consulta uma tabela filial-scoped, sem exceção,
    passa pelo checklist desta seção ANTES de ser considerada pronta —
    não só as que gravam.
+9. **Se esta rodada já está reescrevendo uma RPC `fin_*` por QUALQUER
+   motivo (lock, campo, bug), feche o `has_filial_access` dela agora,
+   não depois** — mesmo que o achado do review não tenha pedido
+   explicitamente. Deixar uma RPC "pra fechar depois" quando ela já
+   está sendo tocada na MESMA sessão, pelo MESMO assunto (filial), foi
+   exatamente o que gerou 2 rodadas seguidas de achado sobre `fin_
+   atualizar_lancamento`/`fin_criar_transferencia`/`fin_alterar_
+   competencia_grupo` (§9.74) depois de já saber, desde §9.68, que a
+   classe inteira precisava do check. A lista de RPCs pendentes (memória
+   de sessão) só deve conter funções que esta PR NUNCA tocou — qualquer
+   função que apareça num `CREATE OR REPLACE` desta sessão e ainda
+   esteja na lista é uma bandeira vermelha.
 
 Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.67, §9.73,
-checklist completo na memória de sessão.
+§9.74, checklist completo na memória de sessão.
 
 ---
 

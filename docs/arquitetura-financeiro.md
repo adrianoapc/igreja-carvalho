@@ -4684,6 +4684,78 @@ edite a migration original se ainda não foi deployada) e seção B, item 8
 
 `npx tsc`: 0 novos erros.
 
+### 9.74 46ª rodada de review: `fin_alterar_competencia_grupo` sem filial nenhuma + deadlock ENTRE duas funções diferentes — fechamento das RPCs já tocadas por esta PR
+
+Review de 02/08 03:28 sobre o commit de §9.73 (`c71eeff6`), 2 achados. O
+usuário pediu explicitamente pra não tratar isso como mais uma rodada
+pontual — esta seção documenta um fechamento mais amplo, não só os 2
+achados literais.
+
+1. **P1 — `fin_alterar_competencia_grupo` nunca validou filial** — a
+   MESMA função que §9.72 acabou de reescrever pro fix de deadlock,
+   ainda sem nenhum `has_filial_access`. Um tesoureiro restrito à filial
+   B que soubesse o id de uma parcela da filial A sincronizava o grupo
+   inteiro da filial A (`SECURITY DEFINER` bypassa RLS, só `igreja_id`
+   era checado — mesma classe de §9.61/§9.68/§9.73, de novo). Fix:
+   `has_filial_access(v_igreja, v_atual.filial_id)` logo após a
+   releitura pós-lock que §9.72 já introduziu — todas as parcelas de um
+   grupo compartilham `filial_id` (gravado uma vez na criação), checar a
+   de `v_atual` cobre o grupo inteiro.
+
+2. **P2 — deadlock ENTRE `fin_excluir_lancamento` e `fin_alterar_
+   competencia_grupo`** — não é o mesmo bug de D.5 numa função só; são
+   DUAS funções com protocolos de lock DIFERENTES operando no MESMO
+   grupo. `fin_excluir_lancamento` trava a raiz individualmente primeiro
+   (`SELECT ... WHERE id = p_id FOR UPDATE`) e só trava outras linhas
+   DEPOIS, durante o reparenting; `fin_alterar_competencia_grupo` (desde
+   §9.72) já trava o grupo inteiro de uma vez, em ordem determinística.
+   Rodando concorrentemente sobre o mesmo grupo, os dois protocolos
+   incompatíveis podiam deadlockar. Fix: mesmo protocolo nas duas —
+   `fin_excluir_lancamento` passa a resolver o grupo sem lock, travar o
+   grupo INTEIRO numa única statement (`ORDER BY id`), releitura pós-lock
+   — antes de decidir o que excluir/reparentear.
+
+**Fechamento proativo** (o pedido do usuário era "não apenas uma rodada
+simples" — a resposta a isso não é só corrigir os 2 achados, é fechar o
+que dá pra fechar SEM expandir escopo pra fora do diff): as ~12 RPCs sem
+`has_filial_access` de §9.68 continuam, na maioria, fora do diff desta
+PR (nunca tocadas por nenhuma migration desta sessão) — permanecem
+registradas como fase dedicada. MAS duas delas JÁ estavam no diff,
+reescritas várias vezes por outros motivos nesta mesma sessão:
+`fin_atualizar_lancamento` (6+ rodadas de fixes de filial nos CAMPOS,
+nunca no acesso à LINHA) e `fin_criar_transferencia` (lock + resolução
+de forma, nunca acesso às CONTAS). Fechadas aqui também — não porque o
+review pediu, mas porque não fechar uma RPC que já está sendo reescrita
+na mesma sessão, pelo mesmo motivo (filial), é exatamente o padrão que
+gerou as 2 rodadas de achado sobre este assunto. `fin_atualizar_
+lancamento` ganhou os dois lados: acesso à filial ATUAL (bloqueia editar
+transação de filial que o chamador não acessa) e, quando `filial_id` está
+sendo mudado de fato, acesso à filial NOVA também (bloqueia mover uma
+transação PRA uma filial que o chamador não acessa). `fin_criar_
+transferencia` ganhou o check nas DUAS contas (origem e destino).
+
+Lista de §9.68 atualizada: de ~12 RPCs sem `has_filial_access`, restam
+**8** fora do diff desta PR (`fin_alterar_status_lancamento`,
+`fin_estornar_transferencia`, `fin_ajustar_saldo`, `fin_recalcular_
+saldo_conta`, `fin_confirmar_conciliacao`, `fin_desconciliar`,
+`fin_alternar_conferencia_manual`, `fin_marcar_extrato_ignorado`) —
+essas continuam precisando da fase dedicada. `fin_excluir_lancamento`
+segue SEM o check de acesso (só o protocolo de lock foi corrigido aqui —
+está na mesma lista dos 8, deliberadamente não fechado nesta rodada por
+não ter sido citado pelo achado e não estar diretamente relacionado ao
+fix de lock).
+
+Harness Docker: 4 cenários de bloqueio (tesoureiro filial B barrado em
+`fin_alterar_competencia_grupo`/`fin_atualizar_lancamento`/`fin_criar_
+transferencia` sobre recurso da filial A, pelo canal JWT/web real);
+mesma filial continua funcionando nas 3; `fin_excluir_lancamento`
+confirmado ainda sem check (comportamento esperado, não regressão). 2
+sessões `psql` reais rodando `fin_excluir_lancamento` e `fin_alterar_
+competencia_grupo` concorrentemente sobre o mesmo grupo: as duas
+completam com sucesso, sem deadlock (uma serializa atrás da outra).
+
+`npx tsc`: 0 novos erros.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
@@ -4695,22 +4767,27 @@ edite a migration original se ainda não foi deployada) e seção B, item 8
   snapshot baseline antes da F1.
 - **Paridade na convivência** (F3) → monitorar divergências via audit log
   enquanto a flag antiga existir.
-- **~12 RPCs `SECURITY DEFINER` do CORE (pré-existentes, em produção)
-  sem NENHUM check de `has_filial_access`** (§9.68) — `fin_atualizar_
-  lancamento`, `fin_excluir_lancamento`, `fin_alterar_status_lancamento`,
-  `fin_alterar_competencia_grupo`, `fin_criar_transferencia`,
+- **8 RPCs `SECURITY DEFINER` do CORE (pré-existentes, em produção,
+  NUNCA tocadas por esta PR) sem NENHUM check de `has_filial_access`**
+  (§9.68, lista reduzida em §9.74) — `fin_alterar_status_lancamento`,
   `fin_estornar_transferencia`, `fin_ajustar_saldo`, `fin_recalcular_
   saldo_conta`, `fin_confirmar_conciliacao`, `fin_desconciliar`,
   `fin_alternar_conferencia_manual`, `fin_marcar_extrato_ignorado`. Um
-  tesoureiro restrito a UMA filial consegue editar/excluir/pagar/
-  transferir/ajustar saldo de QUALQUER transação/conta do tenant
-  inteiro. **Risco de segurança mais sério identificado nesta sessão —
-  prioridade alta pra uma fase dedicada**, fora desta PR (nenhuma delas
-  faz parte do diff do Getnet, exceto `fin_vincular_lote_antecipacao`,
-  já corrigida). Fix: mesmo padrão já usado em `fin_conferencia_totais_
-  getnet`/`fin_criar_lancamento` — `has_filial_access` contra a filial
-  EFETIVA do recurso sendo operado, testado no canal JWT/web real (o
-  gap só se manifesta lá, não em service_role).
+  tesoureiro restrito a UMA filial consegue editar/pagar/ajustar saldo/
+  conciliar de QUALQUER transação/conta do tenant inteiro através
+  dessas RPCs. **Risco de segurança mais sério identificado nesta
+  sessão — prioridade alta pra uma fase dedicada.** Fix: mesmo padrão já
+  usado em `fin_conferencia_totais_getnet`/`fin_criar_lancamento`/
+  `fin_atualizar_lancamento`/`fin_criar_transferencia`/`fin_alterar_
+  competencia_grupo`/`fin_vincular_lote_antecipacao` (já corrigidas) —
+  `has_filial_access` contra a filial EFETIVA do recurso sendo operado,
+  testado no canal JWT/web real (o gap só se manifesta lá, não em
+  service_role).
+  **`fin_excluir_lancamento` é um caso à parte**: teve o PROTOCOLO DE
+  LOCK corrigido (§9.74, pra não deadlockar contra `fin_alterar_
+  competencia_grupo`), mas ainda não tem `has_filial_access` — fica na
+  mesma lista de pendências, não nos "8 nunca tocados", porque já foi
+  reescrita nesta sessão por outro motivo.
 - **Passo 0 obrigatório antes de deployar a cadeia "sempre recalcula" de
   saldo** (§9.72) — rodar `fin_diagnosticar_drift_saldo` em qualquer
   ambiente com dados históricos reais e revisar manualmente toda conta
