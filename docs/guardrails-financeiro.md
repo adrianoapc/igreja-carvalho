@@ -344,6 +344,27 @@ reproduzido com 2 sessões reais antes e depois do fix (§9.72).
 
 Referências: §9.72.
 
+### D.6 — "Resolve sem lock, trave depois" (D.5) precisa RE-CONFIRMAR o que foi resolvido, depois do lock
+
+D.5 resolve a corrida de "quem trava o quê primeiro" — mas abre uma
+JANELA nova: entre o `SELECT` sem lock que resolve o identificador do
+grupo (`v_pai`) e o momento em que o lock é efetivamente adquirido,
+OUTRA transação concorrente pode ter mudado a estrutura do grupo (ex.:
+excluído a raiz e reparenteado as irmãs). O `v_pai` resolvido fica
+apontando pra algo que não existe mais — o lock adquirido com esse valor
+trava 0 linhas (o predicado não bate com nada), e toda query seguinte
+que usa esse `v_pai` (inclusive o `UPDATE` final) também não bate com
+nada. A RPC retorna sucesso sem ter feito nada — falha SILENCIOSA, sem
+erro nenhum. **Depois de adquirir o lock, re-resolva o identificador da
+MESMA forma; se mudou, refaça o ciclo (resolve → trava → confere) até
+estabilizar** — só nesse ponto está garantido que ninguém mais está
+alterando a estrutura. Achado real: `fin_alterar_competencia_grupo` E
+`fin_excluir_lancamento`, as duas com o mesmo padrão (§9.75) — reproduzido
+de verdade com 2 sessões `psql` (uma instrumentada com `pg_sleep` pra
+segurar a transação já mutada, mas não commitada, forçando a janela).
+
+Referências: §9.75.
+
 ---
 
 ## E. Migrations — defesas precisam vir ANTES do que protegem

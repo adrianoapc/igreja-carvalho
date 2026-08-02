@@ -4756,6 +4756,52 @@ completam com sucesso, sem deadlock (uma serializa atrás da outra).
 
 `npx tsc`: 0 novos erros.
 
+### 9.75 47ª rodada de review: raiz do grupo (`v_pai`) ficava obsoleta se um reparenting concorrente acontecesse durante a espera do lock
+
+Review de 02/08 15:41 sobre o commit de §9.74 (`cd5a2e1e`), 1 achado real
+— e a mesma classe se repete em `fin_excluir_lancamento`, escrita com o
+mesmo padrão na MESMA migration, sem eu ter verificado esse cenário.
+
+O padrão "resolve a raiz do grupo (`v_pai`) com `SELECT` sem lock, trava
+o grupo inteiro depois" (§9.72/§9.74, pra evitar deadlock — guardrail
+D.5) tem uma janela: se, ENQUANTO esta chamada espera o lock do grupo,
+outra sessão concorrente excluir a raiz e reparentear (`fin_excluir_
+lancamento`), o `v_pai` resolvido ANTES de esperar fica apontando pra um
+id que não existe mais (a raiz antiga, deletada) ou que ninguém mais
+referencia como pai. Quando o lock libera, o predicado `(id = v_pai OR
+lancamento_pai_id = v_pai)` não bate com NENHUMA linha — Postgres trava 0
+linhas — e toda query seguinte que usa `v_pai` (inclusive o `UPDATE`
+final) também não bate com nada. A RPC retorna sucesso (`ok: true`) sem
+atualizar nenhuma parcela — falha silenciosa.
+
+Fix: depois de adquirir o lock do grupo, RE-RESOLVE a raiz da mesma
+forma. Se o valor mudou em relação ao que foi usado pra travar, o grupo
+foi alterado por uma transação concorrente durante a espera — o lock
+adquirido pode não cobrir o grupo real; refaz o ciclo (resolve → trava →
+confere) com a raiz atualizada, até estabilizar. Aplicado nas DUAS
+funções que usam este padrão — `fin_alterar_competencia_grupo` (achado
+do review) e `fin_excluir_lancamento` (mesma classe, não citada pelo
+achado, corrigida proativamente por já usar o padrão idêntico).
+
+Harness Docker: reproduzido de verdade com 2 sessões `psql` reais —
+sessão A (`fin_excluir_lancamento` na raiz, instrumentada com `pg_sleep`
+logo antes do `RETURN` pra segurar a transação já reparenteada+excluída,
+mas ainda não commitada) e sessão B (`fin_alterar_competencia_grupo` na
+parcela 3, iniciada ~1s depois). Pré-fix: B retorna `{"ok": true, "ids":
+null}` — sucesso relatado, nada atualizado, exatamente o bug descrito.
+Pós-fix, mesma instrumentação/timing: B detecta que a raiz mudou,
+re-resolve pra `parcela 2` (a nova raiz pós-reparenting) e atualiza
+`parcela 2` + `parcela 3` corretamente.
+
+**Varredura**: as únicas 2 funções que resolvem uma raiz de grupo
+mutável (`COALESCE(lancamento_pai_id, id)`) antes de travar são estas
+duas — nenhuma outra RPC desta sessão usa esse padrão (`fin_criar_
+transferencia`/`fin_vincular_lote_antecipacao` travam por parâmetro
+direto, não por um identificador derivado que pode mudar por ação
+concorrente de terceiros). Classe fechada.
+
+`npx tsc`: 0 novos erros.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
