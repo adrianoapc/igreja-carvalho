@@ -4282,6 +4282,47 @@ da mesma classe antes que o Codex precise apontar um por um):
 
 `npx tsc`: 0 novos erros.
 
+### 9.66 38ª rodada de review: forma da transferência sem filial + categoria do deságio não reseta ao trocar de conta
+
+Review de 02/08 01:10 sobre o commit de §9.65 (`5ef1a70`). 2 achados, os
+dois continuações diretas da varredura da rodada anterior:
+
+1. **P2 — `fin_criar_transferencia` resolve "Transferência Bancária" sem
+   filtro de filial** — a varredura de §9.65 (grep de `FOR UPDATE`)
+   confirmou não sobrar mais nenhum lock pendente, mas não cobriu esta
+   função pro OUTRO padrão da mesma PR (§9.61/§9.62/§9.64): resolução de
+   `forma_pagamento_id` por rótulo sem checar filial. `fin_criar_
+   transferencia` não passa pelo resolvedor de `fin_criar_lancamento`
+   (faz `INSERT` direto), então o fix de §9.61 nunca cobriu este ponto —
+   numa igreja com "Transferência Bancária" cadastrada por filial, a
+   busca (`ORDER BY created_at ASC`) podia pegar a forma mais antiga de
+   OUTRA filial. Fix: mesmo padrão de §9.61 — restringe a candidatos da
+   MESMA filial efetiva ou globais, prioriza a própria filial. Testado no
+   harness: forma "Transferência Bancária" da filial B mais antiga que a
+   da filial A, transferência entre 2 contas da filial A resolve
+   corretamente pra forma da filial A.
+
+2. **P2 — `LancarDesagioDialog.tsx`: categoria não reseta ao trocar de
+   conta** — eu já tinha identificado esse risco no código (comentário
+   deixado na correção de §9.65) mas decidido não corrigir proativamente,
+   tratando como só um "rough edge" de UX (o backend já rejeita com
+   segurança). O review confirmou que é achado de verdade: trocar a
+   conta (extrato global) recarrega as opções de categoria pra filial da
+   nova conta, mas não limpa `categoriaId` já selecionado — o botão
+   continua habilitado e submete a categoria antiga (escondida, fora da
+   lista), rejeitada pelo backend só no submit. Fix: `useEffect` reseta
+   `categoriaId` sempre que `contaId` muda (guardrail A.4).
+
+**Lição**: uma varredura proativa "achar outros padrões da mesma classe"
+(pedida pelo usuário em §9.65) não é uma operação única — precisa cobrir
+TODOS os pontos de escrita daquele padrão, não só os que já foram tocados
+antes. `fin_criar_transferencia` é um `INSERT` direto que nunca passou
+pelos resolvedores já corrigidos, então ficou fora do grep mental da
+rodada anterior (que focou em `FOR UPDATE`, não simultaneamente no padrão
+de resolução de forma por rótulo).
+
+`npx tsc`: 0 novos erros.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

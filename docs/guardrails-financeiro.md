@@ -140,6 +140,16 @@ DEFINER`:**
    Antes de declarar um fix desse tipo "completo", pergunte: essa mesma
    tabela/RPC tem outro campo com o mesmo formato (FK pra catálogo com
    `filial_id`)? Se sim, corrija todos juntos.
+   **Generalizar por CAMPO não basta — generalize por PONTO DE ESCRITA
+   também.** `fin_criar_transferencia` resolve `forma_pagamento_id`
+   ("Transferência Bancária") por rótulo com um `INSERT` direto, sem
+   passar pelo resolvedor de `fin_criar_lancamento` já corrigido — ficou
+   de fora da varredura de §9.65 porque o grep focou no padrão de lock
+   daquela rodada, não simultaneamente no padrão de resolução por rótulo
+   de rodadas anteriores (§9.66). Ao fechar uma classe, `grep` por TODOS
+   os `INSERT INTO transacoes_financeiras` e `SELECT ... FROM formas_
+   pagamento`/`categorias_financeiras`/etc. no schema, não só pelas RPCs
+   "oficiais" que já foram tocadas antes.
 6. **Antes de QUALQUER `CREATE OR REPLACE FUNCTION public.fin_*`, ache a
    versão mais recente de verdade primeiro** —
    `grep -rl "CREATE OR REPLACE FUNCTION public.<nome>" supabase/

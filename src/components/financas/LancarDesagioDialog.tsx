@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Label } from "@/components/ui/label";
@@ -72,6 +72,17 @@ export function LancarDesagioDialog({ open, onOpenChange, lote, onLancado }: Lan
     },
     enabled: open && !!igrejaId,
   });
+
+  // Trocar a conta pode mudar a filial efetiva (extrato global) e portanto
+  // o conjunto de categorias válidas — sem isso, o Select mantinha uma
+  // categoria de uma filial diferente selecionada (nem mais visível na
+  // lista) e o botão de lançar continuava habilitado, submetendo a
+  // categoria antiga escondida, rejeitada pelo backend (achado do
+  // /code-review; mesmo padrão de "estado escopado por contexto precisa
+  // resetar quando o contexto muda" do guardrail A.4).
+  useEffect(() => {
+    setCategoriaId("");
+  }, [contaId]);
 
   const contaSelecionada = contas.find((c) => c.id === contaId);
   // Mesma regra do backend: COALESCE(extrato.filial_id, conta.filial_id) —
