@@ -4557,6 +4557,60 @@ os dois efeito colateral de fixes anteriores DESTA sessão.
 
 `npx tsc`: 0 novos erros.
 
+### 9.72 44ª rodada de review: deadlock em edição concorrente de competência de grupo + drift de saldo pré-deploy
+
+Review de 02/08 02:56 sobre o commit de §9.71 (`de4ba627`), 2 achados —
+naturezas bem diferentes.
+
+1. **P2 — `fin_alterar_competencia_grupo` deadlockava com 2 sessões
+   editando parcelas DIFERENTES do MESMO grupo** — a função travava
+   `p_lancamento_id` INDIVIDUALMENTE (`FOR UPDATE`) numa statement, e só
+   DEPOIS travava o grupo inteiro (`id = v_pai OR lancamento_pai_id =
+   v_pai`) numa segunda. Sessão A editando a parcela 2 e sessão B
+   editando a parcela 3 do mesmo grupo, concorrentes: A trava a parcela 2
+   primeiro, B trava a parcela 3 primeiro — depois A tenta travar o
+   grupo (que inclui a parcela 3, já com B) e espera; B tenta travar o
+   grupo (que inclui a parcela 2, já com A) e espera — espera circular,
+   Postgres aborta uma. Fix: resolve a raiz do grupo (`v_pai`) com um
+   `SELECT` SEM lock primeiro, depois trava o grupo INTEIRO numa ÚNICA
+   statement em ordem determinística (`ORDER BY id`) — nunca mais um lock
+   individual isolado antes do lock do grupo. `v_atual` relido depois do
+   lock, snapshot fresco.
+
+   Harness Docker: deadlock REPRODUZIDO de verdade com 2 sessões `psql`
+   reais (instrumentado com `pg_sleep` entre os 2 locks da versão antiga,
+   pra forçar a janela de corrida — mesma técnica já usada nesta sessão
+   pra reproduzir deadlocks de lock ordering) — `ERROR: deadlock
+   detected` confirmado na versão pré-fix. Pós-fix, mesmo teste (2
+   sessões reais, mesma janela forçada): as duas completam com sucesso.
+   Regressão: chamada normal ainda devolve `snapshot_antes`/`warnings`
+   corretos; lançamento não-parcelado ainda é rejeitado.
+
+2. **P1 — drift de saldo histórico pode ser apagado pelo recálculo
+   automático** — achado de natureza DIFERENTE dos anteriores: não é um
+   bug de lógica, é uma precondição de deploy. `_fin_recalcular_saldo_
+   conta_raw` sempre recalcula `saldo_atual = saldo_inicial + Σ
+   transações pagas` — se alguma conta tiver um ajuste manual histórico
+   feito direto em `contas.saldo_atual` (antes de `fin_ajustar_saldo`
+   existir como RPC auditável), esse ajuste não está refletido em
+   `saldo_inicial` nem em nenhuma transação — a próxima transação paga
+   comum dispara o recálculo e apaga o ajuste em silêncio. Corrigir isso
+   automaticamente às cegas arriscaria mascarar um bug real como se
+   fosse ajuste legítimo — precisa de revisão humana, não código.
+
+   Fix: função de diagnóstico só-leitura nova,
+   `fin_diagnosticar_drift_saldo`, que lista toda conta cujo `saldo_atual`
+   diverge da fórmula, com a diferença. Vira o **passo 0 obrigatório do
+   runbook de deploy** desta PR: rodar ANTES de qualquer deploy pra um
+   ambiente com dados históricos reais; cada linha retornada exige
+   decisão manual — ajuste legítimo (dobra a diferença em
+   `saldo_inicial`) ou drift real (investiga antes de aceitar). Testado
+   no harness: conta sem drift não aparece; conta com ajuste simulado
+   (`UPDATE contas SET saldo_atual = ...` direto) aparece com a
+   diferença correta.
+
+`npx tsc`: 0 novos erros.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
@@ -4584,3 +4638,10 @@ os dois efeito colateral de fixes anteriores DESTA sessão.
   getnet`/`fin_criar_lancamento` — `has_filial_access` contra a filial
   EFETIVA do recurso sendo operado, testado no canal JWT/web real (o
   gap só se manifesta lá, não em service_role).
+- **Passo 0 obrigatório antes de deployar a cadeia "sempre recalcula" de
+  saldo** (§9.72) — rodar `fin_diagnosticar_drift_saldo` em qualquer
+  ambiente com dados históricos reais e revisar manualmente toda conta
+  retornada (ajuste legado legítimo → dobra em `saldo_inicial`; drift
+  real → investiga) ANTES do deploy. Sem isso, a próxima transação paga
+  comum numa conta com ajuste manual histórico (feito fora de
+  `fin_ajustar_saldo`) apaga esse ajuste em silêncio.
