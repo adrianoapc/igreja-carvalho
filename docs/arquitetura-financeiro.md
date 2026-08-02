@@ -4479,6 +4479,40 @@ reais:
 
 `npx tsc`: 0 novos erros.
 
+### 9.70 42ª rodada de review: precisão de moeda e data impossível ainda passavam na validação Getnet
+
+Review de 02/08 02:07 sobre o commit de §9.69 (`a85012fb`) — mais
+"evidência nova" sobre `ImportarRecebivelGetnetTab.tsx`, mesmas 2 funções
+de validação já endurecidas em §9.65:
+
+1. **P2 — `isValorGetnetValido` aceitava qualquer quantidade de casas
+   decimais** — `(,\d+)?` deixava `"12,345"` (3 casas) passar,
+   `parseValorGetnet` mandava `12.345` pra uma coluna `numeric(14,2)`,
+   que arredonda em SILÊNCIO pra `12.35` — dado financeiro alterado sem
+   nenhum aviso, reportado como "importado com sucesso". Fix: `,\d{2}`
+   — exige EXATAMENTE 2 casas decimais (precisão de moeda) quando a
+   célula tem vírgula.
+
+2. **P2 — `isDataGetnetValida` só checava o FORMATO, não se a data
+   existe no calendário** — `"31/02/2026"` ou `"29/02/2025"` (não
+   bissexto) batiam o regex de forma (`\d{2}/\d{2}/\d{4}`) e a linha
+   entrava como válida no preview; só falhava DEPOIS, no cast `::date`
+   da RPC, contada como inválida depois de uma importação PARCIAL já ter
+   rodado — sem chance de o usuário corrigir antes. Fix:
+   `isDataCalendarioValida` — constrói um `Date` e confere round-trip
+   (dia/mês/ano de volta batendo com o que foi construído); `Date`
+   normaliza dia fora do range (31/02 vira 03/03), o round-trip detecta
+   essa normalização e rejeita.
+
+**Varredura proativa**: grep por outros parsers de data/valor no escopo
+desta PR (Getnet CSV, SFTP) — `getnetExtratoParser.ts` (F6, PR #52,
+espelho SFTP) não tem parser de data/valor nesse formato; os únicos
+outros lugares com o mesmo padrão shape-only são, de novo,
+`ImportarTab.tsx`/`ImportarExtratosTab.tsx` (fora do diff desta PR,
+mesma decisão de §9.65/§9.69). Classe fechada dentro do escopo desta PR.
+
+`npx tsc`: 0 novos erros.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

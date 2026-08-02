@@ -134,17 +134,19 @@ const parseValorGetnet = (valor: string): number | null => {
 // /code-review, mesma classe do fix de contagem de colunas).
 //
 // Valida o formato BRUTO brasileiro (milhar agrupado de 3 em 3 com ponto,
-// decimal com vírgula) em vez do resultado já normalizado — a versão
-// anterior removia TODOS os pontos antes de validar, o que deixava
-// "1.2.3" passar como "123" (múltiplos pontos == corrompido, não é
-// milhar de verdade) e um "12.34" mal-formatado (brasileiro nunca usa
-// ponto pra 2 casas decimais) virar "1234" em silêncio — achado do
-// /code-review, evidência nova depois do fix anterior. `\.\d{3}` exige
-// EXATAMENTE 3 dígitos por grupo de milhar, o que rejeita os dois casos.
+// decimal com vírgula, EXATAMENTE 2 casas — precisão de moeda) em vez do
+// resultado já normalizado. Histórico: a versão original removia TODOS os
+// pontos antes de validar ("1.2.3" passava como "123"); a próxima aceitava
+// qualquer quantidade de casas decimais depois da vírgula — um valor como
+// "12,345" (3 casas) passava e `parseValorGetnet` mandava `12.345` pra uma
+// coluna `numeric(14,2)`, que arredonda em silêncio pra `12.35` (dado
+// financeiro alterado sem aviso, achado do /code-review, evidência nova
+// depois do fix anterior). `\.\d{3}` exige EXATAMENTE 3 dígitos por grupo
+// de milhar; `,\d{2}` exige EXATAMENTE 2 casas decimais quando presente.
 const isValorGetnetValido = (valor: string): boolean => {
   const str = valor.trim();
   if (!str) return true;
-  return /^-?\d{1,3}(\.\d{3})*(,\d+)?$/.test(str);
+  return /^-?\d{1,3}(\.\d{3})*(,\d{2})?$/.test(str);
 };
 
 const parseDataGetnet = (data: string): string | null => {
@@ -154,14 +156,34 @@ const parseDataGetnet = (data: string): string | null => {
   return `${m[3]}-${m[2]}-${m[1]}`;
 };
 
+// Confere se dia/mês/ano formam uma data real do calendário (rejeita
+// 31/02, 29/02 fora de ano bissexto etc.) — não só o formato. `Date`
+// normaliza dia fora do range (ex.: 31/02 vira 03/03), então o
+// round-trip (dia/mês/ano de volta batendo com o que foi construído)
+// detecta a normalização e rejeita.
+const isDataCalendarioValida = (dia: number, mes: number, ano: number): boolean => {
+  const d = new Date(ano, mes - 1, dia);
+  return d.getFullYear() === ano && d.getMonth() === mes - 1 && d.getDate() === dia;
+};
+
 // Mesmo raciocínio de isValorGetnetValido: célula de data não-vazia mas
 // fora do formato esperado (ex.: "31-07-2026" em vez de "31/07/2026")
 // virava null em silêncio — indistinguível de uma célula vazia — e a
 // linha entrava como válida mesmo faltando uma data (achado do
 // /code-review, mesma rodada do fix de valor monetário).
+//
+// Só checar o FORMATO não bastava: uma célula com a forma certa mas uma
+// data impossível (31/02/2026, 29/02/2025 — não bissexto) passava aqui,
+// só falhava depois no cast ::date da RPC, contada como linha inválida
+// DEPOIS de uma importação parcial já ter rodado — sem chance de o
+// usuário corrigir antes (achado do /code-review, evidência nova depois
+// do fix anterior).
 const isDataGetnetValida = (data: string): boolean => {
   const s = data.trim();
-  return !s || /^\d{2}\/\d{2}\/\d{4}$/.test(s);
+  if (!s) return true;
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return false;
+  return isDataCalendarioValida(Number(m[1]), Number(m[2]), Number(m[3]));
 };
 
 // Parser da linha crua (array de 26 células já decodificadas) → objeto
