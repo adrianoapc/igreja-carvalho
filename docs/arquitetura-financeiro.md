@@ -4436,6 +4436,49 @@ canal).
 
 `npx tsc`: 0 novos erros (mudança só em SQL, escopo desta rodada).
 
+### 9.69 41ª rodada de review: upload concorrente sobrescreve preview + conferência não invalida após lançar deságio
+
+Review de 02/08 01:53 sobre o commit de §9.68 (`61148dc5`), 2 achados
+reais:
+
+1. **P2 — `ImportarRecebivelGetnetTab.tsx`: seleção de um 2º arquivo
+   antes da leitura do 1º terminar** — `handleFileUpload` seta `fileName`
+   de forma síncrona, depois `await file.arrayBuffer()` (assíncrono).
+   Selecionar um arquivo B enquanto a leitura de A ainda está pendente
+   dispara as duas leituras em paralelo, sem ordem garantida de
+   conclusão — se A (mais lento) terminar DEPOIS de B, `linhas` fica com
+   o conteúdo de A enquanto `fileName` mostra "B" (a última atribuição
+   síncrona). Clicar Importar manda dados de um arquivo diferente do que
+   a UI identifica. Fix: `uploadTokenRef` incrementado a cada seleção;
+   após o único `await` da função, descarta o resultado se o token não
+   é mais o atual (mesmo padrão de qualquer requisição assíncrona que
+   pode ficar obsoleta).
+
+   **Varredura proativa**: o mesmo `handleFileUpload` (seta `fileName`
+   antes do único `await file.arrayBuffer()`, sem guarda) existe
+   IDENTICO em `ImportarExtratosTab.tsx` e `ImportarTab.tsx` — mas são
+   arquivos de PRs anteriores (#47/#53), fora do diff desta PR, mesma
+   decisão de escopo já tomada em §9.65 pro bug de parsing de valor.
+   Não corrigido aqui; registrado como o mesmo known issue.
+
+2. **P2 — `LotesAntecipacaoTab.tsx`: conferência não invalida depois de
+   lançar deságio** — a tela mostra `ConferenciaTotaisGetnetCard`
+   (totais de `fin_conferencia_totais_getnet`) e a lista de lotes juntas;
+   lançar um deságio muda `desagio_lancado`/`diferenca_nao_explicada`
+   pra aquela conta/período, mas o callback `onLancado` só dava
+   `refetch()` na lista de lotes — o card de conferência, montado na
+   mesma tela, continuava mostrando os totais de ANTES até um remount
+   não relacionado. Fix: `queryClient.invalidateQueries({ queryKey:
+   ["conferencia-totais-getnet"] })` junto no `onLancado`.
+
+   Verificado que `onVinculado` (corrigir vínculo extrato↔lote) NÃO
+   precisa do mesmo fix — vincular sozinho não muda `desagio_lancado`
+   (só conta lotes com `status='lancamento_criado'`, que só acontece ao
+   LANÇAR, não ao vincular), e `fin_vincular_lote_antecipacao` já
+   recusa revincular um lote com deságio lançado (`FIN_JA_LANCADO`).
+
+`npx tsc`: 0 novos erros.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

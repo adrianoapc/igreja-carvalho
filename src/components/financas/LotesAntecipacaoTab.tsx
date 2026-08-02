@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -45,6 +46,7 @@ function StatusBadge({ status }: { status: LoteAntecipacao["status"] }) {
 
 export function LotesAntecipacaoTab() {
   const { formatValue } = useHideValues();
+  const queryClient = useQueryClient();
   const { data: lotes = [], isLoading, refetch } = useLotesAntecipacao();
   const [loteVinculando, setLoteVinculando] = useState<LoteAntecipacao | null>(null);
   const [loteLancando, setLoteLancando] = useState<LoteAntecipacao | null>(null);
@@ -158,6 +160,13 @@ export function LotesAntecipacaoTab() {
           lote={loteLancando}
           onLancado={() => {
             refetch();
+            // Lançar o deságio muda oferta_bruto/taxa_mdr/desagio_lancado
+            // de fin_conferencia_totais_getnet pra essa conta/período — o
+            // card de conferência (montado nesta mesma tela) só refetch
+            // por causa própria (troca de conta/período), então sem isso
+            // continuava mostrando os totais de ANTES do lançamento até
+            // um remount não relacionado (achado do /code-review).
+            queryClient.invalidateQueries({ queryKey: ["conferencia-totais-getnet"] });
             setLoteLancando(null);
           }}
         />

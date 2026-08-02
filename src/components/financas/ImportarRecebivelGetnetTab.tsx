@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
@@ -204,6 +204,13 @@ export function ImportarRecebivelGetnetTab() {
   const [linhasInvalidas, setLinhasInvalidas] = useState(0);
   const [formatoReconhecido, setFormatoReconhecido] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
+  // Token do upload em andamento — descarta o resultado de uma leitura
+  // (arrayBuffer, assíncrona) que não é mais a mais recente. Sem isso,
+  // selecionar um 2º arquivo antes da leitura do 1º terminar podia deixar
+  // o 1º (mais lento) sobrescrever linhas com dado de um arquivo diferente
+  // do que fileName mostra, já que as duas leituras rodam em paralelo sem
+  // ordem garantida de conclusão (achado do /code-review).
+  const uploadTokenRef = useRef(0);
 
   const { data: integracoes = [] } = useQuery<IntegracaoOption[]>({
     queryKey: ["integracoes-getnet-recebivel", igrejaId],
@@ -254,10 +261,12 @@ export function ImportarRecebivelGetnetTab() {
       toast.error(`Arquivo maior que ${MAX_FILE_SIZE_MB}MB`);
       return;
     }
+    const meuToken = ++uploadTokenRef.current;
     setFileName(file.name);
 
     try {
       const buffer = await file.arrayBuffer();
+      if (meuToken !== uploadTokenRef.current) return; // seleção mais nova já assumiu
       // O portal Getnet exporta em ISO-8859-1 (Latin-1), não UTF-8 — decodificar
       // como UTF-8 corromperia todos os campos acentuados (LANÇAMENTO, VALOR
       // LÍQUIDO etc.) e quebraria a detecção de cabeçalho.
