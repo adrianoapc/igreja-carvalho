@@ -338,7 +338,26 @@ $$;
 -- pré-calculado: DISTINCT ON (igreja_id, lower(nome)) só pode ter 1
 -- candidato por nome pra igreja INTEIRA, então não tem como respeitar
 -- filial — precisa resolver por linha, cada uma com sua própria filial_id.
-
+--
+-- Restrito a NULL ou provadamente incompatível (achado do /code-review,
+-- §9.71→§9.73): a versão original deste UPDATE sobrescrevia QUALQUER
+-- forma_pagamento_id que divergisse do candidato resolvido por rótulo —
+-- inclusive um id já válido (mesma filial ou global), só porque a busca
+-- por nome hoje aponta pra outro candidato. Dois cenários reais perdiam
+-- um vínculo correto: (a) forma renomeada depois da transação — a busca
+-- por nome não acha mais candidato, `melhor.forma_id` fica NULL, e um id
+-- válido era zerado; (b) duas formas compatíveis compartilhando o nome
+-- histórico — a ordenação trocava um id válido por outro (também válido,
+-- mas não o originalmente gravado) sem motivo real. A correção
+-- inicialmente saiu como uma migration SEPARADA e posterior
+-- (20260731310000, já removida) — mas como as migrations rodam em ordem
+-- de timestamp, essa migration (mais antiga) sempre executaria PRIMEIRO e
+-- já teria destruído o id original antes da "correção" rodar — a
+-- informação já estaria perdida, a correção não tinha como recuperar
+-- nada. Fix tem que estar AQUI, na migration original, não numa camada
+-- por cima: só re-resolve quando o id está NULL (nunca resolvido) OU
+-- provadamente incompatível (aponta pra uma filial ESPECÍFICA diferente
+-- da transação — o bug real que este backfill existe pra corrigir).
 -- Postgres não aceita LATERAL referenciando a própria tabela-alvo do
 -- UPDATE ("invalid reference to FROM-clause entry for table t") — resolve
 -- o melhor candidato por linha numa CTE primeiro (subquery correlacionada
@@ -355,6 +374,18 @@ WITH melhor AS (
     FROM public.transacoes_financeiras t
    WHERE t.forma_pagamento IS NOT NULL
      AND t.forma_pagamento !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+     AND (
+       -- nunca resolvido ainda
+       t.forma_pagamento_id IS NULL
+       -- ou provadamente incompatível: aponta pra uma filial ESPECÍFICA
+       -- diferente da da transação (nunca "nome diferente hoje")
+       OR EXISTS (
+         SELECT 1 FROM public.formas_pagamento fp_atual
+          WHERE fp_atual.id = t.forma_pagamento_id
+            AND fp_atual.filial_id IS NOT NULL
+            AND fp_atual.filial_id IS DISTINCT FROM t.filial_id
+       )
+     )
 )
 UPDATE public.transacoes_financeiras t
    SET forma_pagamento_id = melhor.forma_id

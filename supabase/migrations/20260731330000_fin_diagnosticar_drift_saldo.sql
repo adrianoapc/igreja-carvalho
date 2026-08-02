@@ -33,6 +33,19 @@
 -- docs/arquitetura-financeiro.md §9.72): rodar isso ANTES de qualquer
 -- deploy pra um ambiente com dados reais, revisar cada linha retornada
 -- manualmente.
+--
+-- Achado do /code-review, rodada seguinte (§9.73): a primeira versão
+-- desta função filtrava só por `igreja_id` (tenant), sem `has_filial_
+-- access` nenhum — sendo `SECURITY DEFINER` (bypassa RLS de contas/
+-- transações), um tesoureiro restrito a UMA filial que chamasse esta RPC
+-- "só de diagnóstico" via app/devtools enxergava nome, saldo registrado,
+-- saldo calculado e diferença de TODAS as contas do tenant, de qualquer
+-- filial — exatamente a mesma classe de vazamento já documentada em
+-- §9.61/§9.68, cometida de novo aqui, numa função nova, na MESMA sessão
+-- que documentou a classe inteira. Fix: `has_filial_access` por conta —
+-- `has_filial_access` já libera geral pra quem tem papel admin/
+-- super_admin (é exatamente quem deveria rodar este diagnóstico antes de
+-- um deploy), e restringe tesoureiro comum à própria filial.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.fin_diagnosticar_drift_saldo(
@@ -73,6 +86,7 @@ BEGIN
        WHERE t.conta_id = c.id AND t.status = 'pago'
     ) v_calc
    WHERE c.igreja_id = v_igreja
+     AND public.has_filial_access(v_igreja, c.filial_id)
      AND c.saldo_atual IS DISTINCT FROM v_calc.saldo_calculado
    ORDER BY abs(c.saldo_atual - v_calc.saldo_calculado) DESC;
 END;

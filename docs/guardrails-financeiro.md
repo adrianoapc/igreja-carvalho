@@ -177,9 +177,24 @@ DEFINER`:**
    parcela nascia com uma competência própria, violando o invariante "1
    competência por grupo" que o guard D10 (`fin_atualizar_lancamento`)
    só protege depois de criado, não no nascimento (§9.67).
+8. **`SECURITY DEFINER` + filial-scoped SEM `has_filial_access` não tem
+   exceção pra "é só leitura"/"é só diagnóstico"/"ninguém vai chamar
+   isso do app normal".** Uma RPC read-only ainda bypassa RLS — se ela
+   lista linhas de uma tabela com `filial_id` (contas, transações,
+   catálogos), ainda vaza dado de outra filial pra quem chamar
+   diretamente (devtools, script, integração futura). Achado real,
+   MESMA SESSÃO que escreveu a regra 5 acima: `fin_diagnosticar_drift_
+   saldo`, função NOVA (não `CREATE OR REPLACE` de algo pré-existente,
+   escrita do zero DEPOIS de já ter documentado a classe inteira em
+   §9.68) filtrava só por `igreja_id`, sem `has_filial_access` nenhum —
+   um tesoureiro restrito a uma filial via essa RPC "só de diagnóstico"
+   enxergava nome/saldo/diferença de TODAS as contas do tenant (§9.73).
+   Toda RPC nova que consulta uma tabela filial-scoped, sem exceção,
+   passa pelo checklist desta seção ANTES de ser considerada pronta —
+   não só as que gravam.
 
-Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.67, checklist
-completo na memória de sessão.
+Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.67, §9.73,
+checklist completo na memória de sessão.
 
 ---
 
@@ -301,6 +316,22 @@ completo.
 
 Referências: §9.51, §9.53, §9.54, §9.55, §9.56.
 
+### D.5 — Nunca trave uma linha individual isolada antes de travar o grupo inteiro
+
+Quando uma operação vai travar um GRUPO de linhas relacionadas (`id = raiz
+OR pai_id = raiz`), **não trave nenhuma linha individual antes** — nem
+"só pra ler", numa statement separada. Duas sessões editando membros
+DIFERENTES do mesmo grupo concorrentemente: cada uma trava sua própria
+linha primeiro (statements separadas), depois tenta travar o grupo
+inteiro (que inclui a linha que a OUTRA já travou) — espera circular,
+deadlock certo. Resolva qual é o grupo com um `SELECT` SEM lock, trave o
+grupo inteiro numa ÚNICA statement (ordem determinística, D.1), releia os
+dados depois do lock. Achado real: `fin_alterar_competencia_grupo`
+travava `p_lancamento_id` sozinho, depois o grupo — corrigido, deadlock
+reproduzido com 2 sessões reais antes e depois do fix (§9.72).
+
+Referências: §9.72.
+
 ---
 
 ## E. Migrations — defesas precisam vir ANTES do que protegem
@@ -322,7 +353,22 @@ janela de risco") foi usado e re-contestado repetidas vezes nesta PR —
 às vezes a premissa realmente não vale mais (deploy incremental, dado que
 já existia). **Escreva a migration robusta independente da suposição.**
 
-Referências: §9.35, §9.39, §9.51, §9.53.
+**Corrigir um backfill/UPDATE de dado com uma migration NOVA e POSTERIOR
+só funciona se a informação que ela precisa ainda existir quando ela
+rodar.** Migrations rodam em ordem de timestamp — se a migration ORIGINAL
+(mais antiga) sobrescreve/apaga um dado, uma migration "corretiva"
+POSTERIOR não tem como recuperar o valor original: ele já foi perdido
+antes dela sequer começar a rodar. Se a migration original ainda não foi
+deployada em NENHUM ambiente real, **corrija na migration original
+diretamente** — não empilhe uma correção que roda tarde demais pra
+funcionar. Achado real: o backfill de `forma_pagamento_id` (§9.61)
+sobrescrevia id válido; a primeira tentativa de correção saiu como
+migration separada e posterior (§9.71) — só que como a original roda
+PRIMEIRO, a correção operava sobre dado que ela mesma já tinha destruído,
+e não conseguia recuperar nada (achado do /code-review, §9.73). Fix
+definitivo: editar a migration original, remover a "correção" inútil.
+
+Referências: §9.35, §9.39, §9.51, §9.53, §9.73.
 
 ---
 

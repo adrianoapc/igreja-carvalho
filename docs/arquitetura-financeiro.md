@@ -4611,6 +4611,79 @@ naturezas bem diferentes.
 
 `npx tsc`: 0 novos erros.
 
+### 9.73 45ª rodada de review: os 2 fixes da rodada anterior estavam ERRADOS — backfill corretivo tarde demais + diagnóstico vazando filial
+
+Review de 02/08 03:11 sobre o commit de §9.72 (`76a7b317`). 2 achados —
+os dois em cima de fixes escritos NA RODADA IMEDIATAMENTE ANTERIOR, e os
+dois de classes que este próprio guardrail já documentava antes de eu
+cometer o erro. Diferente das rodadas anteriores, aqui NÃO adicionei uma
+correção por cima — corrigi na raiz e removi o que não funcionava.
+
+1. **P1 — o "fix" do backfill de §9.71 não funcionava, porque rodava
+   TARDE DEMAIS** — a correção (restringir a re-resolução a id `NULL` ou
+   provadamente incompatível) saiu como migration NOVA e POSTERIOR
+   (`20260731310000`). Só que migrations rodam em ordem de timestamp: a
+   migration ORIGINAL do backfill flawed (`20260731220000`, §9.61) roda
+   PRIMEIRO — já sobrescrevia todo id divergente ANTES da "correção"
+   sequer começar. Pro cenário de forma renomeada, o id original já
+   tinha virado `NULL`; pro cenário de nome duplicado, já tinha virado o
+   candidato errado — em nenhum dos dois a informação original ainda
+   existia quando `20260731310000` rodava. A "correção" não corrigia
+   nada. Esse é exatamente o padrão já documentado no guardrail (seção
+   E: "defesas precisam vir ANTES do que protegem") — eu tinha
+   documentado a regra e violado ela na tentativa de aplicá-la.
+
+   Fix definitivo: **editei `20260731220000` diretamente** (a migration
+   original — confirmado de novo que a branch inteira nunca foi
+   deployada em ambiente real, então não há dado real pra recuperar) com
+   a lógica restrita já embutida desde o início, e **removi
+   `20260731310000`** (virou inútil depois do fix na raiz). Testado no
+   harness: os mesmos 4 cenários de §9.71 (renomeada, duplicada,
+   incompatível, nunca resolvida) — agora como UMA ÚNICA passada de
+   backfill, sem janela de corrupção entre duas migrations.
+
+2. **P1 — `fin_diagnosticar_drift_saldo` (a função NOVA de §9.72)
+   vazava filial** — filtrava só por `igreja_id`, sem `has_filial_access`
+   nenhum. Sendo `SECURITY DEFINER`, um tesoureiro restrito a uma filial
+   que chamasse essa RPC "só de diagnóstico" via app/devtools enxergava
+   nome, saldo registrado, saldo calculado e diferença de TODAS as
+   contas do tenant — a MESMA classe de vazamento de §9.61/§9.68,
+   cometida de novo, numa função escrita DEPOIS de já ter documentado a
+   classe inteira como o risco de segurança mais sério da sessão. Fix:
+   `has_filial_access(v_igreja, c.filial_id)` no `WHERE`.
+
+   Testado no harness (canal JWT/web real): tesoureiro restrito à filial
+   A só vê a conta com drift da filial A; admin (mesmo com contexto de
+   filial A) vê as contas com drift das DUAS filiais — confirma que o
+   caso de uso real (operador rodando o diagnóstico antes do deploy)
+   continua funcionando.
+
+**Varredura de verificação** (pedido explícito do usuário — não confiar
+que os 2 achados eram os únicos, verificar a extensão real do problema):
+`grep` em todas as ~12 migrations desta sessão (`20260731220000` a
+`20260731330000`) por `CREATE FUNCTION` (não `CREATE OR REPLACE`) — só
+`fin_validar_fk_filial` (helper interno, não exposto pra chamada livre
+com filtro arbitrário — escopo correto por design) e
+`fin_diagnosticar_drift_saldo` (corrigida acima) são funções
+GENUINAMENTE NOVAS desta sessão; todas as outras são `CREATE OR REPLACE`
+de RPCs pré-existentes, e nenhuma teve um `has_filial_access`
+pré-existente REMOVIDO por mim (nenhuma tinha, pra começo — gap já
+documentado em §9.68, deliberadamente fora de escopo). `grep` por
+`UPDATE`/`INSERT`/`DELETE`/`DO $$` soltos (fora de função) em todas as
+mesmas migrations: só o backfill de `forma_pagamento_id` (corrigido
+acima) é uma migration de dado one-time — nenhuma outra migration desta
+sessão tem esse padrão. Os 2 achados desta rodada eram, de fato, os
+únicos 2 pontos onde essas 2 classes reapareceram dentro do que esta
+sessão escreveu.
+
+Guardrail atualizado com as 2 lições em forma de regra explícita, não só
+o achado pontual: seção E (corrigir um backfill com uma migration nova e
+posterior só funciona se a informação ainda existir quando ela rodar —
+edite a migration original se ainda não foi deployada) e seção B, item 8
+(RPC "só leitura"/"só diagnóstico" não é exceção ao check de filial).
+
+`npx tsc`: 0 novos erros.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
