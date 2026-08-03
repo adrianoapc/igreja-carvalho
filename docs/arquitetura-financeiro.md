@@ -5136,6 +5136,66 @@ Review de 03/08 13:03 sobre o commit de §9.79 (`10b811fc`), 2 achados.
 
 `npx tsc`: 0 novos erros.
 
+### 9.81 Auditoria de segurança dedicada (não veio do Codex) — 3 achados, 2 inéditos
+
+Depois de mais de 50 rodadas de review sobre esta PR, o usuário perdeu
+confiança no processo reativo (investigar só o que o Codex aponta + sweep
+de padrão irmão) e pediu uma auditoria de segurança completa e
+independente do diff inteiro contra `main` — não incremental, sem reusar
+nenhuma conclusão anterior da sessão. Rodada com agentes de contexto
+fresco (sem viés das minhas próprias investigações), grounded nos
+guardrails/arquitetura reais do projeto (não em suposições genéricas de
+"boas práticas"), com uma segunda camada de verificação cética
+independente pra cada achado antes de reportar. 3 achados confirmados
+(confiança 0.8+), **2 deles nunca reportados em nenhuma rodada anterior**:
+
+1. **`fin_criar_transferencia` — `p_extras.filial_id` nunca validado**
+   (NOVO). A função valida `has_filial_access` nas 2 CONTAS (origem/
+   destino, desde §9.74), mas o campo que define a filial da própria
+   transferência e das 2 transações espelho — `p_extras.filial_id`,
+   enviado literalmente por `TransferenciaDialog.tsx:222` — nunca passava
+   por `has_filial_access`. Um tesoureiro restrito à filial B, usando
+   contas às quais tem acesso legítimo (pra passar nos checks de conta),
+   conseguia mandar `p_extras.filial_id` de outra filial e gravar a
+   transferência + as 2 transações nessa filial alheia sem nunca ter
+   acesso checado. Mesmo padrão que `fin_criar_lancamento` já usa pro
+   mesmo campo — replicado aqui.
+
+2. **`fin_lancar_sessao` — `conta_id` sem filial + filial da PRÓPRIA
+   sessão nunca validada** (o `conta_id` já estava documentado como risco
+   adiado desde §11; a validação da filial da SESSÃO em si é achado NOVO,
+   encontrado ao ler a função inteira pra montar o fix). Esta PR reescreveu
+   a função inteira (`CREATE OR REPLACE`, migration `20260729130000`, por
+   outro motivo — resolução de `forma_pagamento_id`) sem fechar o gap do
+   `conta_id`, contrariando a própria regra do guardrail B.9. E além
+   disso: `v_sessao.filial_id` (a filial da sessão de contagem sendo
+   lançada) nunca era validada contra o chamador — um tesoureiro restrito
+   à filial B, sabendo o id de uma sessão da filial A, conseguia lançar
+   entradas na filial alheia mesmo sem tocar em nenhuma conta de fora.
+
+3. **`fin_recalcular_saldo_conta` — já no radar, mas esta PR abriu a porta
+   da frente pra ele** — já era uma das "8 RPCs sem `has_filial_access`"
+   documentadas desde §9.68 como o risco mais sério da sessão inteira, mas
+   até esta PR só era alcançável via chamada direta da RPC (devtools/
+   script). Esta PR reescreveu a função por outro motivo (ajuste de valor
+   líquido, `20260730110000`) sem fechar o gap, **e criou o primeiro botão
+   de verdade na UI pra ela** (`Contas.tsx`, "Recalcular Saldo", modo
+   dry-run + aplicar) — a listagem já filtra por filial, mas isso é só
+   client-side; a RPC chamada direto continuava aceitando qualquer
+   `p_conta_id` do tenant.
+
+Fix (migration `20260731390000`): `has_filial_access` na filial efetiva
+de cada recurso, mesmo padrão já usado em toda a sessão. Testado em
+harness Postgres real (`harness_v30_*`) com as 3 funções completas — 11
+cenários (tesoureiro restrito rejeita em cada um dos 3 pontos, passa nos
+casos legítimos; admin sempre passa). `npx tsc`: 0 novos erros (rodada
+100% backend).
+
+**Nenhum achado** nas edge functions (`reclass-transacoes`, `undo-import`)
+nem no parsing de CSV/OFX — verificado por sub-agentes dedicados.
+
+`npx tsc`: 0 novos erros.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
@@ -5147,11 +5207,12 @@ Review de 03/08 13:03 sobre o commit de §9.79 (`10b811fc`), 2 achados.
   snapshot baseline antes da F1.
 - **Paridade na convivência** (F3) → monitorar divergências via audit log
   enquanto a flag antiga existir.
-- **8 RPCs `SECURITY DEFINER` do CORE (pré-existentes, em produção,
+- **7 RPCs `SECURITY DEFINER` do CORE (pré-existentes, em produção,
   NUNCA tocadas por esta PR) sem NENHUM check de `has_filial_access`**
-  (§9.68, lista reduzida em §9.74) — `fin_alterar_status_lancamento`,
-  `fin_estornar_transferencia`, `fin_ajustar_saldo`, `fin_recalcular_
-  saldo_conta`, `fin_confirmar_conciliacao`, `fin_desconciliar`,
+  (§9.68, lista reduzida em §9.74, `fin_recalcular_saldo_conta` corrigida
+  em §9.81 — ver nota abaixo) — `fin_alterar_status_lancamento`,
+  `fin_estornar_transferencia`, `fin_ajustar_saldo`,
+  `fin_confirmar_conciliacao`, `fin_desconciliar`,
   `fin_alternar_conferencia_manual`, `fin_marcar_extrato_ignorado`. Um
   tesoureiro restrito a UMA filial consegue editar/pagar/ajustar saldo/
   conciliar de QUALQUER transação/conta do tenant inteiro através
@@ -5166,8 +5227,17 @@ Review de 03/08 13:03 sobre o commit de §9.79 (`10b811fc`), 2 achados.
   **`fin_excluir_lancamento` é um caso à parte**: teve o PROTOCOLO DE
   LOCK corrigido (§9.74, pra não deadlockar contra `fin_alterar_
   competencia_grupo`), mas ainda não tem `has_filial_access` — fica na
-  mesma lista de pendências, não nos "8 nunca tocados", porque já foi
+  mesma lista de pendências, não nos "7 nunca tocados", porque já foi
   reescrita nesta sessão por outro motivo.
+  **`fin_recalcular_saldo_conta` CORRIGIDA em §9.81**: saiu desta lista.
+  Não foi achado de review reativo — veio de uma auditoria de segurança
+  dedicada, pedida pelo usuário depois de perder confiança no processo
+  incremental. Achado agravante que motivou fechar AGORA em vez de
+  esperar a fase dedicada: esta PR reescreveu a função por outro motivo
+  (`20260730110000`) E deu a ela o primeiro botão de verdade na UI
+  (`Contas.tsx`, "Recalcular Saldo") sem fechar o gap — um risco antes só
+  alcançável via devtools/script virou alcançável por qualquer tesoureiro
+  clicando um botão.
 - **Passo 0 obrigatório antes de deployar a cadeia "sempre recalcula" de
   saldo** (§9.72, corrigido em §9.77) — a versão original deste risco
   dizia "rode a RPC `fin_diagnosticar_drift_saldo` antes do deploy", mas
@@ -5223,14 +5293,17 @@ Review de 03/08 13:03 sobre o commit de §9.79 (`10b811fc`), 2 achados.
   rejeição. Fix real exige nova migration (adicionar `fin_validar_fk_
   tenant`+`fin_validar_fk_filial` nos 4 campos) + harness — fora do
   escopo desta PR, fase dedicada futura.
-- **`fin_pagar_reembolso` e `fin_lancar_sessao` também nunca validam
-  filial de `conta_id`** (achado adjacente do §9.80, não corrigido) —
-  mesma classe do fix de `fin_criar_lancamento`/`fin_atualizar_lancamento`
-  (item logo acima), mas essas duas são pré-existentes e NUNCA tocadas
-  por nenhuma migration desta PR (última alteração em 20260728/
-  20260729, antes do trabalho de hardening de filial começar) — mesmo
-  critério de escopo dos "9 RPCs sem has_filial_access". `fin_pagar_
-  reembolso` só chama `fin_validar_fk_tenant('contas', p_conta_id, ...)`;
-  `fin_lancar_sessao` nem isso, pro `conta_id` de cada item de sessão de
-  contagem. Fix real: mesmo padrão (`has_filial_access` na conta) +
-  harness — fora do escopo desta PR, mesma fase dedicada futura.
+- **`fin_pagar_reembolso` ainda nunca valida filial de `conta_id`**
+  (achado do §9.80, não corrigido) — mesma classe do fix de `fin_criar_
+  lancamento`/`fin_atualizar_lancamento`, mas é pré-existente e NUNCA
+  tocada por nenhuma migration desta PR (última alteração em 20260728,
+  antes do trabalho de hardening de filial começar) — mesmo critério de
+  escopo dos "7 RPCs sem has_filial_access" acima. Só chama
+  `fin_validar_fk_tenant('contas', p_conta_id, ...)`. Fix real: mesmo
+  padrão (`has_filial_access` na conta) + harness — fora do escopo desta
+  PR, fase dedicada futura.
+  **`fin_lancar_sessao` CORRIGIDA em §9.81** (saiu deste item — tinha o
+  mesmo gap de `conta_id`, MAIS a filial da própria sessão nunca validada;
+  os dois fechados na auditoria de segurança dedicada, não esperaram a
+  fase futura, porque a função já tinha sido reescrita nesta PR por outro
+  motivo — §9.80/guardrail B.9).
