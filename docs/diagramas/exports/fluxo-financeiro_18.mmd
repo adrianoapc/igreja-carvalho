@@ -1,0 +1,20 @@
+flowchart TD
+    subgraph PORTAL["Portal Getnet (manual, sem SFTP)"]
+        CSV["Recebível Extrato Detalhado.csv\nISO-8859-1, ';'-delimitado, 26 colunas fixas"]
+    end
+
+    CSV --> COMP["ImportarRecebivelGetnetTab\n(Gerenciar Dados)\nTextDecoder iso-8859-1 + split manual\n(não usa lib xlsx — encoding real ≠ UTF-8)"]
+    COMP -->|"valida cabeçalho exato\n(26 colunas, rejeita se mudar)"| PARSE["parse linha a linha\nignora TIPO LANÇAMENTO=Subtotal"]
+
+    subgraph RPC["fin_importar_recebivel_getnet\n(SECURITY DEFINER + fin_resolver_contexto)"]
+        DEDUPE["dedupe_key = md5(chave natural + #ocorrência)\n(mesmo padrão do fix Santander, §9.13)"]
+        UPSERT["upsert por Contrato Registradora\n('0' = sentinel sem contrato, ignorado)"]
+    end
+
+    PARSE -->|"p_linhas jsonb"| RPC
+    RPC --> JOB[(fin_extrato_ingestao_jobs\norigem='getnet_recebivel_portal')]
+    RPC --> LANC[(getnet_recebivel_lancamentos\nON CONFLICT DO NOTHING)]
+    RPC --> LOTE[(getnet_antecipacao_lotes\n1 row por Contrato Registradora\nstatus='pendente_vinculo')]
+    RPC --> AUD[(fin_audit_log)]
+
+    LOTE -.->|"Fase B ✅"| VINC["vínculo manual com\nextrato_bancario_id + deságio\ncomo lançamento de saída"]

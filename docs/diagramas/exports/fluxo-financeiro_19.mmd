@@ -1,0 +1,35 @@
+flowchart TD
+    subgraph FK["FK real: forma_pagamento_id"]
+        TXT["forma_pagamento (text, legado)\nUUID-texto | rótulo | string fixa"]
+        BACK["backfill tenant-scoped\n(uuid-texto + rótulo case-insensitive)"]
+        TXT --> BACK
+        BACK --> FPID["forma_pagamento_id (uuid, FK real)"]
+        CRIAR["fin_criar_lancamento /\nfin_atualizar_lancamento"] -->|"valida fin_validar_fk_tenant\nresolve rótulo sem id (chatbot)"| FPID
+        SESSAO["fin_lancar_sessao"] --> FPID
+    end
+
+    subgraph LOTES["Lotes de Antecipação (Reconciliação Bancária)"]
+        LISTA["getnet_antecipacao_lotes\nstatus: pendente_vinculo"]
+        VDLG["VincularExtratoLoteDialog\nsugere por data±30d + descrição\n(sem auto-selecionar)"]
+        LISTA --> VDLG
+        VDLG -->|"escolha manual"| VINC2["fin_vincular_lote_antecipacao\ndeságio = valor_atual_contrato - extrato.valor\n(nunca persistido, sempre recalculado)"]
+        VINC2 --> VINCULADO["status: vinculado"]
+        VINCULADO --> LDLG["LancarDesagioDialog\nescolhe conta + categoria saída"]
+        LDLG --> LANC["fin_lancar_desagio_antecipacao\n→ fin_criar_lancamento (real)\ntipo=saida, status=pago\nrecusa relançar (FIN_JA_LANCADO)"]
+        LANC --> CRIADO["status: lancamento_criado"]
+    end
+
+    subgraph CONF["Conferência de totais (só leitura)"]
+        RPC3["fin_conferencia_totais_getnet\np_conta_id, período"]
+        RPC3 --> C1["Σ Oferta bruto\n(forma_pagamento_id → nome ILIKE '%cart%')"]
+        RPC3 --> C2["− Σ taxa MDR"]
+        RPC3 --> C3["− Σ deságio lançado no período\n(getnet_antecipacao_lotes.status=lancamento_criado)"]
+        RPC3 --> C4["Σ Banco creditado\n(extratos_bancarios, mesma conta/período)"]
+        C1 --> DIFF["Diferença não explicada\n(sinaliza, não decide a causa)"]
+        C2 --> DIFF
+        C3 --> DIFF
+        C4 --> DIFF
+    end
+
+    FPID -.->|"join confiável"| C1
+    CRIADO -.-> C3
