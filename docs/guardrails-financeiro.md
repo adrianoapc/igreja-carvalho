@@ -286,7 +286,7 @@ DEFINER`:**
     precisa re-checar uma conta que não mudou).
 
 Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.65, §9.67,
-§9.73, §9.74, §9.80, checklist completo na memória de sessão.
+§9.73, §9.74, §9.80, §9.81, §9.82, checklist completo na memória de sessão.
 
 ---
 
