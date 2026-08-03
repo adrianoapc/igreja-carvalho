@@ -27,6 +27,9 @@ import {
   ChevronDown,
   ChevronRight,
   Layers,
+  RefreshCw,
+  ArrowDown,
+  ArrowUp,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -58,8 +61,11 @@ import { useAuthContext } from "@/contexts/AuthContextProvider";
 import {
   colunaDataFiltro,
   TIPO_DATA_FILTRO_DEFAULT,
+  recalcularSaldoConta,
+  somarEncargos,
   type TipoDataFiltro,
 } from "@/features/financeiro/core";
+import { EncargoBadges } from "@/components/financas/EncargoBadges";
 
 export default function Contas() {
   const navigate = useNavigate();
@@ -74,6 +80,11 @@ export default function Contas() {
     saldo_atual: number;
   } | null>(null);
   const [selectedContaIds, setSelectedContaIds] = useState<string[]>([]);
+  const [recalculandoContaId, setRecalculandoContaId] = useState<
+    string | null
+  >(null);
+  const [visaoValor, setVisaoValor] = useState<"bruto" | "liquido">("bruto");
+  const [ordemData, setOrdemData] = useState<"asc" | "desc">("desc");
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [customRange, setCustomRange] = useState<{
     from: Date;
@@ -106,7 +117,11 @@ export default function Contas() {
     contaNumero?: string;
     cnpjBanco?: string;
   } | null>(null);
-  const { data: contas, isLoading } = useQuery({
+  const {
+    data: contas,
+    isLoading,
+    refetch: refetchContas,
+  } = useQuery({
     queryKey: ["contas", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
@@ -300,7 +315,7 @@ export default function Contas() {
       const colunaPeriodo = colunaDataFiltro(tipoData);
       let query = supabase
         .from("transacoes_financeiras")
-        .select("conta_id, tipo, valor, status")
+        .select("conta_id, tipo, valor, valor_liquido, status")
         .eq("igreja_id", igrejaId)
         .gte(colunaPeriodo, startDate)
         .lte(colunaPeriodo, endDate);
@@ -318,7 +333,8 @@ export default function Contas() {
     enabled: !loading && !!igrejaId,
   });
 
-  // Calcular totais por conta no período
+  // Calcular totais por conta no período — bruto ou líquido conforme
+  // visaoValor (mesmo toggle de Entradas/Saídas/Calendário, §9.25).
   const totaisPorConta = useMemo(() => {
     if (!allTransacoesPeriodo) return {};
 
@@ -327,16 +343,20 @@ export default function Contas() {
         if (!acc[t.conta_id]) {
           acc[t.conta_id] = { entradas: 0, saidas: 0 };
         }
+        const valor =
+          visaoValor === "liquido"
+            ? Number(t.valor_liquido ?? t.valor)
+            : Number(t.valor);
         if (t.tipo === "entrada") {
-          acc[t.conta_id].entradas += Number(t.valor);
+          acc[t.conta_id].entradas += valor;
         } else {
-          acc[t.conta_id].saidas += Number(t.valor);
+          acc[t.conta_id].saidas += valor;
         }
         return acc;
       },
       {} as Record<string, { entradas: number; saidas: number }>,
     );
-  }, [allTransacoesPeriodo]);
+  }, [allTransacoesPeriodo, visaoValor]);
 
   const getTipoIcon = (tipo: string) => {
     switch (tipo) {
@@ -366,6 +386,45 @@ export default function Contas() {
 
   const formatCurrency = (value: number) => {
     return formatValue(value);
+  };
+
+  // Corrige drift de contas.saldo_atual (ADR-027 §9.28) — o trigger que
+  // move o saldo somava valor bruto até jul/2026 (20260730110000). Dry-run
+  // primeiro: só mexe no saldo se o tesoureiro confirmar a diferença.
+  const handleRecalcularSaldo = async (conta: {
+    id: string;
+    nome: string;
+    saldo_atual: number;
+  }) => {
+    setRecalculandoContaId(conta.id);
+    try {
+      const diagnostico = await recalcularSaldoConta(conta.id, false);
+      const registrado = Number(diagnostico.saldo_registrado ?? 0);
+      const calculado = Number(diagnostico.saldo_calculado ?? 0);
+
+      if (Math.abs(registrado - calculado) < 0.005) {
+        toast.success(`Saldo de "${conta.nome}" já está correto.`);
+        return;
+      }
+
+      const confirmado = window.confirm(
+        `Saldo registrado de "${conta.nome}": ${formatCurrency(registrado)}\n` +
+          `Saldo calculado (Σ entradas líquidas − Σ saídas líquidas pagas): ${formatCurrency(calculado)}\n\n` +
+          `Atenção: o cálculo só considera lançamentos em transações — um ajuste manual de saldo feito ANTES do sistema atual (direto na conta, sem lançamento correspondente) não entra nessa soma e seria perdido ao aplicar.\n\n` +
+          `Aplicar a correção?`,
+      );
+      if (!confirmado) return;
+
+      await recalcularSaldoConta(conta.id, true);
+      toast.success(`Saldo de "${conta.nome}" corrigido.`);
+      refetchContas();
+    } catch (error) {
+      toast.error("Erro ao recalcular saldo", {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setRecalculandoContaId(null);
+    }
   };
 
   const getStatusDisplay = (transacao: {
@@ -437,10 +496,19 @@ export default function Contas() {
     return items;
   };
 
-  // Aplicar filtro de status
+  // Aplicar filtro de status + ordenar pelo eixo de data selecionado — a
+  // query já vem ordenada desc, mas o botão de ordenação precisa poder
+  // inverter sem refazer a busca (mesmo padrão de TransacoesPage, §9.25).
   const transacoesFiltradas = useMemo(() => {
-    return filterByStatus(transacoes);
-  }, [transacoes, statusFilter]);
+    const filtradas = filterByStatus(transacoes);
+    return [...filtradas].sort((a, b) => {
+      const dataA = String(a[colunaData] || "");
+      const dataB = String(b[colunaData] || "");
+      return ordemData === "asc"
+        ? dataA.localeCompare(dataB)
+        : dataB.localeCompare(dataA);
+    });
+  }, [transacoes, statusFilter, colunaData, ordemData]);
 
   const toggleGrupo = (dataKey: string) => {
     setGruposExpandidos((prev) => {
@@ -481,21 +549,32 @@ export default function Contas() {
     });
   }, [transacoesAgrupadas]);
 
+  const valorEfetivo = (t: { valor: number | string; valor_liquido?: number | string | null }) =>
+    visaoValor === "liquido"
+      ? Number(t.valor_liquido ?? t.valor)
+      : Number(t.valor);
+
   const totalEntradas =
     transacoesFiltradas
       ?.filter((t) => t.tipo === "entrada")
-      .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+      .reduce((sum, t) => sum + valorEfetivo(t), 0) || 0;
   const totalSaidas =
     transacoesFiltradas
       ?.filter((t) => t.tipo === "saida")
-      .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+      .reduce((sum, t) => sum + valorEfetivo(t), 0) || 0;
   const saldoPeriodo = totalEntradas - totalSaidas;
+  const encargosPeriodo = somarEncargos(transacoesFiltradas || []);
 
   type TransacaoLista = {
     id: string;
     tipo: string;
     descricao: string;
     valor: number | string;
+    valor_liquido?: number | string | null;
+    taxas_administrativas?: number | string | null;
+    multas?: number | string | null;
+    juros?: number | string | null;
+    desconto?: number | string | null;
     status?: string;
     data_vencimento?: string | Date | null;
     data_pagamento?: string | Date | null;
@@ -522,10 +601,8 @@ export default function Contas() {
                   )}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-medium truncate flex-1">
-                  {t.descricao}
-                </p>
+                    <p className="text-sm font-medium flex items-baseline gap-1.5">
+                <span className="truncate min-w-0 flex-1">{t.descricao}</span>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -533,12 +610,12 @@ export default function Contas() {
                     navigator.clipboard.writeText(t.id);
                     toast.success("ID copiado!");
                   }}
-                  className="text-[10px] font-mono text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
+                  className="text-[10px] font-mono font-normal text-muted-foreground/70 hover:text-foreground px-1 rounded hover:bg-muted transition-colors flex-shrink-0"
                   title="Copiar ID"
                 >
                   {t.id.substring(0, 6)}
                 </button>
-              </div>
+              </p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <p className="text-xs text-muted-foreground">
                   {t[colunaData] &&
@@ -568,13 +645,20 @@ export default function Contas() {
               </div>
             </div>
             <div className="text-right ml-2">
+              {visaoValor === "liquido" && (
+                <EncargoBadges
+                  totais={somarEncargos([t])}
+                  formatCurrency={formatCurrency}
+                  className="justify-end mb-1"
+                />
+              )}
               <p
                 className={`text-sm font-bold ${
                   t.tipo === "entrada" ? "text-green-600" : "text-red-600"
                 }`}
               >
                 {t.tipo === "entrada" ? "+" : "-"}{" "}
-                {formatCurrency(Number(t.valor))}
+                {formatCurrency(valorEfetivo(t))}
               </p>
             </div>
           </div>
@@ -613,7 +697,7 @@ export default function Contas() {
     const datasFiltradas = Object.keys(gruposFiltrados).sort((a, b) => {
       if (a === "sem-data") return 1;
       if (b === "sem-data") return -1;
-      return b.localeCompare(a);
+      return ordemData === "asc" ? a.localeCompare(b) : b.localeCompare(a);
     });
 
     return (
@@ -632,12 +716,12 @@ export default function Contas() {
 
           if (temEntradas && !temSaidas) {
             // Só entradas - mostrar total positivo em verde
-            totalGrupo = grupo.reduce((sum, t) => sum + Number(t.valor), 0);
+            totalGrupo = grupo.reduce((sum, t) => sum + valorEfetivo(t), 0);
             corTotal = "text-green-600";
             prefixo = "+";
           } else if (temSaidas && !temEntradas) {
             // Só saídas - mostrar total positivo em vermelho (o contexto já indica que é saída)
-            totalGrupo = grupo.reduce((sum, t) => sum + Number(t.valor), 0);
+            totalGrupo = grupo.reduce((sum, t) => sum + valorEfetivo(t), 0);
             corTotal = "text-red-600";
             prefixo = "-";
           } else {
@@ -645,7 +729,7 @@ export default function Contas() {
             totalGrupo = grupo.reduce(
               (sum, t) =>
                 sum +
-                (t.tipo === "entrada" ? Number(t.valor) : -Number(t.valor)),
+                (t.tipo === "entrada" ? valorEfetivo(t) : -valorEfetivo(t)),
               0,
             );
             corTotal = totalGrupo >= 0 ? "text-green-600" : "text-red-600";
@@ -751,7 +835,7 @@ export default function Contas() {
                           }`}
                         >
                           {t.tipo === "entrada" ? "+" : "-"}{" "}
-                          {formatCurrency(Number(t.valor))}
+                          {formatCurrency(valorEfetivo(t))}
                         </p>
                       </div>
                     </div>
@@ -961,11 +1045,29 @@ export default function Contas() {
                         variant="ghost"
                         size="sm"
                         className="h-7 w-7 p-0"
+                        disabled={recalculandoContaId === conta.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRecalcularSaldo(conta);
+                        }}
+                        title="Recalcular saldo (corrige divergência com o valor líquido)"
+                      >
+                        {recalculandoContaId === conta.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedConta(conta);
                           setAjusteSaldoDialogOpen(true);
                         }}
+                        title="Ajustar saldo"
                       >
                         <Settings className="w-3.5 h-3.5" />
                       </Button>
@@ -1091,29 +1193,40 @@ export default function Contas() {
 
           {/* Totalizador */}
           {transacoes && transacoes.length > 0 && (
-            <div className="grid grid-cols-3 gap-2 mb-4 p-3 bg-muted/50 rounded-lg">
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground mb-1">Entradas</p>
-                <p className="text-sm font-bold text-green-600">
-                  {formatCurrency(totalEntradas)}
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground mb-1">Saídas</p>
-                <p className="text-sm font-bold text-red-600">
-                  {formatCurrency(totalSaidas)}
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground mb-1">Saldo</p>
-                <p
-                  className={cn(
-                    "text-sm font-bold",
-                    saldoPeriodo >= 0 ? "text-green-600" : "text-red-600",
-                  )}
-                >
-                  {formatCurrency(saldoPeriodo)}
-                </p>
+            <div className="mb-4 p-3 bg-muted/50 rounded-lg">
+              {visaoValor === "liquido" && (
+                <EncargoBadges
+                  totais={encargosPeriodo}
+                  formatCurrency={formatCurrency}
+                  className="justify-center mb-2"
+                />
+              )}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Entradas
+                  </p>
+                  <p className="text-sm font-bold text-green-600">
+                    {formatCurrency(totalEntradas)}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Saídas</p>
+                  <p className="text-sm font-bold text-red-600">
+                    {formatCurrency(totalSaidas)}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Saldo</p>
+                  <p
+                    className={cn(
+                      "text-sm font-bold",
+                      saldoPeriodo >= 0 ? "text-green-600" : "text-red-600",
+                    )}
+                  >
+                    {formatCurrency(saldoPeriodo)}
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -1153,6 +1266,61 @@ export default function Contas() {
                   </SelectContent>
                 </Select>
                 <TooltipProvider>
+                  <div className="flex items-center gap-0.5 border rounded-md p-0.5">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={visaoValor === "bruto" ? "default" : "ghost"}
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setVisaoValor("bruto")}
+                        >
+                          Bruto
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Valor nominal do título</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={visaoValor === "liquido" ? "default" : "ghost"}
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setVisaoValor("liquido")}
+                        >
+                          Líquido
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Valor efetivamente pago/recebido (com desconto, taxa,
+                        juros e multa)
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  {!visaoCalendario && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setOrdemData((o) => (o === "desc" ? "asc" : "desc"))
+                          }
+                        >
+                          {ordemData === "desc" ? (
+                            <ArrowDown className="w-4 h-4" />
+                          ) : (
+                            <ArrowUp className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {ordemData === "desc"
+                          ? "Mais recente primeiro (clique p/ inverter)"
+                          : "Mais antiga primeiro (clique p/ inverter)"}
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button

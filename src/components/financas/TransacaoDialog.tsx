@@ -33,7 +33,18 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   criarLancamento,
   atualizarLancamento,
+  alterarCompetenciaGrupo,
 } from "@/features/financeiro/core";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useDadosApoio } from "@/features/financeiro/core/hooks/useDadosApoio";
 
 // Helper para converter string ISO (YYYY-MM-DD) para Date no timezone local
@@ -86,6 +97,7 @@ interface TransacaoDialogProps {
     base_ministerial_id?: string | null;
     fornecedor_id?: string | null;
     forma_pagamento?: string | null;
+    forma_pagamento_id?: string | null;
     observacoes?: string | null;
     tipo_lancamento?: "unico" | "recorrente" | "parcelado";
     anexo_url?: string | null;
@@ -133,6 +145,23 @@ export function TransacaoDialog({
   const [valorLiquido, setValorLiquido] = useState("");
   const [dataVencimento, setDataVencimento] = useState<Date>(new Date());
   const [dataCompetencia, setDataCompetencia] = useState<Date>(new Date());
+  // D10: quando fin_atualizar_lancamento recusa editar a competência de uma
+  // parcela isolada de um grupo parcelado, oferece sincronizar o grupo todo
+  // via fin_alterar_competencia_grupo em vez de só mostrar um erro genérico.
+  const [confirmarSincronizarGrupo, setConfirmarSincronizarGrupo] = useState<{
+    lancamentoId: string;
+    novaCompetencia: string;
+    // Competência ANTES da sincronização — usada pra reverter o grupo
+    // inteiro se o reaplicar do patchRestante falhar (compensação, já que
+    // as duas RPCs não rodam na mesma transação de banco).
+    competenciaAnterior: string | null;
+    // Resto do patch (descrição, valor, forma de pagamento etc.) que a RPC
+    // recusou junto por causa do bloqueio de competência — reaplicado após
+    // sincronizar o grupo, senão essas edições se perdem silenciosamente
+    // (review Codex P1).
+    patchRestante: Record<string, unknown>;
+  } | null>(null);
+  const [sincronizandoGrupo, setSincronizandoGrupo] = useState(false);
   const [contaId, setContaId] = useState("");
   const [categoriaId, setCategoriaId] = useState("none");
   const [subcategoriaId, setSubcategoriaId] = useState("none");
@@ -215,7 +244,7 @@ export function TransacaoDialog({
         subcategoria_id: transacao.subcategoria_id,
         centro_custo_id: transacao.centro_custo_id,
         fornecedor_id: transacao.fornecedor_id,
-        forma_pagamento: transacao.forma_pagamento,
+        forma_pagamento_id: transacao.forma_pagamento_id,
       });
 
       setContaId(transacao.conta_id ? String(transacao.conta_id) : "none");
@@ -245,7 +274,7 @@ export function TransacaoDialog({
       setCentroCustoId(transacao.centro_custo_id || "none");
       setBaseMinisterialId(transacao.base_ministerial_id || "none");
       setFornecedorId(transacao.fornecedor_id || "none");
-      setFormaPagamento(transacao.forma_pagamento || "");
+      setFormaPagamento(transacao.forma_pagamento_id || "");
       setObservacoes(transacao.observacoes || "");
       setTipoLancamento(transacao.tipo_lancamento || "unico");
       setAnexoUrl(transacao.anexo_url || "");
@@ -348,10 +377,13 @@ export function TransacaoDialog({
         forceApply,
       );
 
-      const { data: transacoes, error } = await supabase
+      // forma_pagamento_id ainda não consta nos tipos gerados de types.ts
+      // (regenerar com `supabase gen types` após o deploy da migration).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: transacoes, error } = await (supabase as any)
         .from("transacoes_financeiras")
         .select(
-          "categoria_id, subcategoria_id, centro_custo_id, base_ministerial_id, conta_id, forma_pagamento",
+          "categoria_id, subcategoria_id, centro_custo_id, base_ministerial_id, conta_id, forma_pagamento_id",
         )
         .eq("fornecedor_id", fornecedorIdParam)
         .not("categoria_id", "is", null)
@@ -389,9 +421,9 @@ export function TransacaoDialog({
             (baseMinisterialFreq[t.base_ministerial_id] || 0) + 1;
         if (t.conta_id)
           contaFreq[t.conta_id] = (contaFreq[t.conta_id] || 0) + 1;
-        if (t.forma_pagamento)
-          formaPagamentoFreq[t.forma_pagamento] =
-            (formaPagamentoFreq[t.forma_pagamento] || 0) + 1;
+        if (t.forma_pagamento_id)
+          formaPagamentoFreq[t.forma_pagamento_id] =
+            (formaPagamentoFreq[t.forma_pagamento_id] || 0) + 1;
       });
 
       const getMaisFrequente = (freq: Record<string, number>) => {
@@ -688,8 +720,23 @@ export function TransacaoDialog({
       if (dados.centro_custo_sugerido_id)
         setCentroCustoId(dados.centro_custo_sugerido_id);
       if (dados.conta_sugerida_id) setContaId(dados.conta_sugerida_id);
-      if (dados.forma_pagamento_sugerida)
-        setFormaPagamento(dados.forma_pagamento_sugerida);
+      // forma_pagamento_sugerida vem da coluna de texto legada (ex.:
+      // "PIX"), não de um id — diferente das outras sugestões acima, que
+      // já vêm como *_id. formaPagamento agora é o valor do Select (id
+      // real ou "none"/""), então setar o texto bruto direto mandaria
+      // "PIX" como forma_pagamento_id pro backend, que falha ao tentar
+      // fazer cast pra uuid (fin_validar_fk_tenant). Mapeia pro id
+      // correspondente em formasPagamento por nome antes de aplicar; sem
+      // correspondência, não aplica (acima de discretamente quebrar
+      // com um id inválido, achado do /code-review).
+      if (dados.forma_pagamento_sugerida) {
+        const formaEncontrada = formasPagamento?.find(
+          (f) =>
+            f.nome.trim().toLowerCase() ===
+            dados.forma_pagamento_sugerida!.trim().toLowerCase(),
+        );
+        if (formaEncontrada) setFormaPagamento(formaEncontrada.id);
+      }
 
       // Se não veio fornecedor_id, buscar fornecedor existente - priorizar CNPJ/CPF
       if (
@@ -877,6 +924,13 @@ export function TransacaoDialog({
 
       // Campos comuns criar/editar — a escrita acontece nas RPCs fin_* do
       // CORE (ADR-029); tenant e permissão são validados no banco.
+      const competenciaFormatada = formatLocalDate(dataCompetencia);
+      // "" é tanto o estado inicial de uma transação nova quanto o de uma
+      // existente cujo forma_pagamento_id nunca foi mapeado (reembolso/
+      // transferência — fora do escopo da FK, ver 20260729130000). "none"
+      // é a escolha explícita "Não especificado" no Select.
+      const formaPagamentoId =
+        formaPagamento && formaPagamento !== "none" ? formaPagamento : null;
       const camposComuns = {
         subcategoria_id:
           subcategoriaId && subcategoriaId !== "none" ? subcategoriaId : null,
@@ -888,9 +942,6 @@ export function TransacaoDialog({
             : null,
         fornecedor_id:
           fornecedorId && fornecedorId !== "none" ? fornecedorId : null,
-        forma_pagamento:
-          formaPagamento && formaPagamento !== "none" ? formaPagamento : null,
-        data_competencia: formatLocalDate(dataCompetencia),
         data_pagamento:
           foiPago && dataPagamento ? formatLocalDate(dataPagamento) : null,
         // Juros e multas só quando pago (atraso); desconto/taxas sempre
@@ -905,8 +956,35 @@ export function TransacaoDialog({
       };
 
       if (transacao) {
-        await atualizarLancamento(String(transacao.id), {
+        // D10: fin_atualizar_lancamento recusa (FIN_COMPETENCIA_GRUPO)
+        // QUALQUER patch que contenha data_competencia numa parcela de
+        // grupo parcelado — mesmo sem mudança real de valor. Como o form
+        // sempre carrega esse campo, só inclui no patch quando o valor
+        // realmente difere do que já estava salvo (review Codex P1); assim
+        // editar outro campo (descrição, valor...) numa parcela não aciona
+        // o bloqueio à toa.
+        const competenciaMudou =
+          transacao.data_competencia !== competenciaFormatada;
+        // Mesmo raciocínio da competência: só inclui forma_pagamento_id no
+        // patch quando muda de verdade. Sem isso, reabrir uma transação
+        // legada sem forma_pagamento_id mapeado (formaPagamento carrega ""),
+        // salvar SEM tocar no campo, manda forma_pagamento_id:null — a RPC
+        // vê a chave presente e zera também o texto legado forma_pagamento
+        // (Codex P2), apagando um dado que o usuário nunca pediu pra mudar.
+        // "" (nunca tocado) e "none" (escolha explícita de "Não
+        // especificado") colapsam pro mesmo formaPagamentoId=null — sem
+        // checar o estado bruto, a limpeza explícita numa transação já
+        // legada (ambos null) também era tratada como "sem mudança" e
+        // silenciosamente ignorada (achado do /code-review).
+        const formaPagamentoMudou =
+          formaPagamento === "none" ||
+          formaPagamentoId !== (transacao.forma_pagamento_id || null);
+        const patchAtualizar = {
           ...camposComuns,
+          ...(competenciaMudou
+            ? { data_competencia: competenciaFormatada }
+            : {}),
+          ...(formaPagamentoMudou ? { forma_pagamento_id: formaPagamentoId } : {}),
           tipo,
           tipo_lancamento: tipoLancamento as "unico" | "parcelado" | "recorrente",
           descricao,
@@ -915,7 +993,7 @@ export function TransacaoDialog({
           conta_id: contaId,
           categoria_id:
             categoriaId && categoriaId !== "none" ? categoriaId : null,
-          status: foiPago ? "pago" : "pendente",
+          status: (foiPago ? "pago" : "pendente") as "pago" | "pendente",
           total_parcelas:
             tipoLancamento === "parcelado" ? parseInt(totalParcelas) : undefined,
           recorrencia: tipoLancamento === "recorrente" ? recorrencia : null,
@@ -924,7 +1002,30 @@ export function TransacaoDialog({
               ? formatLocalDate(dataFimRecorrencia)
               : null,
           lancado_por: userData.user?.id,
-        });
+        };
+        try {
+          await atualizarLancamento(String(transacao.id), patchAtualizar);
+        } catch (updateError: unknown) {
+          // D10: mesmo com o filtro acima, uma mudança DELIBERADA de
+          // competência numa parcela ainda aciona o bloqueio — nesse caso
+          // preserva o resto do patch pra reaplicar depois de sincronizar
+          // o grupo, em vez de descartar silenciosamente (Codex P1).
+          if (
+            updateError instanceof Error &&
+            updateError.message.includes("FIN_COMPETENCIA_GRUPO")
+          ) {
+            const { data_competencia: _omit, ...patchRestante } =
+              patchAtualizar;
+            setConfirmarSincronizarGrupo({
+              lancamentoId: String(transacao.id),
+              novaCompetencia: competenciaFormatada!,
+              competenciaAnterior: transacao.data_competencia ?? null,
+              patchRestante,
+            });
+            return;
+          }
+          throw updateError;
+        }
       } else {
         const resultado = await criarLancamento({
           tipo: tipo as "entrada" | "saida",
@@ -936,6 +1037,8 @@ export function TransacaoDialog({
             categoriaId && categoriaId !== "none" ? categoriaId : null,
           extras: {
             ...camposComuns,
+            forma_pagamento_id: formaPagamentoId,
+            data_competencia: competenciaFormatada,
             status: foiPago ? "pago" : "pendente",
             tipo_lancamento: tipoLancamento as
               | "unico"
@@ -990,6 +1093,9 @@ export function TransacaoDialog({
       onOpenChange(false);
       resetForm();
     } catch (error: unknown) {
+      // FIN_COMPETENCIA_GRUPO (D10) já é tratado no catch específico em
+      // volta de atualizarLancamento, mais acima, onde o resto do patch
+      // ainda está disponível pra reaplicar depois de sincronizar o grupo.
       toast.error(
         error instanceof Error
           ? error.message
@@ -998,6 +1104,110 @@ export function TransacaoDialog({
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSincronizarCompetenciaGrupo = async () => {
+    if (!confirmarSincronizarGrupo) return;
+    setSincronizandoGrupo(true);
+    try {
+      const resultado = await alterarCompetenciaGrupo(
+        confirmarSincronizarGrupo.lancamentoId,
+        confirmarSincronizarGrupo.novaCompetencia,
+      );
+      resultado.warnings?.forEach((w) => toast.info(w));
+
+      // snapshot_antes = competência de cada parcela ANTES desta sincronização
+      // — usado só se precisar compensar abaixo, pra saber se um "reverter pra
+      // competenciaAnterior" seria um revert de verdade (grupo já era
+      // uniforme) ou só mais uma sincronização forçada (grupo legado já
+      // divergente entre as parcelas — o próprio caso que esta ação existe
+      // pra resolver; achado do /code-review).
+      const snapshotAntes = (resultado.snapshot_antes ?? null) as
+        | { id: string; data_competencia: string | null }[]
+        | null;
+      const grupoJaEraUniforme =
+        !snapshotAntes ||
+        new Set(snapshotAntes.map((s) => s.data_competencia)).size <= 1;
+
+      // Reaplica o resto do patch original (descrição, valor, forma de
+      // pagamento etc.) que a recusa FIN_COMPETENCIA_GRUPO tinha descartado
+      // junto com a mudança de competência — sincronizar o grupo não pode
+      // jogar fora as outras edições pedidas no mesmo submit (Codex P1).
+      if (Object.keys(confirmarSincronizarGrupo.patchRestante).length > 0) {
+        try {
+          await atualizarLancamento(
+            confirmarSincronizarGrupo.lancamentoId,
+            confirmarSincronizarGrupo.patchRestante,
+          );
+        } catch (patchError: unknown) {
+          // As duas RPCs não rodam na mesma transação de banco — se o
+          // resto do patch falhar (ex.: FK apagada ou transação conciliada
+          // nesse meio-tempo), a competência do grupo INTEIRO já foi
+          // commitada pela chamada acima. Compensa revertendo o grupo pra
+          // competência anterior em vez de deixar a mudança de competência
+          // aplicada sem o resto das edições pedidas no mesmo submit
+          // (achado do /code-review).
+          const msgBase =
+            patchError instanceof Error
+              ? patchError.message
+              : "Erro ao salvar as demais alterações";
+          if (confirmarSincronizarGrupo.competenciaAnterior === null) {
+            // Competência original do grupo era NULA (nunca setada) —
+            // alterarCompetenciaGrupo exige uma data não-nula
+            // (FIN_VALIDACAO), então não tem como reverter pra esse estado
+            // via essa RPC. Diferente de "valor anterior desconhecido": o
+            // valor É conhecido (null), só não é restaurável por esse
+            // caminho — nem tenta, mensagem honesta direto (achado do
+            // /code-review: a checagem por truthiness antes tratava null
+            // igual a "desconhecido" e caía neste mesmo texto sem
+            // distinguir os dois casos).
+            toast.error(
+              `${msgBase} — a competência original das parcelas era vazia e não é possível restaurar isso automaticamente (a sincronização exige uma data). O grupo ficou com a competência ${confirmarSincronizarGrupo.novaCompetencia}. Confira manualmente se necessário.`,
+            );
+          } else {
+            try {
+              await alterarCompetenciaGrupo(
+                confirmarSincronizarGrupo.lancamentoId,
+                confirmarSincronizarGrupo.competenciaAnterior,
+              );
+              // Restaurar cada parcela pro seu valor INDIVIDUAL original
+              // exigiria uma RPC dedicada (fin_atualizar_lancamento rejeitaria
+              // no meio do caminho com o mesmo FIN_COMPETENCIA_GRUPO que essa
+              // tela inteira existe pra contornar) — o revert aqui só
+              // consegue sincronizar todo mundo pra um valor único de novo.
+              // Se o grupo já era uniforme antes, isso é um revert de
+              // verdade; se já era divergente (legado), é só mais uma
+              // sincronização forçada — a mensagem reflete qual dos dois.
+              toast.error(
+                grupoJaEraUniforme
+                  ? `${msgBase} — competência do grupo revertida, nada foi alterado.`
+                  : `${msgBase} — competência sincronizada de volta pra ${confirmarSincronizarGrupo.competenciaAnterior}, mas este grupo já tinha competências divergentes entre as parcelas ANTES desta ação — não foi possível restaurar o valor individual de cada uma. Confira manualmente se necessário.`,
+              );
+            } catch {
+              toast.error(
+                `${msgBase} — a competência do grupo já foi alterada e NÃO pôde ser revertida automaticamente. Confira manualmente.`,
+              );
+            }
+          }
+          return;
+        }
+      }
+
+      toast.success("Competência sincronizada em todas as parcelas do lançamento!");
+      queryClient.invalidateQueries({ queryKey: ["entradas"] });
+      queryClient.invalidateQueries({ queryKey: ["saidas"] });
+      setConfirmarSincronizarGrupo(null);
+      onOpenChange(false);
+      resetForm();
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Erro ao sincronizar competência do grupo",
+      );
+    } finally {
+      setSincronizandoGrupo(false);
     }
   };
 
@@ -1660,6 +1870,37 @@ export function TransacaoDialog({
         imageZoom={imageZoom}
         setImageZoom={setImageZoom}
       />
+      <AlertDialog
+        open={!!confirmarSincronizarGrupo}
+        onOpenChange={(open) => !open && setConfirmarSincronizarGrupo(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sincronizar competência do grupo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta parcela faz parte de um lançamento parcelado — todas as
+              parcelas compartilham a mesma competência (D10). Aplicar a nova
+              competência a esta parcela isolada divergiria do grupo. Deseja
+              aplicar a nova competência a TODAS as parcelas deste
+              lançamento?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={sincronizandoGrupo}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={sincronizandoGrupo}
+              onClick={(e) => {
+                e.preventDefault();
+                handleSincronizarCompetenciaGrupo();
+              }}
+            >
+              {sincronizandoGrupo ? "Sincronizando..." : "Sincronizar grupo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

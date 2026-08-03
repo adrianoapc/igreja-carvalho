@@ -19,9 +19,14 @@ export function agruparPorData<T extends object>(
   }, {});
 }
 
-/** Datas dos grupos em ordem decrescente (mais recente primeiro). */
-export function ordenarDatasDesc(grupos: Record<string, unknown>): string[] {
-  return Object.keys(grupos).sort(
-    (a, b) => new Date(b).getTime() - new Date(a).getTime(),
-  );
+/** Datas dos grupos ordenadas por data — "desc" (mais recente primeiro,
+ * default) ou "asc" (mais antiga primeiro). */
+export function ordenarDatas(
+  grupos: Record<string, unknown>,
+  ordem: "asc" | "desc" = "desc",
+): string[] {
+  return Object.keys(grupos).sort((a, b) => {
+    const diff = new Date(a).getTime() - new Date(b).getTime();
+    return ordem === "asc" ? diff : -diff;
+  });
 }

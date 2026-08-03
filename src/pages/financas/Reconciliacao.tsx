@@ -5,6 +5,7 @@ import { ConciliacaoManual } from "@/features/financeiro/conciliacao/Conciliacao
 import { ConciliacaoInteligente } from "@/features/financeiro/conciliacao/ConciliacaoInteligente";
 import { HistoricoExtratos } from "@/components/financas/HistoricoExtratos";
 import { RelatorioCobertura } from "@/components/financas/RelatorioCobertura";
+import { LotesAntecipacaoTab } from "@/components/financas/LotesAntecipacaoTab";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -45,7 +46,7 @@ export default function Reconciliacao() {
           (teclado, ARIA) sem precisar sincronizar um <Select> controlado à
           parte, que duplicaria estado por pouco ganho com só 5 itens.
         */}
-        <TabsList className="mb-4 flex w-full justify-start gap-1 overflow-x-auto sm:grid sm:grid-cols-5">
+        <TabsList className="mb-4 flex w-full justify-start gap-1 overflow-x-auto sm:grid sm:grid-cols-6">
           <TabsTrigger value="dashboard" className="shrink-0 sm:shrink">
             Dashboard
           </TabsTrigger>
@@ -60,6 +61,9 @@ export default function Reconciliacao() {
           </TabsTrigger>
           <TabsTrigger value="relatorio" className="shrink-0 sm:shrink">
             Relatório
+          </TabsTrigger>
+          <TabsTrigger value="antecipacao" className="shrink-0 sm:shrink">
+            Lotes de Antecipação
           </TabsTrigger>
         </TabsList>
         <TabsContent value="dashboard">
@@ -76,6 +80,9 @@ export default function Reconciliacao() {
         </TabsContent>
         <TabsContent value="relatorio">
           <RelatorioCobertura />
+        </TabsContent>
+        <TabsContent value="antecipacao">
+          <LotesAntecipacaoTab />
         </TabsContent>
       </Tabs>
     </div>

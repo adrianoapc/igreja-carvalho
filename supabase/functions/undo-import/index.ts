@@ -103,6 +103,11 @@ Deno.serve(async (req) => {
 
     // Delete transactions
     if (transacaoIds.length > 0) {
+      // trigger_atualizar_saldo_conta (20260731190000) recalcula a conta do
+      // zero sozinho em qualquer DELETE de linha paga — não depende mais de
+      // o INSERT original ter aplicado o movimento corretamente (fix na raiz
+      // do achado de §9.48 sobre este mesmo arquivo), então não precisa de
+      // nenhum recálculo explícito aqui.
       const { error: deleteError } = await supabase
         .from("transacoes_financeiras")
         .delete()

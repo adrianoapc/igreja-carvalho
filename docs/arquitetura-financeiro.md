@@ -7,6 +7,12 @@
 > devem ser formalizadas como **ADR-029 (camada canônica de lançamentos no
 > banco)** e **ADR-030 (conciliação transacional e motor único de score)**.
 
+> **Antes de escrever código novo no financeiro**, consulte
+> [`docs/guardrails-financeiro.md`](guardrails-financeiro.md) — checklist
+> obrigatório extraído das rodadas de review desta PR (filial compartilhada,
+> RPC `SECURITY DEFINER`, trigger de saldo, locks/concorrência, harness).
+> Resumo curto também no `CLAUDE.md` da raiz do repo.
+
 ---
 
 ## 1. Diagnóstico resumido
@@ -471,7 +477,7 @@ flowchart TD
     EDGES[Edges de integração<br/>getnet-sftp, santander, pix] -->|service role + p_contexto| CORE
 
     subgraph CORE FINANCEIRO — Postgres
-        CORE[RPCs canônicas fin_*<br/>fin_criar_lancamento · fin_atualizar_lancamento<br/>fin_alterar_status_lancamento · fin_excluir_lancamento<br/>fin_criar_transferencia · fin_ingerir_extratos<br/>fin_confirmar_conciliacao · fin_desconciliar<br/>fin_gerar_candidatos_conciliacao<br/>fin_lancar_sessao · fin_pagar_reembolso · fin_ajustar_saldo]
+        CORE[RPCs canônicas fin_*<br/>fin_criar_lancamento · fin_atualizar_lancamento<br/>fin_alterar_status_lancamento · fin_excluir_lancamento<br/>fin_alterar_competencia_grupo<br/>fin_criar_transferencia · fin_ingerir_extratos<br/>fin_confirmar_conciliacao · fin_desconciliar<br/>fin_gerar_candidatos_conciliacao<br/>fin_lancar_sessao · fin_pagar_reembolso · fin_ajustar_saldo]
         CORE --> T[(transacoes_financeiras<br/>transferencias_contas<br/>extratos_bancarios<br/>conciliacoes_*)]
         T --> TRG[triggers saldo · RLS leitura · auditoria]
     end
@@ -1880,14 +1886,3345 @@ válido ao perder foco.
 | D1 | Camada canônica no banco (ADR-029) | Aprovar — pré-requisito de tudo |
 | D2 | Padrão `features/` no frontend | Financeiro inaugura; demais domínios depois |
 | D3 | Modelo de vínculo de conciliação | (a) manter 3 estruturas via RPC agora; (b) modelo único N:M `conciliacoes`+`conciliacao_itens` como evolução. FK física em `transacao_vinculada_id` após saneamento |
-| D4 | Imutabilidade | Editar/excluir lançamento conciliado? Parcela do meio? A RPC precisa de resposta |
+| D4 | Imutabilidade | Editar/excluir lançamento conciliado? Parcela do meio? A RPC precisa de resposta — exclusão resolvida desde a F1 (escopo `este_e_futuras`); edição de competência da parcela do meio resolvida por D10 (jul/2026) |
 | D5 | Getnet tipo 1 vs tipo 5 | Tipo 5 como verdade do espelho, só novos períodos — ✅ implementado na F6 (opt-in via `config.espelho_tipo5_desde`) |
 | D6 | Recorrência/parcelamento | Materializar tudo na criação (parcelado); job mensal (recorrente) |
 | D7 | Efeitos colaterais (alertas) | Fila no banco lida por edge — bot e front geram os mesmos alertas |
 | D8 | Status ENUM vs TEXT+CHECK | Padronizar na F1 (barato agora, caro depois) — inclui sanear os status de `sessoes_contagem` (CHECK × `finalizado` × StatusBadge) |
 | D9 | Workflow de reembolso | O estado `aprovado` entra no fluxo real (com ação de aprovar/rejeitar na UI e notificação) ou sai do schema? Quem aprova: `admin` (trigger atual) ou também `tesoureiro` (UI atual)? |
+| D10 | Competência de grupo em lançamentos parcelados | `fin_criar_lancamento` (D6) já materializa todas as parcelas com a mesma `data_competencia`; `fin_atualizar_lancamento` recusa divergir a competência de uma parcela isolada (`FIN_COMPETENCIA_GRUPO`) — sincronização explícita via `fin_alterar_competencia_grupo` — ✅ implementado (jul/2026, ver §9.19) |
 | D11 | Tipo de Data (Vencimento/Pagamento) como eixo de filtro | Dois eixos ortogonais — Tipo de Data (qual coluna filtra a listagem) e Regime (o que entra no relatório) — ✅ implementado (jul/2026, ver §9.20 e [ADR-031](adr/ADR-031-tipo-de-data-filtro-e-regime-caixa.md)) |
 | D12 | Campo de data digitável nos dialogs do financeiro | `DateFieldPicker` (MaskedInput + Calendar como atalho) substitui popover-calendário-só nos 8 campos de data única — ✅ implementado (jul/2026, ver §9.21 e [ADR-032](adr/ADR-032-campo-de-data-digitavel-financeiro.md)) |
+
+### 9.17 Importação do Recebível Extrato Detalhado (portal Getnet) — Fase A (jul/2026)
+
+O SFTP da Getnet ficou indisponível num período (set-nov/2025), sem o arquivo
+EDI (layout V10.1) que alimenta `getnet_*`/`extratos_bancarios` hoje. O
+usuário baixou manualmente do **portal** Getnet o CSV "Recebível Extrato
+Detalhado" — único arquivo indispensável entre os 4 formatos alternativos do
+portal: sozinho cobre tanto o nível de venda (bruto/taxa/líquido/NSU/
+autorização/parcelas) quanto o mecanismo de cessão/antecipação (via
+`Contrato Registradora`), que nenhum outro arquivo do portal revela.
+
+Esta fase (A) só **importa e agrupa** — vínculo com extrato bancário e
+lançamento do deságio de antecipação como saída ficam para a Fase B, depois
+de validar a importação com dado real.
+
+**Tabelas novas** (padrão RLS `fin_*`: `igreja_id` + `filial_id` recortados +
+`user_filial_access`, **não** o padrão antigo `get_current_user_igreja_id()`/
+`has_role()` de `getnet_resumo`/`getnet_financeiro_resumo` — ver
+`[[feedback-fin-rpc-security-checklist]]`):
+
+- **`getnet_recebivel_lancamentos`** — uma linha por linha do CSV (exceto
+  `Subtotal`, derivável por soma). `dedupe_key` = `md5` das colunas naturais
+  da linha (vencimento + bandeira + tipo_lançamento + lançamento + NSU +
+  valor_líquido + data_venda) **+ contador de ocorrência dentro do lote de
+  import** — mesmo padrão do dedupe Santander (commit `5adc3f0`, §9.13) e do
+  `external_id` `file:...#occ` do `ImportarExtratosTab`. Necessário porque o
+  CSV real tem linhas `Saldo Anterior` genuinamente duplicadas (confirmado:
+  mesma data+bandeira+valor 0,00 repetida 2x no mesmo arquivo) — sem
+  contador, a segunda seria descartada como falso duplicado.
+- **`getnet_antecipacao_lotes`** — um row por `Contrato Registradora`, upsert
+  automático durante a importação (`Valor Atual Do Contrato` é fixo repetido
+  em toda linha do mesmo contrato). `UNIQUE (igreja_id, contrato_registradora)`
+  — **desvio deliberado** do desenho original (`UNIQUE` global): evita que o
+  upsert via `SECURITY DEFINER` (que bypassa RLS) atualize a linha de outro
+  tenant caso dois números de contrato colidam entre igrejas diferentes.
+
+**RPC `fin_importar_recebivel_getnet(p_integracao_id, p_linhas, p_contexto)`**
+— valida tenant/filial da integração (deve ser `provedor='getnet'`), insere
+deduplicado (`ON CONFLICT DO NOTHING`), upsert de lote por contrato (sem
+tocar `status`, pra não reverter progresso da Fase B num reimport), 1 job em
+`fin_extrato_ingestao_jobs` (reaproveitada; `origem='getnet_recebivel_portal'`
+— exigiu relaxar `conta_id` pra nullable nessa tabela, já que um lote da
+Getnet não tem conta bancária associada). Isolamento por linha (`BEGIN...
+EXCEPTION`) igual `fin_ingerir_extratos` — uma linha malformada não derruba o
+lote inteiro.
+
+**Achado durante a calibração contra CSV real do usuário**: o portal usa o
+valor literal `"0"` em `Contrato Registradora` como sentinel de "sem
+contrato" (visto em linhas `Pagamento Realizado`/`Valor Liquidado (R$)`) —
+não é um contrato de verdade. A RPC normaliza `"0"` para `NULL` (mesma regra
+de `""`), senão o upsert criaria um lote fantasma `contrato_registradora='0'`
+compartilhado por todas as igrejas que importassem essa linha.
+
+**Parser client-side** (`ImportarRecebivelGetnetTab.tsx`, ao lado do
+`ImportarExtratosTab` genérico em Gerenciar Dados): **não reaproveita a lib
+`xlsx`** como o desenho original previa — o CSV real do portal Getnet é
+**ISO-8859-1 (Latin-1), não UTF-8**; decodificar como UTF-8 corrompe todo
+campo acentuado (`LANÇAMENTO`, `VALOR LÍQUIDO` etc.) antes mesmo de tentar
+mapear coluna. O componente decodifica via `TextDecoder("iso-8859-1")` e
+faz `split(";")` manual — o layout real tem 26 colunas fixas, sem aspas/
+escaping (confirmado contra os 2 CSVs reais do usuário), então não precisa
+do parser CSV completo da lib. Cabeçalho validado por comparação exata
+(normalizada) contra as 26 colunas esperadas — rejeita o arquivo se a Getnet
+mudar o layout, em vez de importar com colunas erradas silenciosamente.
+Campo `parcelas` fica como texto bruto (`"1 de 7"`, não quebrado em
+atual/total — a coluna do portal mistura os dois conceitos numa string só,
+ambíguo demais pra normalizar nesta fase sem mais exemplos reais).
+
+**Verificação**: `npx tsc --noEmit`: 62 erros (baseline, nenhum novo).
+Harness Docker (`postgres:15` standalone) com 6 cenários: idempotência de
+`Saldo Anterior` duplicada dentro do lote, reimport idempotente (0 inseridos
+na 2ª rodada), upsert de lote sem duplicar por contrato + sentinel `"0"`
+ignorado, rejeição de integração de outro tenant (`FIN_FK`), rejeição de
+integração não-Getnet (`FIN_VALIDACAO`), RLS bloqueando `SELECT` cross-tenant
+e `INSERT` direto (só a RPC escreve). Reprodução isolada em Node do parser
+contra os 2 CSVs reais do usuário (arquivos de maio/2025 e setembro/2025):
+217 linhas parseadas, 66 `Subtotal` ignoradas, valores batendo linha a linha
+com o que já tinha sido conferido manualmente na investigação — venda de
+R$100 em 18/05/2025 → R$97,91 cedidos, lote de 30/09/2025 (contrato
+`2025093000995438317`) → R$1.523,81 em 7 linhas, deságio R$168,62
+(consistente com o valor depositado real de R$1.355,19 no extrato bancário,
+já importado via API Santander).
+
+**Fase B implementada em seguida, mesma sessão** — ver §9.18.
+
+### 9.18 FK real de forma de pagamento + Fase B do Recebível Getnet (jul/2026)
+
+Ao planejar a Fase B (vínculo do lote de antecipação com o extrato bancário +
+conferência de totais por período), a "conferência de totais" precisava
+somar **entradas via cartão** — e não havia jeito confiável de identificar
+isso: `transacoes_financeiras.forma_pagamento` sempre foi texto solto, nunca
+uma FK real pra `formas_pagamento.id`. Usuário confirmou: corrigir a causa
+raiz antes de construir o card em cima dela.
+
+**`forma_pagamento_id uuid` (FK real)** — migration
+`20260729130000_fin_forma_pagamento_fk.sql`. 4 escritores gravavam formatos
+incompatíveis na coluna texto antiga: `fin_lancar_sessao`/`TransacaoDialog.tsx`
+→ `formas_pagamento.id::text` (válido, mas como texto); `fin_pagar_reembolso`
+→ `'pix'|'dinheiro'|'transferencia'` (vocabulário de preferência, CHECK
+próprio, **fora de escopo** — conceito diferente de "qual formas_pagamento foi
+usado"); `fin_criar_transferencia` → string fixa `'Transferência Bancária'`;
+`chatbot-financeiro` (edge function) → rótulo em Português exato. Consequência
+real, não hipotética: `fin_ofertas_periodo` só resolvia nome pras linhas com
+UUID; `isPagamentoDinheiro` (frontend) fazia `.includes("dinheiro")` e só
+batia pros rótulos; a tela de edição de transação perdia o valor original ao
+reabrir linhas gravadas por bot/reembolso (Select não achava o item).
+
+Coluna nova mantém a texto antiga (não dropada — ainda é a única fonte de
+verdade pra `fin_pagar_reembolso`/parte de `fin_criar_transferencia`, e
+fallback de exibição pras linhas não mapeadas). Backfill tenant-scoped em 2
+passes (UUID-como-texto; rótulo case-insensitive, cobrindo tanto o rótulo
+exato do bot quanto o minúsculo do reembolso numa query só) — sem recorte
+por `igreja_id` seria bug cross-tenant real, já que `formas_pagamento` não
+tem `UNIQUE(igreja_id, nome)`. `fin_criar_lancamento`/`fin_atualizar_
+lancamento` passam a validar `forma_pagamento_id` via `fin_validar_fk_tenant`
+(antes um id de outro tenant passava batido — regressão real coberta no
+harness) e resolvem rótulo sem id explícito quando só vier texto (cobre o
+chatbot sem tocar na edge function). `fin_lancar_sessao` passa a gravar as
+duas colunas. `fin_ofertas_periodo` simplifica o join (sem `::text`) — exigiu
+`DROP FUNCTION` antes do `CREATE OR REPLACE` por mudança de tipo de retorno.
+Leitores heurísticos corrigidos: novo hook `useFormaPagamentoDinheiroId`
+resolve o id do "Dinheiro" da igreja uma vez; `isPagamentoDinheiro` compara
+id, não mais substring; exports (`ExportarTab.tsx`/`TransacoesPage.tsx`)
+mostram o nome resolvido via embed, com o texto legado só como fallback.
+
+**Fase B do Recebível Getnet** (migrations `20260729120000`/`20260729140000`):
+- `fin_vincular_lote_antecipacao(p_lote_id, p_extrato_bancario_id)` — grava
+  o vínculo manual, calcula o deságio (`valor_atual_contrato - extrato.valor`,
+  nunca persistido, sempre recalculado em leitura), recusa trocar o vínculo
+  depois do lançamento criado. Tela `LotesAntecipacaoTab.tsx` (aba "Lotes de
+  Antecipação" dentro de Reconciliação Bancária): `VincularExtratoLoteDialog`
+  sugere candidatos por proximidade de data (`data_contratacao_contrato` ±
+  30 dias) + descrição contendo "antecipa"/"getnet", sem auto-selecionar — a
+  escolha final é sempre manual, mesmo padrão de `VincularTransacaoDialog`.
+- `fin_lancar_desagio_antecipacao(p_lote_id, p_categoria_id, p_conta_id)` —
+  chama `fin_criar_lancamento` de verdade (não um INSERT direto — é a
+  primeira chamada SQL-a-SQL da porta única neste repo), `tipo='saida'`,
+  `status='pago'` imediato (o dinheiro já saiu na antecipação), descrição
+  referenciando o Contrato Registradora. Recusa relançar (`FIN_JA_LANCADO`)
+  se `lancamento_desagio_id` já preenchido — idempotente por rejeição, não
+  por no-op silencioso. `LancarDesagioDialog.tsx` deixa o tesoureiro escolher
+  conta/categoria de saída (sem categoria hardcoded — sugestão do plano era
+  "Custo de Antecipação de Recebíveis", criável na tela de categorias já
+  existente).
+- `fin_conferencia_totais_getnet(p_conta_id, p_data_inicio, p_data_fim)` —
+  só leitura, sem `fin_registrar_auditoria`. `Σ Oferta bruto (forma_pagamento
+  classificada como cartão, nome ILIKE '%cart%') − Σ MDR − Σ deságio lançado
+  no período = esperado no banco`, comparado contra `Σ Banco creditado`
+  (`extratos_bancarios`, mesma conta/período). Não decide a causa da
+  diferença — só torna o gap visível, card em `ConferenciaTotaisGetnetCard.tsx`
+  (topo da aba, reaproveita `MonthPicker`/`getPeriodoRange`). Classificação
+  "cartão" por nome (não por `taxa_administrativa > 0`, que pegaria boleto
+  com taxa se algum dia existir) — só ficou confiável depois da FK real
+  acima; antes não dava pra confiar no join.
+
+**Verificação**: `npx tsc --noEmit`: 62 baseline, 0 novos. Harness Docker
+(`postgres:15` standalone) com 6 cenários: backfill correto nos 4 padrões
+históricos (UUID-texto, rótulo maiúsculo, rótulo minúsculo, texto livre não-
+mapeável fica NULL) + isolamento de tenant (2 igrejas com "PIX" cada, sem
+vazamento cross-tenant); `fin_criar_lancamento` grava `forma_pagamento_id`
+válido e rejeita id de outro tenant (`FIN_FK`, regressão real antes não
+coberta); `fin_atualizar_lancamento` sincroniza as duas colunas e rejeita
+patch cross-tenant; `fin_lancar_sessao` grava as duas colunas consistentes;
+`fin_ofertas_periodo` resolve `forma_nome` via join sem cast; Fase B ponta-a-
+ponta com o exemplo real já validado (contrato `2025093000995438317`,
+R$1.523,81 − R$1.355,19 = R$168,62 de deságio) — vínculo calcula o deságio
+certo, `fin_lancar_desagio_antecipacao` cria o lançamento via
+`fin_criar_lancamento` de verdade, recusa relançar, e
+`fin_conferencia_totais_getnet` soma os 4 componentes corretamente.
+
+### 9.19 D10 — Competência de grupo em lançamentos parcelados (jul/2026)
+
+Usuário colou uma avaliação externa questionando se, numa compra parcelada
+(ex.: equipamento em 10x), o DRE por Competência deveria diluir o valor ao
+longo dos meses (competência = vencimento de cada parcela) ou concentrar o
+valor cheio no mês do fato gerador (competência compartilhada por todas as
+parcelas). Investigação no código, antes de decidir qualquer direção,
+mostrou que o alicerce já existia: `fin_criar_lancamento` (D6, F1) já
+materializa as N parcelas com a mesma `data_competencia` (mesmo `p_extras`
+reaproveitado em todas as iterações do loop) e `get_dre_anual(p_regime=
+'competencia')` já agrega por `data_competencia` incluindo `pendente` — ou
+seja, a leitura já entrega o resultado desejado desde que os dados fiquem
+consistentes. O gap real (não coberto por nenhuma RPC até então): **edição**
+não propagava. `fin_atualizar_lancamento` fazia `UPDATE` só na linha
+editada — mudar a competência da parcela 5/10 não atualizava as parcelas
+1-4/6-10, e `reclass-transacoes` tinha o mesmo problema (bloqueava só por
+conciliada, nunca verificava parcelas irmãs fora da seleção). Decisão
+confirmada com o usuário: endurecer o modelo existente (reaproveitar
+`lancamento_pai_id`), não migrar para uma entidade "Documento Financeiro"
+separada; imobilizado/depreciação de equipamentos ficou fora de escopo
+(decisão de produto futura, independente desta).
+
+**Migration `20260729150000_fin_competencia_grupo_parcelado.sql`**:
+
+- `fin_atualizar_lancamento` (CREATE OR REPLACE): bloqueia com erro nomeado
+  `FIN_COMPETENCIA_GRUPO` quando `p_patch` contém `data_competencia` e o
+  lançamento é `tipo_lancamento='parcelado'` com `lancamento_pai_id` setado
+  ou `total_parcelas > 1` — a menos que o patch traga
+  `_permitir_divergencia_competencia: true` (escape hatch para renegociação
+  pontual de uma parcela; não exposto na UI, só via chamada direta). Regra
+  restrita a `parcelado` — `recorrente` mantém competência própria por
+  ocorrência, sem bloqueio (validado no harness).
+- **Nova RPC `fin_alterar_competencia_grupo(p_lancamento_id, p_nova_competencia,
+  p_contexto)`**: resolve `v_pai := COALESCE(lancamento_pai_id, id)` (mesmo
+  padrão de `fin_excluir_lancamento`), rejeita se `tipo_lancamento <>
+  'parcelado'`, rejeita se qualquer parcela do grupo já estiver conciliada
+  (lista os ids no erro), atualiza `data_competencia` de todas as parcelas
+  numa única transação, audita snapshot antes/depois, e avisa (warning, não
+  bloqueia) quando alguma parcela afetada já está `status='pago'` — a
+  competência pode retroagir sobre um período de DRE já reportado.
+- `reclass-transacoes/index.ts`: antes do bloqueio existente por campo
+  conciliado, se `data_competencia` está em `updateFields`, calcula os
+  "pais" das transações-alvo `tipo_lancamento='parcelado'`, busca o grupo
+  completo de cada um e compara com a seleção. Havendo irmã fora da
+  seleção, recusa com 409 `GRUPO_PARCELADO_INCOMPLETO` (payload com
+  `ids_irmas_faltantes`) sem aplicar nada — mesmo espírito de "recusar e
+  informar" do bloqueio de conciliada, sem expandir a seleção por conta
+  própria.
+- Frontend: `TransacaoResumo` ganhou `tipo_lancamento`/`lancamento_pai_id`/
+  `numero_parcela`/`total_parcelas` (colunas que já vinham do `select("*")`
+  de `useLancamentos.ts`, sem query nova); `LancamentoCard.tsx` mostra badge
+  "Parcela X/Y"; `lancamentos.api.ts` ganhou o wrapper
+  `alterarCompetenciaGrupo`; `TransacaoDialog.tsx` detecta
+  `FIN_COMPETENCIA_GRUPO` no catch do submit e oferece um `AlertDialog` de
+  confirmação antes de sincronizar o grupo; `Reclassificacao.tsx` passou a
+  ler o corpo JSON de `error.context` (Response não consumida da
+  `FunctionsHttpError`) para exibir a mensagem estruturada de erros 409
+  nomeados (cobre `GRUPO_PARCELADO_INCOMPLETO` e, de bônus, o
+  `TRANSACAO_CONCILIADA` pré-existente, que tinha o mesmo problema de
+  mensagem genérica).
+
+**Verificação**: harness Docker (`postgres:15` standalone com stubs de
+`auth.*`/tenant, não replay das migrations reais) com 7 cenários cobrindo
+o bloqueio isolado, a sincronização completa do grupo, o bloqueio por
+parcela conciliada, a rejeição de `tipo_lancamento='unico'`, a exceção de
+`recorrente`, o escape hatch e isolamento de tenant — todos OK. Lógica de
+detecção de grupo incompleto do `reclass-transacoes` isolada em Node (5
+cenários: seleção parcial bloqueia, grupo completo aplica, dois grupos
+simultâneos aplicam, patch sem `data_competencia` não aciona a checagem,
+lançamento único nunca aciona) — mesmo padrão já usado no repo para lógica
+pura de gate (PR #59/#63), sem harness SQL por não haver SQL nesse trecho.
+
+### 9.22 Fix pós-review (Codex + /code-review, PR #67): forma_pagamento_id e sinal da taxa perdidos + edição descartada no sync de competência (jul/2026)
+
+Review Codex sobre o PR #67 (frontend do Recebível Getnet + FK de forma de
+pagamento + D10) acharam 2 P1 e 1 P2 reais; a rodada seguinte de `/code-
+review` (angle line-by-line) achou uma 4ª regressão do MESMO padrão que a
+correção do 1º achado ainda não tinha coberto:
+
+1. **`fin_atualizar_lancamento` tinha perdido `forma_pagamento_id`.** A
+   migration da FK (§9.18, `20260729130000`) deu `CREATE OR REPLACE` na
+   função adicionando `forma_pagamento_id`; a migration do D10 (§9.19,
+   `20260729150000`, sessão paralela) deu OUTRO `CREATE OR REPLACE` na
+   mesma função, a partir de uma cópia anterior à reconciliação das duas
+   sessões — apagou o suporte à FK sem ninguém perceber (`CREATE OR
+   REPLACE` substitui o corpo inteiro). Efeito real: editar a forma de
+   pagamento de uma transação existente devolvia sucesso com um warning
+   "campo ignorado" — sem erro, sem reverter a UI, só nunca gravava.
+   Fix: nova migration `20260730100000_fin_atualizar_lancamento_forma_
+   pagamento_id.sql` reincorpora o bloco de `forma_pagamento_id` na versão
+   atual da função (já com o bloqueio D10), mantendo as duas features
+   juntas desta vez.
+2. **Sincronizar competência do grupo descartava o resto da edição.**
+   `TransacaoDialog.tsx` sempre mandava `data_competencia` no patch de
+   qualquer edição (mesmo sem mudança real), então `fin_atualizar_
+   lancamento` recusava com `FIN_COMPETENCIA_GRUPO` qualquer edição numa
+   parcela de grupo parcelado — não só quando a competência de fato
+   mudava. O fluxo de recuperação (`handleSincronizarCompetenciaGrupo`)
+   só sincronizava a competência e fechava o dialog, jogando fora
+   silenciosamente as outras mudanças (descrição, valor, forma de
+   pagamento, status...) que o usuário tinha pedido no mesmo submit. Fix
+   em duas camadas: (a) só inclui `data_competencia` no patch de edição
+   quando o valor realmente difere do que já estava salvo — elimina o
+   falso-positivo na maioria dos casos; (b) quando o bloqueio ainda assim
+   dispara (mudança deliberada de competência numa parcela, junto com
+   outros campos), o resto do patch é preservado e reaplicado via
+   `atualizarLancamento` depois de `fin_alterar_competencia_grupo`
+   sincronizar o grupo — nada se perde.
+3. **P2**: `useTransacoesFiltro.ts` — `formaDinheiroId` faltava no array
+   de dependências do `useMemo`; o filtro "Conferido Manual" ficava vazio
+   até algum outro filtro mudar, porque a resolução assíncrona do id do
+   "Dinheiro" não disparava recálculo. Fix: adicionado à lista de deps.
+4. **`fin_atualizar_lancamento` TAMBÉM tinha perdido o sinal da taxa
+   administrativa** (§9.15, PR #58/#59: taxa subtrai de `valor_liquido` em
+   entrada, soma em saída) — a mesma colisão de `CREATE OR REPLACE` do
+   achado 1 apagou os dois ao mesmo tempo (a cópia usada como base pelo
+   D10 precedia AMBAS as correções), só que a 1ª rodada de fix (achado 1)
+   só notou o `forma_pagamento_id`, sem checar se mais alguma coisa tinha
+   sido revertida junto. Achado pelo `/code-review` (angle line-by-line)
+   ao revisar o próprio fix do achado 1 — confirmado direto no arquivo
+   antes de aplicar. Como `TransacaoDialog.tsx` sempre manda
+   `valor_liquido` já calculado com o sinal certo, o recálculo server-side
+   quebrado não disparava na prática pelo único chamador atual — mas a RPC
+   é a porta única (ADR-029) e qualquer chamador futuro sem `valor_liquido`
+   explícito receberia o valor errado sem aviso. Fix: reincorporado no
+   mesmo `20260730100000` (`v_sinal_taxa`, idêntico ao de `20260729130000`).
+
+**Verificação**: harness Docker (`postgres:15`) com 6 cenários — grava
+`forma_pagamento_id` numa transação única sem warning de campo ignorado;
+rejeita `forma_pagamento_id` de outro tenant (regressão do `fin_validar_
+fk_tenant`, não voltou a passar batido); edita uma parcela sem tocar
+competência sem acionar o bloqueio D10; muda competência de fato numa
+parcela e o bloqueio D10 continua disparando; recálculo de `valor_liquido`
+sem `valor_liquido` explícito no patch — entrada com taxa 3 dá líquido 97
+(100−3), saída com taxa 3 dá líquido 103 (100+3). `npx tsc`: 63 baseline
+(herdado de `origin/main` pós-#65/#66), 0 novos.
+
+**Lição**: ao restaurar um campo apagado por uma colisão de migrations,
+não basta reincorporar SÓ o campo que o review apontou — vale diffar a
+função inteira contra a última versão correta conhecida antes de assumir
+que só aquele campo foi afetado (aqui, os dois achados vieram do MESMO
+`CREATE OR REPLACE` malfeito, mas em duas rodadas de review separadas).
+
+### 9.23 Achado do `/code-review` (não corrigido nesta PR): ExportarTab perdeu o eixo Competência — e correção com 3ª opção (jul/2026)
+
+Dois agentes independentes do `/code-review` (cross-file tracer e removed-
+behavior auditor) acharam, cada um por conta própria, que `ExportarTab.tsx`
+tinha perdido a capacidade de filtrar/exportar por `data_competencia` —
+antes da PR #65 ("seletor Tipo de Data"), o export sempre filtrava por
+competência; depois, só `data_vencimento`/`data_pagamento` ficaram
+disponíveis via `TipoDataFiltroSelect`/`colunaDataFiltro` (ADR-031).
+**Confirmado que isso não veio desta PR** — já estava em `origin/main`
+antes do rebase (PR #65, já mergeada); só apareceu no `/code-review` porque
+a ferramenta rastreia efeito através de arquivos adjacentes, não só linhas
+adicionadas por este branch.
+
+Usuário pediu a correção direto: Exportar precisa das 3 opções
+(Vencimento/Pagamento/Competência). Implementado **só dentro de
+`ExportarTab.tsx`**, sem tocar no `TipoDataFiltro`/`colunaDataFiltro`/
+`TipoDataFiltroSelect` compartilhados — dois motivos, achados investigando
+o blast radius antes de mexer:
+
+1. **`TipoDataFiltroSelect` é um componente único sem lista de opções
+   parametrizável** — widening o tipo compartilhado faria a 3ª opção
+   aparecer em TODAS as 6 telas que usam o seletor (`TransacoesPage`,
+   `Contas`, `Dashboard`, `Insights`, `ExportarTab`, `LancamentoCard`), não
+   só em Exportar.
+2. **`Dashboard.tsx` manda `tipoData` direto pra `fin_resumo_periodo` como
+   `p_eixo`**, e essa RPC tem `CHECK`/`IN ('vencimento','pagamento')` — um
+   3º valor vindo do tipo compartilhado quebraria essa tela com uma
+   exceção Postgres não tratada.
+3. **ADR-031 documenta a separação "Tipo de Data" (qual coluna ordena)
+   vs. "Regime" (o que entra no relatório) como decisão deliberada**, não
+   uma omissão — misturar Competência ali confundiria os dois conceitos
+   que o ADR foi escrito pra manter separados.
+
+Local em `ExportarTab.tsx`: `TipoDataFiltroExport` (tipo local, 3 valores),
+`colunaDataFiltroExport()` (helper local), `Select` de 3 itens substituindo
+`<TipoDataFiltroSelect>`. A regra "Data de Caixa exporta só pago" (bloco
+`if (colunaPeriodo === "data_pagamento")`) não precisou de ajuste —
+Competência cai naturalmente no mesmo ramo `else` que Vencimento já usava,
+respeitando o filtro de Status normal. Mesma ressalva de `data_pagamento`
+se aplica a `data_competencia`: é nullable no banco (coluna adicionada bem
+depois de `data_vencimento`, sem backfill), então lançamentos legados sem
+competência preenchida somem silenciosamente de um export filtrado por
+esse eixo — mesmo comportamento já aceito pro eixo Pagamento, não uma
+regressão nova.
+
+`npx tsc`: 63 baseline, 0 novos.
+
+### 9.24 Paridade bruto×líquido em Saídas + desconto de antecipação (jul/2026)
+
+Usuário apontou duas lacunas em `TransacoesPage.tsx`/`ExportarTab.tsx`,
+ambas cobertas por ADR-027 (`valor_liquido = valor + juros + multas +
+(sinal_taxa * taxas_administrativas) - desconto`) mas nunca expostas na UI
+pro lado de Saídas nem pro campo `desconto`:
+
+1. **Boleto pago antecipado tem desconto** — banco cobra menos que o valor
+   nominal do título. Esse `desconto` já é gravado pelas RPCs `fin_*` desde
+   o D-ADR-027, mas nunca apareceu em tela nem em export — usuário só via
+   taxa/juros/multa, nunca o abatimento.
+2. **Cards de bruto×líquido só existiam pra Entradas** — o gate
+   `tipo === "entrada"` escondia a separação valor-nominal × valor-líquido
+   pra Saídas, mesmo elas tendo a mesma divergência (juros/multa de atraso
+   fazem o líquido pago ser MAIOR que o nominal; desconto de antecipação faz
+   ser MENOR).
+
+**`TransacoesPage.tsx`**: removido o gate `tipo === "entrada"` de
+`valorLiquidoOuBruto`/`totalPagoLiquido`/`totalPendenteLiquido` — a mesma
+lógica de bruto×líquido (§9.15/9.16) agora se aplica a Entradas e Saídas
+igualmente, já que `valor_liquido` vem calculado certo pro tipo direto da
+RPC. Card "Taxas" virou "Taxas e Encargos" e passou a somar
+`taxas_administrativas + multas + juros` juntos (antes só a taxa
+administrativa) — do jeito que o usuário pediu ("precisamos colocar dentro
+de taxas, multas e juros tb"), restrito a `status IN ('pago','pendente')`
+(mesma ressalva do §9.16: `cancelado` mantém os campos preenchidos mas não
+deve contar). Novo card "Desconto" (ícone `Tag`, cor teal) soma `desconto`
+das mesmas transações, mostrado pros dois tipos. Grid do Resumo unificado
+em `grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6` (era
+condicional por tipo) — 6 cards fixos: total, pago/recebido, pendente,
+taxas e encargos, desconto, transferências.
+
+**`ExportarTab.tsx`**: `desconto` estava ausente da query, do tipo
+`TransacaoExportacao`, da lista `COLUNAS_DISPONIVEIS` e do
+`handleExportar` — nunca tinha sido exportável, diferente de
+`taxas_administrativas`/`multas`/`juros` que já tinham coluna própria desde
+antes. Adicionado seguindo exatamente o mesmo padrão dos três campos
+irmãos: `desconto` no `.select()`, `desconto?: number | null` no tipo,
+`{ id: "desconto", label: "Desconto" }` em `COLUNAS_DISPONIVEIS`, e
+`row.Desconto = t.desconto ?? 0` no `handleExportar`.
+
+Fora do escopo: `handleExportar` dentro de `TransacoesPage.tsx` (função
+morta, marcada `void handleExportar; // exportação via página Arquivos,
+mantido para atalho futuro`, não ligada a nenhum botão) não foi tocada —
+o caminho de export real e único é `ExportarTab.tsx`.
+
+`npx tsc`: 63 baseline, 0 novos.
+
+### 9.25 Toggle Bruto/Líquido + badges de composição + ordenar por data (jul/2026)
+
+Extensão direta do §9.24: não bastava ter os campos de desconto/taxa/juros/
+multa nos totais do topo — o usuário queria poder alternar, lançamento a
+lançamento, entre o valor nominal do título (bruto) e o que efetivamente
+foi pago/recebido (líquido), com um resumo visual de por que os dois
+diferem. Pedido em 3 partes, na mesma conversa:
+
+1. Botão Bruto/Líquido no cabeçalho da Lista/Agrupada/Calendário (Entradas
+   e Saídas), badges de composição (Desconto/Taxa/Juros/Multa) antes do
+   valor quando em modo Líquido.
+2. O código do lançamento (6 primeiros chars do id, copiável) sai de onde
+   estava (botão destacado à direita da descrição) e vai pro fim do texto
+   da descrição, liberando espaço pros badges.
+3. Botão de ordenar por data (mais recente/mais antiga primeiro) na Lista
+   e na Agrupada.
+
+**Decisões de UX fechadas com o usuário antes de implementar** (AskUserQuestion):
+Bruto é o padrão ao abrir a tela (Líquido é opt-in); lançamento sem nenhum
+encargo não mostra badge nenhum no modo Líquido (bruto == líquido, nada a
+explicar); o código do lançamento mantém o mesmo estilo, só reposicionado.
+
+**Novo módulo compartilhado** — `core/lib/encargos.ts` (puro, sem React,
+respeita a regra "core não importa de módulo nenhum") com `somarEncargos`,
+`encargosAtivos` e `temEncargo` operando sobre `{ desconto,
+taxas_administrativas, juros, multas }`; e `components/financas/
+EncargoBadges.tsx` (apresentacional, consome o core) — usado por
+`LancamentoCard`, pelos totais de grupo em `TransacoesPage` e pelos 4
+calendários (Entradas/Saídas × Mês/Timeline). Um componente só, 6 pontos de
+uso — a alternativa era repetir a mesma lógica de composição em 6 arquivos
+diferentes, exatamente o tipo de duplicação cliente-a-cliente que rendeu
+bug em rodadas anteriores desta sessão.
+
+**`LancamentoCard.tsx`**: novo prop `visaoValor?: "bruto" | "liquido"`
+(default `"bruto"`) controla `valorExibido` e, em modo líquido, renderiza
+`<EncargoBadges>` acima do valor (right-aligned) — que retorna `null`
+sozinho quando não há nenhum encargo, então a regra "sem badge quando não
+há o que explicar" cai de graça sem `if` duplicado no call site. Descrição
+virou `<h3 className="flex items-baseline gap-1.5">` com o texto (`flex-1
+min-w-0 truncate`) e o botão de ID como filho — sai do canto direito da
+linha do título e passa a ficar logo depois do texto, mesmo estilo
+monoespaçado/copiável, só com opacidade reduzida (`text-muted-foreground/70`)
+já que agora divide espaço com a descrição.
+
+**`TransacoesPage.tsx`**: dois estados novos, `visaoValor` e `ordemData`
+(`"asc" | "desc"`, default `"desc"` — mesmo sentido que a query já usa).
+Botão Bruto/Líquido é um segmented-control de 2 `Button` dentro de uma
+borda comum (não é `ToggleGroup` do design system — o padrão já usado nesta
+tela pra Lista/Agrupar/Calendário é `Button` + `Tooltip`, mantido por
+consistência). Botão de ordenar (`ArrowDown`/`ArrowUp`) só aparece fora da
+visão Calendário (grade de dias não tem uma noção linear de "ordem" pra
+inverter). Ordenação implementada client-side — `transacoesOrdenadas`
+(novo `useMemo`) reordena `transacoesFiltradas` pela mesma coluna de data
+usada pra buscar o período (`colunaDataFiltro(tipoData)`, comparação de
+string ISO `yyyy-MM-dd`, sem parsing de `Date`) e alimenta a paginação;
+pra Agrupada, `ordenarDatasDesc` virou `ordenarDatas(grupos, ordem)`
+(único caller, generalização direta, sem wrapper). Totais de grupo
+(Agrupada) ganharam o mesmo toggle: `totalGrupo` alterna bruto/líquido e
+badges de composição (soma de todos os lançamentos do dia) aparecem acima
+do total quando em modo Líquido.
+
+**Calendários (`SaidasCalendario`/`SaidasTimelineCalendario`/
+`EntradasCalendario`/`EntradasTimelineCalendario`, 4 arquivos quase
+idênticos, sem componente compartilhado — decisão herdada, não revisitada
+aqui)**: sem toggle (não fazia sentido nesse layout) — sempre mostra os
+dois números. Na célula do dia (grade do mês ou timeline), valor líquido
+aparece como uma segunda linha discreta abaixo do valor bruto, **só quando
+diferem** (mesma regra de "nada a explicar, nada a mostrar" da Lista). No
+modal "Detalhes do dia", cada lançamento e o "Total do Dia" ganharam um
+`<EncargoBadges bruto=... liquido=... totais=.../>` — aí sim sempre com
+Bruto e Líquido explícitos (não só a diferença), porque o pedido explícito
+foi literal: "Bruto / Líquido / Descontos / Taxas / Multa / Juros" — só
+renderizado quando existe pelo menos 1 encargo (`temEncargo`), pra não
+duplicar "Bruto R$X / Líquido R$X" idênticos na maioria dos lançamentos.
+`EntradasCalendario`/`EntradasTimelineCalendario` somam entrada e saída
+separadamente pra achar o líquido do dia (`totalEntradasLiquido -
+totalSaidasLiquido`) — mesmo padrão redundante que o bruto já usava (essas
+telas só recebem transações de um tipo por vez, o split por `t.tipo` é
+defensivo/pré-existente, não alterado aqui).
+
+**Ajuste de tipos**: `Transacao` (`hooks/useTransacoesFiltro.ts`) ganhou os
+5 campos (`valor_liquido`, `taxas_administrativas`, `multas`, `juros`,
+`desconto`) como propriedades nomeadas — já chegavam via `[key: string]:
+any` e funcionavam em runtime, mas `somarEncargos(grupo)` falhava no
+"weak type" check do TS (`EncargoCampos` só tem campos opcionais; o TS
+exige pelo menos 1 propriedade em comum *declarada*, índice não conta).
+
+`npx tsc`: 63 baseline, 0 novos. `npx eslint` nos 10 arquivos tocados: os
+9 erros de `no-explicit-any` pré-existentes (props `dadosPorDia:
+Record<string, Array<any>>` dos calendários, `[key: string]: any` de
+`Transacao`) continuam nos mesmos arquivos, confirmado por diff antes/depois
+via `git stash` — nenhum novo. Sem ambiente de browser disponível nesta
+sessão pra teste visual — só verificação estática (tsc + eslint + leitura
+cuidadosa do diff completo).
+
+### 9.26 Fix: Forma de Pagamento duplicada no dialog de lançamento (jul/2026)
+
+Usuário reportou, com print, o dropdown "Forma de pgto" do `TransacaoDialog`
+mostrando cada nome duplicado (Cartão de Débito, Cheque, Débito em conta,
+Dinheiro, PIX, Transferência Bancária — cada um 2×). Investigação inicial
+suspeitou de falta de filtro por `tipo` (entrada/saída) — **descartada
+depois de confirmar com o usuário**: `categorias_financeiras` já filtra por
+tipo corretamente (`useDadosApoio.ts`), e `formas_pagamento` nunca teve
+coluna `tipo` (catálogo único pros dois lados, por design — não é bug).
+
+Causa real, achada comparando a query de `formasPagamento` com a de
+`contas` no mesmo hook (`useDadosApoio.ts`): `contas` já filtra
+`igreja_id` + (`filial_id` quando `!isAllFiliais`), mas `formasPagamento`
+não filtrava nem `igreja_id` nem `filial_id` — buscava a tabela inteira
+(mitigado de vazamento cross-tenant só pela RLS, mas sem filtro nenhum de
+filial). Igrejas com mais de uma filial, cada uma com seu próprio cadastro
+de formas de pagamento de mesmo nome (mesmo padrão de
+`FormasPagamento.tsx`, que já filtra por filial no cadastro), acabavam
+tendo as duas linhas retornadas e exibidas juntas no dropdown do dialog.
+
+Fix: `formasPagamento` em `useDadosApoio.ts` passou a seguir exatamente o
+mesmo padrão de `contas` (mesmo arquivo, poucas linhas acima) —
+`.eq("igreja_id", igrejaId)` + `.eq("filial_id", filialId)` só quando
+`!isAllFiliais`, `enabled: !!igrejaId`, queryKey com
+`igrejaId/filialId/isAllFiliais`. Não mexeu em `useFormaPagamentoDinheiroId.ts`
+(hook relacionado, também sem filtro de filial) — esse já usa
+`.limit(1).maybeSingle()` então não duplica/quebra visualmente; resolver
+determinística mas potencialmente pra filial errada quando há mais de um
+"Dinheiro" cadastrado é um problema mais sutil, de correção do "Conferido
+Manual"/isPagamentoDinheiro, não do sintoma reportado — fica para outra
+sessão, com o mesmo cuidado.
+
+`npx tsc`: 63 baseline, 0 novos. `npx eslint` no arquivo: limpo.
+
+### 9.27 Checkboxes multi-seleção em ExportarTab: Tipo de Dados vira abas do Excel (jul/2026)
+
+Plano salvo numa sessão anterior (`podemos-transformar-essa-op-o-hidden-diffie.md`,
+nunca implementado) — usuário confirmou execução ao perguntar "perdemos a
+seleção múltipla?". Os 4 filtros de `ExportarTab.tsx` (Tipo de Dados,
+Status, Conta, Categoria) eram `Select` de valor único; viram checkbox
+multi-seleção (popover), com uma decisão central confirmada no plano
+original: **"aba" = worksheet dentro do MESMO arquivo `.xlsx`**, não uma
+tela nova — marcar Entradas + Saídas gera 1 arquivo com 2 abas.
+
+**Novo `src/components/financas/MultiSelectFilter.tsx`**: combobox
+genérico (`Popover` + `Checkbox`, "Selecionar todos"/"Limpar" no topo),
+mesmo formato visual de um `SelectTrigger`. `selected: string[]` vazio =
+"todos/todas" (sem filtro), reaproveitado nos 4 filtros.
+
+**`src/lib/exportUtils.ts`**: `exportToExcel` (assinatura inalterada,
+ainda usada por `DRE.tsx`/`TransacoesPage.tsx`/`Todos.tsx`/
+`SalaDeGuerra.tsx` sem mudança) teve sua lógica de montar worksheet
+(number format + autosize de coluna) extraída pra `buildWorksheet()`
+privada, reusada pela função nova `exportSheetsToExcel(sheets, filename)`
+— um `book_new()` só, uma aba por item de `sheets` (pula abas vazias, erro
+só se todas vierem vazias).
+
+**`ExportarTab.tsx`**: os 4 `useState` de valor único viraram arrays
+(`tiposSelecionados`, `statusSelecionados`, `contasSelecionadas`,
+`categoriasSelecionadas`). Mudanças de maior risco, todas conforme o plano
+original:
+- **Categorias** (filtro compartilhado): a query passou de `.eq("tipo",
+  tipo)` pra `.in("tipo", tiposConceito)` — união dos tipos funcionais
+  marcados, já que a lista de categorias precisa cobrir Entradas E Saídas
+  quando os dois estão marcados.
+- **Query de transações**: 1 query virou 2 (`entradasQuery`/`saidasQuery`,
+  uma por tipo funcional), cada uma habilitada só quando seu tipo está
+  marcado — extraídas pra `fetchTransacoesExportacao()` (função de módulo,
+  sem closures, parametrizada por `tipo`) pra não duplicar a query
+  inteira. Preserva TODAS as regras já existentes (Data de Caixa força
+  `status=pago` e ignora o filtro de Status; `.in()` em conta/categoria
+  quando array não vazio).
+- **Status multi-seleção**: `statusParaQuery()` combina Pago/Pendente/
+  Atrasado num `.or()` do PostgREST — Atrasado é subconjunto de Pendente
+  (pendente + vencimento passado), então marcar os dois junto simplifica
+  pra só `status.eq.pendente` (não perde nenhuma linha, não duplica).
+- **Preview**: quando mais de 1 tipo funcional está marcado, um seletor
+  "Visualizando: [Entradas] [Saídas]" (mesmo estilo dos botões Todas/
+  Nenhuma de Colunas) decide qual dataset a tabela mostra —
+  `previewTipoEfetivo` é **derivado do state**, não sincronizado via
+  `useEffect` (se o tipo em preview for desmarcado, cai pro primeiro tipo
+  funcional que sobrou automaticamente). O card "Preview (N registros)" e
+  o botão Exportar mostram o TOTAL somado de todos os tipos marcados; só a
+  tabela em si mostra o tipo em preview.
+- **Exportar**: monta as linhas de cada tipo marcado (mesmo mapeamento de
+  colunas de sempre, extraído pra `montarLinhasExportacao()`) e chama
+  `exportSheetsToExcel` uma vez com todas as abas. Efeito colateral
+  positivo: o nome do arquivo não duplica mais timestamp (o código antigo
+  carimbava manualmente E `exportToExcel` carimbava de novo por dentro).
+- **Zero tipos selecionados**: `Alert` pedindo pra selecionar ao menos um
+  tipo substitui o Preview; botão Exportar desabilitado.
+
+`npx tsc`: 63 baseline, 0 novos. `npx eslint`: 1 warning de
+`exhaustive-deps` (memo de `transacoesPreview` faltando), corrigido
+envolvendo o cálculo em `useMemo` próprio.
+
+### 9.28 Fix crítico: saldo de conta somava valor BRUTO, não líquido + paridade em Contas.tsx (jul/2026)
+
+Usuário pediu pra replicar em `Contas.tsx` o mesmo tratamento Bruto/
+Líquido de Entradas/Saídas/Calendário (§9.25), e perguntou se o valor ali
+"provavelmente vai ter que bater com o saldo da conta". Investigação antes
+de mexer em UI achou algo mais sério: **o saldo real da conta
+(`contas.saldo_atual`) nunca considerou taxa/desconto/juros/multa.**
+
+`atualizar_saldo_conta()` — o trigger `AFTER UPDATE OF status` que é o
+executor único do saldo (D-2025-11, documentado no cabeçalho da F1) — soma/
+subtrai `NEW.valor`/`OLD.valor` (bruto) desde que foi criado em
+`20251130045754`, **antes** do conceito de `valor_liquido` existir
+(ADR-027, jul/2026). Nenhuma migration posterior redefiniu essa função.
+Mesmo bug em `fin_recalcular_saldo_conta()` (utilitário de correção de
+drift, existia desde a F1, nunca tinha sido chamado pela UI — sem call-site
+até este fix). Impacto real: toda entrada com taxa administrativa, toda
+saída com desconto de antecipação/juros/multa de atraso, fazia
+`saldo_atual` divergir do saldo de banco de verdade — ex.: entrada bruta
+R$203,58 com R$3,58 de taxa (líquido R$200,00) somava R$203,58 no saldo,
+não os R$200,00 que entraram de fato.
+
+**Fix** (`20260730110000_fin_saldo_conta_valor_liquido.sql`): as duas
+funções passam a usar `COALESCE(valor_liquido, valor)` em vez de `valor` —
+fallback pro bruto quando `valor_liquido` é NULL (lançamentos anteriores
+ao ADR-027, ou qualquer INSERT fora de `fin_criar_lancamento`), mesmo
+padrão de fallback já usado no frontend desde §9.15/9.24. `fin_criar_
+transferencia`/`fin_ajustar_saldo` NÃO tocados — não têm conceito de
+bruto×líquido (movimento interno de conta / ajuste manual direto).
+Harness Docker (`harness_saldo_liquido.sql`/`_tests.sql` no scratchpad): 7
+cenários — entrada com taxa, saída com multa, fallback pro bruto quando
+`valor_liquido` é NULL, reversão pago→pendente desfazendo pelo valor
+certo, dry-run do recálculo (não aplica), aplicação do recálculo corrige o
+drift, isolamento de tenant. Todos OK.
+
+**Corrigir o código só resolve daqui pra frente** — não reescreve
+`saldo_atual` já acumulado errado em produção. Como `fin_recalcular_saldo_
+conta` nunca tinha um botão na UI, adicionado um em `Contas.tsx`: ícone
+`RefreshCw` no card de cada conta chama a RPC em modo dry-run
+(`p_aplicar=false`) primeiro, mostra `window.confirm` com saldo registrado
+× saldo calculado, só aplica (`p_aplicar=true`) se o tesoureiro confirmar —
+nunca sobrescreve saldo sem revisão humana do diff, mesmo cuidado usado em
+toda mudança que mexe em dinheiro real nesta sessão.
+
+**Paridade visual** (o pedido original): `Contas.tsx` tem sua própria
+lista de "Lançamentos" (não usa `LancamentoCard` — implementação própria,
+pré-existente, fora de escopo revisitar aqui) que ganhou o mesmo toggle
+Bruto/Líquido + `EncargoBadges` + ID reposicionado pro fim da descrição de
+§9.25: total do período (Entradas/Saídas/Saldo), badges por lançamento, e
+os mini-totais "Entradas/Saídas/Saldo" dentro de cada card de conta
+(`totaisPorConta`, período selecionado — dado diferente de `saldo_atual`,
+que é o saldo corrente/histórico da conta). A visão Calendário de
+`Contas.tsx` já reusa `EntradasCalendario`/`EntradasTimelineCalendario`
+(mesmos componentes de §9.25) — herdou o líquido-abaixo-do-bruto e os
+badges do detalhe do dia de graça, sem código novo; aliás é o primeiro
+lugar onde o split entrada/saída desses 2 componentes realmente processa
+dado misto (em `TransacoesPage.tsx` só chega um tipo por vez).
+
+`npx tsc`: 63 baseline, 0 novos. `npx eslint`: mesmos 13 problemas
+pré-existentes (confirmados via `git stash`), nenhum novo.
+
+**Follow-up (mesmo dia)**: faltou o botão de ordenar por data — usuário
+notou a ausência comparado a `TransacoesPage.tsx` (§9.25). Adicionado
+`ordemData` (`"asc"|"desc"`, default `"desc"`) com o mesmo botão
+`ArrowDown`/`ArrowUp` ao lado do toggle Bruto/Líquido, escondido na visão
+Calendário. Duas ordenações client-side existentes em `Contas.tsx`
+precisaram do parâmetro: `transacoesFiltradas` (lista "Todos", comparação
+de string ISO no eixo `colunaData`) e o sort interno de
+`renderTransactionListGrouped` (chaves de data da visão agrupada). Note
+que a função `datasOrdenadas`/`transacoesAgrupadas` (linhas ~513-537) é
+código morto — não alimenta nenhuma renderização (a agrupada de verdade é
+`renderTransactionListGrouped`, que recomputa por conta própria) —
+pré-existente, não tocado aqui.
+
+### 9.29 Fixes pós-review (Codex, PR #67, jul/2026): trigger de saldo em INSERT + filial em Fase B + forma_pagamento legada
+
+Usuário pediu pra triar os comentários do Codex na PR #67 (9 no total, 3
+rodadas). Cada um verificado por leitura direta do código antes de agir —
+não corrigido por suposição:
+
+**3 achados stale** (código já corrigia o problema descrito, de commits
+anteriores desta mesma sessão): `TransacaoDialog.tsx` linha do patch de
+competência (patchRestante já reaplicado, §9.22), linha do
+`forma_pagamento_id` em `fin_atualizar_lancamento` (migration
+`20260730100000` já resolve), `useTransacoesFiltro.ts` (`formaDinheiroId`
+já está no array de dependências do `useMemo`). Confirmados por leitura
+direta, não descartados por suposição.
+
+**1 achado real, corrigido no frontend**: `TransacaoDialog.tsx` mandava
+`forma_pagamento_id: null` no patch de UPDATE mesmo quando o campo nunca
+tinha sido tocado pelo usuário — para uma transação legada sem
+`forma_pagamento_id` mapeado (reembolso/transferência, fora do escopo da
+FK de `20260729130000`), isso fazia `fin_atualizar_lancamento` zerar
+também o texto legado `forma_pagamento`, mesmo editando um campo
+completamente não relacionado. Fix: mesmo padrão já usado pra
+`data_competencia` (§9.22) — só inclui `forma_pagamento_id` no patch
+quando o valor efetivamente muda em relação ao carregado.
+
+**3 achados reais na Fase B do Getnet, corrigidos no backend + frontend**
+(migration `20260731100000_fin_pos_review_pr67_fixes.sql`):
+
+1. **`fin_vincular_lote_antecipacao` não validava filial do extrato** — na
+   visão "todas as filiais", um lote de uma filial podia ser vinculado a um
+   crédito bancário de outra. Fix: rejeita quando `extrato.filial_id ≠
+   lote.filial_id` (lote sem filial = global, aceita qualquer extrato do
+   tenant).
+2. **`fin_lancar_desagio_antecipacao` não validava filial da conta** —
+   mesmo problema na escolha de conta pro lançamento da saída de deságio.
+   Mesma regra de fix.
+3. Frontend (`VincularExtratoLoteDialog.tsx`/`LancarDesagioDialog.tsx`):
+   as queries de candidatos/contas escopavam pelo seletor global
+   "todas as filiais", não pelo `lote.filial_id` — corrigido pra sempre
+   escopar pelo lote quando ele tem filial definida, com o backend como
+   última linha de defesa. `useLotesAntecipacao.ts` passou a expor
+   `filial_id` (faltava no select/tipo).
+
+**Achado adicional, fora do que o Codex sinalizou, encontrado investigando
+o #3** (`fin_lancar_desagio_antecipacao` usa `fin_criar_lancamento` com
+`status:'pago'` direto no INSERT): **o trigger de saldo
+(`atualizar_saldo_conta`) só dispara em `AFTER UPDATE OF status` — nunca
+em `INSERT`.** Qualquer lançamento criado JÁ pago (não via
+pendente→pago) nunca move `contas.saldo_atual`. Isso não é exclusivo do
+deságio — afeta **`fin_lancar_sessao`** (toda oferta com
+`forma_pagamento.gera_pago=true`, ex. PIX/Cartão — o caminho mais comum do
+Relatório de Ofertas) e **`fin_pagar_reembolso`** (todo pagamento de
+reembolso) igualmente, ambos pré-existentes, não introduzidos nesta PR.
+`fin_criar_transferencia` já sabia disso e compensava com um `UPDATE`
+manual de `saldo_atual` logo após os 2 INSERTs.
+
+Fix: trigger passa a cobrir `INSERT OR UPDATE OF status` (função ganha um
+branch `IF TG_OP = 'INSERT'`, testando só `NEW.status='pago'` — sem
+`OLD` pra comparar). `fin_criar_transferencia` perde a compensação manual
+duplicada (senão o saldo se moveria 2× pro mesmo valor: uma vez pelo
+UPDATE explícito, outra pelo trigger agora reagindo ao INSERT). Nenhuma
+mudança em `fin_criar_lancamento`/`fin_lancar_sessao`/`fin_pagar_reembolso`
+foi necessária — o fix no trigger cobre todos os call-sites de uma vez,
+sem precisar tocar em cada RPC individualmente.
+
+**Harness Docker** (`harness_pos_review_trigger.sql`/`_tests.sql`,
+extensão de `harness2_schema.sql` já usado nesta sessão): 9 cenários — 3
+de INSERT (entrada pago move saldo, saída pago move saldo, pendente não
+move nada), regressão do UPDATE pendente↔pago existente, `fin_criar_
+transferencia` de ponta a ponta confirmando que o saldo se move
+**exatamente 1×** em cada conta (não duplicado), os 2 guards de filial
+(rejeita cross-filial, aceita same-filial) e `fin_lancar_desagio_
+antecipacao` de ponta a ponta confirmando que o saldo se move sozinho
+agora. Todos OK.
+
+**Limitação de transição documentada, não corrigida por não ter solução
+sem uma trilha de auditoria que não existe**: uma transação já paga
+*antes* de `20260730110000` (fix bruto→líquido) rodar, se revertida
+*depois*, é desfeita pelo valor líquido — mas tinha sido somada
+originalmente em bruto pelo trigger antigo, deixando um pequeno drift
+permanente pra aquela transação específica. Mitigado pelo mesmo
+`fin_recalcular_saldo_conta`/botão "Recalcular Saldo" (§9.28) — o
+recálculo soma tudo do zero, não depende de qual versão do trigger rodou
+historicamente. Texto do `confirm()` de "Recalcular Saldo" em
+`Contas.tsx` também ganhou um aviso explícito sobre ajustes manuais
+pré-F1 (gravados direto em `saldo_atual`, sem transação correspondente)
+não entrarem na soma recalculada — mesmo achado do Codex, mitigado por
+aviso explícito no fluxo de confirmação humana já existente, não por
+detecção automática (não há como diferenciar programaticamente "drift de
+bug" de "ajuste legítimo antigo" sem mais dados).
+
+`npx tsc`: 63 baseline, 0 novos. `npx eslint`: mesmos erros/warnings
+pré-existentes em todos os arquivos tocados (confirmado via `git stash`),
+nenhum novo.
+
+### 9.30 Fix pós-`/code-review`: lote global de antecipação deixava passar deságio cross-filial
+
+Rodada de `/code-review` (não Codex) sobre o commit de §9.29 achou um
+loophole real que os 6 fixes anteriores não cobriam: `fin_lancar_
+desagio_antecipacao` só validava a conta contra `getnet_antecipacao_
+lotes.filial_id` — mas esse campo é nullable ("lote global", quando a
+integração não amarra a uma filial fixa). Nesse caso a validação inteira
+era pulada: lote global vinculado a um extrato da filial B (aceito, nada
+pra cruzar ainda) podia depois ter o deságio lançado numa conta da filial
+C — nada validava B contra C, e o lançamento final gravava
+`filial_id=NULL` (o do lote), não o da filial que o dinheiro realmente
+passou.
+
+**Fix** (`20260731110000_fin_desagio_filial_lote_global.sql`):
+`fin_lancar_desagio_antecipacao` passa a validar a conta contra a filial
+do **extrato já vinculado** (`v_extrato.filial_id`), não a do lote —
+cobre os dois casos: lote com filial (extrato já é garantidamente da
+mesma, por causa do fix de §9.29) e lote global (o extrato concreto
+escolhido é quem ancora a filial real do fluxo). O lançamento final grava
+`filial_id = COALESCE(extrato.filial_id, conta.filial_id)`, nunca mais o
+`filial_id` cru do lote.
+
+**Segunda rodada do `/code-review` sobre esse mesmo fix** achou mais uma:
+o frontend (`LancarDesagioDialog.tsx`) replicava a regra caindo pra
+`lote.filial_id` quando a do extrato vinha NULL — divergindo do backend
+(que só olha o extrato, nunca o lote). Isso vira bug de verdade porque
+`getnet_antecipacao_lotes.filial_id` nunca teve FK real (diferente de
+`extratos_bancarios.filial_id`/`contas.filial_id`, que já tinham `ON
+DELETE SET NULL`): deletar uma filial depois de um lote vinculado a um
+extrato dela zera extrato/contas por cascade, mas deixava o lote com um
+UUID solto (dangling) — o frontend filtrava contas por esse UUID morto,
+dropdown sempre vazio, mesmo o backend aceitando qualquer conta nesse
+caso. Fix duplo: `ALTER TABLE getnet_antecipacao_lotes ADD CONSTRAINT
+... REFERENCES filiais(id) ON DELETE SET NULL` (raiz do problema — agora
+o lote nunca fica com UUID morto) + frontend para de cair pro
+`lote.filial_id`, usa só `lote.extratos_bancarios?.filial_id`, espelhando
+o backend à risca.
+
+Harness Docker estendido (`harness_pos_review_tests.sql`, T10-T13): lote
+global vincula com extrato de qualquer filial (T10); deságio numa conta
+de filial diferente da do extrato é rejeitado (T11); com a conta certa,
+aceita e grava a filial do extrato, não NULL (T12); deletar a filial
+depois do vínculo zera `getnet_antecipacao_lotes.filial_id` via FK (T13a)
+e o backend segue aceitando qualquer conta quando a filial do extrato já
+é NULL, consistente com o que o frontend corrigido passaria a filtrar —
+nada, sem UUID fantasma (T13b). 13/13 cenários (T1-T9 de §9.29 + T10-T13)
+OK.
+
+`npx tsc`: 63 baseline, 0 novos. `npx eslint`: limpo nos arquivos tocados.
+
+### 9.31 3 achados reais na 5ª rodada de review (Codex): saldo pago→pago, autorização de filial, contexto não repassado
+
+Mesmo ciclo de `/code-review` do §9.30, rodada seguinte, sobre o commit do
+fix anterior. 6 dos 9 comentários eram repetição do que já estava
+corrigido (mesmos 3 stale de sempre — competência, forma_pagamento legada,
+`useMemo` deps — confirmados de novo por leitura direta; mais os 2
+achados já mitigados de §9.29/9.28 — reversão pós-deploy, ajuste manual
+legado — que o Codex não tem como enxergar resolvidos porque a mitigação
+vive noutro arquivo/é uma decisão de produto, não uma mudança de código
+que o diff mostra). 3 eram reais, verificados por leitura direta antes de
+corrigir (`20260731120000_fin_pos_review_pr67_fixes3.sql`):
+
+1. **`atualizar_saldo_conta()` não cobria pago→pago.** O trigger (mesmo já
+   com o fix de §9.29 pra INSERT) só tratava as transições pendente↔pago —
+   editar valor/desconto/taxas/conta de uma transação que **continua**
+   `pago` (ex.: corrigir um valor digitado errado em algo já confirmado,
+   via `TransacaoDialog`) mudava `valor_liquido` na linha mas não tocava
+   `contas.saldo_atual`, que ficava desatualizado silenciosamente. Fix:
+   terceiro branch (`OLD.status='pago' AND NEW.status='pago'`) desfaz o
+   movimento antigo (conta/tipo/valor de antes) e aplica o novo — cobre
+   tanto o caso comum (mesma conta, valor mudou) quanto o mais raro
+   (conta_id ou tipo trocados mantendo pago).
+2. **`fin_vincular_lote_antecipacao`/`fin_lancar_desagio_antecipacao` não
+   verificavam acesso à filial do chamador** — só igreja_id. Sendo
+   `SECURITY DEFINER` (bypassa RLS), um tesoureiro restrito a uma filial
+   que soubesse o UUID de um lote/extrato de outra conseguia agir nele
+   direto via RPC, ignorando a segmentação de filial da UI — mesma classe
+   de gap que `fin_importar_recebivel_getnet` já cobria (e que o checklist
+   de `[[feedback-fin-rpc-security-checklist]]` prevê). Fix: os dois
+   ganharam `has_filial_access(v_igreja, filial_efetiva)` — filial do lote
+   quando definida, senão a do extrato (mesmo conceito de "filial efetiva"
+   de §9.30).
+3. **`fin_lancar_desagio_antecipacao` passava `NULL` pro `p_contexto` da
+   chamada aninhada a `fin_criar_lancamento`**, em vez do `v_ctx` já
+   resolvido. Sem efeito hoje (só tem call-site via UI/web, onde
+   `fin_resolver_contexto(NULL,...)` recalcula do zero sem problema), mas
+   quebraria um caller service-role (bot/edge) futuro — `fin_resolver_
+   contexto` exige `p_contexto` não-nulo nesse canal. Bug pré-existente
+   (a chamada já vinha assim antes desta PR), barato de corrigir já que a
+   função estava sendo tocada mesmo.
+
+Harness Docker estendido (T14-T16): editar valor de uma transação já paga
+rebalanceia o saldo pelo delta (T14); trocar `conta_id` mantendo pago move
+o saldo da conta antiga pra nova (T15); tesoureiro com `get_jwt_filial_id()`
+setado pra uma filial é rejeitado tentando vincular lote de outra e segue
+liberado pra vincular lote da própria (T16 — precisou de um pequeno stub
+novo no harness, `get_jwt_filial_id()` lendo de uma GUC setável por teste,
+já que o stub original do `harness2_schema.sql` retornava `NULL` fixo
+= acesso irrestrito sempre, incapaz de exercitar o caminho de rejeição).
+16/16 cenários no total (T1-T13 de §9.29/9.30 + T14-T16).
+
+`npx tsc`: 63 baseline, 0 novos (mudança 100% backend, nenhum arquivo TS
+tocado nesta rodada).
+
+### 9.32 6ª rodada de review: bug de sinal herdado do trigger original (nov/2025) + rede de segurança na FK
+
+Mesmo ciclo de `/code-review` de §9.29-9.31, rodada seguinte sobre o
+commit do fix anterior. 8 dos 10 comentários eram repetição (3 stale de
+sempre + 2 já mitigados fora do diff + 3 apontando pra versões antigas de
+arquivo já substituídas nos commits de §9.30/9.31 — o Codex ainda não
+tinha "visto" esses fixes quando gerou os comentários, mesmo já
+existindo). 2 reais, verificados por leitura direta
+(`20260731130000_fin_pos_review_pr67_fixes5.sql`):
+
+1. **Bug de sinal herdado do trigger original (nov/2025), nunca notado em
+   3 reescritas desta sessão.** A branch "pago → pendente/cancelado" de
+   `atualizar_saldo_conta()` desfaz o movimento testando `NEW.tipo` — mas
+   deveria testar `OLD.tipo` (o tipo que efetivamente gerou o movimento
+   quando a linha ficou paga). `fin_atualizar_lancamento` permite trocar
+   `tipo` E `status` no mesmo patch (os dois estão na allow-list): mudar
+   uma entrada paga de R$100 pra saída pendente no mesmo patch cai nessa
+   branch, mas testa o tipo NOVO ('saida') em vez do velho ('entrada') —
+   soma R$100 de novo em vez de subtrair os R$100 originais, um desvio de
+   R$200. As outras duas branches (pago novo, pago→pago — as duas escritas
+   nesta sessão) já usavam o tipo certo em cada lado; só a branch herdada
+   do código de nov/2025 tinha o bug, e ninguém reparou porque trocar
+   `tipo` e `status` juntos é raro na prática (a UI nunca faz isso — só a
+   RPC permite). Fix: troca `NEW.tipo` por `OLD.tipo` nessa branch
+   especificamente.
+2. **FK de `getnet_antecipacao_lotes.filial_id` (§9.30) sem limpeza prévia
+   de linha órfã** — se existisse uma linha com UUID de filial já
+   deletada, o `ADD CONSTRAINT` falharia (Postgres valida linhas
+   existentes). Avaliado e considerado sem risco real hoje: a tabela nasce
+   nesta mesma sequência de migrations e o deploy é sempre atômico no
+   merge (não há janela pra uma filial ser deletada "no meio"). Mantida
+   como rede de segurança mesmo assim — barato, e confirmado via harness
+   que não afeta nenhuma linha quando não há órfã (`UPDATE 0`).
+
+Harness Docker (T17): patch único trocando `tipo` (entrada→saida) e
+`status` (pago→pendente) ao mesmo tempo confirma que o saldo volta a zero
+(desfaz os R$100 originais), não sobe pra R$200 (bug antigo). 17/17
+cenários no total desta sequência de fixes pós-review.
+
+`npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
+
+### 9.33 7ª rodada de review: `useFormaPagamentoDinheiroId` só resolvia uma forma "Dinheiro" por igreja
+
+Mesmo ciclo de review, rodada seguinte. 12 dos 13 comentários eram
+repetição do que já estava corrigido em commits anteriores (§9.28-9.32).
+1 real, verificado por leitura direta antes de corrigir:
+
+`useFormaPagamentoDinheiroId` resolvia só a forma de pagamento "Dinheiro"
+mais antiga da igreja (`.order("created_at").limit(1)`), mas
+`formas_pagamento` pode ter uma linha "Dinheiro" por filial (mesmo padrão
+de duplicação já visto em §9.26 — a causa raiz ali era outra, falta de
+filtro de igreja/filial, mas o CONCEITO de "mais de um Dinheiro por
+igreja" é o mesmo). Igrejas com "Dinheiro" cadastrado por filial faziam
+`isPagamentoDinheiro` nunca bater pras transações que não usassem
+especificamente a forma mais antiga — "Conferido Manual" ficava invisível
+e o filtro correspondente excluía essas linhas silenciosamente, em
+`LancamentoCard`, `SessaoLancamentos` e `useTransacoesFiltro`. Achado
+antecipado já em §9.26 ("resolver determinística mas potencialmente pra
+filial errada... fica para outra sessão") — corrigido agora.
+
+Fix: `useFormaPagamentoDinheiroId` passa a retornar um `Set<string>` com
+TODOS os ids "Dinheiro" da igreja (não só o mais antigo);
+`isPagamentoDinheiro` (core/lib/status.ts) passa a checar pertencimento no
+Set em vez de igualdade com um id único. Aproveitado pra também matar a
+duplicação que `useTransacoesFiltro.ts` já tinha (reimplementava o mesmo
+`isDinheiro` inline em vez de chamar o helper compartilhado) — agora
+importa e usa `isPagamentoDinheiro` direto.
+
+`npx tsc`: 63 baseline, 0 novos — os 3 call-sites (`LancamentoCard`,
+`SessaoLancamentos`, `TransacoesPage`→`useTransacoesFiltro`) só passam a
+variável adiante, sem precisar de edição própria, o tipo `Set<string>`
+flui de ponta a ponta. `npx eslint`: mesmos 2 erros pré-existentes
+(confirmados via `git stash`), nenhum novo. Verificado por leitura
+cuidadosa da lógica (mudança pequena e mecânica — igualdade vira
+pertencimento em Set — sem harness dedicado, mesmo critério de escopo já
+usado nesta sessão pra fixes puramente de lógica TS de baixa
+complexidade).
+
+### 9.34 8ª rodada de review: vínculo lote↔extrato não era concurrency-safe
+
+Mesmo ciclo de review, rodada seguinte. 11 dos 12 comentários eram
+repetição (`useTransacoesFiltro.ts:72` não voltou — a linha mudou de
+verdade no commit de §9.33, então o Codex parou de ancorar comentário
+nela). 1 real, verificado por leitura direta:
+
+`fin_vincular_lote_antecipacao` trava a linha do LOTE (`FOR UPDATE WHERE
+id = p_lote_id`) e faz um `EXISTS` pra checar se o extrato já está
+vinculado a outro lote — mas isso não trava nada no EXTRATO. Duas
+chamadas concorrentes vinculando **lotes diferentes** ao **mesmo
+extrato** travam linhas de lote diferentes, então nenhuma bloqueia a
+outra: os dois `EXISTS` rodam antes de qualquer `UPDATE` comitar, os dois
+passam, os dois committam — o mesmo crédito bancário vira antecipação de
+2 lotes, e lançar os 2 deságios conta o mesmo dinheiro duas vezes.
+Clássico TOCTOU (time-of-check-to-time-of-use); o `EXISTS` sozinho nunca
+fecha esse tipo de janela, só uma constraint no banco fecha de verdade.
+
+Fix (`20260731140000_fin_lote_extrato_unique.sql`): índice único parcial
+em `extrato_bancario_id` (parcial porque a coluna é nullable — lotes
+ainda não vinculados podem ter `NULL` à vontade, só valores não-nulos
+precisam ser únicos). O `EXISTS` continua ali como fast-path (evita ida
+ao banco pro caso comum, sem corrida), mas quem garante de verdade é o
+índice; o `UPDATE` final ganha um handler de `unique_violation`
+convertendo o erro técnico do Postgres na mesma mensagem `FIN_VALIDACAO`
+amigável que o `EXISTS` já dava.
+
+Harness Docker (T18): confirma o fast-path via RPC (regressão) e, mais
+importante, simula a corrida de verdade fazendo um `UPDATE` direto
+(bypassando o `EXISTS` da RPC) tentando duplicar `extrato_bancario_id` —
+sem concorrência real de duas conexões, mas validando que a garantia que
+realmente importa (a constraint do banco) rejeita mesmo quando a camada
+de aplicação é contornada. 18/18 cenários no total desta sequência.
+
+`npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
+
+### 9.35 9ª rodada de review: total agrupado ignorava toggle líquido + conta global excluída no deságio
+
+Mesmo ciclo de review, sobre o commit de §9.34. 13 dos 15 comentários eram
+repetição de achados já corrigidos em commits anteriores desta mesma PR
+(inclusive 2 casos — FK órfã em `20260731110000` e índice único em
+`20260731140000` — onde a "correção" é reconhecer que não há risco real:
+a tabela `getnet_antecipacao_lotes` e a função vulnerável nasceram nesta
+mesma PR ainda não deployada, então não existe dado de produção que possa
+ter passado pela janela de corrida antes da constraint existir). Todas as
+13 threads stale foram respondidas com o commit onde já haviam sido
+corrigidas (ou a razão de não haver risco real) e marcadas como resolvidas
+na PR. 2 achados novos e reais, verificados por leitura direta:
+
+1. `Contas.tsx` → `renderTransactionListGrouped` (visão agrupada por data)
+   calculava o total do grupo e o valor de cada linha expandida sempre com
+   `Number(t.valor)` (bruto), ignorando o toggle Bruto/Líquido —
+   `valorEfetivo(t)` (que usa `valor_liquido` quando `visaoValor ===
+   "liquido"`) já existia e era usado corretamente na lista não-agrupada
+   (`renderTransactionList`), só não tinha sido aplicado na agrupada. Fix:
+   troca `Number(t.valor)` por `valorEfetivo(t)` nos 3 branches do total
+   (só-entrada, só-saída, misto) e no valor individual da linha expandida.
+
+2. `LancarDesagioDialog.tsx` → dropdown de conta filtrava com
+   `.eq("filial_id", filialEfetivaLote)` quando o extrato vinculado tinha
+   filial — em SQL, `NULL` nunca é igual a nada, então contas globais
+   (`filial_id IS NULL`) desapareciam do dropdown mesmo o backend
+   (`fin_lancar_desagio_antecipacao`, §9.30) aceitando explicitamente
+   conta global nesse caso (só rejeita quando `v_conta_filial IS NOT NULL
+   AND` diverge). Fix: troca por `.or("filial_id.eq.<uuid>,filial_id.is.null")`
+   pra incluir as globais, espelhando a regra do backend.
+
+Mudança 100% frontend, sem migration nova. `npx tsc`: 63 baseline, 0 novos
+nos dois arquivos.
+
+### 9.36 10ª rodada de review: mesmo padrão de filtro de filial em mais 2 hooks
+
+Mesmo ciclo, sobre o commit de §9.35. 26 dos 28 comentários retornados pela
+API eram os 13 threads de §9.35 (já resolvidas, a API de comments as lista
+de novo independente do estado de resolução) mais as próprias 13 respostas.
+2 novos, mesma classe de bug do item 2 de §9.35 — filtro `.eq("filial_id",
+filialId)` excluindo registro global (`filial_id IS NULL`) que deveria
+ficar visível em qualquer filial:
+
+1. `useLotesAntecipacao.ts:43` — lista de lotes de antecipação Getnet, na
+   visão de uma filial específica, excluía lotes globais
+   (`getnet_antecipacao_lotes.filial_id IS NULL`) que o backend
+   (`fin_vincular_lote_antecipacao`, §9.30) aceita vincular a qualquer
+   extrato do tenant — tesoureiro de filial não conseguia nem ver o lote
+   pra iniciar o fluxo.
+
+2. `useDadosApoio.ts:120` — lista de formas de pagamento pro
+   `TransacaoDialog`, mesma exclusão para formas criadas em "Todas as
+   filiais" (`filial_id NULL`). Confirmado via RLS antes de corrigir
+   (`has_filial_access`, migration `20260105153404`: `... OR _filial_id IS
+   NULL`) — RLS já trata `filial_id NULL` como compartilhado; o filtro do
+   frontend era mais restritivo que a política real.
+
+Fix nos dois: troca `.eq("filial_id", filialId)` por
+`.or("filial_id.eq.<uuid>,filial_id.is.null")`.
+
+Achado extra (não corrigido, fora de escopo): grep por
+`.eq("filial_id"` no restante do código mostra ~150 outras ocorrências do
+mesmo padrão, em módulos fora do diff desta PR (Kids, Pessoas, Eventos,
+Voluntariado, Escalas etc.) — não faz parte deste PR nem foi sinalizado
+pelo Codex (só comenta linhas do diff). Candidato a uma varredura dedicada
+futura, não desta sessão.
+
+Mudança 100% frontend, sem migration nova. `npx tsc`: 63 baseline, 0 novos
+nos dois arquivos.
+
+### 9.37 11ª rodada de review: extrato global pulava o check de acesso à conta
+
+Mesmo ciclo, sobre o commit de §9.36. 2 novos, ambos reais:
+
+1. **`fin_lancar_desagio_antecipacao`** (última versão: 20260731120000) —
+   `has_filial_access(v_igreja, v_extrato.filial_id)` recebia a filial do
+   EXTRATO. Quando o extrato vinculado ao lote é global (`filial_id NULL`
+   — conta compartilhada), `has_filial_access` retorna `true` pra
+   QUALQUER usuário do tenant (mesma convenção de sempre: registro global
+   é compartilhado). E como o check de compatibilidade logo abaixo só
+   roda quando `v_extrato.filial_id IS NOT NULL`, ele também era pulado
+   nesse caso — nada validava que a CONTA escolhida (`p_conta_id`)
+   pertence a uma filial que o chamador realmente acessa. Um tesoureiro
+   da filial A que soubesse o UUID de uma conta da filial B conseguia
+   lançar o deságio nela diretamente via RPC (`SECURITY DEFINER` bypassa
+   RLS), desde que o lote estivesse vinculado a um extrato global.
+
+   Fix (`20260731150000_fin_desagio_filial_efetiva_extrato_global.sql`):
+   busca `v_conta_filial` ANTES do guard de acesso e checa
+   `has_filial_access(v_igreja, COALESCE(v_extrato.filial_id,
+   v_conta_filial))` — extrato com filial mantém o comportamento
+   original; extrato global passa a validar acesso contra a filial da
+   CONTA escolhida.
+
+   Harness Docker dedicado (schema mínimo reconstruído do zero — os
+   arquivos de sessões anteriores não sobreviveram no scratchpad; stubs
+   de `has_filial_access`/`fin_resolver_contexto` controlados por GUC de
+   sessão em vez de JWT real). 5 cenários rodados 2x (função pré-fix e
+   pós-fix, mesmos dados): T1/T2 (extrato com filial, conta mesma/outra
+   filial — regressão, comportamento idêntico nas duas versões) e T4/T5
+   (extrato global, conta própria/global — regressão, sempre sucede).
+   T3 (extrato global, conta de outra filial — o exploit) sucede
+   indevidamente na versão pré-fix e é corretamente rejeitado
+   (`FIN_TENANT: sem acesso à filial deste lote/extrato`) na pós-fix.
+
+2. **`LancarDesagioDialog.tsx`** — o fix de §9.35 (contas globais no
+   dropdown) só cobria o branch `filialEfetivaLote` truthy; o `else`
+   (extrato global, `filialEfetivaLote` null) ainda filtrava com
+   `.eq("filial_id", filialId)` puro, excluindo contas globais do mesmo
+   jeito. Mesma correção: `.or("filial_id.eq.<uuid>,filial_id.is.null")`
+   também nesse branch — espelha a regra efetiva do backend após o fix
+   do item 1 (extrato global valida contra a filial da conta, que pode
+   ser a própria filial do usuário OU global).
+
+`npx tsc`: 63 baseline, 0 novos.
+
+### 9.38 12ª rodada de review: mais 2 dropdowns excluindo registro global
+
+Mesmo ciclo, sobre o commit de §9.37. 2 novos, mesma classe de bug (`.eq
+("filial_id", filialId)` excluindo `filial_id IS NULL`), confirmados
+antes de corrigir:
+
+1. `VincularExtratoLoteDialog.tsx:109` — ao vincular um lote GLOBAL
+   (`lote.filial_id IS NULL`) num extrato, a lista de extratos candidatos
+   filtrava só pela filial atual, excluindo extratos compartilhados.
+   Confirmado contra o backend: `fin_vincular_lote_antecipacao`
+   (20260731140000) checa `has_filial_access(v_igreja,
+   COALESCE(v_lote.filial_id, v_extrato.filial_id))` — pra lote global,
+   isso é o acesso à filial do EXTRATO, que passa tanto pra extrato da
+   própria filial quanto pra global.
+
+2. `ConferenciaTotaisGetnetCard.tsx:37` — dropdown de conta pro card de
+   conferência de totais Getnet excluía contas compartilhadas. Confirmado
+   contra `fin_conferencia_totais_getnet` (20260729140000): a RPC só
+   valida `fin_validar_fk_tenant` (tenant), sem nenhuma restrição de
+   filial — o filtro do frontend era mais restritivo que a RPC.
+
+Fix nos dois: mesmo `.or("filial_id.eq.<uuid>,filial_id.is.null")` já
+usado em §9.35/9.36/9.37.
+
+Verificação de escopo: grep de `.eq("filial_id"` nos demais arquivos
+tocados por esta PR encontrou 1 ocorrência a mais dentro do diff
+(`ExportarTab.tsx:177`), mas é o mesmo código pré-existente apenas
+realocado por um refactor desta PR (aparece como remoção em uma posição
+e adição idêntica em outra no `git diff main...HEAD`) — não é lógica nova
+introduzida por esta PR, mesmo critério de "fora de escopo" de §9.36.
+
+`npx tsc`: 63 baseline, 0 novos.
+
+### 9.39 Varredura proativa (sem esperar 13ª rodada): mais um dropdown de conta
+
+4 rodadas seguidas (§9.35-9.38) encontraram a mesma classe de bug em
+arquivo diferente a cada vez — pedido do usuário pra rodar a varredura
+completa de uma vez em vez de continuar reativo por rodada do Codex.
+
+Grep de `.eq("filial_id"` em todos os 34 arquivos tocados por esta PR
+encontrou mais ocorrências além das já corrigidas. Escopo discutido e
+delimitado com o usuário: corrigir só o que interage diretamente com o
+fluxo Getnet desta PR; o resto fica registrado, não corrigido nesta
+sessão (evita inflar o diff da PR com bugs pré-existentes sem relação
+com Getnet).
+
+**Corrigido:** `useDadosApoio.ts` (dropdown de conta do `TransacaoDialog`,
+linha ~29) — mesmo padrão, `.eq("filial_id", filialId)` excluía contas
+compartilhadas. Trocado por `.or("filial_id.eq.<uuid>,filial_id.is.null")`.
+
+**Registrado, não corrigido (pré-existente, sem relação direta com
+Getnet — decisão explícita do usuário):**
+- `useLancamentos.ts` (linhas 67, 103, 121, 171) — mesma classe de bug em
+  `transacoes_financeiras`/`contas`/`categorias_financeiras`/
+  `extratos_bancarios`: registro global some das listas de Entradas/
+  Saídas e dos filtros quando o usuário está numa filial específica.
+  Confirmado que `categorias_financeiras` também suporta registro global
+  (`CategoriaDialog.tsx:82` grava `filial_id: !isAllFiliais ? filialId :
+  null`) e que a RLS de `transacoes_financeiras` usa `has_filial_access`
+  (mesma convenção NULL=compartilhado).
+- `useLancamentos.ts:138` (fornecedores) — **bug diferente, não desta
+  classe**: a tabela `fornecedores` nunca recebeu coluna `filial_id`
+  (só `igreja_id`, migration `20260103150000`); o filtro
+  `.eq("filial_id", filialScope)` provavelmente falha em runtime sempre
+  que `filialScope` é truthy. Não investigado a fundo — decisão do
+  usuário foi só registrar.
+- `Contas.tsx` (linhas 135, 288, 326) — página principal de Contas: lista
+  de contas, lista de transações do período e cálculo de totais por
+  conta, todos excluindo registro global do mesmo jeito.
+- `Reclassificacao.tsx:309` + `supabase/functions/reclass-transacoes/
+  index.ts:302` — preview de busca e action de aplicar reclassificação em
+  lote, ambos com o mesmo filtro; precisariam ser corrigidos EM CONJUNTO
+  (preview e apply têm que bater, senão preview mostra transação que o
+  apply não toca — risco já documentado em memória de sessão sobre lógica
+  duplicada cliente/servidor).
+- `ExportarTab.tsx:177` (exportação CSV) — mesmo padrão; código
+  pré-existente apenas realocado por esta PR (não é lógica nova), mesmo
+  critério de fora-de-escopo de §9.36.
+
+`npx tsc`: 63 baseline, 0 novos.
+
+### 9.40 13ª rodada de review: 4 achados novos, todos reais
+
+Mesmo ciclo, sobre o commit de §9.39. 4 novos, os 4 confirmados por
+leitura direta e corrigidos:
+
+1. **`TransacaoDialog.tsx`** — `formaPagamentoMudou` comparava só o
+   `formaPagamentoId` derivado (`""` sem tocar e `"none"` explícito
+   colapsam pro mesmo `null`). Numa transação legada sem
+   `forma_pagamento_id` mapeado, selecionar explicitamente "Não
+   especificado" também resultava em `null`, então a comparação achava
+   "sem mudança" e omitia `forma_pagamento_id` do patch — a RPC nunca via
+   a chave, o texto legado (`forma_pagamento`) ficava intocado, e a UI
+   reportava sucesso sem ter limpado nada. Fix: `formaPagamentoMudou`
+   passa a ser `true` sempre que o estado bruto do Select for `"none"`
+   (só acontece por ação explícita do usuário — o carregamento inicial
+   nunca seta esse valor), além da comparação por id já existente.
+
+2. **`LotesAntecipacaoTab.tsx`** — lote `vinculado` só oferecia "Lançar
+   como saída"; se o extrato escolhido estava errado, ou gerava deságio
+   não-positivo (rejeitado por `fin_lancar_desagio_antecipacao`), não
+   havia como corrigir o vínculo pela UI — apesar do backend
+   (`fin_vincular_lote_antecipacao`) permitir trocar o vínculo
+   livremente até `lancamento_criado`. Fix: botão "Corrigir vínculo"
+   adicionado ao lado de "Lançar como saída" nesse status, reabrindo
+   `VincularExtratoLoteDialog`.
+
+3. **`status.ts`** — `isPagamentoDinheiro` foi migrada nesta PR de
+   heurística por texto (`forma.toLowerCase().includes("dinheiro")`)
+   pra comparação por `forma_pagamento_id`, mas `fin_pagar_reembolso` é
+   um escritor explicitamente fora do escopo da FK (documentado na
+   própria migration `20260729130000`: "mantida como legado/fallback...
+   pros escritores fora de escopo") — só grava o texto
+   `forma_pagamento='dinheiro'`, nunca o id. Sem fallback, todo
+   reembolso pago em dinheiro parava de ser reconhecido como "Dinheiro"
+   em `LancamentoCard`, `SessaoLancamentos` e no filtro de conferência
+   manual (`useTransacoesFiltro`). Fix: `isPagamentoDinheiro` ganha um
+   3º parâmetro opcional (texto legado) e cai pro fallback de substring
+   só quando `formaPagamentoId` é nulo; os 3 call sites passam o campo
+   `forma_pagamento` (que `SessaoLancamentos.tsx` nem buscava no
+   `select` — adicionado).
+
+4. **`VincularExtratoLoteDialog.tsx`** — sem
+   `data_contratacao_contrato` (import histórico sem essa coluna
+   preenchida), `dataAncora` caía pra "hoje", e a janela fixa
+   `hoje-5..hoje+30` excluía qualquer crédito de um contrato antigo —
+   sem controle de data na UI pra compensar, o lote ficava impossível de
+   vincular. Fix: filtro de data só é aplicado quando
+   `data_contratacao_contrato` existe; sem âncora confiável, a busca por
+   texto (já existente) fica sem filtro de data nenhum.
+
+`npx tsc`: 63 baseline, 0 novos.
+
+### 9.41 14ª rodada de review: sincronizar competência de grupo não era atômico
+
+Mesmo ciclo, sobre o commit de §9.40. 1 novo, real: `handleSincronizar
+CompetenciaGrupo` chama duas RPCs em sequência — `alterarCompetenciaGrupo`
+(muda a competência de TODAS as parcelas do grupo) e, se `patchRestante`
+não estiver vazio, `atualizarLancamento` (reaplica o resto do patch
+original: descrição, valor, forma de pagamento etc. — ver D10/§9.19). As
+duas não rodam na mesma transação de banco; se a segunda falhar (FK
+apagada ou transação conciliada concorrentemente, por exemplo), a
+competência do grupo inteiro já tinha sido commitada pela primeira, mas o
+resto das edições pedidas no mesmo submit se perdia — o catch só mostrava
+um erro genérico, sem meio de desfazer o que já tinha sido salvo.
+
+Fix (compensação, não transação real — as duas RPCs continuam
+independentes): o estado `confirmarSincronizarGrupo` passa a guardar
+`competenciaAnterior` (capturada de `transacao.data_competencia` no
+momento em que o bloqueio `FIN_COMPETENCIA_GRUPO` é detectado). Se
+`atualizarLancamento` falhar depois da competência já ter sido
+sincronizada, tenta reverter o grupo pra `competenciaAnterior` via uma
+segunda chamada a `alterarCompetenciaGrupo` — sucesso ou falha do
+revert, o toast final deixa claro pro usuário se ficou tudo desfeito ou
+se precisa conferir manualmente (não há como isso passar despercebido em
+qualquer um dos 3 desfechos possíveis: tudo certo, revertido, ou
+precisa de conferência manual).
+
+`npx tsc`: 63 baseline, 0 novos.
+
+### 9.42 15ª rodada de review: checagem de grupo parcelado sem lote em massa
+
+Mesmo ciclo, sobre o commit de §9.41. 1 novo, real:
+`reclass-transacoes/index.ts` (job de reclassificação em massa, aceita
+até 5000 transações) — ao alterar `data_competencia`, a checagem de
+"todas as parcelas irmãs estão na seleção" (D10, §9.19) montava um único
+`.or()` com 2 predicados UUID (`lancamento_pai_id.eq.<id>,id.eq.<id>`)
+por grupo parcelado distinto (`paisAlvo`). Um lote grande com muitos
+grupos parcelados diferentes gera uma URL de centenas de KB, rejeitada
+pelo gateway antes da checagem — nem a query de irmãs nem o update
+chegam a rodar, o job falha inteiro sem mensagem útil.
+
+Fix: `paisAlvo` dividido em lotes fixos de 100 antes de montar cada
+`.or()`, resultados unidos em `grupoCompleto` — mesma lógica e mesmo
+resultado final, só bounded por requisição.
+
+Deno edge function, fora do `npx tsc` do projeto principal — checado com
+`deno check supabase/functions/reclass-transacoes/index.ts` (limpo).
+
+### 9.43 16ª rodada de review: exclusão de lançamento pago deixava resíduo de saldo
+
+Mesmo ciclo, sobre o commit de §9.42. 1 novo, real e diretamente causado
+por uma mudança desta própria PR: `20260731100000` (§9.29) estendeu o
+trigger `trigger_atualizar_saldo_conta` pra cobrir `AFTER INSERT` (além
+de `UPDATE OF status`), pra RPCs que criam lançamento já `'pago'` direto
+(`fin_lancar_sessao`, `fin_pagar_reembolso`,
+`fin_lancar_desagio_antecipacao` desta mesma PR) moverem
+`contas.saldo_atual` corretamente na criação.
+
+Efeito colateral não percebido: `fin_excluir_lancamento` sempre fez
+`DELETE` físico de linha paga (só emite warning, não bloqueia — decisão
+deliberada de antes desta PR, documentada e mitigada pelo botão
+"Recalcular Saldo"). Antes de `20260731100000`, deletar uma transação
+paga criada via INSERT direto era neutro pro saldo (o trigger nunca
+tinha movido nada nesse INSERT). Depois, o INSERT passou a mover — mas o
+trigger nunca ganhou um branch de `DELETE`, então excluir essa mesma
+transação paga passou a deixar sempre um resíduo real no saldo (mesma
+classe de drift que o warning já alertava, só que agora acontece
+sistematicamente pra qualquer lançamento pago recém-criado excluído, não
+só num caso raro).
+
+Fix (`20260731160000_fin_saldo_conta_reversao_delete.sql`): trigger
+ganha branch `TG_OP = 'DELETE'` desfazendo o movimento
+(`OLD.tipo`/`OLD.valor_liquido`) quando a linha excluída estava paga —
+mesmo raciocínio do branch "pago → pendente/cancelado" já existente.
+Trigger recriado incluindo `DELETE` no evento. Warning de
+`fin_excluir_lancamento` removido (deixou de ser verdade: saldo agora É
+recalculado automaticamente na exclusão de linha paga).
+
+Harness Docker dedicado (schema mínimo: só `contas` + `transacoes_
+financeiras` + o trigger em si, sem as RPCs — testa o trigger
+diretamente via INSERT/DELETE crus). 4 cenários, 2 rodadas (trigger
+pré-fix e pós-fix, mesmos dados): T1 (insert entrada paga → saldo sobe)
+e T3 (delete de transação pendente não mexe no saldo) idênticos nas
+duas rodadas. T2 (delete de entrada paga) e T4 (insert+delete de saída
+paga) confirmam o bug na pré-fix (saldo fica com resíduo) e a correção
+exata na pós-fix (saldo volta a 0 nos dois casos).
+
+`npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
+
+### 9.44 17ª rodada de review: paginação faltando no batching de §9.42
+
+Mesmo ciclo, sobre o commit de §9.43. 1 novo, real — segunda camada do
+mesmo achado de §9.42: dividir `paisAlvo` em lotes de 100 resolveu o
+tamanho da URL, mas cada lote ainda podia retornar mais linhas do que o
+limite de resposta do PostgREST (`db-max-rows`, aplicado mesmo sem
+`.limit()` explícito) — 100 grupos parcelados com muitas parcelas cada
+soma rápido. Um corte silencioso na resposta faria `irmasForaDaSelecao`
+ficar vazio por engano se as parcelas irmãs faltantes caírem
+precisamente na página cortada, deixando passar uma sincronização de
+competência que viola o invariante de grupo completo (D10) — o próprio
+bug que essa checagem existe pra prevenir.
+
+Fix: cada lote de 100 pais passa a paginar com `.range()` (páginas de
+500) até uma página vir mais curta que o tamanho da página — não depende
+de conhecer o limite exato configurado no servidor, só do padrão
+"página incompleta = acabou".
+
+Deno edge function — checado com `deno check` (limpo).
+
+### 9.45 18ª rodada de review: 2 follow-ups reais + 1 thread antiga esquecida
+
+Sobre o commit de §9.44, mais uma thread que sobrou de rodadas bem
+anteriores (nunca tinha sido respondida/resolvida — escapou do
+fluxo por não estar ancorada num dos commits HEAD checados nas rodadas
+anteriores):
+
+0. `useFormaPagamentoDinheiroId.ts` — comentário de 2026-07-31T12:03,
+   já corrigido desde 35da158 (sessão anterior a esta): a query já
+   retorna TODOS os ids "Dinheiro" da igreja (`ilike` + sem `.limit(1)`),
+   não só o mais antigo. Confirmado por leitura direta, sem código novo
+   — só resposta e resolução da thread.
+
+1. `VincularExtratoLoteDialog.tsx` — mesma classe do achado de §9.44: a
+   busca de extratos candidatos (`extratos_bancarios`) não paginava.
+   Pra lote sem `data_contratacao_contrato` (§9.40 removeu o filtro de
+   data nesse caso), a busca varre todo o histórico de créditos — fácil
+   passar do teto de 1000 linhas do PostgREST, cortando a resposta em
+   silêncio; como o filtro de texto é aplicado client-side sobre o que
+   já veio, um crédito antigo válido fora da primeira página nunca
+   seria encontrado. Fix: mesma paginação por `.range()`, mas com um
+   detalhe a mais que o de §9.44 não precisava — o builder do
+   supabase-js não é seguro reexecutar após o primeiro `await` (cada
+   página anterior já tinha disparado o fetch), então virou uma fábrica
+   `montarQuery()` que recria os mesmos filtros a cada página, com
+   `.order("id")` adicional como desempate estável de `data_transacao`
+   entre páginas.
+
+2. `reclass-transacoes/index.ts` — no fix de paginação de §9.44 (as
+   próprias requisições `.range()` que resolveram o corte de linhas),
+   faltava um `.order()` determinístico. SQL não garante ordem estável
+   entre requisições `LIMIT/OFFSET` separadas sem `ORDER BY` — páginas
+   podiam se sobrepor ou pular linhas, e uma irmã pulada fazia a
+   checagem de grupo completo (D10) passar por engano, o mesmo risco que
+   a paginação de §9.44 tentou fechar. Fix: `.order("id")` antes de cada
+   `.range()`.
+
+`npx tsc`: 63 baseline, 0 novos. Deno edge function checada com
+`deno check` (limpo).
+
+### 9.46 19ª rodada de review: paginação alastrando + Dinheiro desativado
+
+Mesmo ciclo, sobre o commit de §9.45. 3 novos, todos reais — a mesma
+lacuna de paginação continuou aparecendo à medida que cada fix anterior
+deixava mais uma consulta parecida exposta:
+
+1. `useLotesAntecipacao.ts` — listagem principal de lotes de antecipação
+   (`LotesAntecipacaoTab`) sem paginação; igreja com mais de 1000 lotes
+   visíveis perderia os mais antigos em silêncio, sem conseguir vincular/
+   lançar contratos históricos pela aba nova. Fix: mesmo padrão de
+   `.range()` + fábrica de query + `.order("id")` como desempate (
+   `data_contratacao_contrato` pode repetir ou ser `NULL` entre lotes).
+
+2. `VincularExtratoLoteDialog.tsx` — a consulta de lotes já vinculados
+   (`jaVinculados`, usada só pra excluir extratos já ocupados da lista de
+   candidatos) também sem paginação — E sem filtro de `igreja_id`
+   nenhum (lia `getnet_antecipacao_lotes` do banco inteiro, todos os
+   tenants, o que só piorava o risco de estourar a página). Passar de
+   1000 lotes vinculados no tenant faria um extrato já ocupado continuar
+   aparecendo como candidato disponível, falhando só depois no índice
+   único do backend (§9.34) — usuário descobre um a um por tentativa e
+   erro. Fix: escopa por `igreja_id` (reduz drasticamente o teto de
+   risco sozinho) + mesma paginação por `.range()`.
+
+3. `useFormaPagamentoDinheiroId.ts` — o `.eq("ativo", true)` (adicionado
+   nesta mesma PR, §9.33) misturava dois usos diferentes: filtrar formas
+   pra um SELETOR de transação nova (onde só ativa faz sentido) com
+   DETECÇÃO de transações históricas que já apontam pra uma forma
+   "Dinheiro" (onde o estado atual de `ativo` é irrelevante — a
+   transação já foi paga daquele jeito). Desativar uma forma "Dinheiro"
+   fazia toda transação histórica com aquele FK non-null passar a ser
+   tratada como não-dinheiro, já que `isPagamentoDinheiro` só cai pro
+   fallback de texto quando o id é `null`, nunca quando é um id válido
+   mas não reconhecido. Fix: hook de detecção não filtra mais por
+   `ativo`.
+
+`npx tsc`: 63 baseline, 0 novos.
+
+### 9.47 20ª rodada de review: 1º P1 real desde a varredura de paginação
+
+Mesmo ciclo, sobre o commit de §9.46. 3 novos — 2 P1, 1 P2, todos reais:
+
+1. **Limpeza de filial órfã ainda tarde demais** (P1) — §9.35 e §9.39 já
+   tinham discutido essa mesma constraint (`getnet_antecipacao_lotes_
+   filial_id_fkey`, `20260731110000`) e concluído "sem risco real hoje".
+   O achado novo não contesta isso — aponta que, MESMO SEM risco hoje, a
+   limpeza "rede de segurança" ficou em `20260731130000`, DUAS migrations
+   DEPOIS do `ADD CONSTRAINT` que ela deveria proteger; se a premissa
+   "sem risco" um dia deixar de valer, a limpeza nunca seria alcançada
+   (a sequência pararia no próprio `ADD CONSTRAINT` antes de chegar
+   nela). Fix: `UPDATE ... SET filial_id = NULL WHERE NOT EXISTS (...)`
+   movido pra dentro de `20260731110000`, imediatamente antes do `ADD
+   CONSTRAINT`; removido de `20260731130000` (editar uma migration já
+   escrita NESTA MESMA PR ainda não deployada é seguro — não existe
+   histórico de produção pra preservar).
+
+2. **`fin_excluir_lancamento` reverte movimento que uma linha legada
+   nunca teve** (P1) — o branch `DELETE` do trigger (§9.43) assume que o
+   `INSERT` da linha aplicou o movimento. Verdade só pra linhas criadas
+   DEPOIS de `20260731100000` (quando o trigger passou a cobrir INSERT).
+   Uma linha paga criada ANTES disso por um escritor de INSERT-direto
+   (`fin_lancar_sessao`, `fin_pagar_reembolso`) nunca teve seu movimento
+   aplicado pelo trigger antigo — excluir essa linha agora desfaz um
+   movimento que nunca existiu, na direção OPOSTA. Sem marcador nas
+   linhas existentes pra distinguir "legada" de "nova".
+
+   Fix (`20260731170000_fin_saldo_recalculo_delete_e_snapshot_
+   competencia.sql`): em vez de tentar identificar linhas legadas,
+   `fin_excluir_lancamento` chama `fin_recalcular_saldo_conta(conta_id,
+   true)` depois do `DELETE` de uma linha que estava paga. Recalcular do
+   zero (`saldo_inicial + Σ pagas restantes`) é autoritativo e não
+   depende de nenhuma suposição sobre o que o trigger aplicou
+   historicamente — vira no-op pro caso novo (trigger já tinha acertado)
+   e corrige o caso legado (trigger errou).
+
+   Harness Docker dedicado: simula uma linha legada aplicando o trigger
+   ANTIGO (só `UPDATE`) no INSERT (saldo fica 0, confirmando que o
+   INSERT não moveu nada) e só DEPOIS troca pro trigger novo (com
+   `DELETE`) antes de excluir — reproduz o resíduo (-100 em vez de 0) na
+   versão pré-fix de `fin_excluir_lancamento`, confirma a correção
+   (saldo volta a 0) na pós-fix, e 2 regressões (linha nova
+   paga/excluída, linha pendente excluída) sem mudança de comportamento.
+
+3. **Compensação de competência não restaura parcelas individualmente**
+   (P2, sobre o fix de §9.41) — `handleSincronizarCompetenciaGrupo`
+   guarda só a competência da PARCELA EDITADA como `competenciaAnterior`
+   e reaplica esse único valor a TODAS as parcelas se precisar reverter.
+   Pra um grupo LEGADO que já tinha competências divergentes entre as
+   parcelas antes desta ação (exatamente o público que a sincronização
+   existe pra atender), isso não restaura cada parcela pro seu valor
+   original — e a mensagem "nada foi alterado" fica falsa nesse caso.
+
+   Fix: `fin_alterar_competencia_grupo` já calculava `v_snapshot`
+   (competência de cada parcela ANTES da sincronização) só pra
+   auditoria — passou a devolver `snapshot_antes` no retorno também.
+   Frontend usa isso pra saber se o grupo já era uniforme (revert de
+   verdade, mesma mensagem de antes) ou já divergente (mensagem honesta:
+   sincronizado de volta pra um valor único, mas não dá pra restaurar o
+   valor individual de cada parcela sem uma RPC dedicada — restaurar
+   linha a linha via `fin_atualizar_lancamento` disparia o próprio
+   `FIN_COMPETENCIA_GRUPO` no meio do caminho). Testado via harness
+   Docker: grupo com competências divergentes (`2026-01-01`/
+   `2026-02-01`) confirma que `snapshot_antes` retorna os dois valores
+   originais corretamente.
+
+`npx tsc`: 63 baseline, 0 novos (item 3 frontend + 2 RPCs backend).
+
+### 9.48 21ª rodada de review: undo-import tinha o mesmo bug de linha legada
+
+Mesmo ciclo, sobre o commit de §9.47. 2 novos, ambos reais:
+
+1. **`undo-import/index.ts`** (P1) — mesmo achado de §9.47 (linha paga
+   legada, criada antes de `20260731100000`, nunca teve o movimento
+   aplicado pelo trigger antigo), mas por um caminho DIFERENTE: essa
+   edge function desfaz um job de importação inteiro com um `DELETE`
+   direto na tabela (`transacoes_financeiras.delete().in("id", ...)`),
+   sem passar por `fin_excluir_lancamento` — o fix de §9.47 (recalcular
+   saldo após excluir linha paga) não cobre esse caminho porque não é
+   chamado por ele.
+
+   Fix: busca `conta_id`/`status` das transações ANTES do `DELETE` (não
+   dá pra saber depois), monta o conjunto de contas afetadas por pelo
+   menos uma linha PAGA, e chama a RPC `fin_recalcular_saldo_conta`
+   (service role, contexto `{igreja_id: job.igreja_id, ator_profile_id,
+   canal: 'import-undo'}`) pra cada uma depois do delete — mesma
+   estratégia autoritativa de §9.47, aplicada no nível do edge function
+   já que aqui é uma exclusão em massa multi-conta, não uma RPC por
+   linha. `deno check` limpo; lógica idêntica à já validada via harness
+   em §9.47 (só a orquestração de "quais contas recalcular" é nova,
+   sem SQL novo), harness não repetido.
+
+2. **`EntradasCalendario.tsx`** (P2) — dia com total BRUTO zero
+   (entrada e saída se cancelando, ex.: R$100 de entrada com R$10 de
+   taxa + R$100 de saída) escondia o bloco inteiro, inclusive o total
+   LÍQUIDO que não era zero (-R$10 no exemplo). Fix: gate trocado de
+   `total !== 0` pra `(total !== 0 || totalLiquido !== 0)`.
+
+   Observação (não corrigido): `SaidasCalendario.tsx`,
+   `EntradasTimelineCalendario.tsx` e `SaidasTimelineCalendario.tsx` têm
+   a mesma estrutura de card com líquido condicional, mas usam `total >
+   0` (não `total !== 0`) — uma condição logicamente diferente (também
+   esconde totais negativos, não só zero) que não foi concretamente
+   demonstrada como bug pelo review; fora de escopo desta rodada.
+
+`npx tsc`: 63 baseline, 0 novos. Deno edge function checada com
+`deno check` (limpo).
+
+### 9.49 22ª rodada de review: 2 P2 corrigidos; o P1 (3º da série "linha legada") em análise separada
+
+Mesmo ciclo, sobre o commit de §9.48. 3 novos — 2 P2 já corrigidos aqui, o
+P1 é o TERCEIRO achado da mesma classe "linha paga legada" (§9.47 DELETE
+via `fin_excluir_lancamento`, §9.48 DELETE via `undo-import`, agora UPDATE
+via "Marcar como Pendente") — tratado à parte por levantar uma decisão de
+escopo (patch pontual vs. fix na raiz do trigger), alinhada com o usuário
+antes de agir.
+
+1. **`ImportarRecebivelGetnetTab.tsx`** (P2) — `parseLinha` preenche
+   índices fora do array com `celulas[idx] ?? ""` → `null`; uma linha
+   truncada ou com um `;` a mais (deslocando colunas) nunca era rejeitada
+   por contagem de células, só produzia campos `null` que a RPC de
+   importação aceita — a linha malformada entrava como "importada com
+   sucesso", poluindo os dados do lote em silêncio. Fix: valida
+   `celulas.length === HEADER_ESPERADO.length` antes de chamar
+   `parseLinha`; linhas com contagem errada são descartadas, contadas
+   à parte de "subtotal ignorado", e sinalizadas com um alerta
+   destrutivo + toast (não é um caso normal como o subtotal, é sinal de
+   arquivo malformado).
+
+2. **`LotesAntecipacaoTab.tsx` / `fin_conferencia_totais_getnet`** (P2)
+   — depois do deságio lançado, a despesa paga gerada podia ser revertida
+   (pendente/cancelada) pelo menu normal de transações
+   (`TransacaoActionsMenu`) sem nada sincronizar o lote de volta: ficava
+   travado em `lancamento_criado` sem ação de relink/relançar na aba, E
+   `fin_conferencia_totais_getnet` continuava somando essa despesa (a
+   query só filtra `lote.status = 'lancamento_criado'`, nunca checa o
+   status atual da transação referenciada).
+
+   Fix (`20260731180000_fin_lote_antecipacao_sincroniza_reversao.sql`):
+   trigger novo em `transacoes_financeiras` — linha com
+   `origem_registro='getnet_antecipacao_desagio'` que estava paga e deixa
+   de estar (`UPDATE` pago→não-pago) reseta o lote correspondente pra
+   `status='vinculado'` (mantém `extrato_bancario_id`, só limpa
+   `lancamento_desagio_id`) — `LotesAntecipacaoTab` volta a oferecer
+   "Corrigir vínculo"/"Lançar como saída" naturalmente, e a conferência
+   para de contar o lote. Branch `DELETE` incluído por simetria mas hoje
+   inalcançável na prática (`lancamento_desagio_id` referencia
+   `transacoes_financeiras(id)` sem `ON DELETE`, migration
+   `20260729100000` — qualquer `DELETE` de linha ainda referenciada falha
+   na própria FK antes do trigger); mantido como defesa em profundidade,
+   testado isoladamente no harness (schema de teste sem essa FK, só pra
+   validar a lógica do trigger em si). 4 cenários no harness: revert
+   pago→pendente (reseta), transação sem essa origem (regressão, não
+   mexe), delete de paga com essa origem (reseta, testado sem a FK real),
+   `UPDATE OF status` disparado mas valor final continua `'pago'`
+   (regressão, não mexe).
+
+`npx tsc`: 63 baseline, 0 novos (item 1). Migration do item 2 validada
+via harness Docker dedicado.
+
+### 9.50 P1 de §9.49 — fix na raiz: trigger de saldo para de somar/subtrair, sempre recalcula
+
+3ª ocorrência da mesma classe de bug em 3 rodadas seguidas (§9.47 DELETE
+via `fin_excluir_lancamento`, §9.48 DELETE via `undo-import`, §9.49 UPDATE
+via "Marcar como Pendente") — sempre a mesma causa raiz: `atualizar_saldo_
+conta()` fazia matemática INCREMENTAL, e todo branch que "desfaz" um
+movimento assume que ele foi de fato aplicado quando a linha ficou paga.
+Verdade só pra linhas cujo INSERT rodou com o trigger já cobrindo INSERT
+(desde `20260731100000`); uma linha paga criada antes disso por um
+escritor de INSERT-direto (`fin_lancar_sessao`, `fin_pagar_reembolso`)
+nunca teve seu movimento aplicado — qualquer tentativa de desfazê-lo
+corrompia o saldo. 2 patches pontuais já não bastavam; decisão explícita
+do usuário foi resolver na raiz em vez de continuar caçando o próximo
+caminho.
+
+Fix (`20260731190000_fin_saldo_conta_sempre_recalcula.sql`): o trigger
+NUNCA MAIS soma/subtrai incrementalmente. Qualquer evento envolvendo linha
+paga (INSERT pago, DELETE de paga, UPDATE onde `OLD.status='pago' OU
+NEW.status='pago'` — cobre transição de status nos dois sentidos E edição
+de valor/conta/tipo mantendo status pago) recalcula a(s) conta(s)
+afetada(s) DO ZERO via um helper interno novo
+(`_fin_recalcular_saldo_conta_raw`, sem `fin_resolver_contexto` —
+propositalmente sem exigir contexto/permissão, já que roda de dentro do
+trigger disparado por qualquer caller incluindo service_role sem
+`p_contexto`; sem grant pra `authenticated`/`anon`/`service_role`, só
+acessível via ownership de dentro de outra função `SECURITY DEFINER`).
+Elimina a classe de bug inteira, permanentemente, em qualquer caminho
+atual ou futuro — não depende mais de nenhuma suposição sobre o que um
+INSERT anterior aplicou. Custo: uma `SUM` por evento em vez de O(1);
+aceitável na escala esperada (transações por conta de uma igreja).
+
+Consequência: os patches pontuais de §9.47 (`fin_excluir_lancamento`
+chamando `fin_recalcular_saldo_conta` explicitamente) e §9.48
+(`undo-import` fazendo o mesmo em loop) ficaram redundantes — removidos
+nesta mesma migration/commit pra não recalcular a mesma conta 2x à toa.
+
+Harness Docker dedicado, 8 checagens em 2 rodadas (trigger antigo só pro
+setup da linha legada, depois trocado pelo novo): T1 reproduz o cenário
+exato do P1 desta rodada (unpay de linha legada — saldo correto, não mais
+corrompido); T2 insert+delete de linha nova (regressão); T3 edição de
+valor numa linha que continua paga, sem duplicar nem perder a diferença;
+T4 troca de `conta_id` numa linha paga — as DUAS contas recalculadas
+corretamente; T5 pendente→pago normal; T6 pendente editada e excluída não
+mexe no saldo. Todas bateram exatamente com o esperado.
+
+`npx tsc`/`deno check`: 0 novos (mudança 100% backend + simplificação do
+`undo-import`).
+
+### 9.51 23ª rodada de review: 2 P1 sobre os fixes de §9.49/§9.50 — corrida no recálculo + deságio órfão reativável
+
+Mesmo ciclo, sobre os 2 commits mais recentes (§9.49 e §9.50). 2 novos,
+ambos P1, ambos reais, cada um sobre um fix desta mesma sessão:
+
+1. **Corrida em `_fin_recalcular_saldo_conta_raw`** — a versão de §9.50
+   fazia `UPDATE contas SET saldo_atual = (SELECT SUM(...) ...)` num
+   único statement. A subquery do `SET` usa o snapshot de QUANDO ESSE
+   UPDATE COMEÇOU (READ COMMITTED); esperar a trava de outra transação
+   concorrente recalculando a MESMA conta só re-checa (EvalPlanQual) as
+   colunas da própria linha de `contas`, não dá um snapshot novo pra
+   subquery sobre `transacoes_financeiras`. Duas transações inserindo
+   pago pra mesma conta ao mesmo tempo: a segunda espera a trava da
+   primeira, mas quando prossegue ainda soma com o snapshot de ANTES de
+   esperar — sobrescreve `saldo_atual` com uma soma que nasce sem um dos
+   dois movimentos.
+
+   Fix: trava a conta (`SELECT ... FOR UPDATE`) numa statement SEPARADA
+   antes da soma — depois que a espera termina, a soma (statement nova)
+   pega um snapshot fresco, já vendo o que a outra transação commitou.
+   Mesmo padrão que `fin_recalcular_saldo_conta` (RPC pública) já usava
+   desde `20260710120000`; só o helper interno novo tinha colapsado tudo
+   num único `UPDATE`.
+
+   Harness Docker com 2 sessões `psql` concorrentes de verdade (uma em
+   background, `pg_sleep(3)` segurando a trava antes de commitar; a
+   outra inicia ~1s depois, bloqueia na trava, e só prossegue quando a
+   primeira libera): reproduziu o bug na versão pré-fix (saldo final
+   -30 em vez de 70 — o movimento de +100 da primeira sessão sumiu) e
+   confirmou a correção exata (70) na pós-fix.
+
+2. **Deságio órfão reativável** — o trigger de §9.49 reseta o LOTE
+   quando sua despesa é revertida, mas a transação original continua
+   existindo, com `origem_registro='getnet_antecipacao_desagio'`,
+   disponível pro "Marcar como Pago" comum. Como `fin_lancar_desagio_
+   antecipacao` sempre cria a transação JÁ paga (`fin_criar_lancamento`
+   com `status='pago'` no INSERT — nunca passa por pendente→pago na
+   criação), a ÚNICA forma de uma linha dessa origem fazer a transição
+   pendente/cancelado→pago é justamente essa reativação órfã. Sem
+   guarda, dava pra pagar de novo a transação órfã E lançar um deságio
+   NOVO pelo lote (já resetado pra `vinculado`) — deságio contado duas
+   vezes, e `fin_conferencia_totais_getnet` só vê o novo.
+
+   Fix: trigger `BEFORE UPDATE OF status` novo — rejeita reativar
+   (pendente/cancelado→pago) uma linha `origem_registro=
+   'getnet_antecipacao_desagio'` que não é mais referenciada por
+   nenhum lote, com mensagem `FIN_DESAGIO_ORFAO` orientando a lançar um
+   novo deságio pelo lote em vez de reaproveitar a linha órfã.
+
+   Harness Docker, 3 cenários: transação órfã (bloqueia, mensagem
+   correta), transação da mesma origem mas AINDA referenciada por um
+   lote — caso defensivo que não deveria ocorrer na prática, mas
+   confirma que o guard não trava cegamente por origem sozinha (permite
+   corretamente), e transação comum sem essa origem (não afetada).
+
+Migration única (`20260731200000_fin_saldo_lock_e_impede_desagio_orfao.
+sql`) pros dois fixes — ambos P1 sobre o mesmo par de commits, mesma
+rodada de review. `npx tsc`: 63 baseline, 0 novos (mudança 100%
+backend).
+
+### 9.52 24ª rodada de review: mais 2 achados sobre os triggers de deságio de §9.51
+
+Mesmo ciclo, sobre o commit de §9.51 (`58aae40`). 2 novos — 1 P1, 1 P2,
+ambos sobre os triggers de proteção de deságio criados na rodada anterior;
+editados diretamente nos arquivos de origem (`20260731180000`/
+`20260731200000`, ambos ainda não deployados nesta mesma PR — mesma
+prática já usada em §9.47):
+
+1. **Editar deságio ainda vinculado** (P1) — o guard de §9.51
+   (`impedir_reativar_desagio_orfao`) só bloqueava REATIVAR
+   (pendente→pago) uma linha órfã; não bloqueava editar valor/conta/
+   tipo/data de uma linha AINDA paga e vinculada a um lote
+   `lancamento_criado`. O editor comum de transação deixava mudar esses
+   campos livremente, divergindo do deságio calculado a partir do
+   contrato/extrato no lançamento original sem o lote saber — `fin_
+   conferencia_totais_getnet` propagaria o valor adulterado sem aviso
+   (lote continua `lancamento_criado`, conferência confia cegamente no
+   valor atual da transação).
+
+   Fix: função renomeada pra `proteger_desagio_vinculado` (escopo mais
+   amplo que só "órfã"), ganha um segundo check — rejeita mudar
+   `valor`/`valor_liquido`/`conta_id`/`tipo`/datas enquanto a linha
+   estiver vinculada a um lote (`FIN_DESAGIO_VINCULADO`). Mudar só o
+   `status` continua permitido (é o caminho de reverter/desvincular,
+   tratado pelo trigger de §9.49). Harness Docker, 4 cenários com os 3
+   triggers de deságio juntos (a extração parcial pro harness inicial
+   mascarou um dos triggers irmãos, corrigido aplicando o arquivo real
+   inteiro): editar valor vinculada (bloqueia), reverter status sem
+   editar mais nada (permite — desvincula o lote), editar valor DEPOIS
+   de já desvinculada/órfã (permite — vira transação comum), transação
+   sem essa origem (não afetada).
+
+2. **Branch DELETE do trigger de §9.49 era inalcançável de verdade** (P2)
+   — confirmação do que já estava documentado como suspeita no
+   comentário da migration: `getnet_antecipacao_lotes.lancamento_
+   desagio_id` não tem `ON DELETE`, então a ação "Excluir" do menu
+   comum SEMPRE falhava com erro de FK pra um deságio ainda vinculado —
+   o branch `AFTER DELETE` nunca chegava a rodar. Fix: a mesma função
+   (`sincronizar_lote_antecipacao_ao_reverter_desagio`) passa a ser
+   usada em DOIS triggers separados — `BEFORE DELETE` (desvincula o
+   lote antes da checagem de FK rodar, usando `TG_WHEN` pra diferenciar
+   dentro da mesma função) e `AFTER UPDATE OF status` (continua
+   tratando o revert pago→não-pago, sem esse problema porque `UPDATE`
+   não mexe em `id`). Validado no harness: `DELETE` de deságio vinculado
+   agora sucede (antes falhava na FK) e o lote é corretamente
+   desvinculado.
+
+`npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
+
+### 9.53 25ª rodada de review: dedup antes do índice + guard vazando por reclass + deadlock em transferências opostas
+
+Mesmo ciclo, sobre o commit de §9.52 (`ba55d15`). 3 novos — 2 P1, 1 P2,
+os 3 editados diretamente nas migrations de origem (ainda não deployadas
+nesta mesma PR):
+
+1. **Dedup antes do índice único** (P1, `20260731140000`) — mesmo
+   raciocínio de "sem risco hoje" já contestado em rodadas anteriores
+   (§9.35/§9.39/§9.51 sobre a FK de filial): se esta instância já tivesse
+   sofrido a corrida que este índice existe pra fechar, dois lotes podiam
+   compartilhar o mesmo `extrato_bancario_id` não-nulo, e o `CREATE
+   UNIQUE INDEX` abortaria a migration antes mesmo do índice (e do
+   handler de `unique_violation` da RPC) existirem — justamente nas
+   instalações que mais precisam do fix. Decisão desta rodada: parar de
+   reargumentar "sem risco hoje" e só tornar a migration robusta de
+   verdade. Fix: `UPDATE` de reconciliação antes do índice — mantém o
+   lote com `created_at` mais antigo vinculado, devolve os demais pra
+   `pendente_vinculo` (não deleta nada, tesoureiro revisa manualmente).
+   Testado no harness: 2 lotes com o mesmo extrato (datas diferentes) →
+   o mais antigo mantém o vínculo, o outro volta a `pendente_vinculo`, e
+   o `CREATE UNIQUE INDEX` sucede.
+
+2. **Guard de deságio vazava por reclassificação em massa** (P1,
+   `20260731200000`) — o trigger de §9.52 disparava só em `UPDATE OF
+   status`, mas `reclass-transacoes/index.ts` monta o `UPDATE` só com os
+   campos que o usuário escolheu reclassificar (ex.: só `conta_id`, sem
+   `status` no `SET`) — o guard inteiro nunca disparava por esse
+   caminho, deixando mover um deságio ainda vinculado de conta/
+   competência sem o lote nem a conferência saberem. Fix: `UPDATE OF`
+   passa a listar TODAS as colunas que a função realmente checa
+   (`status, valor, valor_liquido, conta_id, tipo, data_vencimento,
+   data_competencia, data_pagamento`), não só `status`. Testado no
+   harness simulando exatamente o padrão de update do reclass (só
+   `conta_id`, só `data_competencia`, sem `status`) — ambos agora
+   bloqueados; mudar um campo fora da lista (`categoria_id`) continua
+   permitido.
+
+3. **Deadlock em transferências concorrentes de direções opostas** (P2,
+   `20260731100000`) — `fin_criar_transferencia` trava as contas na
+   ORDEM DE INSERÇÃO (saída primeiro, entrada depois) via o trigger de
+   saldo do primeiro `INSERT` pago de cada uma. Duas transferências
+   concorrentes A→B e B→A: cada uma trava sua própria origem e espera a
+   outra (que a segunda transação já travou como sua origem) — espera
+   circular, Postgres detecta e aborta uma das duas, mesmo sendo ambas
+   válidas. Fix: trava as duas contas em ORDEM DETERMINÍSTICA (por `id`)
+   numa única `SELECT ... FOR UPDATE` logo no início da RPC, antes de
+   qualquer `INSERT` pago — as duas direções passam a tentar travar na
+   MESMA ordem, eliminando a espera circular.
+
+   Harness com 2 sessões `psql` concorrentes de verdade: reproduzido o
+   deadlock exato com a ordem de travas antiga (locks diretos simulando
+   a ordem de inserção original — sessão B abortada com "deadlock
+   detected"); confirmado que a ordem determinística faz a segunda
+   sessão apenas ESPERAR (não deadlockar) e completar com sucesso assim
+   que a primeira libera.
+
+`npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
+
+### 9.54 26ª rodada de review: duplicata já lançada + trigger de saldo vira statement-level
+
+Mesmo ciclo, sobre o commit de §9.53 (`5bdabea`). 2 novos — 1 P1, 1 P2,
+ambos editados diretamente nas migrations de origem (ainda não
+deployadas):
+
+1. **Reconciliação de duplicata não cobria deságio já lançado** (P1,
+   `20260731140000`) — a reconciliação de §9.53 (mantém o lote mais
+   antigo, devolve os demais pra `pendente_vinculo`) preservava
+   `lancamento_desagio_id` e a transação paga quando a DUPLICATA já
+   tinha avançado até `lancamento_criado`. Efeitos: a despesa continuava
+   afetando o saldo mas sumia da conferência (só soma lote
+   `lancamento_criado`); e depois de revincular o lote (agora `pendente_
+   vinculo`), `fin_lancar_desagio_antecipacao` rejeitaria relançar
+   porque o `lancamento_desagio_id` antigo continuava não-nulo
+   (`FIN_JA_LANCADO`) — fluxo travado. Fix: antes da limpeza genérica,
+   um bloco reverte a transação paga de qualquer duplicata que já tenha
+   `lancamento_criado` e recalcula a conta afetada inline (fórmula de
+   `fin_recalcular_saldo_conta` aplicada direto — esta migration roda
+   ANTES do fix que torna o recálculo sempre correto, `20260731190000`,
+   então não dá pra contar com qual versão do trigger de saldo está
+   ativa neste ponto da sequência). Testado no harness: duplicata com
+   deságio pago (-50 na conta) revertida corretamente, conta volta a 0,
+   `lancamento_desagio_id` limpo, índice único criado com sucesso.
+
+2. **Trigger de saldo recalculava linha por linha, não por lote** (P2,
+   nova migration `20260731210000`) — job de reclassificação em massa
+   (até 5000 transações) ou `undo-import` em lote disparavam o trigger
+   `FOR EACH ROW` uma vez POR LINHA; cada disparo fazia uma `SUM`
+   completa sobre todo o histórico pago da conta mais um `SELECT FOR
+   UPDATE` — para N linhas na mesma conta, N recálculos redundantes
+   (só o último importa), podendo causar timeout/lock contention e
+   abortar um job válido. Achado extra descoberto ao investigar: o
+   antigo `UPDATE OF status` também deixava passar uma reclassificação
+   que muda só `conta_id` sem tocar `status` — o mesmo gap já fechado em
+   `proteger_desagio_vinculado` (§9.53), mas nunca replicado pro trigger
+   de saldo.
+
+   Fix: trigger sai de `FOR EACH ROW` pra `FOR EACH STATEMENT`, usando
+   transition tables (`REFERENCING OLD TABLE`/`NEW TABLE`, PG10+) pra
+   coletar as contas afetadas pela statement INTEIRA de uma vez e
+   recalcular cada conta DISTINTA uma única vez — 3 triggers separados
+   (INSERT só tem `NEW TABLE`, DELETE só `OLD TABLE`, UPDATE os dois),
+   porque a cláusula `REFERENCING` precisa bater exatamente com o que
+   cada operação disponibiliza. Descoberta no meio do caminho: Postgres
+   não permite combinar transition tables com `UPDATE OF <coluna>`
+   ("transition tables cannot be specified for triggers with column
+   lists") — o trigger de UPDATE passou a disparar em QUALQUER update
+   (sem lista de colunas), com o filtro `status='pago'` em
+   `old_table`/`new_table` decidindo sozinho quais contas merecem
+   recálculo; isso resolve o gap de `conta_id` de graça, sem precisar
+   enumerar colunas.
+
+   Harness com 8 cenários: 3 regressões unitárias (insert/update/delete
+   de linha única), bulk insert de 3 linhas numa conta numa única
+   statement, bulk update de status em 2 linhas numa única statement,
+   reclassificação movendo `conta_id` de uma linha paga sem `status` no
+   `SET` (as duas contas recalculadas certo), update de campo não
+   relacionado não quebra nem muda saldo, e reversão de uma linha com
+   saldo "corrompido" manualmente confirma que o recálculo é sempre
+   autoritativo (ignora o valor anterior, reconstrói da fonte).
+
+`npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
+
+### 9.55 27ª rodada de review: FOR UPDATE conflitava com o lock da própria FK
+
+Mesmo ciclo, sobre o commit de §9.54 (`6c72910`). 1 novo, P2, sutil — sobre
+o próprio fix de concorrência de §9.51: `_fin_recalcular_saldo_conta_raw`
+usava `SELECT ... FOR UPDATE` pra travar a conta antes de somar. Todo
+`INSERT` filho em `transacoes_financeiras` retém um lock `KEY SHARE` na
+linha de `contas` referenciada (checagem da FK `conta_id`) até commitar —
+padrão do Postgres, existe justamente pra permitir inserts concorrentes
+sem se atrapalharem. `FOR UPDATE` conflita com `KEY SHARE` de OUTRA
+sessão: duas transações inserindo pago pra mesma conta ao mesmo tempo
+— cada uma já tem seu próprio `KEY SHARE` (compatíveis entre si, ambos
+adquiridos sem esperar) e depois as duas tentam subir pra `FOR UPDATE` no
+recálculo — espera circular, Postgres aborta uma como deadlock. Mesma
+classe de bug que o índice/trava determinística já vinha corrigindo, só
+que desta vez o CULPADO era o próprio lock que eu tinha acabado de
+adicionar pra resolver a corrida anterior.
+
+Fix: troca `FOR UPDATE` por `FOR NO KEY UPDATE` — mais fraco, mas ainda
+serializa quem realmente precisa escrever (`NO KEY UPDATE` conflita com
+`NO KEY UPDATE`/`UPDATE`/`SHARE`), e é justamente o modo desenhado pra ser
+compatível com `KEY SHARE` de outra sessão (essa é a razão de existir da
+distinção `NO KEY UPDATE`/`KEY SHARE` desde o Postgres 9.3: permitir
+inserts referenciando uma FK sem brigar com updates que não mexem na
+chave). Aplicado nos dois lugares com o mesmo padrão:
+`_fin_recalcular_saldo_conta_raw` (`20260731200000`) e
+`fin_recalcular_saldo_conta` (RPC pública, `20260730110000` — mesmo risco,
+corrigido por consistência mesmo sem achado específico sobre ela).
+
+Harness com 2 sessões `psql` concorrentes simulando exatamente a
+sequência de locks (não a trigger inteira — testa a interação de lock
+isoladamente): `FOR KEY SHARE` + espera + upgrade. Com `FOR UPDATE`
+(pré-fix): reproduzido o deadlock exato, uma sessão abortada. Com `FOR NO
+KEY UPDATE` (pós-fix): as duas sessões completam quase instantaneamente,
+sem espera nenhuma uma pela outra.
+
+`npx tsc`: 63 baseline, 0 novos (mudança 100% backend).
+
+### 9.56 28ª rodada de review: query key sem contexto + mais um deadlock por ordem indefinida
+
+Mesmo ciclo, sobre o commit de §9.55 (`6f9f9c6`). 2 novos, ambos P2, ambos
+reais:
+
+1. **`ConferenciaTotaisGetnetCard.tsx`** — `contaId` (estado local) nunca
+   era resetado ao trocar de igreja/filial com o card montado, e a
+   queryKey de `totais` não incluía `igrejaId`/`filialId`/`isAllFiliais`.
+   `fin_conferencia_totais_getnet` só valida `igreja_id` (não filial, achado
+   já registrado em §9.39) — trocar de FILIAL mantendo a mesma igreja não
+   geraria nem erro: continuaria mostrando os totais da conta antiga (de
+   outra filial) em silêncio. Fix: `useEffect` reseta `contaId` quando
+   `igrejaId`/`filialId`/`isAllFiliais` mudam; contexto também entra na
+   queryKey por segurança adicional.
+
+2. **Mais um deadlock por ordem indefinida** (`20260731210000`, trigger de
+   §9.54) — os 3 loops de `atualizar_saldo_conta_lote()` usavam `SELECT
+   DISTINCT conta_id` sem `ORDER BY`. Postgres não garante NENHUMA ordem
+   pra `DISTINCT`; duas operações em lote concorrentes (dois jobs de
+   reclassificação, ou um bulk update disputando com `fin_criar_
+   transferencia`) tocando as MESMAS contas em ordens diferentes podiam
+   travar uma na outra — cada `_fin_recalcular_saldo_conta_raw` retém o
+   lock da conta até commitar, mesmo padrão de deadlock já corrigido em
+   `fin_criar_transferencia` (§9.53), agora reaparecendo no trigger que
+   nasceu justamente da rodada seguinte àquele fix. Fix: `ORDER BY
+   conta_id` nos 3 loops (INSERT/DELETE/UPDATE), mesma ordem determinística
+   já usada na RPC de transferência.
+
+   Tentei reproduzir o deadlock exato com 2 sessões `psql` concorrentes e
+   ordem de linha invertida entre elas, mas o `DISTINCT` do Postgres
+   produziu a MESMA ordem nas duas sessões neste ambiente por acaso — não
+   deu pra forçar deterministicamente sem instrumentar o trigger com um
+   `pg_sleep` só de teste (o que fiz: confirma bloqueio consistente de ~6s,
+   sem deadlock, quando as duas sessões calham de processar na mesma
+   ordem). Validação foca no que é verificável com certeza: `ORDER BY
+   conta_id` produz ordem ascendente determinística independente da ordem
+   de entrada (testado diretamente), e a correção em lote continua
+   funcionando (regressão). O mecanismo em si (ordem determinística evita
+   espera circular) já tinha sido validado com sessões concorrentes reais
+   no fix análogo de `fin_criar_transferencia` (§9.53).
+
+`npx tsc`: 63 baseline, 0 novos.
+
+### 9.57 29ª rodada de review: 3 achados de frontend, todos reais
+
+Mesmo ciclo, sobre o commit de §9.56 (`ffe2410`). 3 novos, todos P2, todos
+reais, mudança 100% frontend (sem migration nova):
+
+1. **`ExportarTab.tsx`** — `isLoading` (combina `entradasQuery.isLoading`
+   e `saidasQuery.isLoading`, já existia) nunca era usado no `disabled` do
+   botão "Exportar" — só checava `tiposSelecionados.length`,
+   `totalRegistros` e `colunasSelecionadas.length`. Cenário: usuário já
+   tem "entradas" carregado (50 registros) e marca "saidas" também —
+   `saidasQuery` é habilitada agora e começa a carregar, mas
+   `totalRegistros` continua 50 (soma do que já tem) até saidas
+   terminar — botão fica habilitado nessa janela, e clicar exporta um
+   Excel faltando a aba de saídas (`exportSheetsToExcel` descarta abas
+   vazias em silêncio, sem erro). Fix: `isLoading` entra no `disabled`.
+
+2. **`ImportarRecebivelGetnetTab.tsx`** — mesma classe do fix de §9.49
+   (contagem de colunas), um nível mais fundo: mesmo com a contagem de
+   células correta, uma célula monetária malformada mas não-vazia
+   ("abc", "123x") virava `null` em silêncio dentro de `parseValorGetnet`
+   (`parseFloat` aceita sufixo lixo — `"123x"` vira `123`; `NaN` vira
+   `null`, indistinguível de uma célula legitimamente vazia). Fix: nova
+   `isValorGetnetValido` valida o resultado já normalizado (mesma
+   transformação de separador de milhar/decimal do parser) contra
+   `/^-?\d+(\.\d+)?$/ ` — mais robusto que tentar casar o formato bruto.
+   Linha com qualquer campo de valor não-vazio e inválido é rejeitada
+   antes do parse, contada junto com as outras `invalidas`.
+
+3. **`TransacaoDialog.tsx`** — a compensação de competência de §9.51
+   checava `competenciaAnterior` por truthiness; quando o grupo
+   originalmente tinha `data_competencia = NULL` (legado), isso caía no
+   mesmo branch de "valor anterior desconhecido" — mas o valor NÃO era
+   desconhecido, era `null` conhecido, só que `alterarCompetenciaGrupo`
+   exige uma data não-nula (`FIN_VALIDACAO`) e nunca teria como reverter
+   pra esse estado de qualquer jeito. Fix: checagem explícita
+   `=== null` em vez de truthiness, com uma mensagem própria e honesta
+   pro caso ("competência original era vazia, não é possível restaurar
+   automaticamente") em vez de reusar o texto genérico de "desconhecido".
+
+`npx tsc`: 63 baseline, 0 novos.
+
+### 9.58 30ª rodada de review: 3 achados, mesma linha de §9.57
+
+Mesmo ciclo, sobre o commit de §9.57 (`4793934`). 3 novos, todos P2, todos
+reais, mudança 100% frontend:
+
+1. **`ImportarRecebivelGetnetTab.tsx`** — mesma classe do fix de valor
+   monetário (§9.57), agora pra data: célula não-vazia mas fora do
+   formato esperado (`"31-07-2026"` em vez de `"31/07/2026"`) virava
+   `null` em silêncio dentro de `parseDataGetnet`, indistinguível de
+   célula vazia. Fix: `isDataGetnetValida` (mesmo padrão de
+   `isValorGetnetValido`) valida contra `/^\d{2}\/\d{2}\/\d{4}$/`; linha
+   com qualquer campo de `CAMPOS_DATA` não-vazio e inválido é rejeitada
+   antes do parse, junto com as outras `invalidas`.
+
+2. **`ExportarTab.tsx` — categoria órfã** — trocar "Tipo de Dados" (ex.:
+   Entradas → só Saídas) recalcula as opções de categoria (`categorias`,
+   já filtradas por tipo), mas não removia sozinho os ids que ficaram
+   selecionados e não são mais uma opção visível — viravam um filtro
+   `.in("categoria_id", [...])` invisível (a categoria não aparece mais
+   pra desmarcar) que zera os resultados sem explicação. Fix: `useEffect`
+   reconcilia `categoriasSelecionadas` toda vez que `categorias` muda,
+   removendo ids que não são mais opção válida.
+
+3. **`ExportarTab.tsx` — export com query com erro** — o fix de `isLoading`
+   de §9.57 não cobria o caso de uma query FALHAR (não só demorar):
+   `isLoading` vira `false` quando a query termina, com erro ou sem, e
+   `totalRegistros` continua positivo (soma do que a OUTRA query, bem
+   sucedida, trouxe) — botão ficava habilitado, `handleExportar`
+   substitui a query com erro por `[]`, e `exportSheetsToExcel` descarta
+   silenciosamente a aba vazia, com toast de sucesso mesmo assim. Fix:
+   novo `isError` (mesmo padrão de `isLoading`, combinando `entradasQuery.
+   isError`/`saidasQuery.isError`) entra no `disabled` do botão, com um
+   alerta destrutivo visível no preview explicando o motivo.
+
+`npx tsc`: 63 baseline, 0 novos.
+
+### 9.59 31ª rodada de review: mesma classe de "estado não resetado" nos mesmos 2 arquivos
+
+Mesmo ciclo, sobre o commit de §9.58 (`3d5ad11`). 2 novos, ambos P2, ambos
+reais — um é a mesma classe de bug de contexto-não-resetado já vista em
+§9.56 (agora noutro componente), o outro é uma REGRESSÃO do meu próprio
+fix de §9.58:
+
+1. **`ImportarRecebivelGetnetTab.tsx`** — `integracaoId` nunca era
+   resetado ao trocar de igreja com a aba montada (mesma classe do
+   achado de `ConferenciaTotaisGetnetCard.tsx` em §9.56). Preview de CSV
+   já processado continuava com o botão de importar habilitado, mas
+   `fin_importar_recebivel_getnet` rejeitaria a integração por estar
+   fora do tenant novo; e escolher uma integração válida da igreja nova
+   ainda importaria o PREVIEW retido da igreja antiga. Fix: `useEffect`
+   reseta `integracaoId` e chama `limparPreview()` quando `igrejaId`
+   muda.
+
+2. **`ExportarTab.tsx` — regressão do fix de categoria órfã (§9.58)** —
+   o `useEffect` que reconcilia `categoriasSelecionadas` contra
+   `categorias` reage a QUALQUER mudança de `categorias`, inclusive a
+   transição transitória: trocar `tiposConceito` (ex.: adicionar Saídas
+   com Entradas já selecionado) muda a `queryKey` da query de
+   categorias, e sem manter dados anteriores `categorias` cai pro
+   fallback `[]` do destructuring ENQUANTO a nova busca carrega — meu
+   próprio efeito via essa lista vazia transitória e limpava até a
+   categoria "Entrada" ainda válida, ampliando sem querer as duas
+   queries de exportação. Fix: `placeholderData: keepPreviousData` na
+   query de categorias — mantém a lista anterior visível durante o
+   refetch, então o efeito de reconciliação só vê a lista `[]` transitória
+   se não houver mesmo nenhum dado anterior (primeiro carregamento), não
+   mais a cada troca de tipo.
+
+`npx tsc`: 63 baseline, 0 novos.
+
+### 9.60 32ª rodada de review: filial_id fora do guard de deságio + sugestão de forma de pagamento com texto legado
+
+Mesmo ciclo, sobre o commit de §9.59 (`565624f`). 2 novos — 1 P1, 1 P2,
+ambos reais:
+
+1. **`filial_id` fora do guard de deságio vinculado** (P1,
+   `20260731200000`) — `proteger_desagio_vinculado` (§9.51/§9.53) checava
+   valor/conta/tipo/datas mas não `filial_id`. `TransacaoDialog` sempre
+   inclui `filial_id: isAllFiliais ? null : filialId` no patch (mesmo
+   sem o usuário mexer nisso) — editar um deságio ainda vinculado a
+   partir da visão "Todas as filiais" convertia a despesa gerada em
+   global em silêncio, divergindo do que o lote/extrato realmente são
+   (a mesma classe de "campo fora do guard" já vista 2 vezes nesta PR
+   pro trigger de saldo). Fix: `filial_id` entra na lista de colunas do
+   `BEFORE UPDATE OF` do trigger E na comparação `OLD`/`NEW` dentro da
+   função. Testado no harness: editar só `filial_id` numa linha vinculada
+   agora bloqueia; numa transação comum continua permitido.
+
+2. **Sugestão de forma de pagamento da nota fiscal manda texto onde
+   precisa de id** (P2, `TransacaoDialog.tsx`) — `processar-nota-fiscal`
+   retorna `forma_pagamento_sugerida` a partir da coluna de texto legada
+   (ex.: `"PIX"`) — diferente das outras sugestões (`categoria_sugerida_
+   id`, `conta_sugerida_id` etc.), que já vêm como id. `formaPagamento`
+   (estado do Select) virou um id real desde a FK do ADR-029, então
+   aplicar o texto bruto direto mandava `forma_pagamento_id: "PIX"` pro
+   backend, que falha o cast pra `uuid` em `fin_validar_fk_tenant` — a
+   transação não salvava até o usuário reselecionar manualmente. Fix:
+   mapeia o texto sugerido pro id correspondente em `formasPagamento`
+   (já carregado via `useDadosApoio`) por nome (case-insensitive) antes
+   de aplicar; sem correspondência, não aplica nada (não quebra com um
+   id inválido).
+
+`npx tsc`: 63 baseline, 0 novos. Migration do item 1 validada via harness
+Docker.
+
+### 9.61 33ª rodada de review: conta de outra filial na conferência Getnet + rótulo de forma de pagamento ignora filial + FK sem ON DELETE
+
+Rodada sem comentários linha-a-linha — os 3 achados vieram só no corpo da
+review (`@codex review` de 01/08 12:21). Todos reais, verificados por
+leitura direta e depois harness Docker (réplica fiel de `has_filial_access`/
+`get_jwt_filial_id`/JWT, não só os stubs simplificados de rodadas
+anteriores — o achado P1 só reproduz pelo canal **web** (JWT), o
+`service_role`/bot não passa pelo mesmo gate):
+
+1. **`fin_conferencia_totais_getnet` sem check de filial** (P1,
+   `20260729140000`) — validava `p_conta_id` só com `fin_validar_fk_tenant`
+   (checa `igreja_id`, nunca `filial_id`). Sendo `SECURITY DEFINER`
+   (bypassa RLS), um tesoureiro restrito a uma filial que soubesse o UUID
+   de uma conta de OUTRA filial da mesma igreja lia os totais agregados
+   (oferta bruto, MDR, deságio, banco creditado) daquela conta — mesma
+   classe do bug já corrigido em `fin_lancar_desagio_antecipacao`
+   (§9.19/20260731150000). Fix: `has_filial_access` contra a filial da
+   conta, igual ao padrão já estabelecido. Reproduzido ANTES do fix
+   (versão sem o check retornava os totais pro tesoureiro da filial A
+   pedindo a conta da filial B) e confirmado bloqueado DEPOIS, os dois
+   pelo canal JWT/web real (não só service_role).
+
+2. **`fin_criar_lancamento` resolve rótulo de forma de pagamento sem
+   considerar filial** (P2, `20260729130000`) — a resolução por nome (sem
+   `forma_pagamento_id` explícito, caminho do bot) buscava só por
+   `igreja_id + lower(nome)`, ignorando que `formas_pagamento` aceita uma
+   linha por filial além de uma global (mesmo padrão já documentado em
+   `useFormaPagamentoDinheiroId`, achado de §9.23). Uma igreja com
+   "Dinheiro" cadastrado em 2 filiais podia ter uma transação da filial A
+   silenciosamente resolvida pra forma da filial B (a mais antiga ativa).
+   O backfill da mesma migration (passo 2b, `DISTINCT ON (igreja_id,
+   lower(nome))`) tinha o mesmo problema, agravado: só pode ter 1
+   candidato por nome pra igreja INTEIRA, não tem como respeitar filial
+   nenhuma. Fix: RPC e backfill passam a restringir e priorizar por
+   filial — candidato da MESMA filial primeiro, senão global, nunca uma
+   filial diferente da do lançamento; backfill reescrito como subquery
+   correlacionada (1 linha por vez) rodando de novo inclusive sobre linhas
+   que o backfill anterior já tinha preenchido errado.
+
+3. **FK `forma_pagamento_id` sem `ON DELETE` explícito** (P2,
+   `20260729130000`) — herdava o default `NO ACTION`, diferente de toda
+   outra FK pra `formas_pagamento` no schema (`forma_pagamento_contas` usa
+   `CASCADE`). `CASCADE` seria pior aqui (apagaria a transação); `NO
+   ACTION` quebrava silenciosamente o fluxo já existente de
+   `FormasPagamento.tsx`: excluir uma forma referenciada por qualquer
+   transação (mesmo histórica) passou a falhar com violação de FK, onde
+   antes (coluna não existia) sempre funcionava. Fix: `ON DELETE SET
+   NULL` — exclui a forma, mantém a transação (nome legado preservado em
+   `forma_pagamento`, texto).
+
+Harness Docker: réplica completa de `has_role`/`get_jwt_igreja_id`/
+`get_jwt_filial_id`/`has_filial_access`/`fin_resolver_contexto` (os dois
+ramos, JWT via `SET request.jwt.claims` + `app.test_uid`, e service_role),
+não só stubs simplificados — necessário porque o achado P1 é especificamente
+sobre o canal JWT, que rodadas anteriores não tinham exercitado à parte do
+service_role. 4 cenários confirmados: bloqueio cross-filial (P1),
+permissão na própria filial (P1), resolução de rótulo respeitando filial
+tanto pra lançamento novo quanto pro backfill corretivo (P2), delete com
+`SET NULL` (P2). `npx tsc`: não roda (mudança só em SQL).
+
+### 9.62 34ª rodada de review: `ON DELETE SET NULL` mordendo os próprios fixes de §9.61 + grupo de parcelas órfão
+
+Review de 01/08 17:32 sobre o commit de §9.61 (`b423301`), desta vez com
+comentários linha-a-linha de verdade (diferente da rodada anterior). Os 3
+achados são efeitos colaterais diretos dos meus próprios fixes de §9.61 —
+todos reais, verificados por leitura direta e depois harness Docker:
+
+1. **`fin_conferencia_totais_getnet` some com transações de cartão
+   excluídas** (P1) — o `ON DELETE SET NULL` novo (§9.61, item 3) tem um
+   efeito colateral aqui: o `JOIN` (INNER) com `formas_pagamento` pra
+   classificar "cartão" (`fp.nome ILIKE '%cart%'`) descarta da soma
+   qualquer transação cuja forma tenha sido excluída depois
+   (`forma_pagamento_id` virou `NULL`, INNER JOIN não casa `NULL`) —
+   excluir uma forma "Cartão de Crédito" antiga fazia a própria RPC de
+   conferência subestimar silenciosamente `oferta_bruto`/`taxa_mdr` de
+   períodos passados. Fix: `LEFT JOIN` + classifica por
+   `COALESCE(fp.nome, t.forma_pagamento)` — cai pro texto legado (nunca
+   apagado) quando o FK não existe mais.
+
+2. **`fin_criar_lancamento`/`fin_atualizar_lancamento`: `forma_pagamento_id`
+   EXPLÍCITO não valida filial** (P2) — o fix de §9.61 (item 2) só cobriu
+   a resolução por RÓTULO; quando o id vem explícito (caminho normal do
+   frontend), só validava tenant. Em "Todas as filiais",
+   `useDadosApoio.ts:110-129` lista formas de TODAS as filiais sem
+   filtro, e a transação criada nessa visão nasce com `filial_id NULL`
+   (global) — selecionar a forma de uma filial específica cria uma
+   transação global referenciando metadado privado de uma filial: outra
+   filial vê a transação (é global) mas RLS esconde a forma dela. Fix:
+   mesma regra do rótulo (global ou mesma filial, nunca outra) aplicada
+   também ao id explícito — em `fin_criar_lancamento` E
+   `fin_atualizar_lancamento` (só o primeiro foi citado pelo achado; o
+   segundo tinha a mesma causa raiz e foi corrigido junto, pra não repetir
+   o achado numa rodada futura).
+
+3. **Excluir a parcela raiz orfaneia o grupo inteiro** (P2) —
+   `lancamento_pai_id` é `ON DELETE SET NULL` (20260710120000). Excluir a
+   raiz (`somente_este` ou `este_e_futuras`) desliga TODAS as irmãs de uma
+   vez (todas apontavam pra ela); uma edição de competência subsequente
+   em qualquer irmã sobrevivente chega em `fin_alterar_competencia_grupo`
+   com `lancamento_pai_id NULL`, trata a própria linha como grupo de 1,
+   atualiza só ela e reporta sucesso — as outras, também órfãs, divergem
+   de novo em silêncio. Fix: `fin_excluir_lancamento`, antes de excluir
+   uma raiz com irmãs sobreviventes, promove a sobrevivente de menor
+   `data_vencimento` a nova raiz (`lancamento_pai_id := NULL`) e reaponta
+   as demais pra ela.
+
+   **Achado próprio, não citado pelo review**: testando o fix acima no
+   harness, `este_e_futuras` nunca removia as parcelas futuras de
+   verdade — só a linha de `p_id`. Causa: `conciliacao_status NOT IN
+   ('conciliado_extrato','conciliado_bot')` é `NULL` (não `TRUE`) pra
+   qualquer linha com `conciliacao_status IS NULL` (o caso comum, toda
+   transação não conciliada), e `WHERE` descarta linhas cujo predicado é
+   `NULL` — clássica armadilha de `NOT IN` com coluna nullable. Bug
+   pré-existente em `fin_excluir_lancamento` desde 20260731170000, não
+   introduzido por este fix, mas corrigido junto (mesma função, bem ao
+   lado do reparenting) — `conciliacao_status IS NULL OR ... NOT IN
+   (...)`.
+
+Harness Docker: 6 cenários — LEFT JOIN preserva o total após excluir a
+forma (P1), id explícito de outra filial bloqueado em `fin_criar_
+lancamento` E `fin_atualizar_lancamento` (P2), reparenting confirmado
+(nova raiz assume `lancamento_pai_id NULL`, irmã restante reapontada, e
+`fin_alterar_competencia_grupo` a partir de QUALQUER membro sincroniza o
+grupo inteiro de novo), `este_e_futuras` removendo raiz+futuras de verdade
+depois do fix do `NOT IN`, e 2 regressões (grupo de 1 sem irmãs não
+quebra; excluir parcela do MEIO preserva a raiz das demais). `npx tsc`:
+não roda (mudança só em SQL).
+
+### 9.63 35ª rodada de review: eu mesmo derrubei o guard D10 + categoria do deságio sem filial
+
+Review de 01/08 19:29 sobre o commit de §9.62 (`4898ccf`). 2 achados, 1 é
+uma **regressão que eu mesmo introduzi** na rodada anterior:
+
+1. **P1 — REGRESSÃO PRÓPRIA**: ao adicionar o guard de filial no
+   `forma_pagamento_id` explícito de `fin_atualizar_lancamento` (§9.62),
+   usei como base a versão de `20260729130000` sem checar se havia versão
+   mais recente — havia DUAS: `20260729150000` (D10, bloqueio
+   `FIN_COMPETENCIA_GRUPO` contra editar competência de parcela isolada
+   num grupo parcelado) e `20260730100000` (reincorpora `forma_pagamento_
+   id` + sinal de taxa que o `CREATE OR REPLACE` do D10 tinha derrubado
+   sem perceber — **a mesma classe de bug que acabei de cometer,
+   documentada no cabeçalho daquela própria migration**). Meu
+   `CREATE OR REPLACE` apagou o D10 de novo: editar a competência de uma
+   parcela isolada voltou a suceder silenciosamente, sem sincronizar as
+   irmãs.
+
+   Fix: parte de `20260730100000` (a versão mais recente de verdade,
+   com D4+D10+forma_pagamento_id+sinal de taxa) como base, adiciona só o
+   guard de filial por cima. Virou item novo no guardrail (seção B):
+   antes de QUALQUER `CREATE OR REPLACE` numa função `fin_*`,
+   `grep -rl "CREATE OR REPLACE FUNCTION public.<nome>" supabase/
+   migrations/*.sql | sort` pra achar a versão mais recente de verdade —
+   nunca reaproveitar uma cópia mental de leitura anterior na mesma
+   sessão.
+
+2. **P2 — `fin_lancar_desagio_antecipacao`: categoria sem filial** —
+   mesma classe de §9.61/§9.62 (id explícito só validado por tenant).
+   `LancarDesagioDialog.tsx` listava categorias de TODAS as filiais em
+   "Todas as filiais" (a query de `contas`, logo acima no mesmo arquivo,
+   já filtrava; a de `categorias` não). Fix: RPC valida a filial da
+   categoria contra a filial EFETIVA do lançamento (extrato, com
+   fallback pra conta — `v_filial_lancamento`, calculada mais cedo pra
+   isso); frontend ganha o mesmo filtro `.or(filial_id.eq.X,
+   filial_id.is.null)` que `contas` já tinha.
+
+Harness Docker: D10 confirmado restaurado (editar competência de parcela
+isolada volta a bloquear), guard de filial do `forma_pagamento_id`
+confirmado que NÃO regrediu com o restauro do D10, categoria de outra
+filial bloqueada no deságio, categoria global continua funcionando.
+`npx tsc`: 0 novos erros (mudança em `LancarDesagioDialog.tsx`).
+
+### 9.64 36ª rodada de review + fechamento de classe: `forma_pagamento_id` bloqueado só quando estava NO patch, não quando só `filial_id` mudava
+
+Review de 01/08 22:01 sobre o commit de §9.63 (`cfb8b18`), 1 achado real —
+mais uma vez efeito colateral do meu próprio fix: o guard de filial de
+`forma_pagamento_id` em `fin_atualizar_lancamento` (§9.62) só rodava `IF
+v_aplicar ? 'forma_pagamento_id'`. `TransacaoDialog.tsx` SEMPRE inclui
+`filial_id` no patch, mas só inclui `forma_pagamento_id` quando o usuário
+troca a forma de pagamento — editar uma transação de uma filial específica
+a partir de "Todas as filiais" SEM tocar na forma manda `filial_id: null`
+(vira global) mas OMITE `forma_pagamento_id`, mantendo a forma antiga
+(ainda presa à filial original) — reproduzindo o exato problema que o
+guard existe pra evitar, só que pelo caminho que ele não cobria.
+
+**Depois deste achado, o usuário parou o ciclo review→fix pra perguntar
+por que meu próprio review não estava achando essas coisas antes do
+Codex.** Resposta honesta, verificada: eu estava corrigindo campo por
+campo (o que o achado apontava), não generalizando o padrão.
+`transacoes_financeiras` tem **6 FKs pra catálogos filial-scoped**
+(confirmado via a lista de tabelas de `20260106120001_replicar_cadastros_
+filiais.sql`, que só replica tabela com `filial_id`): `categoria_id`,
+`subcategoria_id`, `centro_custo_id`, `base_ministerial_id`,
+`fornecedor_id`, `forma_pagamento_id`. `fin_validar_fk_tenant` valida
+tenant nos 6, nunca filial. Eu já tinha corrigido só `forma_pagamento_id`
+(§9.61-§9.64) e `categoria_id` só dentro de `fin_lancar_desagio_
+antecipacao` (§9.63) — um campo por rodada, exatamente o padrão que gerou
+4 achados seguidos na mesma classe.
+
+**Decisão do usuário: fechar a classe inteira de uma vez** em vez de
+esperar mais rodadas do Codex achando campo por campo. Fix:
+
+1. Helper novo `fin_validar_fk_filial(tabela, id, filial_efetiva)` —
+   companion de `fin_validar_fk_tenant`, reutilizável pros 6 campos.
+2. `fin_criar_lancamento`: valida os 6 campos (todos resolvidos juntos,
+   sem conceito de patch parcial — mais simples que `fin_atualizar_
+   lancamento`).
+3. `fin_atualizar_lancamento`: valida o PAR EFETIVO campo/filial pros 6
+   — o valor do patch quando presente, senão o já gravado — sempre que
+   QUALQUER um dos dois estiver no patch (generaliza a lição do achado
+   desta rodada pros outros 5 campos).
+4. `fin_lancar_desagio_antecipacao`: `categoria_id` refatorado pra usar o
+   mesmo helper em vez do `IF` inline de §9.63.
+5. Frontend (`useDadosApoio.ts`): `categorias`, `subcategorias`,
+   `centros`, `bases` e `fornecedores` ganham o mesmo filtro de filial que
+   `contas`/`formasPagamento` já tinham — sem isso a UI deixa escolher
+   algo que o backend agora rejeita.
+
+Harness Docker: os 5 campos extras (`subcategoria_id`, `centro_custo_id`,
+`base_ministerial_id`, `fornecedor_id`, `forma_pagamento_id`) de outra
+filial bloqueados em `fin_criar_lancamento`; caminho normal (mesma
+filial/global) continua funcionando; `fin_atualizar_lancamento` bloqueia
+mudar só `filial_id` com `categoria_id` retida de outra filial; editar
+campo não-filial-scoped não dispara nada indevido; D10 confirmado ainda
+intacto (regressão de §9.63 não voltou). `npx tsc`: 0 novos erros.
+
+### 9.65 37ª rodada de review: lock de transferência sem `NO KEY UPDATE`, validação de valor Getnet ainda ingênua, categoria do deságio não recalcula pela conta
+
+Review de 01/08 22:31 sobre o commit de §9.64 (`3d89e70`). 3 achados,
+nenhum novo bug de classe — os 3 são "evidência nova" sobre fixes já
+existentes desta mesma PR:
+
+1. **P2 — `fin_criar_transferencia` sem `FOR NO KEY UPDATE`**
+   (`20260731100000`) — o lock determinístico das 2 contas (evita deadlock
+   entre transferências concorrentes em direções opostas, achado de rodada
+   bem anterior) usava `FOR UPDATE`. Os 2 INSERTs pagos logo depois
+   disparam o trigger de saldo, e qualquer INSERT comum em
+   `transacoes_financeiras` (dentro OU fora da transferência) já retém
+   `KEY SHARE` na conta via checagem de FK — `FOR UPDATE` conflita com
+   `KEY SHARE` de outra sessão, mesma classe já corrigida em
+   `_fin_recalcular_saldo_conta_raw` (§9.28ish) e `fin_recalcular_saldo_
+   conta` (20260730110000), só não replicada aqui ainda. Fix: `FOR NO KEY
+   UPDATE`. Grep sistemático confirmou que não sobrava mais nenhum outro
+   `FOR UPDATE` vivo sobre `contas` no schema (só uma versão ANTIGA,
+   morta, já substituída por `CREATE OR REPLACE` posterior).
+
+   Harness: 2 sessões `psql` reais confirmam o mecanismo — sessão A abre
+   uma transação com um INSERT pendente (retém só `KEY SHARE` via FK) e
+   segura com `pg_sleep(5)`; sessão B chama `fin_criar_transferencia`
+   envolvendo a mesma conta. Com `FOR UPDATE` (pré-fix), B bloqueia e só
+   completa depois de ~4s (esperando A); com `FOR NO KEY UPDATE` (pós-fix),
+   B completa em ~0,1s, sem esperar A. A serialização original (2
+   transferências concorrentes em direções opostas não deadlockar) também
+   reconfirmada com 2 sessões reais rodando de verdade em paralelo — as
+   duas completam com sucesso. **Não reproduzido**: a interleaving EXATA
+   de 3 pontas que o achado descreve (KEY SHARE da FK + upgrade pro NO KEY
+   UPDATE do trigger da MESMA sessão, com uma segunda sessão em FOR UPDATE
+   se intrometendo bem no meio, dentro da janela de um único statement) —
+   forçar esse timing exigiria atrasar artificialmente a execução do
+   trigger no meio do INSERT; o fix é correto por construção (mesma regra
+   de compatibilidade de lock já provada nos outros dois casos), mas essa
+   interleaving específica não foi isolada à parte.
+
+2. **P2 — validação de valor Getnet ainda aceitava formato corrompido**
+   (`ImportarRecebivelGetnetTab.tsx`) — "evidência nova" sobre o fix de
+   §9.49/§9.57/§9.58: `isValorGetnetValido` removia TODOS os pontos antes
+   de validar, deixando `"1.2.3"` passar como `"123"` e um `"12.34"`
+   mal-formatado (brasileiro nunca usa ponto pra 2 casas decimais) virar
+   `"1234"` em silêncio. Fix: valida o formato BRUTO
+   (`/^-?\d{1,3}(\.\d{3})*(,\d+)?$/` — milhar agrupado de EXATAMENTE 3
+   dígitos, decimal com vírgula) em vez do resultado já normalizado.
+
+3. **P2 — categoria do deságio não recalculava pela CONTA quando o
+   extrato é global** (`LancarDesagioDialog.tsx`) — o fix de §9.64 (item
+   3, RPC) cobria a validação no backend, mas o frontend só recalculava a
+   filial efetiva a partir do extrato do lote ou do contexto da VIEW,
+   nunca da CONTA de fato selecionada no formulário — quando o extrato é
+   global e o usuário está em "Todas as filiais", escolher uma conta da
+   filial A e depois uma categoria da filial B passava pela UI mas era
+   rejeitado pelo backend (`fin_validar_fk_filial`). Fix: query de
+   `contas` passa a trazer `filial_id`; nova variável
+   `filialEfetivaConhecida` distingue "nenhuma conta escolhida ainda"
+   (usa o contexto da view como palpite) de "conta escolhida É global"
+   (filtra só categoria global — sem essa distinção, um `??` encadeado
+   colapsaria os dois casos no mesmo fallback pro contexto da view).
+
+**Varredura proativa** (pedido explícito do usuário: achar outros padrões
+da mesma classe antes que o Codex precise apontar um por um):
+- Grep de `FOR UPDATE` sobre `contas` em todas as migrations: só a
+  instância corrigida acima estava viva; nenhuma outra pendência.
+- Grep do padrão "remove pontos antes de validar" (`parseValor`/
+  `isValor*Valido`) em outros parsers de importação financeira:
+  `ImportarTab.tsx`/`ImportarExtratosTab.tsx` (importador genérico de
+  extrato bancário, fora do escopo desta PR — não tocados pelo Getnet)
+  têm uma variação da mesma classe (auto-detecção BR/US por posição do
+  último separador, sem uma função de validação separada — valor
+  malformado vira `0` em silêncio via `isNaN(n) ? 0 : n`, nem sequer
+  bloqueia a linha). **Não corrigido aqui** — são arquivos de PRs
+  anteriores (#47/#53), fora do diff desta PR; misturar esse fix aqui
+  violaria a regra "1 fase = 1 PR" (seção I). Fica registrado como known
+  issue pra uma sessão futura dedicada a eles.
+
+`npx tsc`: 0 novos erros.
+
+### 9.66 38ª rodada de review: forma da transferência sem filial + categoria do deságio não reseta ao trocar de conta
+
+Review de 02/08 01:10 sobre o commit de §9.65 (`5ef1a70`). 2 achados, os
+dois continuações diretas da varredura da rodada anterior:
+
+1. **P2 — `fin_criar_transferencia` resolve "Transferência Bancária" sem
+   filtro de filial** — a varredura de §9.65 (grep de `FOR UPDATE`)
+   confirmou não sobrar mais nenhum lock pendente, mas não cobriu esta
+   função pro OUTRO padrão da mesma PR (§9.61/§9.62/§9.64): resolução de
+   `forma_pagamento_id` por rótulo sem checar filial. `fin_criar_
+   transferencia` não passa pelo resolvedor de `fin_criar_lancamento`
+   (faz `INSERT` direto), então o fix de §9.61 nunca cobriu este ponto —
+   numa igreja com "Transferência Bancária" cadastrada por filial, a
+   busca (`ORDER BY created_at ASC`) podia pegar a forma mais antiga de
+   OUTRA filial. Fix: mesmo padrão de §9.61 — restringe a candidatos da
+   MESMA filial efetiva ou globais, prioriza a própria filial. Testado no
+   harness: forma "Transferência Bancária" da filial B mais antiga que a
+   da filial A, transferência entre 2 contas da filial A resolve
+   corretamente pra forma da filial A.
+
+2. **P2 — `LancarDesagioDialog.tsx`: categoria não reseta ao trocar de
+   conta** — eu já tinha identificado esse risco no código (comentário
+   deixado na correção de §9.65) mas decidido não corrigir proativamente,
+   tratando como só um "rough edge" de UX (o backend já rejeita com
+   segurança). O review confirmou que é achado de verdade: trocar a
+   conta (extrato global) recarrega as opções de categoria pra filial da
+   nova conta, mas não limpa `categoriaId` já selecionado — o botão
+   continua habilitado e submete a categoria antiga (escondida, fora da
+   lista), rejeitada pelo backend só no submit. Fix: `useEffect` reseta
+   `categoriaId` sempre que `contaId` muda (guardrail A.4).
+
+**Lição**: uma varredura proativa "achar outros padrões da mesma classe"
+(pedida pelo usuário em §9.65) não é uma operação única — precisa cobrir
+TODOS os pontos de escrita daquele padrão, não só os que já foram tocados
+antes. `fin_criar_transferencia` é um `INSERT` direto que nunca passou
+pelos resolvedores já corrigidos, então ficou fora do grep mental da
+rodada anterior (que focou em `FOR UPDATE`, não simultaneamente no padrão
+de resolução de forma por rótulo).
+
+`npx tsc`: 0 novos erros.
+
+### 9.67 39ª rodada de review: parcelas nascem com competência divergente (D10 protegia o depois, não o nascimento)
+
+Review de 02/08 01:21 sobre o commit de §9.66 (`f86185b`), 1 achado real:
+
+**P2 — `fin_criar_lancamento`, sem `p_extras.data_competencia`
+explícito, dava uma `data_competencia` DIFERENTE pra cada parcela** — o
+`COALESCE((p_extras ->> 'data_competencia')::date, v_venc)` rodava DENTRO
+do loop de parcelas, e `v_venc` avança 1 mês por iteração. Um grupo
+parcelado já nascia com competências divergentes entre as parcelas —
+exatamente o que o guard D10 (`FIN_COMPETENCIA_GRUPO`,
+`fin_atualizar_lancamento`, §9.29-ish) existe pra impedir, só que o D10
+só protege contra divergir DEPOIS de criado; nada garantia que o grupo
+nascia sincronizado. `TransacaoDialog.tsx` (única UI que chama esta RPC
+hoje) sempre manda `data_competencia` explícito, então o caminho quebrado
+só afetava chamadores que omitem o campo (bot, integrações futuras) — mas
+`fin_criar_lancamento` é a porta única (ADR-029), precisa ser seguro pra
+qualquer chamador.
+
+Fix: `v_data_competencia_base` calculada UMA VEZ antes do loop
+(`COALESCE(explícito, p_data_vencimento)` — a data da parcela 1, não a de
+cada parcela), usada pra TODAS as parcelas quando `tipo_lancamento =
+'parcelado'`. `unico`/`recorrente` mantêm o comportamento anterior (nesta
+função eles nunca de fato iteram mais de uma vez hoje, já que
+`v_total_parcelas` só é setado pra `parcelado` — o `CASE` deixa a regra
+explícita mesmo assim, caso a função cresça no futuro pra materializar
+ocorrências recorrentes em lote, onde cada ocorrência LEGITIMAMENTE quer
+sua própria competência pela data de vencimento).
+
+**Varredura proativa** (mesmo pedido do usuário, §9.65/§9.66): grep de
+todo `FOR ... LOOP` com `INSERT INTO transacoes_financeiras` no schema —
+só `fin_lancar_sessao` (itens de uma sessão de contagem, cada item
+LEGITIMAMENTE distinto, não parcelas da mesma compra — não é a mesma
+classe) e `fin_criar_lancamento` (o corrigido aqui) fazem isso.
+`fin_pagar_reembolso` não tem loop. Nenhuma outra função materializa um
+grupo de linhas que deveriam compartilhar um campo e não compartilham —
+classe fechada.
+
+Harness Docker: 3 cenários — parcelado sem competência explícita agora
+compartilha 1 única competência (a da parcela 1) entre as 3 parcelas;
+parcelado COM competência explícita continua usando o valor explícito em
+todas; `unico` sem regressão. `npx tsc`: 0 novos erros.
+
+### 9.68 40ª rodada de review + descoberta maior: `fin_vincular_lote_antecipacao` só valida filial do NOVO vínculo, e a varredura acha o mesmo buraco em ~10 RPCs core pré-existentes
+
+Review de 02/08 01:34 sobre o commit de §9.67 (`802cf1d`), 1 achado — mas a
+varredura proativa que ele disparou é o achado mais importante desta PR
+inteira.
+
+**O achado do review (P1)**: `fin_vincular_lote_antecipacao` valida acesso
+de filial só contra o NOVO extrato (`COALESCE(v_lote.filial_id, v_extrato.
+filial_id)`). Quando o lote é GLOBAL e já está vinculado a um extrato da
+filial A, um tesoureiro restrito à filial B — que enxerga o lote global
+normalmente — podia REVINCULAR esse lote pra um extrato da filial B sem
+nunca ter acesso checado contra a filial A, cujo vínculo estava
+sobrescrevendo (muda o deságio calculado, "rouba" a posse do fluxo de
+reconciliação de A). Fix: ao trocar um vínculo já existente, valida
+também a filial efetiva do vínculo ATUAL, não só do novo. Testado no
+harness (canal JWT/web real): revincular bloqueado; vínculo inicial (lote
+ainda sem extrato) continua funcionando.
+
+**A varredura**: pedido do usuário (3ª vez, mesma pergunta) — "veja se
+não há outros padrões com o mesmo comportamento de erro". Esse achado é
+"só valida o NOVO estado, nunca o ATUAL" — mas ao procurar esse padrão
+especificamente em `fin_atualizar_lancamento` (a RPC mais usada do
+módulo, PATCH genérico de transação), a resposta foi pior do que "só o
+novo estado": **nenhum estado é validado, nunca foi, desde a criação
+original da função (`20260710120000`)**. `grep -c has_filial_access` em
+cada função `fin_*` (versão mais recente de cada uma) confirma que isto
+NÃO é um problema isolado — é sistêmico em praticamente todo o CORE
+financeiro anterior a esta PR:
+
+| RPC | Opera em | `has_filial_access`? |
+|---|---|---|
+| `fin_atualizar_lancamento` | transação (patch genérico) | **Nunca teve** |
+| `fin_excluir_lancamento` | transação (exclui) | **Nunca teve** |
+| `fin_alterar_status_lancamento` | transação ("Marcar como Pago") | **Nunca teve** |
+| `fin_alterar_competencia_grupo` | grupo de parcelas | **Nunca teve** |
+| `fin_criar_transferencia` | 2 contas | **Nunca teve** |
+| `fin_estornar_transferencia` | transferência | **Nunca teve** |
+| `fin_ajustar_saldo` | conta (ajuste direto de saldo!) | **Nunca teve** |
+| `fin_recalcular_saldo_conta` | conta (recalcula/sobrescreve saldo) | **Nunca teve** |
+| `fin_confirmar_conciliacao` | transação + extrato | **Nunca teve** |
+| `fin_desconciliar` | transação | **Nunca teve** |
+| `fin_alternar_conferencia_manual` | transação | **Nunca teve** |
+| `fin_marcar_extrato_ignorado` | extrato | **Nunca teve** |
+| `fin_vincular_lote_antecipacao` | lote+extrato | Parcial (corrigido aqui) |
+
+Ou seja: hoje, qualquer usuário com papel `admin`/`tesoureiro` (mesmo
+restrito a UMA filial na UI) consegue, via essas RPCs `SECURITY DEFINER`
+(que bypassam RLS por definição), editar/excluir/marcar como pago/
+transferir/ajustar saldo de QUALQUER transação ou conta do TENANT
+INTEIRO, de qualquer filial — a restrição de filial que a UI aplica é
+só um filtro de conveniência, não uma fronteira de segurança de verdade
+nessas RPCs.
+
+**Por que não foi corrigido nesta mesma leva**: das ~13 RPCs acima, só
+`fin_vincular_lote_antecipacao` faz parte do diff desta PR (Fase B do
+Getnet). As outras ~12 são do CORE financeiro, criadas em fases
+anteriores (F0-F7, já mergeadas e em produção) — corrigir todas aqui
+violaria a regra "1 fase = 1 PR" (guardrail seção I) E, mais importante,
+é uma mudança de comportamento de autorização em RPCs já em produção,
+que merece harness, teste e review DEDICADOS, não bundlada numa PR que já
+tem 80+ threads de review sobre um assunto diferente (Getnet). Fica
+registrado aqui como o achado de segurança mais sério identificado nesta
+sessão inteira — ação recomendada: nova fase dedicada, prioridade alta,
+adicionando `has_filial_access` (mesmo padrão já usado em
+`fin_conferencia_totais_getnet`/`fin_criar_lancamento`/`fin_lancar_
+desagio_antecipacao`) em cada uma dessas RPCs, testada com harness real
+(canal JWT/web, não só service_role — o gap só se manifesta nesse
+canal).
+
+`npx tsc`: 0 novos erros (mudança só em SQL, escopo desta rodada).
+
+### 9.69 41ª rodada de review: upload concorrente sobrescreve preview + conferência não invalida após lançar deságio
+
+Review de 02/08 01:53 sobre o commit de §9.68 (`61148dc5`), 2 achados
+reais:
+
+1. **P2 — `ImportarRecebivelGetnetTab.tsx`: seleção de um 2º arquivo
+   antes da leitura do 1º terminar** — `handleFileUpload` seta `fileName`
+   de forma síncrona, depois `await file.arrayBuffer()` (assíncrono).
+   Selecionar um arquivo B enquanto a leitura de A ainda está pendente
+   dispara as duas leituras em paralelo, sem ordem garantida de
+   conclusão — se A (mais lento) terminar DEPOIS de B, `linhas` fica com
+   o conteúdo de A enquanto `fileName` mostra "B" (a última atribuição
+   síncrona). Clicar Importar manda dados de um arquivo diferente do que
+   a UI identifica. Fix: `uploadTokenRef` incrementado a cada seleção;
+   após o único `await` da função, descarta o resultado se o token não
+   é mais o atual (mesmo padrão de qualquer requisição assíncrona que
+   pode ficar obsoleta).
+
+   **Varredura proativa**: o mesmo `handleFileUpload` (seta `fileName`
+   antes do único `await file.arrayBuffer()`, sem guarda) existe
+   IDENTICO em `ImportarExtratosTab.tsx` e `ImportarTab.tsx` — mas são
+   arquivos de PRs anteriores (#47/#53), fora do diff desta PR, mesma
+   decisão de escopo já tomada em §9.65 pro bug de parsing de valor.
+   Não corrigido aqui; registrado como o mesmo known issue.
+
+2. **P2 — `LotesAntecipacaoTab.tsx`: conferência não invalida depois de
+   lançar deságio** — a tela mostra `ConferenciaTotaisGetnetCard`
+   (totais de `fin_conferencia_totais_getnet`) e a lista de lotes juntas;
+   lançar um deságio muda `desagio_lancado`/`diferenca_nao_explicada`
+   pra aquela conta/período, mas o callback `onLancado` só dava
+   `refetch()` na lista de lotes — o card de conferência, montado na
+   mesma tela, continuava mostrando os totais de ANTES até um remount
+   não relacionado. Fix: `queryClient.invalidateQueries({ queryKey:
+   ["conferencia-totais-getnet"] })` junto no `onLancado`.
+
+   Verificado que `onVinculado` (corrigir vínculo extrato↔lote) NÃO
+   precisa do mesmo fix — vincular sozinho não muda `desagio_lancado`
+   (só conta lotes com `status='lancamento_criado'`, que só acontece ao
+   LANÇAR, não ao vincular), e `fin_vincular_lote_antecipacao` já
+   recusa revincular um lote com deságio lançado (`FIN_JA_LANCADO`).
+
+`npx tsc`: 0 novos erros.
+
+### 9.70 42ª rodada de review: precisão de moeda e data impossível ainda passavam na validação Getnet
+
+Review de 02/08 02:07 sobre o commit de §9.69 (`a85012fb`) — mais
+"evidência nova" sobre `ImportarRecebivelGetnetTab.tsx`, mesmas 2 funções
+de validação já endurecidas em §9.65:
+
+1. **P2 — `isValorGetnetValido` aceitava qualquer quantidade de casas
+   decimais** — `(,\d+)?` deixava `"12,345"` (3 casas) passar,
+   `parseValorGetnet` mandava `12.345` pra uma coluna `numeric(14,2)`,
+   que arredonda em SILÊNCIO pra `12.35` — dado financeiro alterado sem
+   nenhum aviso, reportado como "importado com sucesso". Fix: `,\d{2}`
+   — exige EXATAMENTE 2 casas decimais (precisão de moeda) quando a
+   célula tem vírgula.
+
+2. **P2 — `isDataGetnetValida` só checava o FORMATO, não se a data
+   existe no calendário** — `"31/02/2026"` ou `"29/02/2025"` (não
+   bissexto) batiam o regex de forma (`\d{2}/\d{2}/\d{4}`) e a linha
+   entrava como válida no preview; só falhava DEPOIS, no cast `::date`
+   da RPC, contada como inválida depois de uma importação PARCIAL já ter
+   rodado — sem chance de o usuário corrigir antes. Fix:
+   `isDataCalendarioValida` — constrói um `Date` e confere round-trip
+   (dia/mês/ano de volta batendo com o que foi construído); `Date`
+   normaliza dia fora do range (31/02 vira 03/03), o round-trip detecta
+   essa normalização e rejeita.
+
+**Varredura proativa**: grep por outros parsers de data/valor no escopo
+desta PR (Getnet CSV, SFTP) — `getnetExtratoParser.ts` (F6, PR #52,
+espelho SFTP) não tem parser de data/valor nesse formato; os únicos
+outros lugares com o mesmo padrão shape-only são, de novo,
+`ImportarTab.tsx`/`ImportarExtratosTab.tsx` (fora do diff desta PR,
+mesma decisão de §9.65/§9.69). Classe fechada dentro do escopo desta PR.
+
+`npx tsc`: 0 novos erros.
+
+### 9.71 43ª rodada de review: backfill de forma_pagamento sobrescrevia id válido + upload sobrevivia à troca de igreja
+
+Review de 02/08 02:41 sobre o commit de §9.70 (`13f60b8f`), 2 achados —
+os dois efeito colateral de fixes anteriores DESTA sessão.
+
+1. **P1 — backfill corretivo (§9.61) sobrescrevia `forma_pagamento_id`
+   já válido** — o backfill reprocessava TODA linha com texto legado
+   preenchido, comparando o candidato resolvido por RÓTULO+FILIAL contra
+   o id já gravado, e sobrescrevia sempre que divergiam — mesmo quando o
+   id atual já era perfeitamente válido. 2 cenários reais quebravam:
+   (a) forma renomeada depois da transação — a busca por nome não acha
+   mais candidato, `melhor.forma_id` fica `NULL`, e o UPDATE zera um id
+   que era correto; (b) duas formas compatíveis compartilhando o nome
+   histórico — a ordenação podia trocar um id válido por outro
+   (também válido, mas diferente do originalmente gravado) sem motivo
+   real. Fix: só re-resolve quando o id está `NULL` (nunca resolvido) OU
+   provadamente incompatível (aponta pra uma filial ESPECÍFICA diferente
+   da transação — o bug real que o backfill existe pra corrigir); nunca
+   mais sobrescreve um id já global ou já compatível com a filial da
+   transação.
+
+   Testado no harness: 4 cenários — forma renomeada preserva o id
+   antigo; 2 formas com nome duplicado preservam o id já gravado (não
+   troca pro "melhor" candidato por ordenação); id provadamente
+   incompatível (filial errada) continua sendo corrigido; id nunca
+   resolvido continua sendo resolvido. Migration não tinha sido aplicada
+   em nenhum ambiente real ainda (branch não deployada) — sem dado pra
+   recuperar, só a lógica precisava ser corrigida antes de rodar de
+   verdade.
+
+2. **P2 — `uploadTokenRef` (§9.69) não avançava ao trocar de igreja** —
+   o `useEffect` que limpa o preview quando `igrejaId` muda chamava
+   `limparPreview()`, mas não incrementava o token — trocar de igreja
+   enquanto uma leitura (`arrayBuffer`) ainda estava pendente deixava o
+   handler antigo passar no check de token (só avançava ao selecionar
+   OUTRO arquivo) e repopular `linhas` com o arquivo da igreja anterior
+   sob o contexto novo; se a igreja nova tivesse 1 única integração
+   (auto-selecionada), dava pra importar o arquivo errado. Fix: o
+   incremento do token entra dentro do próprio `limparPreview` — cobre
+   automaticamente todo lugar que já chama essa função (troca de igreja,
+   header não reconhecido, arquivo vazio), não só a troca de arquivo.
+
+`npx tsc`: 0 novos erros.
+
+### 9.72 44ª rodada de review: deadlock em edição concorrente de competência de grupo + drift de saldo pré-deploy
+
+Review de 02/08 02:56 sobre o commit de §9.71 (`de4ba627`), 2 achados —
+naturezas bem diferentes.
+
+1. **P2 — `fin_alterar_competencia_grupo` deadlockava com 2 sessões
+   editando parcelas DIFERENTES do MESMO grupo** — a função travava
+   `p_lancamento_id` INDIVIDUALMENTE (`FOR UPDATE`) numa statement, e só
+   DEPOIS travava o grupo inteiro (`id = v_pai OR lancamento_pai_id =
+   v_pai`) numa segunda. Sessão A editando a parcela 2 e sessão B
+   editando a parcela 3 do mesmo grupo, concorrentes: A trava a parcela 2
+   primeiro, B trava a parcela 3 primeiro — depois A tenta travar o
+   grupo (que inclui a parcela 3, já com B) e espera; B tenta travar o
+   grupo (que inclui a parcela 2, já com A) e espera — espera circular,
+   Postgres aborta uma. Fix: resolve a raiz do grupo (`v_pai`) com um
+   `SELECT` SEM lock primeiro, depois trava o grupo INTEIRO numa ÚNICA
+   statement em ordem determinística (`ORDER BY id`) — nunca mais um lock
+   individual isolado antes do lock do grupo. `v_atual` relido depois do
+   lock, snapshot fresco.
+
+   Harness Docker: deadlock REPRODUZIDO de verdade com 2 sessões `psql`
+   reais (instrumentado com `pg_sleep` entre os 2 locks da versão antiga,
+   pra forçar a janela de corrida — mesma técnica já usada nesta sessão
+   pra reproduzir deadlocks de lock ordering) — `ERROR: deadlock
+   detected` confirmado na versão pré-fix. Pós-fix, mesmo teste (2
+   sessões reais, mesma janela forçada): as duas completam com sucesso.
+   Regressão: chamada normal ainda devolve `snapshot_antes`/`warnings`
+   corretos; lançamento não-parcelado ainda é rejeitado.
+
+2. **P1 — drift de saldo histórico pode ser apagado pelo recálculo
+   automático** — achado de natureza DIFERENTE dos anteriores: não é um
+   bug de lógica, é uma precondição de deploy. `_fin_recalcular_saldo_
+   conta_raw` sempre recalcula `saldo_atual = saldo_inicial + Σ
+   transações pagas` — se alguma conta tiver um ajuste manual histórico
+   feito direto em `contas.saldo_atual` (antes de `fin_ajustar_saldo`
+   existir como RPC auditável), esse ajuste não está refletido em
+   `saldo_inicial` nem em nenhuma transação — a próxima transação paga
+   comum dispara o recálculo e apaga o ajuste em silêncio. Corrigir isso
+   automaticamente às cegas arriscaria mascarar um bug real como se
+   fosse ajuste legítimo — precisa de revisão humana, não código.
+
+   Fix: função de diagnóstico só-leitura nova,
+   `fin_diagnosticar_drift_saldo`, que lista toda conta cujo `saldo_atual`
+   diverge da fórmula, com a diferença. Vira o **passo 0 obrigatório do
+   runbook de deploy** desta PR: rodar ANTES de qualquer deploy pra um
+   ambiente com dados históricos reais; cada linha retornada exige
+   decisão manual — ajuste legítimo (dobra a diferença em
+   `saldo_inicial`) ou drift real (investiga antes de aceitar). Testado
+   no harness: conta sem drift não aparece; conta com ajuste simulado
+   (`UPDATE contas SET saldo_atual = ...` direto) aparece com a
+   diferença correta.
+
+`npx tsc`: 0 novos erros.
+
+### 9.73 45ª rodada de review: os 2 fixes da rodada anterior estavam ERRADOS — backfill corretivo tarde demais + diagnóstico vazando filial
+
+Review de 02/08 03:11 sobre o commit de §9.72 (`76a7b317`). 2 achados —
+os dois em cima de fixes escritos NA RODADA IMEDIATAMENTE ANTERIOR, e os
+dois de classes que este próprio guardrail já documentava antes de eu
+cometer o erro. Diferente das rodadas anteriores, aqui NÃO adicionei uma
+correção por cima — corrigi na raiz e removi o que não funcionava.
+
+1. **P1 — o "fix" do backfill de §9.71 não funcionava, porque rodava
+   TARDE DEMAIS** — a correção (restringir a re-resolução a id `NULL` ou
+   provadamente incompatível) saiu como migration NOVA e POSTERIOR
+   (`20260731310000`). Só que migrations rodam em ordem de timestamp: a
+   migration ORIGINAL do backfill flawed (`20260731220000`, §9.61) roda
+   PRIMEIRO — já sobrescrevia todo id divergente ANTES da "correção"
+   sequer começar. Pro cenário de forma renomeada, o id original já
+   tinha virado `NULL`; pro cenário de nome duplicado, já tinha virado o
+   candidato errado — em nenhum dos dois a informação original ainda
+   existia quando `20260731310000` rodava. A "correção" não corrigia
+   nada. Esse é exatamente o padrão já documentado no guardrail (seção
+   E: "defesas precisam vir ANTES do que protegem") — eu tinha
+   documentado a regra e violado ela na tentativa de aplicá-la.
+
+   Fix definitivo: **editei `20260731220000` diretamente** (a migration
+   original — confirmado de novo que a branch inteira nunca foi
+   deployada em ambiente real, então não há dado real pra recuperar) com
+   a lógica restrita já embutida desde o início, e **removi
+   `20260731310000`** (virou inútil depois do fix na raiz). Testado no
+   harness: os mesmos 4 cenários de §9.71 (renomeada, duplicada,
+   incompatível, nunca resolvida) — agora como UMA ÚNICA passada de
+   backfill, sem janela de corrupção entre duas migrations.
+
+2. **P1 — `fin_diagnosticar_drift_saldo` (a função NOVA de §9.72)
+   vazava filial** — filtrava só por `igreja_id`, sem `has_filial_access`
+   nenhum. Sendo `SECURITY DEFINER`, um tesoureiro restrito a uma filial
+   que chamasse essa RPC "só de diagnóstico" via app/devtools enxergava
+   nome, saldo registrado, saldo calculado e diferença de TODAS as
+   contas do tenant — a MESMA classe de vazamento de §9.61/§9.68,
+   cometida de novo, numa função escrita DEPOIS de já ter documentado a
+   classe inteira como o risco de segurança mais sério da sessão. Fix:
+   `has_filial_access(v_igreja, c.filial_id)` no `WHERE`.
+
+   Testado no harness (canal JWT/web real): tesoureiro restrito à filial
+   A só vê a conta com drift da filial A; admin (mesmo com contexto de
+   filial A) vê as contas com drift das DUAS filiais — confirma que o
+   caso de uso real (operador rodando o diagnóstico antes do deploy)
+   continua funcionando.
+
+**Varredura de verificação** (pedido explícito do usuário — não confiar
+que os 2 achados eram os únicos, verificar a extensão real do problema):
+`grep` em todas as ~12 migrations desta sessão (`20260731220000` a
+`20260731330000`) por `CREATE FUNCTION` (não `CREATE OR REPLACE`) — só
+`fin_validar_fk_filial` (helper interno, não exposto pra chamada livre
+com filtro arbitrário — escopo correto por design) e
+`fin_diagnosticar_drift_saldo` (corrigida acima) são funções
+GENUINAMENTE NOVAS desta sessão; todas as outras são `CREATE OR REPLACE`
+de RPCs pré-existentes, e nenhuma teve um `has_filial_access`
+pré-existente REMOVIDO por mim (nenhuma tinha, pra começo — gap já
+documentado em §9.68, deliberadamente fora de escopo). `grep` por
+`UPDATE`/`INSERT`/`DELETE`/`DO $$` soltos (fora de função) em todas as
+mesmas migrations: só o backfill de `forma_pagamento_id` (corrigido
+acima) é uma migration de dado one-time — nenhuma outra migration desta
+sessão tem esse padrão. Os 2 achados desta rodada eram, de fato, os
+únicos 2 pontos onde essas 2 classes reapareceram dentro do que esta
+sessão escreveu.
+
+Guardrail atualizado com as 2 lições em forma de regra explícita, não só
+o achado pontual: seção E (corrigir um backfill com uma migration nova e
+posterior só funciona se a informação ainda existir quando ela rodar —
+edite a migration original se ainda não foi deployada) e seção B, item 8
+(RPC "só leitura"/"só diagnóstico" não é exceção ao check de filial).
+
+`npx tsc`: 0 novos erros.
+
+### 9.74 46ª rodada de review: `fin_alterar_competencia_grupo` sem filial nenhuma + deadlock ENTRE duas funções diferentes — fechamento das RPCs já tocadas por esta PR
+
+Review de 02/08 03:28 sobre o commit de §9.73 (`c71eeff6`), 2 achados. O
+usuário pediu explicitamente pra não tratar isso como mais uma rodada
+pontual — esta seção documenta um fechamento mais amplo, não só os 2
+achados literais.
+
+1. **P1 — `fin_alterar_competencia_grupo` nunca validou filial** — a
+   MESMA função que §9.72 acabou de reescrever pro fix de deadlock,
+   ainda sem nenhum `has_filial_access`. Um tesoureiro restrito à filial
+   B que soubesse o id de uma parcela da filial A sincronizava o grupo
+   inteiro da filial A (`SECURITY DEFINER` bypassa RLS, só `igreja_id`
+   era checado — mesma classe de §9.61/§9.68/§9.73, de novo). Fix:
+   `has_filial_access(v_igreja, v_atual.filial_id)` logo após a
+   releitura pós-lock que §9.72 já introduziu — todas as parcelas de um
+   grupo compartilham `filial_id` (gravado uma vez na criação), checar a
+   de `v_atual` cobre o grupo inteiro.
+
+2. **P2 — deadlock ENTRE `fin_excluir_lancamento` e `fin_alterar_
+   competencia_grupo`** — não é o mesmo bug de D.5 numa função só; são
+   DUAS funções com protocolos de lock DIFERENTES operando no MESMO
+   grupo. `fin_excluir_lancamento` trava a raiz individualmente primeiro
+   (`SELECT ... WHERE id = p_id FOR UPDATE`) e só trava outras linhas
+   DEPOIS, durante o reparenting; `fin_alterar_competencia_grupo` (desde
+   §9.72) já trava o grupo inteiro de uma vez, em ordem determinística.
+   Rodando concorrentemente sobre o mesmo grupo, os dois protocolos
+   incompatíveis podiam deadlockar. Fix: mesmo protocolo nas duas —
+   `fin_excluir_lancamento` passa a resolver o grupo sem lock, travar o
+   grupo INTEIRO numa única statement (`ORDER BY id`), releitura pós-lock
+   — antes de decidir o que excluir/reparentear.
+
+**Fechamento proativo** (o pedido do usuário era "não apenas uma rodada
+simples" — a resposta a isso não é só corrigir os 2 achados, é fechar o
+que dá pra fechar SEM expandir escopo pra fora do diff): as ~12 RPCs sem
+`has_filial_access` de §9.68 continuam, na maioria, fora do diff desta
+PR (nunca tocadas por nenhuma migration desta sessão) — permanecem
+registradas como fase dedicada. MAS duas delas JÁ estavam no diff,
+reescritas várias vezes por outros motivos nesta mesma sessão:
+`fin_atualizar_lancamento` (6+ rodadas de fixes de filial nos CAMPOS,
+nunca no acesso à LINHA) e `fin_criar_transferencia` (lock + resolução
+de forma, nunca acesso às CONTAS). Fechadas aqui também — não porque o
+review pediu, mas porque não fechar uma RPC que já está sendo reescrita
+na mesma sessão, pelo mesmo motivo (filial), é exatamente o padrão que
+gerou as 2 rodadas de achado sobre este assunto. `fin_atualizar_
+lancamento` ganhou os dois lados: acesso à filial ATUAL (bloqueia editar
+transação de filial que o chamador não acessa) e, quando `filial_id` está
+sendo mudado de fato, acesso à filial NOVA também (bloqueia mover uma
+transação PRA uma filial que o chamador não acessa). `fin_criar_
+transferencia` ganhou o check nas DUAS contas (origem e destino).
+
+Lista de §9.68 atualizada: de ~12 RPCs sem `has_filial_access`, restam
+**8** fora do diff desta PR (`fin_alterar_status_lancamento`,
+`fin_estornar_transferencia`, `fin_ajustar_saldo`, `fin_recalcular_
+saldo_conta`, `fin_confirmar_conciliacao`, `fin_desconciliar`,
+`fin_alternar_conferencia_manual`, `fin_marcar_extrato_ignorado`) —
+essas continuam precisando da fase dedicada. `fin_excluir_lancamento`
+segue SEM o check de acesso (só o protocolo de lock foi corrigido aqui —
+está na mesma lista dos 8, deliberadamente não fechado nesta rodada por
+não ter sido citado pelo achado e não estar diretamente relacionado ao
+fix de lock).
+
+Harness Docker: 4 cenários de bloqueio (tesoureiro filial B barrado em
+`fin_alterar_competencia_grupo`/`fin_atualizar_lancamento`/`fin_criar_
+transferencia` sobre recurso da filial A, pelo canal JWT/web real);
+mesma filial continua funcionando nas 3; `fin_excluir_lancamento`
+confirmado ainda sem check (comportamento esperado, não regressão). 2
+sessões `psql` reais rodando `fin_excluir_lancamento` e `fin_alterar_
+competencia_grupo` concorrentemente sobre o mesmo grupo: as duas
+completam com sucesso, sem deadlock (uma serializa atrás da outra).
+
+`npx tsc`: 0 novos erros.
+
+### 9.75 47ª rodada de review: raiz do grupo (`v_pai`) ficava obsoleta se um reparenting concorrente acontecesse durante a espera do lock
+
+Review de 02/08 15:41 sobre o commit de §9.74 (`cd5a2e1e`), 1 achado real
+— e a mesma classe se repete em `fin_excluir_lancamento`, escrita com o
+mesmo padrão na MESMA migration, sem eu ter verificado esse cenário.
+
+O padrão "resolve a raiz do grupo (`v_pai`) com `SELECT` sem lock, trava
+o grupo inteiro depois" (§9.72/§9.74, pra evitar deadlock — guardrail
+D.5) tem uma janela: se, ENQUANTO esta chamada espera o lock do grupo,
+outra sessão concorrente excluir a raiz e reparentear (`fin_excluir_
+lancamento`), o `v_pai` resolvido ANTES de esperar fica apontando pra um
+id que não existe mais (a raiz antiga, deletada) ou que ninguém mais
+referencia como pai. Quando o lock libera, o predicado `(id = v_pai OR
+lancamento_pai_id = v_pai)` não bate com NENHUMA linha — Postgres trava 0
+linhas — e toda query seguinte que usa `v_pai` (inclusive o `UPDATE`
+final) também não bate com nada. A RPC retorna sucesso (`ok: true`) sem
+atualizar nenhuma parcela — falha silenciosa.
+
+Fix: depois de adquirir o lock do grupo, RE-RESOLVE a raiz da mesma
+forma. Se o valor mudou em relação ao que foi usado pra travar, o grupo
+foi alterado por uma transação concorrente durante a espera — o lock
+adquirido pode não cobrir o grupo real; refaz o ciclo (resolve → trava →
+confere) com a raiz atualizada, até estabilizar. Aplicado nas DUAS
+funções que usam este padrão — `fin_alterar_competencia_grupo` (achado
+do review) e `fin_excluir_lancamento` (mesma classe, não citada pelo
+achado, corrigida proativamente por já usar o padrão idêntico).
+
+Harness Docker: reproduzido de verdade com 2 sessões `psql` reais —
+sessão A (`fin_excluir_lancamento` na raiz, instrumentada com `pg_sleep`
+logo antes do `RETURN` pra segurar a transação já reparenteada+excluída,
+mas ainda não commitada) e sessão B (`fin_alterar_competencia_grupo` na
+parcela 3, iniciada ~1s depois). Pré-fix: B retorna `{"ok": true, "ids":
+null}` — sucesso relatado, nada atualizado, exatamente o bug descrito.
+Pós-fix, mesma instrumentação/timing: B detecta que a raiz mudou,
+re-resolve pra `parcela 2` (a nova raiz pós-reparenting) e atualiza
+`parcela 2` + `parcela 3` corretamente.
+
+**Varredura**: as únicas 2 funções que resolvem uma raiz de grupo
+mutável (`COALESCE(lancamento_pai_id, id)`) antes de travar são estas
+duas — nenhuma outra RPC desta sessão usa esse padrão (`fin_criar_
+transferencia`/`fin_vincular_lote_antecipacao` travam por parâmetro
+direto, não por um identificador derivado que pode mudar por ação
+concorrente de terceiros). Classe fechada.
+
+`npx tsc`: 0 novos erros.
+
+### 9.76 48ª rodada de review: reverter pagamento de deságio vinculado ficava impossível — a própria mensagem de erro orientava um caminho que o mesmo guard bloqueava
+
+Review de 02/08 16:34 sobre o commit de §9.75 (`c8a0f17d`), 1 achado real.
+
+`proteger_desagio_vinculado` (trigger `BEFORE UPDATE`, §9.19/§9.51/§9.53)
+bloqueia editar `valor`/`conta`/`tipo`/`filial`/datas (inclusive
+`data_pagamento`) enquanto o deságio ainda está vinculado a um lote — e a
+própria mensagem de erro orienta: "Marque como pendente antes (desvincula
+o lote) pra poder editar". Só que "Reverter pagamento"
+(`fin_alterar_status_lancamento`, não tocada por esta PR) faz `UPDATE
+... SET status = 'pendente', data_pagamento = NULL, ...` numa SÓ
+statement — muda `status` E `data_pagamento` JUNTOS. O guard não
+distinguia "editar `data_pagamento` com `status` igual" (deve bloquear,
+o caso real que a proteção existe pra evitar) de "`data_pagamento`
+sendo limpo COMO CONSEQUÊNCIA do `status` sair de `pago`" (deve ser
+permitido — é o próprio caminho que a mensagem de erro recomenda).
+Resultado: seguir a orientação da mensagem disparava a MESMA exceção de
+novo.
+
+Mais grave: `proteger_desagio_vinculado` é `BEFORE UPDATE`; quem
+realmente desvincula o lote (`sincronizar_lote_antecipacao_ao_reverter_
+desagio`, §9.53) é `AFTER UPDATE OF status`. A exceção do trigger
+`BEFORE` aborta a `UPDATE` inteira antes do `AFTER` sequer rodar —
+"Reverter pagamento" de um deságio vinculado ficava impossível de fazer
+pela UI normal, sem nenhum caminho de saída.
+
+Fix: a checagem de `data_pagamento` só bloqueia quando ele muda SEM o
+`status` também sair de `'pago'` — `data_pagamento` virando `NULL`
+junto com `status` deixando de ser `'pago'` (a assinatura exata de
+"Reverter pagamento") passa a ser permitido; qualquer outra mudança de
+`data_pagamento` continua bloqueada.
+
+Harness Docker: reproduzido o bug (UPDATE idêntico ao de `fin_alterar_
+status_lancamento` falhando com `FIN_DESAGIO_VINCULADO` antes do fix);
+pós-fix, a mesma UPDATE funciona e o lote é confirmado desvinculado
+(`status='vinculado'`, `lancamento_desagio_id=NULL`) pelo trigger
+`AFTER`. 2 regressões: editar `valor` com deságio vinculado continua
+bloqueado; editar `data_pagamento` pra OUTRA data (sem mudar `status`)
+continua bloqueado.
+
+`npx tsc`: 0 novos erros (mudança só em SQL).
+
+### 9.77 49ª rodada de review: o "passo 0" de §9.72 é tarde demais dentro do próprio deploy + preview antigo sobrevive à seleção de um novo arquivo
+
+Review de 02/08 18:14 sobre o commit de §9.76 (`9d905861`), 2 achados.
+
+1. **P1 — o runbook de §9.72 não funciona na prática, pelo mesmo motivo
+   de §9.73 (E: "defesas precisam vir ANTES do que protegem"), só que
+   numa escala maior** — `fin_diagnosticar_drift_saldo` só é CRIADA na
+   migration `20260731330000`, mas o trigger "sempre recalcula" já está
+   ATIVO desde `20260731210000`, muito antes. O backfill de `forma_
+   pagamento_id` (`20260731220000`) faz um `UPDATE transacoes_
+   financeiras` que não mexe em `status`, mas o trigger da statement
+   (sem `OF <colunas>`, dispara em QUALQUER `UPDATE`) recalcula o saldo
+   de toda conta com pelo menos uma linha PAGA tocada pelo backfill —
+   ou seja, `db push` desta PR, aplicado numa única leva de migrations
+   pendentes (como o Supabase CLI realmente aplica), já APAGA o drift
+   histórico na migration `220000`, **11 migrations antes** (`220000` →
+   `330000`) da função de diagnóstico existir pra alguém rodar. "Rodar `fin_diagnosticar_
+   drift_saldo` antes do deploy" é logicamente impossível — a função só
+   existe DEPOIS que o próprio deploy já destruiu o que ela deveria
+   diagnosticar.
+
+   **Por que isso não dá pra corrigir com mais uma migration**: uma
+   migration não consegue "pausar" o `db push` no meio pra um humano
+   decidir algo — todas as migrations pendentes rodam na mesma leva,
+   sem intervenção possível entre elas. Mover a CRIAÇÃO da função pra
+   uma migration com timestamp mais cedo (antes de `210000`) resolveria
+   a ORDEM, mas não resolve o problema de fundo: mesmo criada mais cedo,
+   nada IMPEDE o `db push` de continuar direto pras migrations
+   seguintes sem esperar revisão humana.
+
+   Fix real: o diagnóstico de pré-deploy não pode viver dentro da
+   sequência de migrations desta PR — precisa ser uma query STANDALONE,
+   fora do `supabase/migrations/`, rodada manualmente (SQL Editor do
+   Supabase ou `psql` direto) no ambiente-alvo **antes de sequer
+   iniciar** `supabase db push` pra esta branch. Adicionada ao runbook
+   de deploy (abaixo) como o único "passo 0" que realmente funciona.
+   `fin_diagnosticar_drift_saldo` continua existindo como ferramenta de
+   monitoramento CONTÍNUO pós-deploy (útil pra detectar drift de
+   ajustes futuros fora do ledger), só deixou de ser vendida como gate
+   de pré-deploy desta PR especificamente.
+
+   **Runbook de deploy — passo 0 (rodar ANTES de `supabase db push`,
+   fora de qualquer migration)**:
+   ```sql
+   SELECT
+     c.id AS conta_id, c.nome AS conta_nome,
+     c.saldo_atual AS saldo_atual_registrado,
+     v_calc.saldo_calculado AS saldo_calculado_formula,
+     c.saldo_atual - v_calc.saldo_calculado AS diferenca
+   FROM contas c
+   CROSS JOIN LATERAL (
+     SELECT COALESCE(c.saldo_inicial, 0) + COALESCE(SUM(
+              CASE WHEN t.tipo = 'entrada' THEN COALESCE(t.valor_liquido, t.valor)
+                   ELSE -COALESCE(t.valor_liquido, t.valor) END
+            ), 0) AS saldo_calculado
+       FROM transacoes_financeiras t
+      WHERE t.conta_id = c.id AND t.status = 'pago'
+   ) v_calc
+   WHERE c.saldo_atual IS DISTINCT FROM v_calc.saldo_calculado
+   ORDER BY abs(c.saldo_atual - v_calc.saldo_calculado) DESC;
+   ```
+   Toda linha retornada exige decisão manual (ajuste legítimo → dobra a
+   diferença em `saldo_inicial`; drift real → investiga) **antes** de
+   rodar `supabase db push` pra esta branch nesse ambiente.
+
+2. **P2 — preview antigo sobrevive à seleção de um novo arquivo**
+   (`ImportarRecebivelGetnetTab.tsx`) — "evidência nova" sobre o fix de
+   token de §9.69: o token evita que uma leitura ANTIGA sobrescreva uma
+   MAIS NOVA quando as duas terminam fora de ordem, mas não limpa um
+   preview já COMPLETO enquanto a leitura do arquivo de substituição
+   ainda está em voo. Selecionar um 2º arquivo enquanto o botão
+   Importar já estava habilitado (1º arquivo já processado) deixava
+   `linhas` com os dados do 1º arquivo, `fileName` já mostrando o 2º —
+   clicar Importar nessa janela envia o arquivo errado. Fix:
+   `limparPreview()` roda ANTES do `await file.arrayBuffer()`, não só
+   depois — o preview fica vazio (botão desabilitado) durante toda a
+   janela de leitura do novo arquivo, não só quando ela conclui.
+
+`npx tsc`: 0 novos erros.
+
+### 9.78 50ª rodada de review: score de candidato usava "hoje" como âncora falsa + lote global vinculado escapava do filtro de filial da lista
+
+Review de 02/08 19:13 sobre o commit de §9.77 (retry — a tentativa anterior,
+17:58, falhou com "Something went wrong"), 2 achados.
+
+1. **P2 — `pontuarCandidato` pontuava proximidade de HOJE quando o lote não
+   tem `data_contratacao_contrato`** (`VincularExtratoLoteDialog.tsx`).
+   `montarQuery` já tratava esse caso certo desde §9.40 (sem âncora
+   confiável, não filtra por data — busca o histórico inteiro), mas
+   `dataAncora` continuava caindo em `new Date()` nesse caso, e
+   `pontuarCandidato` usava essa âncora falsa pra dar até 30 pontos de
+   proximidade de data — um crédito recente e SEM relação nenhuma com o
+   lote furava na frente do crédito histórico real só por estar perto de
+   hoje. Piorava com a badge da tela, que sempre anunciava "Buscando
+   créditos entre X e Y" mesmo quando a busca de verdade não tinha filtro
+   de data nenhum (texto enganoso sobre o que a tela está fazendo).
+
+   Fix: `dataAncora` vira `Date | null` (null quando não há
+   `data_contratacao_contrato`); `pontuarCandidato` só soma pontos de data
+   quando recebe uma âncora real; a badge mostra "Sem data de contrato —
+   buscando em todo o histórico" nesse caso, em vez de uma janela que não
+   está sendo aplicada.
+
+   Busquei outros lugares que rankeiam/pontuam candidatos com âncora de
+   data possivelmente nula — `pontuarCandidato` é a única função desse
+   tipo no projeto (`grep`); nenhum outro achado da mesma classe.
+
+2. **P2 — lote global já vinculado a extrato de outra filial escapava do
+   filtro de `useLotesAntecipacao`** — o predicado (`.or(filial_id.eq.
+   ${filialId},filial_id.is.null)`) só olha `lote.filial_id`. Um lote
+   GLOBAL (`filial_id` NULL) que já foi vinculado a um extrato da filial A
+   continua passando nesse filtro pra um usuário restrito à filial B — e
+   como a política RLS de `extratos_bancarios` (`"Ver extratos bancarios"`,
+   20260117145651) restringe só por `role`+tenant, **sem nenhum
+   `has_filial_access`/checagem de filial**, o embed
+   `extratos_bancarios(...)` da query volta com os dados REAIS do extrato
+   da filial A (valor, descrição, data) — não fica null. Ou seja, o efeito
+   é pior do que o relatado: não é só a tela oferecer "Corrigir vínculo"/
+   "Lançar como saída" que o backend vai rejeitar (`fin_vincular_lote_
+   antecipacao`/`fin_lancar_desagio_antecipacao`, ambos corrigidos em
+   §9.68/§9.72 pra checar a filial do vínculo atual) — é a tela também
+   MOSTRAR o deságio e os dados do extrato de uma filial que o usuário não
+   deveria enxergar.
+
+   Fix aplicado (escopo desta PR — filtra a lista, não mexe em RLS de
+   tabela): depois de paginar os lotes, filtra client-side pela filial
+   EFETIVA do vínculo — `lote.filial_id ?? lote.extratos_bancarios?.
+   filial_id ?? null` (mesma convenção de `COALESCE(v_lote.filial_id,
+   v_extrato.filial_id)` de `fin_vincular_lote_antecipacao`,
+   20260731300000) — quando a view está restrita a uma filial
+   (`!isAllFiliais && filialId`), oculta linhas cuja filial efetiva não é
+   nem null nem a filial atual.
+
+   **Risco maior, deliberadamente FORA do escopo desta PR** (mesmo
+   raciocínio de "1 fase = 1 PR" do §11/RPCs sem filial): a política RLS
+   de SELECT de `extratos_bancarios` não tem NENHUMA checagem de filial —
+   qualquer usuário com papel `tesoureiro`/`admin*` do tenant pode ler,
+   via `supabase.from("extratos_bancarios").select(...)` direto (sem
+   passar por RPC nenhuma), o extrato de QUALQUER filial da igreja,
+   independente da sua própria filial. Corrigir a RLS da tabela é uma
+   mudança de escopo maior (afeta todo read-path de extratos, inclusive o
+   próprio `VincularExtratoLoteDialog.tsx`, que busca candidatos entre
+   filiais por design) — documentado aqui e na memória de RPCs sem
+   `has_filial_access` como mais um item da mesma classe de risco, para
+   uma fase futura dedicada.
+
+`npx tsc`: 0 novos erros.
+
+### 9.79 51ª rodada de review: a mitigação client-side de §9.78 chegava tarde demais no fio + "Todas as filiais" oferecia catálogo de qualquer filial pro mesmo campo que o backend rejeita
+
+Review de 03/08 02:19 sobre o commit de §9.78 (`4f1a1b24`), 2 achados.
+
+1. **P1 — filtrar no React não fecha o vazamento, só esconde o sintoma**
+   (`useLotesAntecipacao.ts`) — evidência nova sobre o fix anterior: o
+   `.filter()` client-side (§9.78) roda DEPOIS que o PostgREST já devolveu
+   o embed `extratos_bancarios(valor, data_transacao, descricao,
+   filial_id)` completo no payload de rede. Como a RLS de SELECT de
+   `extratos_bancarios` não é filial-scoped (§9.78), o embed não fica
+   `null` pra um usuário sem acesso — ele traz os dados REAIS do extrato
+   de outra filial; a tela só deixa de RENDERIZAR a linha depois. O
+   vazamento (dado já trafegado, visível em devtools/network tab antes
+   mesmo do React filtrar) continuava existindo.
+
+   Fix real (server-side, sem tocar na RLS compartilhada de `extratos_
+   bancarios` — 14 read-paths diferentes leem essa tabela no app, vários
+   cruzando filiais por design): nova RPC `SECURITY DEFINER` só-leitura,
+   `fin_listar_extratos_vinculados_lote(p_extrato_ids uuid[])`, que
+   filtra por `has_filial_access` ANTES de devolver qualquer linha.
+   `useLotesAntecipacao.ts` para de embutir `extratos_bancarios(...)` via
+   PostgREST e passa a resolver os extratos vinculados chamando essa RPC
+   (em lotes de 500 ids, mesmo teto de paginação já usado pros lotes)
+   depois de buscar as linhas de `getnet_antecipacao_lotes` (RLS própria,
+   já correta, inalterada). O filtro client-side continua existindo, mas
+   agora só decide se a LINHA aparece — o dado do extrato de outra filial
+   nunca chega no navegador pra começar.
+
+   Testado em harness Postgres real (`harness_v28_*`): tesoureiro
+   restrito à filial B pedindo `[extrato_A, extrato_B, extrato_global]`
+   só recebe B+global; pedindo SÓ `extrato_A` (o caso exato do achado)
+   recebe 0 linhas; admin recebe os 3. `npx tsc`: 0 novos erros.
+
+2. **P2 — "Todas as filiais" listava catálogo de QUALQUER filial pro
+   mesmo campo que `fin_validar_fk_filial` rejeita** (`useDadosApoio.ts`)
+   — `TransacaoDialog` manda `filial_id: null` no lançamento sempre que
+   `isAllFiliais` (nenhum seletor de filial por-lançamento existe nesse
+   modo — confirmado em `TransacaoDialog.tsx:955`), então os 6 campos de
+   catálogo filial-scoped (categoria/subcategoria/centro_custo/base_
+   ministerial/fornecedor/forma_pagamento) só podem ser GLOBAIS nesse
+   modo — senão `fin_validar_fk_filial` rejeita (`v_filial_recurso IS
+   DISTINCT FROM NULL` é `true` pra qualquer recurso não-global,
+   confirmado lendo a função). A condição `!isAllFiliais && filialId`
+   deixava `isAllFiliais` SEM filtro nenhum (mostrava opções de QUALQUER
+   filial, não só globais) nos 6 selects — a UI oferecia exatamente a
+   escolha que o backend ia recusar, repetida nos 6 campos (mesmo padrão
+   já visto em §9.64 pro `forma_pagamento_id` sozinho, agora achado nos 6
+   de uma vez, no hook compartilhado do formulário).
+
+   Fix: helper `filtrarPorFilialCatalogo` — `isAllFiliais` → só globais
+   (`.is("filial_id", null)`); filial específica → própria ou global
+   (`.or(...)`, como antes); nem um nem outro (contexto single-filial) →
+   sem filtro, como antes. Aplicado aos 6 selects (`contas` fica de fora
+   — só tem `fin_validar_fk_tenant`, nunca `fin_validar_fk_filial`,
+   confirmado grepando `fin_criar_lancamento`/`fin_atualizar_lancamento`).
+
+   Busquei outros formulários que criam/editam algo com esses 6 campos
+   sob `isAllFiliais`: `LancarDesagioDialog.tsx` já trata esse caso
+   corretamente desde uma rodada anterior (`filialEfetivaConhecida` +
+   `.is("filial_id", null)` quando a filial efetiva é conhecida e é
+   `null`). **Achado adjacente, NÃO corrigido nesta rodada** (é uma classe
+   de bug diferente — omissão de validação, não "seletor oferece o que o
+   backend rejeita" — e exige migration+harness próprios):
+   `fin_criar_transferencia` nunca chama `fin_validar_fk_filial` (só
+   `fin_validar_fk_tenant`, e só pra `categoria_saida_id`/`categoria_
+   entrada_id` — `subcategoria_saida_id`/`base_ministerial_id`/`centro_
+   custo_id` não têm NENHUMA validação, nem de tenant) apesar de
+   `TransferenciaDialog.tsx` resolver esses 4 campos automaticamente por
+   nome (`.ilike(...).limit(1).single()`, sem filtro de filial nenhum) —
+   documentado como risco separado abaixo (§11), fora do escopo desta PR.
+
+`npx tsc`: 0 novos erros.
+
+### 9.80 52ª rodada de review: conta_id só validado por tenant (não filial) em fin_criar_lancamento/fin_atualizar_lancamento + input de arquivo não resetava pra reselecionar o mesmo CSV
+
+Review de 03/08 13:03 sobre o commit de §9.79 (`10b811fc`), 2 achados.
+
+1. **P1 — `conta_id` nunca validado por filial** (`fin_atualizar_lancamento`,
+   flagrado no patch; sibling achado em `fin_criar_lancamento`) — os dois só
+   chamavam `fin_validar_fk_tenant('contas', ...)` (tenant) pro campo
+   `conta_id`/`p_conta_id`, nunca `has_filial_access`. Um tesoureiro
+   restrito à filial B conseguia editar uma transação ACESSÍVEL (da
+   própria filial B, passa no `has_filial_access(v_atual.filial_id)` do
+   topo de `fin_atualizar_lancamento`) e trocar `conta_id` pra uma conta
+   da filial A sem nunca ter acesso checado contra A — o trigger de saldo
+   (statement-level, sempre recalcula, dispara em qualquer `UPDATE`)
+   recalculava o saldo da conta nova (filial A) também, e a transação
+   (ainda `filial_id`=B) passava a referenciar uma conta de outra filial,
+   sem nenhuma trigger detectando a divergência depois. O comentário
+   original desta função (§9.74) já registrava esse gap como "item
+   separado, não bloqueante" — ficou esperando o achado direto.
+
+   `fin_criar_lancamento` tinha o MESMO gap na criação — sibling não
+   reportado diretamente pelo review, achado ao varrer as outras portas
+   de escrita de `transacoes_financeiras.conta_id` (varredura padrão
+   pedida pelo usuário). `fin_criar_transferencia` (conta_origem/
+   conta_destino, §9.74) e `fin_lancar_desagio_antecipacao` (p_conta_id,
+   §9.65) já validavam — confirmado lendo as duas, não precisaram de fix.
+
+   Fix: `has_filial_access(v_igreja, conta.filial_id)` — mesmo padrão já
+   usado em `fin_criar_transferencia` — em `fin_criar_lancamento` (sempre,
+   pro `p_conta_id` recebido) e em `fin_atualizar_lancamento` (só quando
+   `conta_id` está no patch — editar outro campo de uma transação com
+   conta antiga não exige re-checar uma conta que não mudou).
+
+   Testado em harness Postgres real com as duas funções completas
+   (`harness_v29_*`): tesoureiro restrito à filial B — criar/mover pra
+   conta da filial A rejeita; criar/mover pra conta da própria filial B ou
+   conta global passa; editar outro campo sem tocar `conta_id` passa. Admin
+   — sempre passa, qualquer filial. `npx tsc`: 0 novos erros.
+
+   **Achados adjacentes, mesma classe, NÃO corrigidos** (pré-existentes,
+   nunca tocados por esta PR — mesmo critério de escopo dos "9 RPCs sem
+   has_filial_access" já documentados): `fin_pagar_reembolso` (`p_conta_id`,
+   só `fin_validar_fk_tenant`) e `fin_lancar_sessao` (`conta_id` por item,
+   nem tenant) têm o mesmo gap — adicionados à lista de pendências (§11)
+   pra fase dedicada futura.
+
+2. **P2 — `<input type="file">` nativo não resetava ao limpar a prévia**
+   (`ImportarRecebivelGetnetTab.tsx`) — `limparPreview()` zera o estado
+   React (`setLinhas([])`, `setFileName("")` etc.), mas o `<input>` nativo
+   mantém o arquivo anteriormente selecionado no DOM. Navegadores só
+   disparam `change` quando o `value` do input MUDA — reselecionar o MESMO
+   CSV depois de clicar "Limpar prévia" (ou depois de um import bem
+   sucedido, que também chama `limparPreview()`) não disparava `change`
+   nenhum, deixando a prévia vazia sem jeito de tentar de novo a não ser
+   escolher um arquivo DIFERENTE ou recarregar a página. Fix: `fileInputRef`
+   + `fileInputRef.current.value = ""` dentro de `limparPreview()`.
+
+   Busquei outros componentes financeiros com `<input type="file">` e o
+   mesmo padrão "limpa estado React sem resetar o input nativo":
+   `TransacaoUploadSection.tsx` está OK (o input fica dentro de um ramo
+   condicional que desmonta/remonta ao anexar/remover arquivo — o DOM node
+   é recriado do zero, `value` sempre nasce vazio). **`ImportarTab.tsx` e
+   `ImportarExtratosTab.tsx` (as 2 outras abas de import de extrato em
+   `GerenciarDados.tsx`) tinham o MESMO bug** — corrigidas com o mesmo
+   padrão (`fileInputRef`, reset no ponto de limpeza pós-import). Não
+   investiguei `IntegracoesCriarDialog.tsx` (fora do fluxo de import de
+   extrato/recebível, dentro de um `Dialog` que provavelmente desmonta o
+   conteúdo ao fechar — mesmo caso do `TransacaoUploadSection.tsx` — mas
+   não confirmei).
+
+`npx tsc`: 0 novos erros.
+
+### 9.81 Auditoria de segurança dedicada (não veio do Codex) — 3 achados, 2 inéditos
+
+Depois de mais de 50 rodadas de review sobre esta PR, o usuário perdeu
+confiança no processo reativo (investigar só o que o Codex aponta + sweep
+de padrão irmão) e pediu uma auditoria de segurança completa e
+independente do diff inteiro contra `main` — não incremental, sem reusar
+nenhuma conclusão anterior da sessão. Rodada com agentes de contexto
+fresco (sem viés das minhas próprias investigações), grounded nos
+guardrails/arquitetura reais do projeto (não em suposições genéricas de
+"boas práticas"), com uma segunda camada de verificação cética
+independente pra cada achado antes de reportar. 3 achados confirmados
+(confiança 0.8+), **2 deles nunca reportados em nenhuma rodada anterior**:
+
+1. **`fin_criar_transferencia` — `p_extras.filial_id` nunca validado**
+   (NOVO). A função valida `has_filial_access` nas 2 CONTAS (origem/
+   destino, desde §9.74), mas o campo que define a filial da própria
+   transferência e das 2 transações espelho — `p_extras.filial_id`,
+   enviado literalmente por `TransferenciaDialog.tsx:222` — nunca passava
+   por `has_filial_access`. Um tesoureiro restrito à filial B, usando
+   contas às quais tem acesso legítimo (pra passar nos checks de conta),
+   conseguia mandar `p_extras.filial_id` de outra filial e gravar a
+   transferência + as 2 transações nessa filial alheia sem nunca ter
+   acesso checado. Mesmo padrão que `fin_criar_lancamento` já usa pro
+   mesmo campo — replicado aqui.
+
+2. **`fin_lancar_sessao` — `conta_id` sem filial + filial da PRÓPRIA
+   sessão nunca validada** (o `conta_id` já estava documentado como risco
+   adiado desde §11; a validação da filial da SESSÃO em si é achado NOVO,
+   encontrado ao ler a função inteira pra montar o fix). Esta PR reescreveu
+   a função inteira (`CREATE OR REPLACE`, migration `20260729130000`, por
+   outro motivo — resolução de `forma_pagamento_id`) sem fechar o gap do
+   `conta_id`, contrariando a própria regra do guardrail B.9. E além
+   disso: `v_sessao.filial_id` (a filial da sessão de contagem sendo
+   lançada) nunca era validada contra o chamador — um tesoureiro restrito
+   à filial B, sabendo o id de uma sessão da filial A, conseguia lançar
+   entradas na filial alheia mesmo sem tocar em nenhuma conta de fora.
+
+3. **`fin_recalcular_saldo_conta` — já no radar, mas esta PR abriu a porta
+   da frente pra ele** — já era uma das "8 RPCs sem `has_filial_access`"
+   documentadas desde §9.68 como o risco mais sério da sessão inteira, mas
+   até esta PR só era alcançável via chamada direta da RPC (devtools/
+   script). Esta PR reescreveu a função por outro motivo (ajuste de valor
+   líquido, `20260730110000`) sem fechar o gap, **e criou o primeiro botão
+   de verdade na UI pra ela** (`Contas.tsx`, "Recalcular Saldo", modo
+   dry-run + aplicar) — a listagem já filtra por filial, mas isso é só
+   client-side; a RPC chamada direto continuava aceitando qualquer
+   `p_conta_id` do tenant.
+
+Fix (migration `20260731390000`): `has_filial_access` na filial efetiva
+de cada recurso, mesmo padrão já usado em toda a sessão. Testado em
+harness Postgres real (`harness_v30_*`) com as 3 funções completas — 11
+cenários (tesoureiro restrito rejeita em cada um dos 3 pontos, passa nos
+casos legítimos; admin sempre passa). `npx tsc`: 0 novos erros (rodada
+100% backend).
+
+**Nenhum achado** nas edge functions (`reclass-transacoes`, `undo-import`)
+nem no parsing de CSV/OFX — verificado por sub-agentes dedicados.
+
+`npx tsc`: 0 novos erros.
+
+### 9.82 Review de fechamento (pós-§9.81): última violação B.9 — `fin_excluir_lancamento`
+
+Review independente do estado final da PR #67 (todas as 100 threads do
+Codex resolvidas; CI verde), cruzando guardrails B.9 com o inventário de
+`CREATE OR REPLACE FUNCTION public.fin_*` nas migrations `20260730*`/
+`20260731*` desta branch. Achado único **dentro do escopo B.9** ainda
+aberto:
+
+1. **`fin_excluir_lancamento` — reescrita 6× nesta PR, zero
+   `has_filial_access`** (confirma o que §11 já registrava como "caso à
+   parte"). Última definição em `20260731350000` (re-resolve da raiz pós-
+   lock). A migration `20260731340000` chegou a documentar a omissão de
+   propósito ("sem novo check de filial aqui: já está na lista de §9.68,
+   fora de escopo") — exatamente o anti-padrão que B.9 proíbe. Sibling
+   `fin_alterar_competencia_grupo` na MESMA migration já tinha o check
+   (`:233`).
+
+   Fix (migration `20260731400000`): `has_filial_access(v_igreja,
+   v_atual.filial_id)` logo após a releitura pós-lock — mesmo padrão de
+   `fin_alterar_competencia_grupo`/`fin_atualizar_lancamento`. Testado em
+   harness Postgres real (`harness_v31_*`): tesoureiro restrito à filial B
+   rejeita exclusão de lançamento da filial A (linha permanece); exclui
+   própria filial e global; admin exclui qualquer. `npx tsc`: N/A (100%
+   backend).
+
+**Inventário B.9 desta PR após o fix** — todas as RPCs `fin_*` reescritas
+nesta branch agora têm `has_filial_access` (exceto o helper
+`fin_validar_fk_filial`, STABLE, fora do escopo B.9 por design). O backlog
+§11 abaixo permanece válido pros itens **nunca tocados** por esta PR.
 
 ## 11. Riscos
 
@@ -1900,3 +5237,102 @@ válido ao perder foco.
   snapshot baseline antes da F1.
 - **Paridade na convivência** (F3) → monitorar divergências via audit log
   enquanto a flag antiga existir.
+- **7 RPCs `SECURITY DEFINER` do CORE (pré-existentes, em produção,
+  NUNCA tocadas por esta PR) sem NENHUM check de `has_filial_access`**
+  (§9.68, lista reduzida em §9.74; `fin_recalcular_saldo_conta` corrigida
+  em §9.81; `fin_excluir_lancamento` corrigida em §9.82) —
+  `fin_alterar_status_lancamento`,
+  `fin_estornar_transferencia`, `fin_ajustar_saldo`,
+  `fin_confirmar_conciliacao`, `fin_desconciliar`,
+  `fin_alternar_conferencia_manual`, `fin_marcar_extrato_ignorado`. Um
+  tesoureiro restrito a UMA filial consegue editar/pagar/ajustar saldo/
+  conciliar de QUALQUER transação/conta do tenant inteiro através
+  dessas RPCs. **Risco de segurança mais sério identificado nesta
+  sessão — prioridade alta pra uma fase dedicada.** Fix: mesmo padrão já
+  usado em `fin_conferencia_totais_getnet`/`fin_criar_lancamento`/
+  `fin_atualizar_lancamento`/`fin_criar_transferencia`/`fin_alterar_
+  competencia_grupo`/`fin_vincular_lote_antecipacao`/`fin_excluir_
+  lancamento` (já corrigidas) —
+  `has_filial_access` contra a filial EFETIVA do recurso sendo operado,
+  testado no canal JWT/web real (o gap só se manifesta lá, não em
+  service_role).
+  **`fin_excluir_lancamento` CORRIGIDA em §9.82**: saiu desta lista (era
+  o único caso "reescrita nesta PR sem HFA" — violação B.9 fechada).
+  **`fin_recalcular_saldo_conta` CORRIGIDA em §9.81**: saiu desta lista.
+  Não foi achado de review reativo — veio de uma auditoria de segurança
+  dedicada, pedida pelo usuário depois de perder confiança no processo
+  incremental. Achado agravante que motivou fechar AGORA em vez de
+  esperar a fase dedicada: esta PR reescreveu a função por outro motivo
+  (`20260730110000`) E deu a ela o primeiro botão de verdade na UI
+  (`Contas.tsx`, "Recalcular Saldo") sem fechar o gap — um risco antes só
+  alcançável via devtools/script virou alcançável por qualquer tesoureiro
+  clicando um botão.
+- **Passo 0 obrigatório antes de deployar a cadeia "sempre recalcula" de
+  saldo** (§9.72, corrigido em §9.77) — a versão original deste risco
+  dizia "rode a RPC `fin_diagnosticar_drift_saldo` antes do deploy", mas
+  essa RPC só é criada na migration `20260731330000`, DEPOIS que o
+  trigger "sempre recalcula" (ativo desde `210000`) já apaga o drift via
+  o backfill de `forma_pagamento_id` (`220000`) — rodar a RPC "antes do
+  deploy" é logicamente impossível (ela não existe até o próprio deploy
+  já ter destruído o que ela deveria diagnosticar). **O passo 0 de
+  verdade é a query STANDALONE documentada em §9.77**, rodada
+  manualmente (SQL Editor/`psql`) ANTES de sequer iniciar `supabase db
+  push` pra esta branch — nunca uma RPC que a própria migration cria.
+  Sem isso, a próxima transação paga comum numa conta com ajuste manual
+  histórico (feito fora de `fin_ajustar_saldo`) apaga esse ajuste em
+  silêncio, já nas primeiras migrations do deploy.
+- **RLS de `extratos_bancarios` (SELECT) não tem NENHUMA checagem de
+  filial** (achado do §9.78, via `useLotesAntecipacao.ts`) — a política
+  `"Ver extratos bancarios"` (20260117145651, nunca redefinida depois)
+  restringe só por `role` (`admin*`/`tesoureiro`) + `igreja_id`
+  (tenant). Um tesoureiro restrito a UMA filial lê, via
+  `supabase.from("extratos_bancarios").select(...)` direto — sem passar
+  por nenhuma RPC —, o extrato bancário de QUALQUER filial do tenant.
+  Mesma classe do risco das 8 RPCs acima, numa tabela em vez de função;
+  fix real exige `has_filial_access` na própria policy, o que muda o
+  comportamento de todo read-path existente de extratos (inclusive o
+  `VincularExtratoLoteDialog.tsx`, que por design busca candidatos entre
+  filiais) — fora do escopo desta PR, fase dedicada futura junto com o
+  item acima. **Atualizado em §9.79**: o filtro client-side de
+  `useLotesAntecipacao.ts` (mitigação original desta PR) não fechava o
+  vazamento — o dado já tinha saído no payload de rede antes do filtro
+  rodar. Substituído por `fin_listar_extratos_vinculados_lote` (RPC
+  `SECURITY DEFINER`, filtra por `has_filial_access` antes de devolver
+  qualquer linha) — fecha o vazamento especificamente NESTE read-path,
+  sem tocar na RLS compartilhada da tabela. Os outros 13 read-paths
+  diretos de `extratos_bancarios` no app continuam sem proteção de
+  filial — o risco de fundo (a policy em si) permanece o mesmo, só este
+  caminho específico foi fechado.
+- **`fin_criar_transferencia` nunca valida filial (nem tenant, em 3 dos 4
+  campos) das categorias/subcategoria/base/centro de custo que resolve
+  automaticamente** (achado adjacente do §9.79, não corrigido) — só
+  chama `fin_validar_fk_tenant` pra `categoria_saida_id`/`categoria_
+  entrada_id`; `subcategoria_saida_id`, `base_ministerial_id` e
+  `centro_custo_id` não têm NENHUMA validação (nem tenant). O frontend
+  (`TransferenciaDialog.tsx`) resolve os 4 automaticamente por nome
+  (`.ilike(...).limit(1).single()`, tenant-scoped só na query, sem
+  filtro de filial nenhum) — se existirem registros com o mesmo nome em
+  filiais diferentes, uma transferência pode silenciosamente ficar
+  associada à categoria/subcategoria/base/centro de custo da filial
+  ERRADA, sem rejeição nenhuma (ao contrário do padrão categoria/
+  `fin_validar_fk_filial` já usado em `fin_criar_lancamento`/`fin_
+  atualizar_lancamento`/`fin_lancar_desagio_antecipacao`). Diferente da
+  classe "seletor oferece o que o backend rejeita" (§9.65/§9.78/§9.79
+  item 2) — aqui é omissão de validação, sintoma silencioso, não
+  rejeição. Fix real exige nova migration (adicionar `fin_validar_fk_
+  tenant`+`fin_validar_fk_filial` nos 4 campos) + harness — fora do
+  escopo desta PR, fase dedicada futura.
+- **`fin_pagar_reembolso` ainda nunca valida filial de `conta_id`**
+  (achado do §9.80, não corrigido) — mesma classe do fix de `fin_criar_
+  lancamento`/`fin_atualizar_lancamento`, mas é pré-existente e NUNCA
+  tocada por nenhuma migration desta PR (última alteração em 20260728,
+  antes do trabalho de hardening de filial começar) — mesmo critério de
+  escopo dos "7 RPCs sem has_filial_access" acima. Só chama
+  `fin_validar_fk_tenant('contas', p_conta_id, ...)`. Fix real: mesmo
+  padrão (`has_filial_access` na conta) + harness — fora do escopo desta
+  PR, fase dedicada futura.
+  **`fin_lancar_sessao` CORRIGIDA em §9.81** (saiu deste item — tinha o
+  mesmo gap de `conta_id`, MAIS a filial da própria sessão nunca validada;
+  os dois fechados na auditoria de segurança dedicada, não esperaram a
+  fase futura, porque a função já tinha sido reescrita nesta PR por outro
+  motivo — §9.80/guardrail B.9).

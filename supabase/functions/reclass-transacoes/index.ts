@@ -388,6 +388,92 @@ Deno.serve(async (req) => {
       }
     }
 
+    // D10: mudar data_competencia por linha, quando a linha pertence a um
+    // lançamento parcelado (fin_criar_lancamento materializa a competência
+    // igual em todas as parcelas na criação — ver migration
+    // 20260729150000), só é seguro se TODAS as parcelas irmãs também
+    // estiverem na seleção — senão o grupo diverge silenciosamente.
+    // Mesmo espírito do bloqueio acima: recusa e informa, não expande a
+    // seleção por conta própria (o usuário pode ter excluído uma parcela do
+    // filtro por outro motivo). Não se aplica a tipo_lancamento='recorrente'
+    // (cada ocorrência tem competência própria por natureza).
+    if ("data_competencia" in updateFields) {
+      const paisAlvo = Array.from(
+        new Set(
+          transacoes
+            .filter((t) => t.tipo_lancamento === "parcelado")
+            .map((t) => t.lancamento_pai_id ?? t.id),
+        ),
+      );
+
+      if (paisAlvo.length > 0) {
+        // O job aceita até 5000 transações (limite abaixo); num lote com
+        // muitos grupos parcelados distintos, paisAlvo pode ter centenas/
+        // milhares de entradas — um único .or() com 2 predicados UUID por
+        // pai gera uma URL de centenas de KB e é rejeitada pelo gateway
+        // antes da checagem de irmãs rodar (achado do /code-review). Divide
+        // em lotes fixos pra manter cada requisição num tamanho seguro.
+        const PAIS_POR_LOTE = 100;
+        // PostgREST limita linhas por resposta (db-max-rows) mesmo sem
+        // .limit() explícito — 100 grupos com muitas parcelas cada pode
+        // facilmente passar disso, e um corte silencioso aqui faria
+        // irmasForaDaSelecao ficar vazio por engano se as irmãs que faltam
+        // caírem justo na página cortada (achado do /code-review sobre o
+        // fix anterior). Pagina com .range() até uma página vir mais curta
+        // que PAGE_SIZE — não depende de conhecer o limite exato do server.
+        const PAGE_SIZE = 500;
+        const grupoCompleto: { id: string }[] = [];
+        for (let i = 0; i < paisAlvo.length; i += PAIS_POR_LOTE) {
+          const lotePais = paisAlvo.slice(i, i + PAIS_POR_LOTE);
+          const filtroOr = lotePais
+            .map((pai) => `lancamento_pai_id.eq.${pai},id.eq.${pai}`)
+            .join(",");
+          let offset = 0;
+          while (true) {
+            // .order("id") é obrigatório aqui: SQL não garante ordem
+            // estável entre requisições .range() separadas sem um ORDER BY
+            // determinístico — sem isso, páginas podiam se sobrepor ou
+            // pular linhas, e uma irmã pulada faria a checagem de grupo
+            // completo passar por engano (achado do /code-review sobre o
+            // fix anterior).
+            const { data, error: grupoError } = await supabase
+              .from("transacoes_financeiras")
+              .select("id")
+              .eq("igreja_id", igreja_id)
+              .or(filtroOr)
+              .order("id")
+              .range(offset, offset + PAGE_SIZE - 1);
+            if (grupoError) throw grupoError;
+            grupoCompleto.push(...(data ?? []));
+            if (!data || data.length < PAGE_SIZE) break;
+            offset += PAGE_SIZE;
+          }
+        }
+
+        const idsAlvo = new Set(transacoes.map((t) => t.id));
+        const irmasForaDaSelecao = (grupoCompleto ?? []).filter(
+          (t) => !idsAlvo.has(t.id),
+        );
+
+        if (irmasForaDaSelecao.length > 0) {
+          return new Response(
+            JSON.stringify({
+              error: "GRUPO_PARCELADO_INCOMPLETO",
+              message:
+                `${irmasForaDaSelecao.length} parcela(s) irmã(s) do mesmo lançamento parcelado não estão nesta seleção. ` +
+                "Alterar a competência de só algumas parcelas divergiria do grupo. " +
+                "Selecione todas as parcelas do grupo, ou use a ação de sincronizar competência do lançamento.",
+              ids_irmas_faltantes: irmasForaDaSelecao.map((t) => t.id),
+            }),
+            {
+              status: 409,
+              headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+            },
+          );
+        }
+      }
+    }
+
     const alvoIds = transacoes.map((t) => t.id);
 
     // Criar job

@@ -685,3 +685,115 @@ flowchart TD
     CONC -->|"não"| LIVRE
     CONC -->|"sim"| BLOQ["409 TRANSACAO_CONCILIADA\n(desconciliar antes)"]
 ```
+
+## Importação do Recebível Extrato Detalhado (portal Getnet) — Fase A (jul/2026)
+
+Ver §9.17 do `arquitetura-financeiro.md`. Uso alternativo quando o SFTP
+Getnet está indisponível — upload manual do CSV do portal, em vez do EDI
+V10.1 automático. Fase A: só importa e agrupa por `Contrato Registradora`;
+vínculo com extrato bancário e lançamento do deságio são Fase B.
+
+```mermaid
+flowchart TD
+    subgraph PORTAL["Portal Getnet (manual, sem SFTP)"]
+        CSV["Recebível Extrato Detalhado.csv\nISO-8859-1, ';'-delimitado, 26 colunas fixas"]
+    end
+
+    CSV --> COMP["ImportarRecebivelGetnetTab\n(Gerenciar Dados)\nTextDecoder iso-8859-1 + split manual\n(não usa lib xlsx — encoding real ≠ UTF-8)"]
+    COMP -->|"valida cabeçalho exato\n(26 colunas, rejeita se mudar)"| PARSE["parse linha a linha\nignora TIPO LANÇAMENTO=Subtotal"]
+
+    subgraph RPC["fin_importar_recebivel_getnet\n(SECURITY DEFINER + fin_resolver_contexto)"]
+        DEDUPE["dedupe_key = md5(chave natural + #ocorrência)\n(mesmo padrão do fix Santander, §9.13)"]
+        UPSERT["upsert por Contrato Registradora\n('0' = sentinel sem contrato, ignorado)"]
+    end
+
+    PARSE -->|"p_linhas jsonb"| RPC
+    RPC --> JOB[(fin_extrato_ingestao_jobs\norigem='getnet_recebivel_portal')]
+    RPC --> LANC[(getnet_recebivel_lancamentos\nON CONFLICT DO NOTHING)]
+    RPC --> LOTE[(getnet_antecipacao_lotes\n1 row por Contrato Registradora\nstatus='pendente_vinculo')]
+    RPC --> AUD[(fin_audit_log)]
+
+    LOTE -.->|"Fase B ✅"| VINC["vínculo manual com\nextrato_bancario_id + deságio\ncomo lançamento de saída"]
+```
+
+## Fase B do Recebível Getnet + FK real de forma de pagamento (jul/2026)
+
+Ver §9.18 do `arquitetura-financeiro.md`. Completa o fluxo acima: vínculo
+manual do lote com o extrato bancário, lançamento do deságio via
+`fin_criar_lancamento` (porta única, não INSERT direto), e conferência de
+totais só de leitura. A conferência só ficou confiável depois de
+`forma_pagamento_id` virar FK real — antes, `transacoes_financeiras.
+forma_pagamento` era texto solto com 4 formatos incompatíveis gravados por
+4 escritores diferentes.
+
+```mermaid
+flowchart TD
+    subgraph FK["FK real: forma_pagamento_id"]
+        TXT["forma_pagamento (text, legado)\nUUID-texto | rótulo | string fixa"]
+        BACK["backfill tenant-scoped\n(uuid-texto + rótulo case-insensitive)"]
+        TXT --> BACK
+        BACK --> FPID["forma_pagamento_id (uuid, FK real)"]
+        CRIAR["fin_criar_lancamento /\nfin_atualizar_lancamento"] -->|"valida fin_validar_fk_tenant\nresolve rótulo sem id (chatbot)"| FPID
+        SESSAO["fin_lancar_sessao"] --> FPID
+    end
+
+    subgraph LOTES["Lotes de Antecipação (Reconciliação Bancária)"]
+        LISTA["getnet_antecipacao_lotes\nstatus: pendente_vinculo"]
+        VDLG["VincularExtratoLoteDialog\nsugere por data±30d + descrição\n(sem auto-selecionar)"]
+        LISTA --> VDLG
+        VDLG -->|"escolha manual"| VINC2["fin_vincular_lote_antecipacao\ndeságio = valor_atual_contrato - extrato.valor\n(nunca persistido, sempre recalculado)"]
+        VINC2 --> VINCULADO["status: vinculado"]
+        VINCULADO --> LDLG["LancarDesagioDialog\nescolhe conta + categoria saída"]
+        LDLG --> LANC["fin_lancar_desagio_antecipacao\n→ fin_criar_lancamento (real)\ntipo=saida, status=pago\nrecusa relançar (FIN_JA_LANCADO)"]
+        LANC --> CRIADO["status: lancamento_criado"]
+    end
+
+    subgraph CONF["Conferência de totais (só leitura)"]
+        RPC3["fin_conferencia_totais_getnet\np_conta_id, período"]
+        RPC3 --> C1["Σ Oferta bruto\n(forma_pagamento_id → nome ILIKE '%cart%')"]
+        RPC3 --> C2["− Σ taxa MDR"]
+        RPC3 --> C3["− Σ deságio lançado no período\n(getnet_antecipacao_lotes.status=lancamento_criado)"]
+        RPC3 --> C4["Σ Banco creditado\n(extratos_bancarios, mesma conta/período)"]
+        C1 --> DIFF["Diferença não explicada\n(sinaliza, não decide a causa)"]
+        C2 --> DIFF
+        C3 --> DIFF
+        C4 --> DIFF
+    end
+
+    FPID -.->|"join confiável"| C1
+    CRIADO -.-> C3
+```
+
+## Competência de grupo em lançamentos parcelados — D10 (jul/2026)
+
+Ver §9.19 do `arquitetura-financeiro.md`. Fecha o cenário B ("Despesa
+Parcelada", acima): `fin_criar_lancamento` já materializava todas as
+parcelas com a mesma competência na criação; faltava impedir que uma
+edição posterior (isolada ou em lote) fizesse uma parcela divergir do
+grupo sem que ninguém notasse.
+
+```mermaid
+flowchart TD
+    EDIT["fin_atualizar_lancamento\np_patch com data_competencia"]
+    CHECK{"tipo_lancamento='parcelado'\ne tem irmãs (lancamento_pai_id\nou total_parcelas>1)?"}
+    EDIT --> CHECK
+    CHECK -->|não| APLICA["aplica normalmente\n(inclui recorrente — competência\nprópria por ocorrência)"]
+    CHECK -->|"sim, sem _permitir_divergencia_competencia"| BLOQ["rejeita:\nFIN_COMPETENCIA_GRUPO"]
+    CHECK -->|"sim, com _permitir_divergencia_competencia=true"| ESCAPE["aplica só nesta parcela\n(exceção pontual, não exposta na UI)"]
+
+    BLOQ --> UI["TransacaoDialog.tsx\ncatch detecta o erro nomeado"]
+    UI --> CONFIRMA["AlertDialog:\nsincronizar competência do grupo?"]
+    CONFIRMA -->|confirma| SYNC["fin_alterar_competencia_grupo\np_lancamento_id, p_nova_competencia"]
+
+    SYNC --> CONCILIADA{"alguma parcela do grupo\njá conciliada?"}
+    CONCILIADA -->|sim| REJ["rejeita: FIN_CONCILIADO\n(lista os ids)"]
+    CONCILIADA -->|não| UPDATE["UPDATE em todas as parcelas\n(id=pai OU lancamento_pai_id=pai)\nnuma única transação"]
+    UPDATE --> WARN{"alguma parcela\njá paga?"}
+    WARN -->|sim| AVISO["warning: revisar DRE por\ncompetência do período afetado"]
+    WARN -->|não| OK["ok"]
+
+    RECLASS["reclass-transacoes\n(lote)"] -->|"data_competencia\nem updateFields"| GRUPO{"todas as parcelas\nirmãs estão na seleção?"}
+    GRUPO -->|não| REJ2["409 GRUPO_PARCELADO_INCOMPLETO\n(lista ids_irmas_faltantes)"]
+    GRUPO -->|sim| APLICA2["aplica no lote normalmente"]
+```
+

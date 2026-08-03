@@ -3,23 +3,15 @@ import { format } from 'date-fns';
 import { parseLocalDate } from '@/utils/dateUtils';
 
 /**
- * Export data to Excel file
- *
- * @param numberFormats - maps column header -> Excel number format code (e.g. `{ Valor: '#,##0.00' }`)
- *   applied to numeric cells so they stay real numbers (summable) while displaying with the desired format.
+ * Monta uma worksheet a partir de linhas de dados, aplicando formato
+ * numérico do Excel (`numberFormats`) e autosize de colunas — lógica
+ * compartilhada entre `exportToExcel` (1 aba) e `exportSheetsToExcel`
+ * (múltiplas abas no mesmo arquivo).
  */
-export function exportToExcel(
+function buildWorksheet(
   data: Record<string, unknown>[],
-  filename: string,
-  sheetName: string = 'Dados',
   numberFormats?: Record<string, string>,
 ) {
-  if (!data || data.length === 0) {
-    throw new Error('Não há dados para exportar');
-  }
-
-  // Create workbook and worksheet
-  const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(data);
 
   if (numberFormats) {
@@ -47,14 +39,61 @@ export function exportToExcel(
   });
   ws['!cols'] = colWidths;
 
-  // Add worksheet to workbook
+  return ws;
+}
+
+/**
+ * Export data to Excel file
+ *
+ * @param numberFormats - maps column header -> Excel number format code (e.g. `{ Valor: '#,##0.00' }`)
+ *   applied to numeric cells so they stay real numbers (summable) while displaying with the desired format.
+ */
+export function exportToExcel(
+  data: Record<string, unknown>[],
+  filename: string,
+  sheetName: string = 'Dados',
+  numberFormats?: Record<string, string>,
+) {
+  if (!data || data.length === 0) {
+    throw new Error('Não há dados para exportar');
+  }
+
+  const wb = XLSX.utils.book_new();
+  const ws = buildWorksheet(data, numberFormats);
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
-  // Generate filename with timestamp
   const timestamp = format(new Date(), 'yyyy-MM-dd_HHmmss');
   const fullFilename = `${filename}_${timestamp}.xlsx`;
+  XLSX.writeFile(wb, fullFilename);
+}
 
-  // Save file
+/**
+ * Export de múltiplas abas num único arquivo .xlsx — cada item de `sheets`
+ * vira uma worksheet própria (`sheet.name`), com seu próprio
+ * `numberFormats`. Abas sem dado são puladas; erro só se NENHUMA aba tiver
+ * dado (mesma guarda de `exportToExcel`).
+ */
+export function exportSheetsToExcel(
+  sheets: Array<{
+    name: string;
+    data: Record<string, unknown>[];
+    numberFormats?: Record<string, string>;
+  }>,
+  filename: string,
+) {
+  const comDados = sheets.filter((s) => s.data && s.data.length > 0);
+  if (comDados.length === 0) {
+    throw new Error('Não há dados para exportar');
+  }
+
+  const wb = XLSX.utils.book_new();
+  comDados.forEach((sheet) => {
+    const ws = buildWorksheet(sheet.data, sheet.numberFormats);
+    XLSX.utils.book_append_sheet(wb, ws, sheet.name);
+  });
+
+  const timestamp = format(new Date(), 'yyyy-MM-dd_HHmmss');
+  const fullFilename = `${filename}_${timestamp}.xlsx`;
   XLSX.writeFile(wb, fullFilename);
 }
 

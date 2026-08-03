@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { isPagamentoDinheiro } from "@/features/financeiro/core";
+import { useFormaPagamentoDinheiroId } from "@/features/financeiro/core/hooks/useFormaPagamentoDinheiroId";
 
 type Sessao = {
   id: string;
@@ -21,6 +23,7 @@ type Lancamento = {
   data_vencimento: string | null;
   data_pagamento: string | null;
   origem_registro: string | null;
+  forma_pagamento_id?: string | null;
   forma_pagamento?: string | null;
   conferido_manual?: boolean | null;
   categoria: { nome: string } | null;
@@ -68,7 +71,7 @@ export default function SessaoLancamentos() {
         .from("transacoes_financeiras")
         .select(
           `id, valor, data_vencimento, data_pagamento, origem_registro,
-           forma_pagamento, conferido_manual,
+           forma_pagamento_id, forma_pagamento, conferido_manual,
            categoria:categoria_id(nome),
            forma:forma_pagamento_id(nome),
            conta:conta_id(nome)`,
@@ -110,8 +113,7 @@ export default function SessaoLancamentos() {
     return map;
   }, [extratosConciliados]);
 
-  const isPagamentoDinheiro = (forma?: string | null) =>
-    (forma || "").toLowerCase().includes("dinheiro");
+  const formaDinheiroId = useFormaPagamentoDinheiroId();
 
   return (
     <div className="p-4 md:p-6">
@@ -165,7 +167,7 @@ export default function SessaoLancamentos() {
                     const isConciliado = conciliacaoMap.get(l.id);
                     const isConferidoManual =
                       !isConciliado &&
-                      isPagamentoDinheiro(l.forma_pagamento) &&
+                      isPagamentoDinheiro(l.forma_pagamento_id, formaDinheiroId, l.forma_pagamento) &&
                       !!l.conferido_manual;
 
                     return (

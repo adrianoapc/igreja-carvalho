@@ -87,6 +87,7 @@ export function ImportarTab() {
   // Wizard state
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [fileName, setFileName] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [workbook, setWorkbook] = useState<WorkBook | null>(null);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>("");
@@ -960,6 +961,11 @@ export function ImportarTab() {
       setExcluded({});
       setRejected([]);
       setChunkProgress({ processed: 0, total: 0 });
+      // O <input type="file"> nativo mantém o arquivo selecionado no DOM
+      // mesmo com o estado React zerado — reselecionar o MESMO arquivo não
+      // dispara "change" (mesma classe de achado do /code-review em
+      // ImportarRecebivelGetnetTab.tsx).
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
       console.error(err);
       toast.error(
@@ -1133,6 +1139,7 @@ export function ImportarTab() {
                 </label>
               )}
               <input
+                ref={fileInputRef}
                 id="excel-upload"
                 type="file"
                 accept=".xlsx,.xls,.csv"

@@ -10,15 +10,18 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { TransacaoActionsMenu } from "@/components/financas/TransacaoActionsMenu";
+import { EncargoBadges } from "@/components/financas/EncargoBadges";
 import {
   getStatusColorDynamic,
   getStatusDisplay,
   isPagamentoDinheiro,
   colunaDataFiltro,
+  somarEncargos,
   TIPO_DATA_FILTRO_DEFAULT,
   type TransacaoResumo,
   type TipoDataFiltro,
 } from "@/features/financeiro/core";
+import { useFormaPagamentoDinheiroId } from "@/features/financeiro/core/hooks/useFormaPagamentoDinheiroId";
 
 /**
  * Card de lançamento compartilhado por Entradas e Saídas (F2/ADR-029).
@@ -30,11 +33,17 @@ export interface LancamentoCardTransacao extends TransacaoResumo {
   id: string;
   descricao: string;
   valor: number | string;
+  valor_liquido?: number | string | null;
+  taxas_administrativas?: number | string | null;
+  multas?: number | string | null;
+  juros?: number | string | null;
+  desconto?: number | string | null;
   status: string;
   data_vencimento: string;
   data_pagamento?: string | null;
   conciliacao_status?: string | null;
   conferido_manual?: boolean | null;
+  forma_pagamento_id?: string | null;
   forma_pagamento?: string | null;
   solicitacao_reembolso_id?: string | null;
   categoria?: { nome: string; cor?: string | null } | null;
@@ -62,6 +71,9 @@ interface LancamentoCardProps {
   /** Eixo de data usado pra buscar o período (TransacoesPage) — decide se o
    * card mostra vencimento ou pagamento no bloco de data compacto. */
   tipoData?: TipoDataFiltro;
+  /** Bruto (valor nominal) ou líquido (valor_liquido, com desconto/taxa/
+   * juros/multa) — controla o valor exibido e os badges de composição. */
+  visaoValor?: "bruto" | "liquido";
 }
 
 const CONCILIACAO_BADGES: Record<string, { label: string; className: string }> =
@@ -93,11 +105,13 @@ export function LancamentoCard({
   onVerExtrato,
   bordered = true,
   tipoData = TIPO_DATA_FILTRO_DEFAULT,
+  visaoValor = "bruto",
 }: LancamentoCardProps) {
   const conciliacaoStatus =
     transacao.conciliacao_status ||
     (conciliacaoMap.get(transacao.id) ? "conciliado_extrato" : "nao_conciliado");
-  const isDinheiro = isPagamentoDinheiro(transacao.forma_pagamento);
+  const formaDinheiroId = useFormaPagamentoDinheiroId();
+  const isDinheiro = isPagamentoDinheiro(transacao.forma_pagamento_id, formaDinheiroId, transacao.forma_pagamento);
   const isConferidoManual =
     conciliacaoStatus === "nao_conciliado" &&
     isDinheiro &&
@@ -108,6 +122,11 @@ export function LancamentoCard({
   const dataExibidaStr =
     transacao[colunaDataFiltro(tipoData)] || transacao.data_vencimento;
   const dataExibida = new Date(dataExibidaStr + "T00:00:00");
+  const valorExibido =
+    visaoValor === "liquido"
+      ? Number(transacao.valor_liquido ?? transacao.valor)
+      : Number(transacao.valor);
+  const encargosTotais = somarEncargos([transacao]);
 
   return (
     <div
@@ -130,10 +149,8 @@ export function LancamentoCard({
 
       {/* Conteúdo */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="font-semibold text-sm md:text-base truncate flex-1">
-            {transacao.descricao}
-          </h3>
+        <h3 className="font-semibold text-sm md:text-base flex items-baseline gap-1.5">
+          <span className="truncate min-w-0 flex-1">{transacao.descricao}</span>
           <button
             type="button"
             onClick={(e) => {
@@ -141,12 +158,12 @@ export function LancamentoCard({
               navigator.clipboard.writeText(transacao.id);
               toast.success("ID copiado!");
             }}
-            className="text-[10px] font-mono text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
+            className="text-[10px] font-mono font-normal text-muted-foreground/70 hover:text-foreground px-1 rounded hover:bg-muted transition-colors flex-shrink-0"
             title="Copiar ID"
           >
             {transacao.id.substring(0, 6)}
           </button>
-        </div>
+        </h3>
         <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
           {transacao.fornecedor && (
             <>
@@ -180,11 +197,18 @@ export function LancamentoCard({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-right">
+          {visaoValor === "liquido" && (
+            <EncargoBadges
+              totais={encargosTotais}
+              formatCurrency={formatCurrency}
+              className="justify-end mb-1"
+            />
+          )}
           <div className="flex items-center gap-1.5 justify-end">
             <p
               className={`text-base md:text-lg font-bold whitespace-nowrap ${valorClass}`}
             >
-              {formatCurrency(Number(transacao.valor))}
+              {formatCurrency(valorExibido)}
             </p>
             {transacao.solicitacao_reembolso_id && (
               <TooltipProvider>
@@ -205,6 +229,17 @@ export function LancamentoCard({
             )}
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1 mt-1">
+            {transacao.tipo_lancamento === "parcelado" &&
+              !!transacao.total_parcelas &&
+              transacao.total_parcelas > 1 && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] md:text-xs"
+                  title="Parcela deste lançamento — competência compartilhada com as demais (D10)"
+                >
+                  Parcela {transacao.numero_parcela}/{transacao.total_parcelas}
+                </Badge>
+              )}
             <Badge
               className={`text-[10px] md:text-xs ${getStatusColorDynamic(transacao)}`}
             >
