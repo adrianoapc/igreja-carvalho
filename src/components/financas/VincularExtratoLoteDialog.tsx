@@ -36,20 +36,26 @@ interface VincularExtratoLoteDialogProps {
 // destaca; a escolha final é sempre manual.
 function pontuarCandidato(
   e: { data_transacao: string; descricao: string; valor: number },
-  dataAncora: Date,
+  dataAncora: Date | null,
   valorEsperado: number | null,
 ): number {
   let score = 0;
   const desc = e.descricao.toLowerCase();
   if (desc.includes("antecipa") || desc.includes("getnet")) score += 40;
 
-  try {
-    const diffDias = Math.abs(differenceInDays(dataAncora, parseISO(e.data_transacao)));
-    if (diffDias === 0) score += 30;
-    else if (diffDias <= 3) score += 20;
-    else if (diffDias <= 10) score += 10;
-  } catch {
-    // data inválida, sem pontos
+  // Sem data_contratacao_contrato (import histórico), não há âncora real —
+  // pontuar por proximidade de HOJE promoveria créditos recentes e não
+  // relacionados acima do crédito histórico de verdade (achado do
+  // /code-review). Sem âncora, a busca por texto + valor seguem valendo.
+  if (dataAncora) {
+    try {
+      const diffDias = Math.abs(differenceInDays(dataAncora, parseISO(e.data_transacao)));
+      if (diffDias === 0) score += 30;
+      else if (diffDias <= 3) score += 20;
+      else if (diffDias <= 10) score += 10;
+    } catch {
+      // data inválida, sem pontos
+    }
   }
 
   if (valorEsperado != null) {
@@ -74,20 +80,26 @@ export function VincularExtratoLoteDialog({
   const [searchTerm, setSearchTerm] = useState("");
 
   // Antecipação normalmente credita perto da data de contratação do lote;
-  // ±30 dias cobre atraso de liquidação sem trazer ruído demais.
-  const dataAncora = lote.data_contratacao_contrato
-    ? parseISO(lote.data_contratacao_contrato)
-    : new Date();
+  // ±30 dias cobre atraso de liquidação sem trazer ruído demais. Sem
+  // data_contratacao_contrato (import histórico), não há âncora confiável —
+  // fica null (nem filtra por data nem pontua por ela; ver montarQuery e
+  // pontuarCandidato abaixo), em vez de cair pra "hoje" (achado do
+  // /code-review: janela/score relativos a hoje promoviam créditos recentes
+  // e não relacionados acima do crédito histórico real).
+  const dataAncora = lote.data_contratacao_contrato ? parseISO(lote.data_contratacao_contrato) : null;
   const dateWindow = useMemo(
-    () => ({
-      inicio: format(subDays(dataAncora, 5), "yyyy-MM-dd"),
-      fim: format(addDays(dataAncora, 30), "yyyy-MM-dd"),
-    }),
+    () =>
+      dataAncora
+        ? {
+            inicio: format(subDays(dataAncora, 5), "yyyy-MM-dd"),
+            fim: format(addDays(dataAncora, 30), "yyyy-MM-dd"),
+          }
+        : null,
     [dataAncora],
   );
 
   const { data: candidatos = [], isLoading } = useQuery({
-    queryKey: ["extratos-para-vincular-lote", lote.id, igrejaId, filialId, isAllFiliais, dateWindow.inicio, dateWindow.fim],
+    queryKey: ["extratos-para-vincular-lote", lote.id, igrejaId, filialId, isAllFiliais, dateWindow?.inicio, dateWindow?.fim],
     queryFn: async () => {
       if (!igrejaId) return [];
 
@@ -108,7 +120,7 @@ export function VincularExtratoLoteDialog({
         // Sem âncora confiável, não filtra por data: busca por texto + score
         // (que já degrada sozinho sem dataAncora útil) seguem disponíveis pra
         // achar manualmente (achado do /code-review).
-        if (lote.data_contratacao_contrato) {
+        if (dateWindow) {
           q = q.gte("data_transacao", dateWindow.inicio).lte("data_transacao", dateWindow.fim);
         }
         // Lote com filial definida só pode vincular extrato da mesma filial
@@ -245,9 +257,15 @@ export function VincularExtratoLoteDialog({
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-xs flex items-center gap-1">
             <Calendar className="w-3 h-3" />
-            Buscando créditos entre{" "}
-            {format(parseISO(dateWindow.inicio), "dd/MM", { locale: ptBR })} e{" "}
-            {format(parseISO(dateWindow.fim), "dd/MM/yyyy", { locale: ptBR })}
+            {dateWindow ? (
+              <>
+                Buscando créditos entre{" "}
+                {format(parseISO(dateWindow.inicio), "dd/MM", { locale: ptBR })} e{" "}
+                {format(parseISO(dateWindow.fim), "dd/MM/yyyy", { locale: ptBR })}
+              </>
+            ) : (
+              "Sem data de contrato — buscando em todo o histórico"
+            )}
           </Badge>
         </div>
 

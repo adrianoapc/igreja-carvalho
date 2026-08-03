@@ -64,8 +64,14 @@ pra qualquer usuário do tenant quando o registro é global.
    query.or(`filial_id.eq.${filialId},filial_id.is.null`)
    ```
    Isso vale pra `contas`, `formas_pagamento`, `categorias_financeiras`,
-   `extratos_bancarios`, `getnet_antecipacao_lotes` — qualquer tabela com
-   coluna `filial_id` nullable e RLS baseada em `has_filial_access`.
+   `getnet_antecipacao_lotes` — qualquer tabela com coluna `filial_id`
+   nullable e RLS baseada em `has_filial_access`. **`extratos_bancarios`
+   é EXCEÇÃO**: a policy de SELECT (`"Ver extratos bancarios"`,
+   20260117145651) não usa `has_filial_access` — só `role`+`igreja_id`
+   (tenant). Não assuma que uma tabela usa `has_filial_access` na RLS só
+   porque tem coluna `filial_id`; **confira a `CREATE POLICY` real**
+   (item 2 abaixo já cobre isso, mas o erro de assumir por analogia foi
+   cometido de novo em §9.78 especificamente com esta tabela).
 
 2. **Antes de reaproveitar um filtro de filial por analogia, verifique a
    RLS ou a RPC real** — não assuma. `fin_conferencia_totais_getnet`
@@ -93,7 +99,24 @@ pra qualquer usuário do tenant quando o registro é global.
    Achados: `ConferenciaTotaisGetnetCard.tsx` (§9.56),
    `ImportarRecebivelGetnetTab.tsx` (§9.59, `integracaoId`).
 
-Referências: §9.35, §9.36, §9.38, §9.39, §9.46, §9.56, §9.59.
+5. **Um registro GLOBAL (`filial_id IS NULL`) que pode ser VINCULADO depois
+   a outro recurso filial-scoped** (ex.: `getnet_antecipacao_lotes` global
+   vinculado a um `extratos_bancarios` de filial específica) tem uma
+   "filial efetiva" que muda ao longo do tempo — `filial_id` própria
+   continua NULL, mas o vínculo já não é mais "de qualquer filial". Todo
+   filtro de LISTA (não só a RPC de escrita) precisa recalcular a filial
+   efetiva a partir do recurso vinculado
+   (`registro.filial_id ?? registro.vinculado?.filial_id ?? null`), não só
+   olhar a própria `filial_id` — senão a lista mostra (e oferece ação
+   sobre) um vínculo de outra filial pro usuário errado, e se a tabela
+   vinculada for uma das exceções do item 1 (RLS sem `has_filial_access`),
+   os DADOS do vínculo também vazam, não só a ação fica disponível.
+   Achado: `useLotesAntecipacao.ts` (§9.78) — `LancarDesagioDialog.tsx`
+   já usava a convenção certa (`filialEfetivaLote = lote.extratos_
+   bancarios?.filial_id ?? null`) desde antes; a lista da tabela (que
+   decide se as linhas de ação aparecem) não.
+
+Referências: §9.35, §9.36, §9.38, §9.39, §9.46, §9.56, §9.59, §9.78.
 
 ---
 

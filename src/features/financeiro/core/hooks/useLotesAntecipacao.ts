@@ -68,7 +68,25 @@ export function useLotesAntecipacao() {
         if (!data || data.length < PAGE_SIZE) break;
         offset += PAGE_SIZE;
       }
-      return lotes;
+
+      if (isAllFiliais || !filialId) return lotes;
+
+      // Lote global (filial_id NULL) já VINCULADO a um extrato de outra
+      // filial: o predicado acima só olha lote.filial_id, então esse lote
+      // continuava aparecendo aqui — com o deságio/extrato de uma filial
+      // que este usuário não deveria acessar, e com "Corrigir vínculo"/
+      // "Lançar como saída" habilitados mesmo sabendo que fin_vincular_
+      // lote_antecipacao/fin_lancar_desagio_antecipacao vão rejeitar por
+      // falta de acesso à filial do vínculo atual (achado do /code-review).
+      // Filial efetiva do vínculo é COALESCE(lote.filial_id,
+      // extrato.filial_id) — mesma convenção de
+      // 20260731300000/fin_vincular_lote_antecipacao; lote.filial_id nulo
+      // aqui sempre implica lote global (se não fosse global o `.or()`
+      // acima já teria excluído a linha).
+      return lotes.filter((l) => {
+        const filialEfetiva = l.filial_id ?? l.extratos_bancarios?.filial_id ?? null;
+        return filialEfetiva === null || filialEfetiva === filialId;
+      });
     },
     enabled: !!igrejaId,
   });

@@ -4924,6 +4924,74 @@ Review de 02/08 18:14 sobre o commit de §9.76 (`9d905861`), 2 achados.
 
 `npx tsc`: 0 novos erros.
 
+### 9.78 50ª rodada de review: score de candidato usava "hoje" como âncora falsa + lote global vinculado escapava do filtro de filial da lista
+
+Review de 02/08 19:13 sobre o commit de §9.77 (retry — a tentativa anterior,
+17:58, falhou com "Something went wrong"), 2 achados.
+
+1. **P2 — `pontuarCandidato` pontuava proximidade de HOJE quando o lote não
+   tem `data_contratacao_contrato`** (`VincularExtratoLoteDialog.tsx`).
+   `montarQuery` já tratava esse caso certo desde §9.40 (sem âncora
+   confiável, não filtra por data — busca o histórico inteiro), mas
+   `dataAncora` continuava caindo em `new Date()` nesse caso, e
+   `pontuarCandidato` usava essa âncora falsa pra dar até 30 pontos de
+   proximidade de data — um crédito recente e SEM relação nenhuma com o
+   lote furava na frente do crédito histórico real só por estar perto de
+   hoje. Piorava com a badge da tela, que sempre anunciava "Buscando
+   créditos entre X e Y" mesmo quando a busca de verdade não tinha filtro
+   de data nenhum (texto enganoso sobre o que a tela está fazendo).
+
+   Fix: `dataAncora` vira `Date | null` (null quando não há
+   `data_contratacao_contrato`); `pontuarCandidato` só soma pontos de data
+   quando recebe uma âncora real; a badge mostra "Sem data de contrato —
+   buscando em todo o histórico" nesse caso, em vez de uma janela que não
+   está sendo aplicada.
+
+   Busquei outros lugares que rankeiam/pontuam candidatos com âncora de
+   data possivelmente nula — `pontuarCandidato` é a única função desse
+   tipo no projeto (`grep`); nenhum outro achado da mesma classe.
+
+2. **P2 — lote global já vinculado a extrato de outra filial escapava do
+   filtro de `useLotesAntecipacao`** — o predicado (`.or(filial_id.eq.
+   ${filialId},filial_id.is.null)`) só olha `lote.filial_id`. Um lote
+   GLOBAL (`filial_id` NULL) que já foi vinculado a um extrato da filial A
+   continua passando nesse filtro pra um usuário restrito à filial B — e
+   como a política RLS de `extratos_bancarios` (`"Ver extratos bancarios"`,
+   20260117145651) restringe só por `role`+tenant, **sem nenhum
+   `has_filial_access`/checagem de filial**, o embed
+   `extratos_bancarios(...)` da query volta com os dados REAIS do extrato
+   da filial A (valor, descrição, data) — não fica null. Ou seja, o efeito
+   é pior do que o relatado: não é só a tela oferecer "Corrigir vínculo"/
+   "Lançar como saída" que o backend vai rejeitar (`fin_vincular_lote_
+   antecipacao`/`fin_lancar_desagio_antecipacao`, ambos corrigidos em
+   §9.68/§9.72 pra checar a filial do vínculo atual) — é a tela também
+   MOSTRAR o deságio e os dados do extrato de uma filial que o usuário não
+   deveria enxergar.
+
+   Fix aplicado (escopo desta PR — filtra a lista, não mexe em RLS de
+   tabela): depois de paginar os lotes, filtra client-side pela filial
+   EFETIVA do vínculo — `lote.filial_id ?? lote.extratos_bancarios?.
+   filial_id ?? null` (mesma convenção de `COALESCE(v_lote.filial_id,
+   v_extrato.filial_id)` de `fin_vincular_lote_antecipacao`,
+   20260731300000) — quando a view está restrita a uma filial
+   (`!isAllFiliais && filialId`), oculta linhas cuja filial efetiva não é
+   nem null nem a filial atual.
+
+   **Risco maior, deliberadamente FORA do escopo desta PR** (mesmo
+   raciocínio de "1 fase = 1 PR" do §11/RPCs sem filial): a política RLS
+   de SELECT de `extratos_bancarios` não tem NENHUMA checagem de filial —
+   qualquer usuário com papel `tesoureiro`/`admin*` do tenant pode ler,
+   via `supabase.from("extratos_bancarios").select(...)` direto (sem
+   passar por RPC nenhuma), o extrato de QUALQUER filial da igreja,
+   independente da sua própria filial. Corrigir a RLS da tabela é uma
+   mudança de escopo maior (afeta todo read-path de extratos, inclusive o
+   próprio `VincularExtratoLoteDialog.tsx`, que busca candidatos entre
+   filiais por design) — documentado aqui e na memória de RPCs sem
+   `has_filial_access` como mais um item da mesma classe de risco, para
+   uma fase futura dedicada.
+
+`npx tsc`: 0 novos erros.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
@@ -4970,3 +5038,18 @@ Review de 02/08 18:14 sobre o commit de §9.76 (`9d905861`), 2 achados.
   Sem isso, a próxima transação paga comum numa conta com ajuste manual
   histórico (feito fora de `fin_ajustar_saldo`) apaga esse ajuste em
   silêncio, já nas primeiras migrations do deploy.
+- **RLS de `extratos_bancarios` (SELECT) não tem NENHUMA checagem de
+  filial** (achado do §9.78, via `useLotesAntecipacao.ts`) — a política
+  `"Ver extratos bancarios"` (20260117145651, nunca redefinida depois)
+  restringe só por `role` (`admin*`/`tesoureiro`) + `igreja_id`
+  (tenant). Um tesoureiro restrito a UMA filial lê, via
+  `supabase.from("extratos_bancarios").select(...)` direto — sem passar
+  por nenhuma RPC —, o extrato bancário de QUALQUER filial do tenant.
+  Mesma classe do risco das 8 RPCs acima, numa tabela em vez de função;
+  fix real exige `has_filial_access` na própria policy, o que muda o
+  comportamento de todo read-path existente de extratos (inclusive o
+  `VincularExtratoLoteDialog.tsx`, que por design busca candidatos entre
+  filiais) — fora do escopo desta PR, fase dedicada futura junto com o
+  item acima. Mitigação aplicada nesta PR: `useLotesAntecipacao.ts`
+  filtra client-side pela filial efetiva do vínculo (não fecha a leitura
+  na origem, só evita que a UI exiba/ofereça ação sobre o que vazou).
