@@ -4992,6 +4992,79 @@ Review de 02/08 19:13 sobre o commit de §9.77 (retry — a tentativa anterior,
 
 `npx tsc`: 0 novos erros.
 
+### 9.79 51ª rodada de review: a mitigação client-side de §9.78 chegava tarde demais no fio + "Todas as filiais" oferecia catálogo de qualquer filial pro mesmo campo que o backend rejeita
+
+Review de 03/08 02:19 sobre o commit de §9.78 (`4f1a1b24`), 2 achados.
+
+1. **P1 — filtrar no React não fecha o vazamento, só esconde o sintoma**
+   (`useLotesAntecipacao.ts`) — evidência nova sobre o fix anterior: o
+   `.filter()` client-side (§9.78) roda DEPOIS que o PostgREST já devolveu
+   o embed `extratos_bancarios(valor, data_transacao, descricao,
+   filial_id)` completo no payload de rede. Como a RLS de SELECT de
+   `extratos_bancarios` não é filial-scoped (§9.78), o embed não fica
+   `null` pra um usuário sem acesso — ele traz os dados REAIS do extrato
+   de outra filial; a tela só deixa de RENDERIZAR a linha depois. O
+   vazamento (dado já trafegado, visível em devtools/network tab antes
+   mesmo do React filtrar) continuava existindo.
+
+   Fix real (server-side, sem tocar na RLS compartilhada de `extratos_
+   bancarios` — 14 read-paths diferentes leem essa tabela no app, vários
+   cruzando filiais por design): nova RPC `SECURITY DEFINER` só-leitura,
+   `fin_listar_extratos_vinculados_lote(p_extrato_ids uuid[])`, que
+   filtra por `has_filial_access` ANTES de devolver qualquer linha.
+   `useLotesAntecipacao.ts` para de embutir `extratos_bancarios(...)` via
+   PostgREST e passa a resolver os extratos vinculados chamando essa RPC
+   (em lotes de 500 ids, mesmo teto de paginação já usado pros lotes)
+   depois de buscar as linhas de `getnet_antecipacao_lotes` (RLS própria,
+   já correta, inalterada). O filtro client-side continua existindo, mas
+   agora só decide se a LINHA aparece — o dado do extrato de outra filial
+   nunca chega no navegador pra começar.
+
+   Testado em harness Postgres real (`harness_v28_*`): tesoureiro
+   restrito à filial B pedindo `[extrato_A, extrato_B, extrato_global]`
+   só recebe B+global; pedindo SÓ `extrato_A` (o caso exato do achado)
+   recebe 0 linhas; admin recebe os 3. `npx tsc`: 0 novos erros.
+
+2. **P2 — "Todas as filiais" listava catálogo de QUALQUER filial pro
+   mesmo campo que `fin_validar_fk_filial` rejeita** (`useDadosApoio.ts`)
+   — `TransacaoDialog` manda `filial_id: null` no lançamento sempre que
+   `isAllFiliais` (nenhum seletor de filial por-lançamento existe nesse
+   modo — confirmado em `TransacaoDialog.tsx:955`), então os 6 campos de
+   catálogo filial-scoped (categoria/subcategoria/centro_custo/base_
+   ministerial/fornecedor/forma_pagamento) só podem ser GLOBAIS nesse
+   modo — senão `fin_validar_fk_filial` rejeita (`v_filial_recurso IS
+   DISTINCT FROM NULL` é `true` pra qualquer recurso não-global,
+   confirmado lendo a função). A condição `!isAllFiliais && filialId`
+   deixava `isAllFiliais` SEM filtro nenhum (mostrava opções de QUALQUER
+   filial, não só globais) nos 6 selects — a UI oferecia exatamente a
+   escolha que o backend ia recusar, repetida nos 6 campos (mesmo padrão
+   já visto em §9.64 pro `forma_pagamento_id` sozinho, agora achado nos 6
+   de uma vez, no hook compartilhado do formulário).
+
+   Fix: helper `filtrarPorFilialCatalogo` — `isAllFiliais` → só globais
+   (`.is("filial_id", null)`); filial específica → própria ou global
+   (`.or(...)`, como antes); nem um nem outro (contexto single-filial) →
+   sem filtro, como antes. Aplicado aos 6 selects (`contas` fica de fora
+   — só tem `fin_validar_fk_tenant`, nunca `fin_validar_fk_filial`,
+   confirmado grepando `fin_criar_lancamento`/`fin_atualizar_lancamento`).
+
+   Busquei outros formulários que criam/editam algo com esses 6 campos
+   sob `isAllFiliais`: `LancarDesagioDialog.tsx` já trata esse caso
+   corretamente desde uma rodada anterior (`filialEfetivaConhecida` +
+   `.is("filial_id", null)` quando a filial efetiva é conhecida e é
+   `null`). **Achado adjacente, NÃO corrigido nesta rodada** (é uma classe
+   de bug diferente — omissão de validação, não "seletor oferece o que o
+   backend rejeita" — e exige migration+harness próprios):
+   `fin_criar_transferencia` nunca chama `fin_validar_fk_filial` (só
+   `fin_validar_fk_tenant`, e só pra `categoria_saida_id`/`categoria_
+   entrada_id` — `subcategoria_saida_id`/`base_ministerial_id`/`centro_
+   custo_id` não têm NENHUMA validação, nem de tenant) apesar de
+   `TransferenciaDialog.tsx` resolver esses 4 campos automaticamente por
+   nome (`.ilike(...).limit(1).single()`, sem filtro de filial nenhum) —
+   documentado como risco separado abaixo (§11), fora do escopo desta PR.
+
+`npx tsc`: 0 novos erros.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
@@ -5050,6 +5123,32 @@ Review de 02/08 19:13 sobre o commit de §9.77 (retry — a tentativa anterior,
   comportamento de todo read-path existente de extratos (inclusive o
   `VincularExtratoLoteDialog.tsx`, que por design busca candidatos entre
   filiais) — fora do escopo desta PR, fase dedicada futura junto com o
-  item acima. Mitigação aplicada nesta PR: `useLotesAntecipacao.ts`
-  filtra client-side pela filial efetiva do vínculo (não fecha a leitura
-  na origem, só evita que a UI exiba/ofereça ação sobre o que vazou).
+  item acima. **Atualizado em §9.79**: o filtro client-side de
+  `useLotesAntecipacao.ts` (mitigação original desta PR) não fechava o
+  vazamento — o dado já tinha saído no payload de rede antes do filtro
+  rodar. Substituído por `fin_listar_extratos_vinculados_lote` (RPC
+  `SECURITY DEFINER`, filtra por `has_filial_access` antes de devolver
+  qualquer linha) — fecha o vazamento especificamente NESTE read-path,
+  sem tocar na RLS compartilhada da tabela. Os outros 13 read-paths
+  diretos de `extratos_bancarios` no app continuam sem proteção de
+  filial — o risco de fundo (a policy em si) permanece o mesmo, só este
+  caminho específico foi fechado.
+- **`fin_criar_transferencia` nunca valida filial (nem tenant, em 3 dos 4
+  campos) das categorias/subcategoria/base/centro de custo que resolve
+  automaticamente** (achado adjacente do §9.79, não corrigido) — só
+  chama `fin_validar_fk_tenant` pra `categoria_saida_id`/`categoria_
+  entrada_id`; `subcategoria_saida_id`, `base_ministerial_id` e
+  `centro_custo_id` não têm NENHUMA validação (nem tenant). O frontend
+  (`TransferenciaDialog.tsx`) resolve os 4 automaticamente por nome
+  (`.ilike(...).limit(1).single()`, tenant-scoped só na query, sem
+  filtro de filial nenhum) — se existirem registros com o mesmo nome em
+  filiais diferentes, uma transferência pode silenciosamente ficar
+  associada à categoria/subcategoria/base/centro de custo da filial
+  ERRADA, sem rejeição nenhuma (ao contrário do padrão categoria/
+  `fin_validar_fk_filial` já usado em `fin_criar_lancamento`/`fin_
+  atualizar_lancamento`/`fin_lancar_desagio_antecipacao`). Diferente da
+  classe "seletor oferece o que o backend rejeita" (§9.65/§9.78/§9.79
+  item 2) — aqui é omissão de validação, sintoma silencioso, não
+  rejeição. Fix real exige nova migration (adicionar `fin_validar_fk_
+  tenant`+`fin_validar_fk_filial` nos 4 campos) + harness — fora do
+  escopo desta PR, fase dedicada futura.

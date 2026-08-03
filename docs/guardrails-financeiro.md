@@ -116,7 +116,41 @@ pra qualquer usuário do tenant quando o registro é global.
    bancarios?.filial_id ?? null`) desde antes; a lista da tabela (que
    decide se as linhas de ação aparecem) não.
 
-Referências: §9.35, §9.36, §9.38, §9.39, §9.46, §9.56, §9.59, §9.78.
+   **Correção importante em §9.79**: filtrar client-side (`.filter()` no
+   React) NÃO fecha o vazamento de dado do item 1 — só evita que a UI
+   RENDERIZE o que já chegou. Quando a tabela vinculada é uma exceção do
+   item 1 (RLS sem `has_filial_access`), o embed do PostgREST já trouxe
+   os campos reais no payload de rede ANTES do filtro rodar; abrir
+   devtools/network tab mostra o dado de qualquer forma. Fix de verdade:
+   parar de embutir a relação via PostgREST e resolver os campos
+   sensíveis por uma RPC `SECURITY DEFINER` que filtra por
+   `has_filial_access` ANTES de devolver qualquer linha (exemplo:
+   `fin_listar_extratos_vinculados_lote`, §9.79) — o filtro client-side
+   continua útil pra decidir se a LINHA aparece, mas nunca é, sozinho, a
+   correção do vazamento.
+
+6. **Um seletor/dropdown que alimenta um campo validado por `fin_validar_
+   fk_filial` precisa saber a filial EFETIVA do registro sendo criado —
+   inclusive quando essa filial efetiva é `null` (modo "Todas as
+   filiais")**. `!isAllFiliais && filialId` como ÚNICA condição de filtro
+   deixa `isAllFiliais` sem filtro NENHUM — mostra opções de qualquer
+   filial, não só globais —, mas se o registro sendo criado nesse modo
+   sempre grava `filial_id: null` (nenhum seletor de filial por-registro
+   no formulário), só as opções GLOBAIS deveriam aparecer, senão
+   `fin_validar_fk_filial` rejeita a escolha no submit. Três ramos, não
+   dois: `isAllFiliais` → só globais (`.is("filial_id", null)`); filial
+   específica → própria ou global (`.or(...)`); nenhum dos dois (contexto
+   single-filial) → sem filtro. Achado: `useDadosApoio.ts` (§9.79) — os 6
+   selects filial-scoped do formulário de lançamento (categoria/
+   subcategoria/centro_custo/base_ministerial/fornecedor/forma_
+   pagamento) tinham o mesmo bug de uma vez, por reusarem a MESMA
+   condição errada copiada 6 vezes. Antes de dar como resolvido, confira
+   se o registro sendo criado por esse formulário realmente força
+   `filial_id: null` em "Todas as filiais" (grep o payload de criação,
+   não assuma) — se houver um seletor de filial por-registro, o raciocínio
+   não se aplica.
+
+Referências: §9.35, §9.36, §9.38, §9.39, §9.46, §9.56, §9.59, §9.78, §9.79.
 
 ---
 

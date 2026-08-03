@@ -38,22 +38,37 @@ export function useDadosApoio(
     enabled: !!igrejaId,
   });
 
+  // TransacaoDialog manda filial_id: null pro lançamento sempre que
+  // isAllFiliais (nenhum seletor de filial por-lançamento existe nesse
+  // modo — ver TransacaoDialog.tsx) — então os 6 campos de catálogo
+  // filial-scoped abaixo (categoria/subcategoria/centro_custo/base/
+  // fornecedor/forma_pagamento) só podem ser GLOBAIS nesse modo, senão
+  // fin_validar_fk_filial rejeita (filial efetiva NULL != filial do
+  // recurso). `!isAllFiliais && filialId` deixava isAllFiliais SEM filtro
+  // nenhum (mostrava opções de QUALQUER filial, não só globais) — a UI
+  // oferecia exatamente a escolha que o backend ia recusar (achado do
+  // /code-review). Sempre filtra: `isAllFiliais` → só globais; filial
+  // específica → própria ou global; nem um nem outro (single-filial) →
+  // sem filtro, como antes.
+  const filtrarPorFilialCatalogo = <T,>(query: T): T => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const q = query as any;
+    if (isAllFiliais) return q.is("filial_id", null);
+    if (filialId) return q.or(`filial_id.eq.${filialId},filial_id.is.null`);
+    return q;
+  };
+
   const { data: categorias } = useQuery({
     queryKey: ["categorias-select", tipo, filialId, isAllFiliais],
     queryFn: async () => {
-      let query = supabase
-        .from("categorias_financeiras")
-        .select("id, nome")
-        .eq("tipo", tipo)
-        .eq("ativo", true)
-        .order("nome");
-      // §9.65: sem isso, "Todas as filiais" listava categoria de QUALQUER
-      // filial — o backend (fin_validar_fk_filial) agora rejeita quem
-      // pertence a uma filial diferente da do lançamento, então sem o
-      // filtro aqui a UI deixa escolher algo que o backend vai recusar.
-      if (!isAllFiliais && filialId) {
-        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
-      }
+      const query = filtrarPorFilialCatalogo(
+        supabase
+          .from("categorias_financeiras")
+          .select("id, nome")
+          .eq("tipo", tipo)
+          .eq("ativo", true)
+          .order("nome"),
+      );
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -64,15 +79,14 @@ export function useDadosApoio(
     queryKey: ["subcategorias-select", categoriaId, open, filialId, isAllFiliais],
     queryFn: async () => {
       if (!categoriaId || categoriaId === "none") return [];
-      let query = supabase
-        .from("subcategorias_financeiras")
-        .select("id, nome")
-        .eq("categoria_id", categoriaId)
-        .eq("ativo", true)
-        .order("nome");
-      if (!isAllFiliais && filialId) {
-        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
-      }
+      const query = filtrarPorFilialCatalogo(
+        supabase
+          .from("subcategorias_financeiras")
+          .select("id, nome")
+          .eq("categoria_id", categoriaId)
+          .eq("ativo", true)
+          .order("nome"),
+      );
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -84,14 +98,9 @@ export function useDadosApoio(
   const { data: centros } = useQuery({
     queryKey: ["centros-select", filialId, isAllFiliais],
     queryFn: async () => {
-      let query = supabase
-        .from("centros_custo")
-        .select("id, nome")
-        .eq("ativo", true)
-        .order("nome");
-      if (!isAllFiliais && filialId) {
-        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
-      }
+      const query = filtrarPorFilialCatalogo(
+        supabase.from("centros_custo").select("id, nome").eq("ativo", true).order("nome"),
+      );
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -101,14 +110,9 @@ export function useDadosApoio(
   const { data: bases } = useQuery({
     queryKey: ["bases-select", filialId, isAllFiliais],
     queryFn: async () => {
-      let query = supabase
-        .from("bases_ministeriais")
-        .select("id, titulo")
-        .eq("ativo", true)
-        .order("titulo");
-      if (!isAllFiliais && filialId) {
-        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
-      }
+      const query = filtrarPorFilialCatalogo(
+        supabase.from("bases_ministeriais").select("id, titulo").eq("ativo", true).order("titulo"),
+      );
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -118,14 +122,9 @@ export function useDadosApoio(
   const { data: fornecedores } = useQuery({
     queryKey: ["fornecedores-select", filialId, isAllFiliais],
     queryFn: async () => {
-      let query = supabase
-        .from("fornecedores")
-        .select("id, nome")
-        .eq("ativo", true)
-        .order("nome");
-      if (!isAllFiliais && filialId) {
-        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
-      }
+      const query = filtrarPorFilialCatalogo(
+        supabase.from("fornecedores").select("id, nome").eq("ativo", true).order("nome"),
+      );
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -136,18 +135,14 @@ export function useDadosApoio(
     queryKey: ["formas-pagamento-select", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
-      let query = supabase
-        .from("formas_pagamento")
-        .select("id, nome")
-        .eq("ativo", true)
-        .eq("igreja_id", igrejaId)
-        .order("nome");
-      if (!isAllFiliais && filialId) {
-        // Forma de pagamento criada em "Todas as filiais" (filial_id NULL) é
-        // compartilhada — RLS já trata assim via has_filial_access (OR
-        // _filial_id IS NULL); eq() sozinho a excluiria indevidamente.
-        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
-      }
+      const query = filtrarPorFilialCatalogo(
+        supabase
+          .from("formas_pagamento")
+          .select("id, nome")
+          .eq("ativo", true)
+          .eq("igreja_id", igrejaId)
+          .order("nome"),
+      );
       const { data, error } = await query;
       if (error) throw error;
       return data;
