@@ -5196,6 +5196,36 @@ nem no parsing de CSV/OFX — verificado por sub-agentes dedicados.
 
 `npx tsc`: 0 novos erros.
 
+### 9.82 Review de fechamento (pós-§9.81): última violação B.9 — `fin_excluir_lancamento`
+
+Review independente do estado final da PR #67 (todas as 100 threads do
+Codex resolvidas; CI verde), cruzando guardrails B.9 com o inventário de
+`CREATE OR REPLACE FUNCTION public.fin_*` nas migrations `20260730*`/
+`20260731*` desta branch. Achado único **dentro do escopo B.9** ainda
+aberto:
+
+1. **`fin_excluir_lancamento` — reescrita 6× nesta PR, zero
+   `has_filial_access`** (confirma o que §11 já registrava como "caso à
+   parte"). Última definição em `20260731350000` (re-resolve da raiz pós-
+   lock). A migration `20260731340000` chegou a documentar a omissão de
+   propósito ("sem novo check de filial aqui: já está na lista de §9.68,
+   fora de escopo") — exatamente o anti-padrão que B.9 proíbe. Sibling
+   `fin_alterar_competencia_grupo` na MESMA migration já tinha o check
+   (`:233`).
+
+   Fix (migration `20260731400000`): `has_filial_access(v_igreja,
+   v_atual.filial_id)` logo após a releitura pós-lock — mesmo padrão de
+   `fin_alterar_competencia_grupo`/`fin_atualizar_lancamento`. Testado em
+   harness Postgres real (`harness_v31_*`): tesoureiro restrito à filial B
+   rejeita exclusão de lançamento da filial A (linha permanece); exclui
+   própria filial e global; admin exclui qualquer. `npx tsc`: N/A (100%
+   backend).
+
+**Inventário B.9 desta PR após o fix** — todas as RPCs `fin_*` reescritas
+nesta branch agora têm `has_filial_access` (exceto o helper
+`fin_validar_fk_filial`, STABLE, fora do escopo B.9 por design). O backlog
+§11 abaixo permanece válido pros itens **nunca tocados** por esta PR.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
@@ -5209,8 +5239,9 @@ nem no parsing de CSV/OFX — verificado por sub-agentes dedicados.
   enquanto a flag antiga existir.
 - **7 RPCs `SECURITY DEFINER` do CORE (pré-existentes, em produção,
   NUNCA tocadas por esta PR) sem NENHUM check de `has_filial_access`**
-  (§9.68, lista reduzida em §9.74, `fin_recalcular_saldo_conta` corrigida
-  em §9.81 — ver nota abaixo) — `fin_alterar_status_lancamento`,
+  (§9.68, lista reduzida em §9.74; `fin_recalcular_saldo_conta` corrigida
+  em §9.81; `fin_excluir_lancamento` corrigida em §9.82) —
+  `fin_alterar_status_lancamento`,
   `fin_estornar_transferencia`, `fin_ajustar_saldo`,
   `fin_confirmar_conciliacao`, `fin_desconciliar`,
   `fin_alternar_conferencia_manual`, `fin_marcar_extrato_ignorado`. Um
@@ -5220,15 +5251,13 @@ nem no parsing de CSV/OFX — verificado por sub-agentes dedicados.
   sessão — prioridade alta pra uma fase dedicada.** Fix: mesmo padrão já
   usado em `fin_conferencia_totais_getnet`/`fin_criar_lancamento`/
   `fin_atualizar_lancamento`/`fin_criar_transferencia`/`fin_alterar_
-  competencia_grupo`/`fin_vincular_lote_antecipacao` (já corrigidas) —
+  competencia_grupo`/`fin_vincular_lote_antecipacao`/`fin_excluir_
+  lancamento` (já corrigidas) —
   `has_filial_access` contra a filial EFETIVA do recurso sendo operado,
   testado no canal JWT/web real (o gap só se manifesta lá, não em
   service_role).
-  **`fin_excluir_lancamento` é um caso à parte**: teve o PROTOCOLO DE
-  LOCK corrigido (§9.74, pra não deadlockar contra `fin_alterar_
-  competencia_grupo`), mas ainda não tem `has_filial_access` — fica na
-  mesma lista de pendências, não nos "7 nunca tocados", porque já foi
-  reescrita nesta sessão por outro motivo.
+  **`fin_excluir_lancamento` CORRIGIDA em §9.82**: saiu desta lista (era
+  o único caso "reescrita nesta PR sem HFA" — violação B.9 fechada).
   **`fin_recalcular_saldo_conta` CORRIGIDA em §9.81**: saiu desta lista.
   Não foi achado de review reativo — veio de uma auditoria de segurança
   dedicada, pedida pelo usuário depois de perder confiança no processo

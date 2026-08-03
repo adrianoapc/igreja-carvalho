@@ -257,10 +257,12 @@ DEFINER`:**
    exatamente o que gerou 2 rodadas seguidas de achado sobre `fin_
    atualizar_lancamento`/`fin_criar_transferencia`/`fin_alterar_
    competencia_grupo` (§9.74) depois de já saber, desde §9.68, que a
-   classe inteira precisava do check. A lista de RPCs pendentes (memória
-   de sessão) só deve conter funções que esta PR NUNCA tocou — qualquer
-   função que apareça num `CREATE OR REPLACE` desta sessão e ainda
-   esteja na lista é uma bandeira vermelha.
+   classe inteira precisava do check — e ainda `fin_excluir_lancamento`,
+   reescrita 6× com comentário explícito "fora de escopo" na própria
+   migration (§9.82). A lista de RPCs pendentes (memória de sessão) só
+   deve conter funções que esta PR NUNCA tocou — qualquer função que
+   apareça num `CREATE OR REPLACE` desta sessão e ainda esteja na lista
+   é uma bandeira vermelha.
 
 10. **`conta_id`/`p_conta_id` (a conta bancária/caixa que o dinheiro
     entra ou sai) segue uma regra DIFERENTE das 6 FKs de catálogo do
