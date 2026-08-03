@@ -5336,3 +5336,57 @@ nesta branch agora têm `has_filial_access` (exceto o helper
   os dois fechados na auditoria de segurança dedicada, não esperaram a
   fase futura, porque a função já tinha sido reescrita nesta PR por outro
   motivo — §9.80/guardrail B.9).
+- **`has_role()` não filtra por `user_roles.igreja_id`, apesar da coluna
+  existir** — achado em 03/08, no dia do deploy de produção da PR #67,
+  investigando por que "Conta Dinheiro Ofertas" (Igreja Carvalho)
+  mostrava saldo errado (ver 2 itens abaixo). `has_role(_user_id, _role)`
+  só olha `user_id` + `role`, nunca `igreja_id` — mesmo a tabela tendo
+  essa coluna. Como toda `has_filial_access` (usada nas RLS e nas RPCs
+  `fin_*`) tem atalho `OR has_role(auth.uid(), 'admin')`, qualquer usuário
+  com papel `admin`/`admin_igreja`/`admin_filial` em QUALQUER igreja é
+  tratado como admin de TODAS as igrejas do banco inteiro — não só
+  financeiro, isso vale pra toda RLS do sistema que usa `has_role`/
+  `has_filial_access`. **Confirmado que a UI não vaza hoje** (testado ao
+  vivo pelo usuário: login admin na Carvalho só mostra dado da Carvalho,
+  em Contas/Entradas/Saídas) porque o FRONTEND filtra explicitamente por
+  `.eq("igreja_id", igrejaId)` em toda query — a proteção real hoje é
+  essa camada, não a RLS. RLS deveria ser a barreira de fato; hoje é uma
+  segunda rede que só segura se a primeira (o filtro client-side) nunca
+  falhar ou for esquecida em uma tela nova. Prioridade alta, mas usuário
+  decidiu tratar num tema dedicado futuro (acesso/filial/igreja), não
+  nesta PR — fix envolve auditar `has_role` e toda RLS que depende dela,
+  escopo maior que o módulo financeiro.
+- **Transações reais da Igreja Carvalho encontradas com `conta_id`
+  apontando pra conta real da Carvalho mas `igreja_id` gravado como
+  Igreja Teste** — achado no mesmo dia, mesma investigação. Afetava 2 das
+  3 contas da Carvalho (`C. Corrente Max`: 68 entradas + 200 saídas;
+  `Conta Dinheiro Ofertas`: 69 entradas + 1 saída — R$ 136.416,31 só
+  nessa última) — `Doações Voluntárias` estava limpa. O trigger "sempre
+  recalcula" soma por `conta_id` sem checar `igreja_id` (mesma premissa
+  de sempre: `conta_id` deveria garantir a igreja certa via `fin_validar_
+  fk_tenant` na criação — essas linhas quebraram essa garantia), então o
+  saldo ficava inflado por transações de outra igreja. **Corrigido nas 3
+  contas da Carvalho** (usuário corrigiu `conta_id`+`igreja_id` direto no
+  banco, fora de qualquer RPC/migration — sem rastro de auditoria).
+  **Causa raiz NÃO investigada** — não sabemos por que esses dados
+  ficaram cruzados (hipótese mais provável: processo de criação/seed da
+  Igreja Teste copiou dado de exemplo e não remapeou `conta_id` pra
+  contas próprias do tenant de teste), nem se OUTRAS contas/igrejas têm o
+  mesmo problema (só as 3 contas da Carvalho foram auditadas). Fica pro
+  mesmo tema dedicado futuro — inclui: (a) achar a causa raiz, (b)
+  auditar todas as contas de todas as igrejas por esse padrão, (c)
+  considerar reforçar o trigger de saldo com `AND t.igreja_id =
+  c.igreja_id` como segunda trava (sugerido durante a investigação, não
+  aplicado ainda).
+- **Cron jobs `buscar-pix-automatico` e `getnet-sync-automatico` falhando
+  em toda execução** — achado na mesma investigação (`cron.job_run_
+  details`), não relacionado a essa PR. Erro: `unrecognized configuration
+  parameter "app.settings.supabase_url"` — o `net.http_post` dentro do
+  job não consegue resolver essa configuração, então nunca chega a
+  chamar a edge function (`buscar-pix-cron`/`getnet-sftp`). `buscar-pix-
+  automatico` roda de hora em hora e falha toda vez; `getnet-sync-
+  automatico` roda 1x/dia (10h) e também falha. Não investigado a fundo
+  (provavelmente a config `app.settings.supabase_url` nunca foi setada
+  no banco de produção, ou foi setada com nome diferente do que os jobs
+  esperam) — prioridade média, importação automática de PIX/Getnet está
+  parada até isso ser corrigido.
