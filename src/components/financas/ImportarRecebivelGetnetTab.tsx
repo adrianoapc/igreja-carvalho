@@ -233,6 +233,7 @@ export function ImportarRecebivelGetnetTab() {
   // do que fileName mostra, já que as duas leituras rodam em paralelo sem
   // ordem garantida de conclusão (achado do /code-review).
   const uploadTokenRef = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: integracoes = [] } = useQuery<IntegracaoOption[]>({
     queryKey: ["integracoes-getnet-recebivel", igrejaId],
@@ -272,6 +273,12 @@ export function ImportarRecebivelGetnetTab() {
     setLinhasInvalidas(0);
     setFormatoReconhecido(null);
     setFileName("");
+    // O estado React zera, mas o <input type="file"> nativo mantém o
+    // arquivo anteriormente selecionado no DOM — reselecionar o MESMO
+    // arquivo não dispara "change" (o value não muda), deixando a prévia
+    // vazia sem nenhum jeito de tentar de novo a não ser escolher um
+    // arquivo diferente ou recarregar a página (achado do /code-review).
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   // Trocar de igreja com a aba montada mantinha integracaoId da igreja
@@ -490,6 +497,7 @@ export function ImportarRecebivelGetnetTab() {
                 </label>
               )}
               <input
+                ref={fileInputRef}
                 id="recebivel-getnet-upload"
                 type="file"
                 accept=".csv"

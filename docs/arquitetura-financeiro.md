@@ -5065,6 +5065,77 @@ Review de 03/08 02:19 sobre o commit de §9.78 (`4f1a1b24`), 2 achados.
 
 `npx tsc`: 0 novos erros.
 
+### 9.80 52ª rodada de review: conta_id só validado por tenant (não filial) em fin_criar_lancamento/fin_atualizar_lancamento + input de arquivo não resetava pra reselecionar o mesmo CSV
+
+Review de 03/08 13:03 sobre o commit de §9.79 (`10b811fc`), 2 achados.
+
+1. **P1 — `conta_id` nunca validado por filial** (`fin_atualizar_lancamento`,
+   flagrado no patch; sibling achado em `fin_criar_lancamento`) — os dois só
+   chamavam `fin_validar_fk_tenant('contas', ...)` (tenant) pro campo
+   `conta_id`/`p_conta_id`, nunca `has_filial_access`. Um tesoureiro
+   restrito à filial B conseguia editar uma transação ACESSÍVEL (da
+   própria filial B, passa no `has_filial_access(v_atual.filial_id)` do
+   topo de `fin_atualizar_lancamento`) e trocar `conta_id` pra uma conta
+   da filial A sem nunca ter acesso checado contra A — o trigger de saldo
+   (statement-level, sempre recalcula, dispara em qualquer `UPDATE`)
+   recalculava o saldo da conta nova (filial A) também, e a transação
+   (ainda `filial_id`=B) passava a referenciar uma conta de outra filial,
+   sem nenhuma trigger detectando a divergência depois. O comentário
+   original desta função (§9.74) já registrava esse gap como "item
+   separado, não bloqueante" — ficou esperando o achado direto.
+
+   `fin_criar_lancamento` tinha o MESMO gap na criação — sibling não
+   reportado diretamente pelo review, achado ao varrer as outras portas
+   de escrita de `transacoes_financeiras.conta_id` (varredura padrão
+   pedida pelo usuário). `fin_criar_transferencia` (conta_origem/
+   conta_destino, §9.74) e `fin_lancar_desagio_antecipacao` (p_conta_id,
+   §9.65) já validavam — confirmado lendo as duas, não precisaram de fix.
+
+   Fix: `has_filial_access(v_igreja, conta.filial_id)` — mesmo padrão já
+   usado em `fin_criar_transferencia` — em `fin_criar_lancamento` (sempre,
+   pro `p_conta_id` recebido) e em `fin_atualizar_lancamento` (só quando
+   `conta_id` está no patch — editar outro campo de uma transação com
+   conta antiga não exige re-checar uma conta que não mudou).
+
+   Testado em harness Postgres real com as duas funções completas
+   (`harness_v29_*`): tesoureiro restrito à filial B — criar/mover pra
+   conta da filial A rejeita; criar/mover pra conta da própria filial B ou
+   conta global passa; editar outro campo sem tocar `conta_id` passa. Admin
+   — sempre passa, qualquer filial. `npx tsc`: 0 novos erros.
+
+   **Achados adjacentes, mesma classe, NÃO corrigidos** (pré-existentes,
+   nunca tocados por esta PR — mesmo critério de escopo dos "9 RPCs sem
+   has_filial_access" já documentados): `fin_pagar_reembolso` (`p_conta_id`,
+   só `fin_validar_fk_tenant`) e `fin_lancar_sessao` (`conta_id` por item,
+   nem tenant) têm o mesmo gap — adicionados à lista de pendências (§11)
+   pra fase dedicada futura.
+
+2. **P2 — `<input type="file">` nativo não resetava ao limpar a prévia**
+   (`ImportarRecebivelGetnetTab.tsx`) — `limparPreview()` zera o estado
+   React (`setLinhas([])`, `setFileName("")` etc.), mas o `<input>` nativo
+   mantém o arquivo anteriormente selecionado no DOM. Navegadores só
+   disparam `change` quando o `value` do input MUDA — reselecionar o MESMO
+   CSV depois de clicar "Limpar prévia" (ou depois de um import bem
+   sucedido, que também chama `limparPreview()`) não disparava `change`
+   nenhum, deixando a prévia vazia sem jeito de tentar de novo a não ser
+   escolher um arquivo DIFERENTE ou recarregar a página. Fix: `fileInputRef`
+   + `fileInputRef.current.value = ""` dentro de `limparPreview()`.
+
+   Busquei outros componentes financeiros com `<input type="file">` e o
+   mesmo padrão "limpa estado React sem resetar o input nativo":
+   `TransacaoUploadSection.tsx` está OK (o input fica dentro de um ramo
+   condicional que desmonta/remonta ao anexar/remover arquivo — o DOM node
+   é recriado do zero, `value` sempre nasce vazio). **`ImportarTab.tsx` e
+   `ImportarExtratosTab.tsx` (as 2 outras abas de import de extrato em
+   `GerenciarDados.tsx`) tinham o MESMO bug** — corrigidas com o mesmo
+   padrão (`fileInputRef`, reset no ponto de limpeza pós-import). Não
+   investiguei `IntegracoesCriarDialog.tsx` (fora do fluxo de import de
+   extrato/recebível, dentro de um `Dialog` que provavelmente desmonta o
+   conteúdo ao fechar — mesmo caso do `TransacaoUploadSection.tsx` — mas
+   não confirmei).
+
+`npx tsc`: 0 novos erros.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
@@ -5152,3 +5223,14 @@ Review de 03/08 02:19 sobre o commit de §9.78 (`4f1a1b24`), 2 achados.
   rejeição. Fix real exige nova migration (adicionar `fin_validar_fk_
   tenant`+`fin_validar_fk_filial` nos 4 campos) + harness — fora do
   escopo desta PR, fase dedicada futura.
+- **`fin_pagar_reembolso` e `fin_lancar_sessao` também nunca validam
+  filial de `conta_id`** (achado adjacente do §9.80, não corrigido) —
+  mesma classe do fix de `fin_criar_lancamento`/`fin_atualizar_lancamento`
+  (item logo acima), mas essas duas são pré-existentes e NUNCA tocadas
+  por nenhuma migration desta PR (última alteração em 20260728/
+  20260729, antes do trabalho de hardening de filial começar) — mesmo
+  critério de escopo dos "9 RPCs sem has_filial_access". `fin_pagar_
+  reembolso` só chama `fin_validar_fk_tenant('contas', p_conta_id, ...)`;
+  `fin_lancar_sessao` nem isso, pro `conta_id` de cada item de sessão de
+  contagem. Fix real: mesmo padrão (`has_filial_access` na conta) +
+  harness — fora do escopo desta PR, mesma fase dedicada futura.

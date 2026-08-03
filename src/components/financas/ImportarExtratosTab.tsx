@@ -119,6 +119,7 @@ export function ImportarExtratosTab() {
   const { igrejaId, filialId, isAllFiliais } = useFilialId();
   const [contaId, setContaId] = useState<string>("");
   const [fileName, setFileName] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [workbook, setWorkbook] = useState<WorkBook | null>(null);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>("");
@@ -458,6 +459,11 @@ export function ImportarExtratosTab() {
       setWorkbook(null);
       setSheetNames([]);
       setSelectedSheet("");
+      // O <input type="file"> nativo mantém o arquivo selecionado no DOM
+      // mesmo com o estado React zerado — reselecionar o MESMO arquivo não
+      // dispara "change" (mesma classe de achado do /code-review em
+      // ImportarRecebivelGetnetTab.tsx).
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
       console.error(err);
       toast.error("Erro ao importar extratos");
@@ -512,6 +518,7 @@ export function ImportarExtratosTab() {
                 </label>
               )}
               <input
+                ref={fileInputRef}
                 id="extrato-upload"
                 type="file"
                 accept=".xlsx,.xls,.csv,.ofx"

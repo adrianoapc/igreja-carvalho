@@ -262,8 +262,29 @@ DEFINER`:**
    função que apareça num `CREATE OR REPLACE` desta sessão e ainda
    esteja na lista é uma bandeira vermelha.
 
-Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.67, §9.73,
-§9.74, checklist completo na memória de sessão.
+10. **`conta_id`/`p_conta_id` (a conta bancária/caixa que o dinheiro
+    entra ou sai) segue uma regra DIFERENTE das 6 FKs de catálogo do
+    item 5 — não é `fin_validar_fk_filial` (que checa "recurso é global
+    ou bate com a filial EFETIVA da transação"), é `has_filial_access`
+    direto na filial da conta.** `contas` não está na lista de tabelas
+    de `fin_validar_fk_filial` (de propósito — nada no sistema exige que
+    `conta.filial_id` bata com `transacao.filial_id`, só que o CHAMADOR
+    tenha acesso a ela). `fin_criar_lancamento`/`fin_atualizar_lancamento`
+    validavam `conta_id`/`p_conta_id` só com `fin_validar_fk_tenant`
+    (tenant) — nunca `has_filial_access` — até um tesoureiro restrito a
+    uma filial conseguir criar/mover uma transação pra uma conta de
+    OUTRA filial, movendo saldo alheio sem nunca ter acesso checado
+    (§9.80). Mesmo padrão já usado em `fin_criar_transferencia`
+    (conta_origem/conta_destino, §9.74) e `fin_lancar_desagio_
+    antecipacao` (§9.65) — replique sempre que uma RPC nova/editada
+    grava `conta_id`: `SELECT filial_id INTO v_conta_filial FROM contas
+    WHERE id = ...; IF NOT has_filial_access(v_igreja, v_conta_filial)
+    THEN RAISE...`. Em RPC de PATCH parcial, só dispara quando `conta_id`
+    está de fato no patch (editar outro campo com a conta antiga não
+    precisa re-checar uma conta que não mudou).
+
+Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.65, §9.67,
+§9.73, §9.74, §9.80, checklist completo na memória de sessão.
 
 ---
 
@@ -551,8 +572,26 @@ Referências: §9.40, §9.41, §9.56, §9.57, §9.58, §9.59.
 3. Linha rejeitada por conteúdo inválido é uma categoria DIFERENTE de
    "subtotal ignorado" (que é esperado/normal) — conte e sinalize
    separado, com alerta visível, não só um toast que passa despercebido.
+4. **Limpar o estado React de um `<input type="file">` não limpa o
+   `value` do DOM node** — navegadores só disparam `change` quando o
+   `value` do input MUDA; reselecionar o MESMO arquivo depois de "Limpar
+   prévia" (ou depois de um import bem-sucedido que reseta o formulário)
+   não dispara `change` nenhum, deixando o usuário travado (sem preview,
+   sem erro, só o botão de importar desabilitado) a não ser que escolha
+   um arquivo DIFERENTE ou recarregue a página. Sempre que a função de
+   "limpar preview" zera estado de arquivo, também zera o input via
+   `ref`: `if (fileInputRef.current) fileInputRef.current.value = "";`.
+   Não precisa disso se o `<input>` está dentro de um ramo condicional
+   que DESMONTA (condicional de render, ou dialog que desmonta ao
+   fechar) — nesse caso o DOM node é recriado do zero e `value` já nasce
+   vazio; só é necessário quando o MESMO `<input>` persiste montado e só
+   o estado React ao redor muda. Achado real: 3 abas de import de
+   extrato/recebível (`ImportarRecebivelGetnetTab.tsx`,
+   `ImportarTab.tsx`, `ImportarExtratosTab.tsx`) tinham o mesmo bug — a
+   1ª foi o achado direto do review, as outras 2 vieram da varredura por
+   padrão irmão (§9.80).
 
-Referências: §9.49, §9.57, §9.58.
+Referências: §9.49, §9.57, §9.58, §9.80.
 
 ---
 
