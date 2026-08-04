@@ -820,3 +820,44 @@ flowchart TD
 `fin_confirmar_conciliacao` (Fase 4/4, PR separada) segue o mesmo padrão
 de `has_filial_access`, mas dentro de 2 loops (N extratos × N transações).
 
+## `fin_confirmar_conciliacao` ganha `has_filial_access` — Fase 4/4, última
+(§9.86 do `arquitetura-financeiro.md`)
+
+```mermaid
+flowchart TD
+    CALL["fin_confirmar_conciliacao\np_vinculo: extrato_ids[], transacao_ids[], divisoes[]?"]
+    CALL --> LE["loop extratos: ORDER BY id, FOR UPDATE\n+ filial_id no SELECT"]
+    LE --> HFAE{"has_filial_access\npor item?"}
+    HFAE -->|não| REJ1["FIN_TENANT"]
+    HFAE -->|sim| ACE["filial_id NULL? marca âncora compartilhada\nfilial_id concreta? acumula em v_filiais_distintas"]
+    ACE --> LT["loop transações: ORDER BY id, FOR UPDATE\n+ filial_id no SELECT"]
+    LT --> HFAT{"has_filial_access\npor item?"}
+    HFAT -->|não| REJ1
+    HFAT -->|sim| ACT["mesma acumulação\n(âncora / v_filiais_distintas)"]
+
+    ACT --> MISTA{"≥2 filiais concretas\nDISTINTAS?"}
+    MISTA -->|"sim, SEM âncora compartilhada"| REJM["FIN_VALIDACAO:\nfiliais diferentes"]
+    MISTA -->|"sim, COM âncora (filial_id IS NULL\nem algum item)"| NULO["v_filial_efetiva = NULL\n(espelha o motor F4)"]
+    MISTA -->|não, só 1 filial| UNICA["v_filial_efetiva = essa filial"]
+
+    NULO --> FORMATO
+    UNICA --> FORMATO{"1:1 / N:1 (lote) /\n1:N (divisão)"}
+
+    FORMATO -->|"1:N"| BYPASS{"divisoes[].transacao_id\n≡ transacao_ids?"}
+    BYPASS -->|não| REJD["FIN_VALIDACAO:\ndivergência divisoes×transacao_ids\n(fecha bypass de tenant/filial)"]
+    BYPASS -->|sim| WRITE
+
+    FORMATO -->|"1:1 / N:1"| WRITE["conciliacoes_lote/divisao:\nfilial_id = v_filial_efetiva (RECURSO)\n\nreconciliacao_audit_logs/\nconciliacao_ml_feedback:\nfilial_id = v_ctx (ATOR — RelatorioCobertura\nfiltra por isso, .or(eq,is.null))"]
+```
+
+Achado pelo review multi-agente, não pela filial-access em si: o ramo 1:N
+inseria `conciliacoes_divisao_transacoes` a partir de `p_vinculo->
+'divisoes'`, campo separado de `transacao_ids` (o único array travado/
+checado) — um item só em `divisoes` nunca passava por tenant/filial.
+Bypass de isolamento de TENANT, mais grave que o gap de filial que
+motivou esta fase.
+
+Fecha o backlog de `has_filial_access` nas 8 RPCs/policies `SECURITY
+DEFINER` de §11 — Fases 1-3 já mergeadas (RPCs triviais, transferência/
+ajuste/reembolso, RLS de `extratos_bancarios`).
+

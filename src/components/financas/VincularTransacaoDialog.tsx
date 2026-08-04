@@ -228,7 +228,11 @@ export function VincularTransacaoDialog({
       onOpenChange(false);
     } catch (err) {
       console.error("Exceção ao vincular:", err);
-      toast.error("Erro ao vincular transação");
+      // Propaga FIN_TENANT / FIN_VALIDACAO (filial mista, sem acesso, etc.)
+      // — toast genérico escondia a razão real após o check de filial.
+      toast.error(
+        err instanceof Error ? err.message : "Erro ao vincular transação",
+      );
     } finally {
       setLoading(false);
     }

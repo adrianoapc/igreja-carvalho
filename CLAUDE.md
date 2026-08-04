@@ -15,6 +15,9 @@ próprio arquivo):
 - **RPC `SECURITY DEFINER`**: sempre resolver `igreja_id` via
   `fin_resolver_contexto`, validar `has_filial_access` contra a filial
   EFETIVA, e repassar o contexto (não `NULL`) pra RPCs aninhadas.
+  Arrays JSON irmãos (ex.: `transacao_ids` + `divisoes`) precisam da
+  mesma validação; `filial_id` de audit/relatório ≠ filial de junção
+  (ator vs recurso).
 - **Trigger de saldo de conta**: sempre recalcula do zero a partir de
   `transacoes_financeiras` — nunca soma/subtrai incrementalmente. Dispara em
   INSERT/UPDATE/DELETE (sem `OF <colunas>`, statement-level com transition
