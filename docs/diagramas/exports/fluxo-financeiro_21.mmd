@@ -1,0 +1,14 @@
+flowchart TD
+    Q["supabase.from(\"extratos_bancarios\")\n.select(...) — 15 call-sites, 11 arquivos"]
+    Q --> RLS{"policy SELECT:\nrole IN (admin*,tesoureiro)\nAND has_filial_access(igreja_id, filial_id)"}
+    RLS -->|"filial do JWT\nou user_filial_access"| VE["vê a linha"]
+    RLS -->|"outra filial,\nsem permissão explícita"| INV["linha invisível\n(RLS filtra, sem erro)"]
+    RLS -->|"filial_id IS NULL\n(registro global)"| VE
+    RLS -->|"has_role(admin)"| VEALL["vê tudo do tenant\n(e de outros tenants —\ngap herdado, fora de escopo)"]
+
+    subgraph "Único caso intencionalmente cross-filial"
+      VLD["VincularExtratoLoteDialog.tsx"]
+      VLD -->|"lote com filial própria"| C1["eq(filial_id, lote.filial_id)"]
+      VLD -->|"lote global + filial restrita"| C2["or(filial_id.eq.X,\nfilial_id.is.null)"]
+      VLD -->|"todas as filiais"| C3["sem filtro client-side"]
+    end
