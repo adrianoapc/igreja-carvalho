@@ -5277,6 +5277,59 @@ caso positivo), 4 pra ajuste (3 de acesso + 1 confirmando que a
 transação criada grava a filial REAL da conta, não a do contexto), 4
 pra reembolso (3 de acesso + 1 caso positivo).
 
+### 9.85 PR dedicada pós-#67 (fatia 2/3): RLS de `extratos_bancarios` ganha
+`has_filial_access`
+
+Continuação da fatia 1/3 (7 RPCs core sem `has_filial_access`, branch
+separada `fix/financeiro-filial-access-rpcs-simples`, ainda não mergeada).
+Esta fatia fecha o outro lado do mesmo backlog de §11: as 4 policies de
+`extratos_bancarios` (`20260117145651`, nunca redefinidas depois) checavam
+só `role IN (super_admin,admin,tesoureiro)` + `igreja_id = get_jwt_igreja_
+id()` — zero `filial_id`. Confirmado por grep exaustivo antes de aplicar
+(passo 1 desta fase, não assumido de doc antigo): **15 ocorrências de
+`.from("extratos_bancarios")` em 11 arquivos** de `src/`, todas `.select`
+— `INSERT`/`UPDATE`/`DELETE` já revogados de `authenticated`/`anon` desde a
+F7 (`20260713160000`), então o fix nas policies de escrita é reforço
+redundante (defesa em profundidade); o único com efeito comportamental
+real é o SELECT.
+
+**Migration `20260804200000`**: troca `igreja_id = get_jwt_igreja_id()`
+por `public.has_filial_access(igreja_id, filial_id)` no `USING`/`WITH
+CHECK` das 4 policies — mesma troca já validada 2x neste projeto
+(`fin_audit_log_select`, `20260710120000`; `categorias_financeiras`/
+`bases_ministeriais`/`centros_custo`/`fornecedores`, `20260602195254`).
+
+**`VincularExtratoLoteDialog.tsx` (único call-site intencionalmente
+cross-filial) — comportamento confirmado idêntico linha a linha contra o
+código real antes de aplicar**: 3 casos, todos já alinhados com o que
+`has_filial_access` decide — (1) lote com `filial_id` própria → `.eq(
+"filial_id", lote.filial_id)`; (2) lote global + tesoureiro restrito →
+`.or("filial_id.eq.X,filial_id.is.null")`; (3) "todas as filiais" (JWT sem
+`filial_id`) → sem filtro client-side, `has_filial_access` libera geral.
+A RLS nova não muda o conjunto de linhas que nenhum dos 3 casos já
+retornava — é reforço, não restrição adicional pro caminho legítimo.
+
+**Achado do harness, não é regressão desta migration**: `has_filial_
+access()` dá bypass total pra `has_role(admin)` — inclusive cross-TENANT,
+não só cross-filial (um admin de uma igreja vê extrato de OUTRA igreja).
+Comportamento **herdado** da função existente, não modificada por esta
+migration — é o mesmo gap já documentado abaixo ("`has_role()` não filtra
+por `igreja_id`"), fora de escopo desta fatia (que só adiciona escopo de
+filial pra quem já está dentro do tenant correto).
+
+**Harness Postgres standalone** (postgres:15 isolado, `SET ROLE
+authenticated` real — não só chamada de RPC `SECURITY DEFINER`, que
+sempre bypassa RLS por rodar com privilégio do dono): 6 cenários — SELECT
+direto sem RPC rejeita linha de outra filial / aceita própria filial +
+registro global / admin com bypass total (cross-tenant, comportamento
+herdado documentado acima) / JWT sem filial vê tudo do tenant / usuário
+com `user_filial_access` explícito em 2ª filial vê ambas / `WITH CHECK`
+de INSERT rejeita filial cruzada mesmo simulando o `GRANT` liberado
+(teste negativo direto na policy, não só no `GRANT` já revogado pela F7).
+
+Fatia 3/3 (`fin_confirmar_conciliacao`, mais complexa e mais usada) fica
+pra PR seguinte.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
@@ -5329,28 +5382,16 @@ pra reembolso (3 de acesso + 1 caso positivo).
   Sem isso, a próxima transação paga comum numa conta com ajuste manual
   histórico (feito fora de `fin_ajustar_saldo`) apaga esse ajuste em
   silêncio, já nas primeiras migrations do deploy.
-- **RLS de `extratos_bancarios` (SELECT) não tem NENHUMA checagem de
-  filial** (achado do §9.78, via `useLotesAntecipacao.ts`) — a política
-  `"Ver extratos bancarios"` (20260117145651, nunca redefinida depois)
-  restringe só por `role` (`admin*`/`tesoureiro`) + `igreja_id`
-  (tenant). Um tesoureiro restrito a UMA filial lê, via
-  `supabase.from("extratos_bancarios").select(...)` direto — sem passar
-  por nenhuma RPC —, o extrato bancário de QUALQUER filial do tenant.
-  Mesma classe do risco das 8 RPCs acima, numa tabela em vez de função;
-  fix real exige `has_filial_access` na própria policy, o que muda o
-  comportamento de todo read-path existente de extratos (inclusive o
-  `VincularExtratoLoteDialog.tsx`, que por design busca candidatos entre
-  filiais) — fora do escopo desta PR, fase dedicada futura junto com o
-  item acima. **Atualizado em §9.79**: o filtro client-side de
-  `useLotesAntecipacao.ts` (mitigação original desta PR) não fechava o
-  vazamento — o dado já tinha saído no payload de rede antes do filtro
-  rodar. Substituído por `fin_listar_extratos_vinculados_lote` (RPC
-  `SECURITY DEFINER`, filtra por `has_filial_access` antes de devolver
-  qualquer linha) — fecha o vazamento especificamente NESTE read-path,
-  sem tocar na RLS compartilhada da tabela. Os outros 13 read-paths
-  diretos de `extratos_bancarios` no app continuam sem proteção de
-  filial — o risco de fundo (a policy em si) permanece o mesmo, só este
-  caminho específico foi fechado.
+- ~~RLS de `extratos_bancarios` (SELECT) não tem NENHUMA checagem de
+  filial~~ **CORRIGIDA em §9.83** (PR dedicada pós-#67, fatia 2/3) — as 4
+  policies (`20260117145651`) agora usam `has_filial_access(igreja_id,
+  filial_id)` no lugar de `igreja_id = get_jwt_igreja_id()`. Histórico:
+  achado do §9.78, via `useLotesAntecipacao.ts`; **§9.79** já tinha
+  fechado esse read-path específico com uma RPC dedicada
+  (`fin_listar_extratos_vinculados_lote`, porque o filtro client-side
+  vazava no payload de rede antes de rodar) sem tocar na RLS
+  compartilhada — os outros 14 read-paths diretos ficaram sem proteção
+  até §9.83 corrigir a policy em si.
 - **`fin_criar_transferencia` nunca valida filial (nem tenant, em 3 dos 4
   campos) das categorias/subcategoria/base/centro de custo que resolve
   automaticamente** (achado adjacente do §9.79, não corrigido) — só
