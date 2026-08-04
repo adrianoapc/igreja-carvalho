@@ -5226,6 +5226,27 @@ nesta branch agora têm `has_filial_access` (exceto o helper
 `fin_validar_fk_filial`, STABLE, fora do escopo B.9 por design). O backlog
 §11 abaixo permanece válido pros itens **nunca tocados** por esta PR.
 
+### 9.83 Fase 1/4 do plano pós-#67: `has_filial_access` nas 4 RPCs
+triviais
+
+Primeira fatia do backlog de §11 (RPCs `SECURITY DEFINER` sem `has_
+filial_access`) — plano dividido em 4 fases por risco/complexidade
+crescente, cada uma sua própria PR: Fase 1 (esta, as 4 RPCs mais
+simples), Fase 2 (`fin_estornar_transferencia`/`fin_ajustar_saldo`/
+`fin_pagar_reembolso`), Fase 3 (RLS de `extratos_bancarios`), Fase 4
+(`fin_confirmar_conciliacao`, mais complexa, por último).
+
+**Migration `20260804100000`**: `fin_desconciliar`, `fin_alterar_status_
+lancamento`, `fin_alternar_conferencia_manual`, `fin_marcar_extrato_
+ignorado` — todas já liam (ou tinham disponível de graça) a `filial_id`
+do recurso que operam, só faltava `IF NOT public.has_filial_access(v_
+igreja, <filial>)` logo após o `SELECT ... FOR UPDATE`, mesmo padrão já
+validado em `fin_atualizar_lancamento`/`fin_excluir_lancamento`.
+
+Testado em harness Postgres standalone: 16 cenários (4 por RPC — rejeita
+cross-filial / aceita própria filial / admin sempre passa / JWT sem
+filial continua passando).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
@@ -5237,25 +5258,22 @@ nesta branch agora têm `has_filial_access` (exceto o helper
   snapshot baseline antes da F1.
 - **Paridade na convivência** (F3) → monitorar divergências via audit log
   enquanto a flag antiga existir.
-- **7 RPCs `SECURITY DEFINER` do CORE (pré-existentes, em produção,
-  NUNCA tocadas por esta PR) sem NENHUM check de `has_filial_access`**
-  (§9.68, lista reduzida em §9.74; `fin_recalcular_saldo_conta` corrigida
-  em §9.81; `fin_excluir_lancamento` corrigida em §9.82) —
-  `fin_alterar_status_lancamento`,
-  `fin_estornar_transferencia`, `fin_ajustar_saldo`,
-  `fin_confirmar_conciliacao`, `fin_desconciliar`,
-  `fin_alternar_conferencia_manual`, `fin_marcar_extrato_ignorado`. Um
-  tesoureiro restrito a UMA filial consegue editar/pagar/ajustar saldo/
-  conciliar de QUALQUER transação/conta do tenant inteiro através
-  dessas RPCs. **Risco de segurança mais sério identificado nesta
-  sessão — prioridade alta pra uma fase dedicada.** Fix: mesmo padrão já
-  usado em `fin_conferencia_totais_getnet`/`fin_criar_lancamento`/
-  `fin_atualizar_lancamento`/`fin_criar_transferencia`/`fin_alterar_
-  competencia_grupo`/`fin_vincular_lote_antecipacao`/`fin_excluir_
-  lancamento` (já corrigidas) —
-  `has_filial_access` contra a filial EFETIVA do recurso sendo operado,
-  testado no canal JWT/web real (o gap só se manifesta lá, não em
-  service_role).
+- **RPCs `SECURITY DEFINER` do CORE sem NENHUM check de `has_filial_
+  access`** (§9.68, lista reduzida em §9.74; `fin_recalcular_saldo_conta`
+  corrigida em §9.81; `fin_excluir_lancamento` corrigida em §9.82).
+  **4 delas CORRIGIDAS em §9.83, Fase 1/4** — `fin_desconciliar`, `fin_
+  alterar_status_lancamento`, `fin_alternar_conferencia_manual`, `fin_
+  marcar_extrato_ignorado`. Restam pras Fases 2-4 (mesmo plano, PRs
+  seguintes): `fin_estornar_transferencia`, `fin_ajustar_saldo`, `fin_
+  pagar_reembolso`, `fin_confirmar_conciliacao`. Um tesoureiro restrito a
+  UMA filial consegue editar/pagar/ajustar saldo/conciliar de QUALQUER
+  transação/conta do tenant inteiro através das RPCs ainda não corrigidas.
+  Fix: mesmo padrão já usado em `fin_conferencia_totais_getnet`/`fin_
+  criar_lancamento`/`fin_atualizar_lancamento`/`fin_criar_transferencia`/
+  `fin_alterar_competencia_grupo`/`fin_vincular_lote_antecipacao`/`fin_
+  excluir_lancamento` (já corrigidas) — `has_filial_access` contra a
+  filial EFETIVA do recurso sendo operado, testado no canal JWT/web real
+  (o gap só se manifesta lá, não em service_role).
   **`fin_excluir_lancamento` CORRIGIDA em §9.82**: saiu desta lista (era
   o único caso "reescrita nesta PR sem HFA" — violação B.9 fechada).
   **`fin_recalcular_saldo_conta` CORRIGIDA em §9.81**: saiu desta lista.
