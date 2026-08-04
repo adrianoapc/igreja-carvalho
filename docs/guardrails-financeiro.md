@@ -285,8 +285,40 @@ DEFINER`:**
     está de fato no patch (editar outro campo com a conta antiga não
     precisa re-checar uma conta que não mudou).
 
+11. **Payload JSON com arrays "irmãos" (ex.: `transacao_ids` +
+    `divisoes[].transacao_id`): o array que passa por lock/tenant/
+    `has_filial_access` NÃO é automaticamente o único que a função
+    escreve.** Qualquer campo paralelo que alimente um `INSERT` precisa
+    ser validado contra o conjunto já checado (igualdade de conjuntos,
+    ou ⊆ estrito + lock dos extras). Achado real: `fin_confirmar_
+    conciliacao` travava/checava `transacao_ids`, mas o ramo 1:N
+    inseria `conciliacoes_divisao_transacoes` a partir de `p_vinculo->
+    'divisoes'` — um VICTIM só em `divisoes` entrava no vínculo sem
+    nunca ser travado nem checado (§9.83). Grep por todo
+    `jsonb_array_elements(p_*)` / `p_vinculo ->` na função antes de
+    declarar "qualquer item do array" coberto.
+
+12. **`filial_id` em tabelas de AUDITORIA/RELATÓRIO ≠ `filial_id` em
+    tabelas de CONTROLE DE ACESSO.** Junções (`conciliacoes_lote`,
+    `conciliacoes_divisao`) devem gravar a filial EFETIVA do recurso
+    (`v_filial_efetiva`). Audit/ML (`reconciliacao_audit_logs`,
+    `conciliacao_ml_feedback`) devem gravar a filial do CONTEXTO do
+    ator (`v_ctx`) — é o que o relatório filtra ("o que eu fiz nesta
+    filial"). Generalizar `v_filial_efetiva` pra audit fazia sumir do
+    Relatório de Cobertura (filtro Filial X) um evento de conciliação
+    de recurso compartilhado feito DENTRO de X (§9.83).
+
+13. **Filial mista em conciliação multi-item**: rejeitar ≥2 filiais
+    concretas distintas SÓ quando NÃO há âncora compartilhada
+    (`filial_id IS NULL` em pelo menos um item). O motor F4 já propõe
+    splits de extrato compartilhado entre transações de filiais
+    diferentes (`e.filial_id = t.filial_id OR e.filial_id IS NULL OR
+    t.filial_id IS NULL`) — rejeitar esse caso quebra sugestão +
+    lote/divisão legítimos. Mix de filiais concretas SEM recurso
+    compartilhado continua `FIN_VALIDACAO` (§9.83).
+
 Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.65, §9.67,
-§9.73, §9.74, §9.80, §9.81, §9.82, checklist completo na memória de sessão.
+§9.73, §9.74, §9.80, §9.81, §9.82, §9.83, checklist completo na memória de sessão.
 
 ---
 

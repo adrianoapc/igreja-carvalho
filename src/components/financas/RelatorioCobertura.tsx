@@ -150,7 +150,9 @@ export function RelatorioCobertura() {
         .gte("created_at", dataInicio.toISOString());
       
       if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
+        // Guardrail A: eventos com filial_id NULL (ator em "Todas" /
+        // recurso compartilhado) devem continuar visíveis no filtro.
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
       }
       
       if (contaFiltro !== "all") {

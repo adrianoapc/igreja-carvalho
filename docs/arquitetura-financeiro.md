@@ -5226,6 +5226,43 @@ nesta branch agora têm `has_filial_access` (exceto o helper
 `fin_validar_fk_filial`, STABLE, fora do escopo B.9 por design). O backlog
 §11 abaixo permanece válido pros itens **nunca tocados** por esta PR.
 
+### 9.83 `fin_confirmar_conciliacao` — has_filial_access + bypass `divisoes` + filial mista alinhada ao F4
+
+Fase dedicada do backlog §11 (`fin_confirmar_conciliacao`). Migration
+`20260804300000`. Review multi-agente da primeira versão do fix
+identificou 4 pontos que a versão final incorpora:
+
+1. **has_filial_access por item** nos 2 loops (extratos / transações) —
+   fecha o buraco B.9 clássico (tesoureiro da filial B confirmava
+   conciliação da filial A via id conhecido).
+2. **Bypass pré-existente em 1:N**: `conciliacoes_divisao_transacoes`
+   era montada de `p_vinculo->'divisoes'`, campo separado de
+   `transacao_ids` (único array travado/checado). Um chamador passava
+   `transacao_ids` legítimos + `divisoes` com VICTIM de outro tenant/
+   filial — VICTIM nunca entrava no lock/HFA, mas ficava vinculado.
+   Fix: igualdade de conjuntos entre `transacao_ids` e
+   `divisoes[].transacao_id` antes do INSERT.
+3. **Filial mista**: a 1ª versão rejeitava QUALQUER mix de filiais
+   concretas. Quebrava o motor F4, que já propõe splits de extrato
+   compartilhado (`filial_id IS NULL`) entre transações de filiais
+   diferentes. Regra final: rejeita ≥2 filiais concretas só quando
+   NÃO há âncora compartilhada; com âncora, `v_filial_efetiva = NULL`.
+4. **Audit/ML ≠ junção**: `conciliacoes_lote`/`conciliacoes_divisao`
+   gravam `v_filial_efetiva`; `reconciliacao_audit_logs`/
+   `conciliacao_ml_feedback` mantêm a filial do contexto do ator
+   (`v_ctx`) — RelatorioCobertura filtra pela filial em que o usuário
+   trabalhava. Frontend: toasts de `VincularTransacaoDialog`/
+   `useConciliacaoLote` passam a surfacer `err.message` (antes
+   engoliam FIN_TENANT/FIN_VALIDACAO); RelatorioCobertura usa
+   `.or(filial_id.eq.X, filial_id.is.null)` (guardrail A).
+5. **ORDER BY id** nos 2 loops `FOR UPDATE` (guardrail D.1) —
+   pré-existente, fechado de passagem.
+
+Não tocado nesta fase (continuam no §11): `fin_desconciliar`,
+`fin_alterar_status_lancamento`, `fin_estornar_transferencia`,
+`fin_ajustar_saldo`, `fin_alternar_conferencia_manual`,
+`fin_marcar_extrato_ignorado`.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
@@ -5243,19 +5280,22 @@ nesta branch agora têm `has_filial_access` (exceto o helper
   em §9.81; `fin_excluir_lancamento` corrigida em §9.82) —
   `fin_alterar_status_lancamento`,
   `fin_estornar_transferencia`, `fin_ajustar_saldo`,
-  `fin_confirmar_conciliacao`, `fin_desconciliar`,
+  `fin_desconciliar`,
   `fin_alternar_conferencia_manual`, `fin_marcar_extrato_ignorado`. Um
   tesoureiro restrito a UMA filial consegue editar/pagar/ajustar saldo/
-  conciliar de QUALQUER transação/conta do tenant inteiro através
+  desconciliar de QUALQUER transação/conta do tenant inteiro através
   dessas RPCs. **Risco de segurança mais sério identificado nesta
   sessão — prioridade alta pra uma fase dedicada.** Fix: mesmo padrão já
   usado em `fin_conferencia_totais_getnet`/`fin_criar_lancamento`/
   `fin_atualizar_lancamento`/`fin_criar_transferencia`/`fin_alterar_
   competencia_grupo`/`fin_vincular_lote_antecipacao`/`fin_excluir_
-  lancamento` (já corrigidas) —
+  lancamento`/`fin_confirmar_conciliacao` (já corrigidas) —
   `has_filial_access` contra a filial EFETIVA do recurso sendo operado,
   testado no canal JWT/web real (o gap só se manifesta lá, não em
   service_role).
+  **`fin_confirmar_conciliacao` CORRIGIDA em §9.83**: saiu desta lista
+  (HFA por item + bypass `divisoes` + filial mista alinhada ao F4 +
+  locks `ORDER BY id`).
   **`fin_excluir_lancamento` CORRIGIDA em §9.82**: saiu desta lista (era
   o único caso "reescrita nesta PR sem HFA" — violação B.9 fechada).
   **`fin_recalcular_saldo_conta` CORRIGIDA em §9.81**: saiu desta lista.

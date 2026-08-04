@@ -209,7 +209,13 @@ export function useConciliacaoLote({
     },
     onError: (error) => {
       console.error("Erro ao criar lote:", error);
-      toast.error("Erro ao criar conciliação em lote");
+      // Propaga FIN_TENANT / FIN_VALIDACAO (ex.: lote misturando filiais
+      // concretas sem recurso compartilhado) — toast genérico escondia a causa.
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Erro ao criar conciliação em lote",
+      );
     },
   });
 
