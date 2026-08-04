@@ -5277,7 +5277,7 @@ caso positivo), 4 pra ajuste (3 de acesso + 1 confirmando que a
 transação criada grava a filial REAL da conta, não a do contexto), 4
 pra reembolso (3 de acesso + 1 caso positivo).
 
-### 9.85 PR dedicada pós-#67 (fatia 2/3): RLS de `extratos_bancarios` ganha
+### 9.85 PR dedicada pós-#67 (Fase 3/4): RLS de `extratos_bancarios` ganha
 `has_filial_access`
 
 Continuação da fatia 1/3 (7 RPCs core sem `has_filial_access`, branch
@@ -5383,7 +5383,7 @@ pra PR seguinte.
   histórico (feito fora de `fin_ajustar_saldo`) apaga esse ajuste em
   silêncio, já nas primeiras migrations do deploy.
 - ~~RLS de `extratos_bancarios` (SELECT) não tem NENHUMA checagem de
-  filial~~ **CORRIGIDA em §9.83** (PR dedicada pós-#67, fatia 2/3) — as 4
+  filial~~ **CORRIGIDA em §9.83** (PR dedicada pós-#67, Fase 3/4) — as 4
   policies (`20260117145651`) agora usam `has_filial_access(igreja_id,
   filial_id)` no lugar de `igreja_id = get_jwt_igreja_id()`. Histórico:
   achado do §9.78, via `useLotesAntecipacao.ts`; **§9.79** já tinha

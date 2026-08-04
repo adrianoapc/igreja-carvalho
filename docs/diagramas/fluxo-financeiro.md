@@ -797,7 +797,7 @@ flowchart TD
     GRUPO -->|sim| APLICA2["aplica no lote normalmente"]
 ```
 
-## RLS de `extratos_bancarios` ganha `has_filial_access` — fatia 2/3 pós-#67
+## RLS de `extratos_bancarios` ganha `has_filial_access` — Fase 3/4 pós-#67
 (§9.83 do `arquitetura-financeiro.md`)
 
 ```mermaid
