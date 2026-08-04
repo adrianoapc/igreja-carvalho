@@ -5247,6 +5247,36 @@ Testado em harness Postgres standalone: 16 cenários (4 por RPC — rejeita
 cross-filial / aceita própria filial / admin sempre passa / JWT sem
 filial continua passando).
 
+### 9.84 Fase 2/4 do plano pós-#67: `has_filial_access` em
+`fin_estornar_transferencia`/`fin_ajustar_saldo`/`fin_pagar_reembolso`
+
+Continuação da Fase 1 (§9.83, já mergeada). Esta fase cobre 3 RPCs de
+complexidade moderada — cada uma com uma decisão própria de design, não
+só inserir o bloco padrão:
+
+- **`fin_estornar_transferencia`**: só validava tenant da transferência.
+  Fix espelha `fin_criar_transferencia` (§9.74) — checa a filial da
+  própria transferência E das 2 contas envolvidas (origem/destino):
+  estornar exige pelo menos o mesmo acesso que criar.
+- **`fin_ajustar_saldo`**: 2 bugs. (a) zero `has_filial_access`; (b) a
+  `filial_id` GRAVADA na transação de ajuste vinha de `v_ctx->>'filial_
+  id'` (contexto do CHAMADOR), nunca da filial REAL de `p_conta_id`
+  (nunca lida do banco). Fix: lê `contas.filial_id` e usa esse valor
+  tanto no check quanto na gravação — sem mudar o resto do fluxo
+  (`pendente→pago` via `UPDATE`, categoria "Ajuste de Saldo" por
+  igreja/tipo, retorno `{ok, id, warnings}` inalterados).
+- **`fin_pagar_reembolso`**: mesma forma dupla de `fin_ajustar_saldo`,
+  sem o agravante do (b) — a transação já gravava `v_sol.filial_id` (a
+  fonte correta), só faltava bloquear o acesso: (a) filial da própria
+  `solicitacoes_reembolso` (já lida) sem check; (b) `p_conta_id` só
+  validava tenant.
+
+Testado em harness Postgres standalone: 12 cenários — 4 pra
+transferência (filial da transferência / conta origem / conta destino /
+caso positivo), 4 pra ajuste (3 de acesso + 1 confirmando que a
+transação criada grava a filial REAL da conta, não a do contexto), 4
+pra reembolso (3 de acesso + 1 caso positivo).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
@@ -5261,19 +5291,19 @@ filial continua passando).
 - **RPCs `SECURITY DEFINER` do CORE sem NENHUM check de `has_filial_
   access`** (§9.68, lista reduzida em §9.74; `fin_recalcular_saldo_conta`
   corrigida em §9.81; `fin_excluir_lancamento` corrigida em §9.82).
-  **4 delas CORRIGIDAS em §9.83, Fase 1/4** — `fin_desconciliar`, `fin_
-  alterar_status_lancamento`, `fin_alternar_conferencia_manual`, `fin_
-  marcar_extrato_ignorado`. Restam pras Fases 2-4 (mesmo plano, PRs
-  seguintes): `fin_estornar_transferencia`, `fin_ajustar_saldo`, `fin_
-  pagar_reembolso`, `fin_confirmar_conciliacao`. Um tesoureiro restrito a
-  UMA filial consegue editar/pagar/ajustar saldo/conciliar de QUALQUER
-  transação/conta do tenant inteiro através das RPCs ainda não corrigidas.
-  Fix: mesmo padrão já usado em `fin_conferencia_totais_getnet`/`fin_
-  criar_lancamento`/`fin_atualizar_lancamento`/`fin_criar_transferencia`/
-  `fin_alterar_competencia_grupo`/`fin_vincular_lote_antecipacao`/`fin_
-  excluir_lancamento` (já corrigidas) — `has_filial_access` contra a
-  filial EFETIVA do recurso sendo operado, testado no canal JWT/web real
-  (o gap só se manifesta lá, não em service_role).
+  **7 delas CORRIGIDAS** — Fase 1/4 (§9.83, mergeada): `fin_desconciliar`,
+  `fin_alterar_status_lancamento`, `fin_alternar_conferencia_manual`,
+  `fin_marcar_extrato_ignorado`; Fase 2/4 (§9.84, esta PR): `fin_
+  estornar_transferencia`, `fin_ajustar_saldo`, `fin_pagar_reembolso`.
+  Restam pras Fases 3-4: RLS de `extratos_bancarios`,
+  `fin_confirmar_conciliacao`. Um tesoureiro restrito a UMA filial
+  consegue conciliar/ler extrato de QUALQUER filial do tenant através do
+  que falta. Fix: mesmo padrão já usado em `fin_conferencia_totais_
+  getnet`/`fin_criar_lancamento`/`fin_atualizar_lancamento`/`fin_criar_
+  transferencia`/`fin_alterar_competencia_grupo`/`fin_vincular_lote_
+  antecipacao`/`fin_excluir_lancamento` (já corrigidas) — `has_filial_
+  access` contra a filial EFETIVA do recurso sendo operado, testado no
+  canal JWT/web real (o gap só se manifesta lá, não em service_role).
   **`fin_excluir_lancamento` CORRIGIDA em §9.82**: saiu desta lista (era
   o único caso "reescrita nesta PR sem HFA" — violação B.9 fechada).
   **`fin_recalcular_saldo_conta` CORRIGIDA em §9.81**: saiu desta lista.
@@ -5340,15 +5370,11 @@ filial continua passando).
   rejeição. Fix real exige nova migration (adicionar `fin_validar_fk_
   tenant`+`fin_validar_fk_filial` nos 4 campos) + harness — fora do
   escopo desta PR, fase dedicada futura.
-- **`fin_pagar_reembolso` ainda nunca valida filial de `conta_id`**
-  (achado do §9.80, não corrigido) — mesma classe do fix de `fin_criar_
-  lancamento`/`fin_atualizar_lancamento`, mas é pré-existente e NUNCA
-  tocada por nenhuma migration desta PR (última alteração em 20260728,
-  antes do trabalho de hardening de filial começar) — mesmo critério de
-  escopo dos "7 RPCs sem has_filial_access" acima. Só chama
-  `fin_validar_fk_tenant('contas', p_conta_id, ...)`. Fix real: mesmo
-  padrão (`has_filial_access` na conta) + harness — fora do escopo desta
-  PR, fase dedicada futura.
+- ~~`fin_pagar_reembolso` ainda nunca valida filial de `conta_id`~~
+  **CORRIGIDA em §9.83, Fase 2/4** — trazida pro escopo por decisão
+  explícita em vez de ficar "próximo item" adiado de novo. Tinha 2 gaps:
+  filial da própria `solicitacoes_reembolso` (já lida, só faltava o
+  check) + filial de `conta_id` (só validava tenant).
   **`fin_lancar_sessao` CORRIGIDA em §9.81** (saiu deste item — tinha o
   mesmo gap de `conta_id`, MAIS a filial da própria sessão nunca validada;
   os dois fechados na auditoria de segurança dedicada, não esperaram a
