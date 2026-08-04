@@ -35,6 +35,22 @@ non-obvious things.
   (`.github/workflows/supabase-deploy.yml`). Treat writes as hitting real data
   — prefer a dedicated dev/staging Supabase project if one is available.
 
+### Testing authenticated flows
+- Auth is email/password (Google/phone providers are disabled) and the project
+  has **email confirmation on** (`mailer_autoconfirm=false`). Self-signup from
+  the UI therefore does **not** return a session — the account stays unconfirmed
+  and there is no local mail catcher against the hosted project. To exercise the
+  authenticated app (dashboard, financeiro, pessoas, etc.) you need a
+  **pre-existing confirmed account** (ask the user for a test login) or the
+  service-role key to provision/confirm one. Unauthenticated round-trips (login
+  request, password recovery, public `app_config` read) are enough to verify the
+  frontend↔Supabase wiring end to end.
+- Unrelated observation from setup (not an env issue): `parseAuthError` in
+  `src/hooks/useAuthErrors.tsx` compares the raw (non-lowercased) `Error.message`
+  against lowercase patterns, so real backend errors like
+  `Invalid login credentials` fall through to the generic "Erro inesperado"
+  toast. The backend round-trip still works; only the toast label is wrong.
+
 ### Local Supabase is NOT reproducible from committed migrations
 - `supabase start` / `supabase db reset` **fails partway** on a fresh DB
   (~166 of 421 migrations) because the committed migration set has drift:
