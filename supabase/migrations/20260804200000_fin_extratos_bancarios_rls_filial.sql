@@ -1,5 +1,5 @@
 -- ============================================================================
--- has_filial_access na RLS de extratos_bancarios (fatia 2/3 pós-#67,
+-- has_filial_access na RLS de extratos_bancarios (Fase 3/4 pós-#67,
 -- docs/arquitetura-financeiro.md §11 / §9.78-§9.79): as 4 policies vigentes
 -- (20260117145651) checam só role + igreja_id — zero filial_id. Um
 -- tesoureiro restrito a UMA filial lê, via
@@ -8,12 +8,26 @@
 -- já revogados de authenticated/anon desde a F7, 20260713160000), o
 -- extrato bancário de QUALQUER filial do tenant.
 --
--- Fix: mesma troca já aplicada 2x neste projeto pra exatamente essa classe
--- de bug (fin_audit_log_select em 20260710120000; categorias_financeiras/
--- bases_ministeriais/centros_custo/fornecedores em 20260602195254) —
--- has_filial_access(igreja_id, filial_id) engloba a checagem de igreja,
--- substitui igreja_id = get_jwt_igreja_id() nas 4 policies. Mantém os
--- checks de role como estavam.
+-- Fix: ADICIONA has_filial_access(igreja_id, filial_id) às 4 policies,
+-- mantendo `igreja_id = get_jwt_igreja_id()` como conjunção separada (não
+-- substituindo). Mantém os checks de role como estavam.
+--
+-- Achado de review (não apanhado no harness original, que só testava
+-- dentro do próprio tenant): has_filial_access() dá bypass de FILIAL e de
+-- TENANT pra has_role(admin/super_admin) — é o comportamento correto
+-- dentro de uma RPC SECURITY DEFINER (onde esse bypass já é uma decisão
+-- consciente usada em toda a sessão), mas a policy RLS original desta
+-- tabela nunca teve bypass de tenant nenhum — TODO role, inclusive admin,
+-- ficava preso a `igreja_id = get_jwt_igreja_id()`. Trocar por só
+-- has_filial_access() (versão anterior desta migration) teria dado a
+-- admin/super_admin, pela primeira vez, leitura direta de
+-- extratos_bancarios de OUTRO TENANT via .select() — alargamento real,
+-- não herdado, porque a policy nunca teve esse bypass antes. Fix: manter
+-- as DUAS conjunções — `igreja_id = get_jwt_igreja_id() AND has_filial_
+-- access(igreja_id, filial_id)` — has_filial_access cobre filial (incl.
+-- bypass de admin DENTRO do tenant certo); a igualdade de igreja_id
+-- externa preserva a garantia de isolamento de tenant que a policy
+-- sempre teve, para todo role sem exceção.
 --
 -- has_filial_access trata filial_id IS NULL (registro global/compartilhado)
 -- como sempre visível dentro do tenant — não quebra o caso intencionalmente
@@ -24,8 +38,8 @@
 -- Testado em harness Postgres standalone (postgres:15 isolado): SELECT
 -- direto sem RPC, SET ROLE authenticated com JWT simulando tesoureiro
 -- restrito — rejeita linha de outra filial, aceita própria filial e
--- registro global, JWT sem filial continua vendo tudo da igreja (mesmo
--- comportamento documentado das RPCs já corrigidas).
+-- registro global, JWT sem filial continua vendo tudo da igreja, admin
+-- NÃO vê outro tenant (regressão fechada nesta versão).
 -- ============================================================================
 
 DROP POLICY IF EXISTS "Ver extratos bancarios" ON public.extratos_bancarios;
@@ -37,6 +51,7 @@ USING (
   (has_role(auth.uid(), 'super_admin'::app_role)
    OR has_role(auth.uid(), 'admin'::app_role)
    OR has_role(auth.uid(), 'tesoureiro'::app_role))
+  AND (igreja_id = get_jwt_igreja_id())
   AND public.has_filial_access(igreja_id, filial_id)
 );
 
@@ -49,6 +64,7 @@ WITH CHECK (
   (has_role(auth.uid(), 'super_admin'::app_role)
    OR has_role(auth.uid(), 'admin'::app_role)
    OR has_role(auth.uid(), 'tesoureiro'::app_role))
+  AND (igreja_id = get_jwt_igreja_id())
   AND public.has_filial_access(igreja_id, filial_id)
 );
 
@@ -61,12 +77,14 @@ USING (
   (has_role(auth.uid(), 'super_admin'::app_role)
    OR has_role(auth.uid(), 'admin'::app_role)
    OR has_role(auth.uid(), 'tesoureiro'::app_role))
+  AND (igreja_id = get_jwt_igreja_id())
   AND public.has_filial_access(igreja_id, filial_id)
 )
 WITH CHECK (
   (has_role(auth.uid(), 'super_admin'::app_role)
    OR has_role(auth.uid(), 'admin'::app_role)
    OR has_role(auth.uid(), 'tesoureiro'::app_role))
+  AND (igreja_id = get_jwt_igreja_id())
   AND public.has_filial_access(igreja_id, filial_id)
 );
 
@@ -78,5 +96,6 @@ TO authenticated
 USING (
   (has_role(auth.uid(), 'super_admin'::app_role)
    OR has_role(auth.uid(), 'admin'::app_role))
+  AND (igreja_id = get_jwt_igreja_id())
   AND public.has_filial_access(igreja_id, filial_id)
 );

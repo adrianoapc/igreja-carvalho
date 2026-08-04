@@ -798,7 +798,7 @@ flowchart TD
 ```
 
 ## RLS de `extratos_bancarios` ganha `has_filial_access` — Fase 3/4 pós-#67
-(§9.83 do `arquitetura-financeiro.md`)
+(§9.85 do `arquitetura-financeiro.md`)
 
 ```mermaid
 flowchart TD
@@ -817,6 +817,6 @@ flowchart TD
     end
 ```
 
-`fin_confirmar_conciliacao` (fatia 3/3) fica pra depois — mesmo padrão de
-`has_filial_access`, mas dentro de 2 loops (N extratos × N transações).
+`fin_confirmar_conciliacao` (Fase 4/4, PR separada) segue o mesmo padrão
+de `has_filial_access`, mas dentro de 2 loops (N extratos × N transações).
 
