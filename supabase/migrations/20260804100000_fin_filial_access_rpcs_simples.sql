@@ -362,10 +362,10 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.fin_desconciliar(uuid, jsonb) IS
-  'Desconcilia transação (1:1/N:1/1:N). has_filial_access adicionado (§11).';
+  'Desconcilia transação (1:1/N:1/1:N). has_filial_access adicionado (§9.83).';
 COMMENT ON FUNCTION public.fin_alterar_status_lancamento(uuid, text, jsonb, jsonb) IS
-  'Altera status pendente/pago/cancelado. has_filial_access adicionado (§11).';
+  'Altera status pendente/pago/cancelado. has_filial_access adicionado (§9.83).';
 COMMENT ON FUNCTION public.fin_alternar_conferencia_manual(uuid, boolean, jsonb) IS
-  'Toggle de conferência manual. has_filial_access adicionado (§11).';
+  'Alterna conferido_manual + conciliacao_status (nao_conciliado<->conciliado_manual) de um lançamento, sem extrato correspondente (F7). Sincroniza a perna irmã de transferência. Bloqueia se já conciliado via extrato/bot (D4). has_filial_access adicionado (§9.83).';
 COMMENT ON FUNCTION public.fin_marcar_extrato_ignorado(uuid, boolean, jsonb) IS
-  'Ignora/reativa extrato sem vínculo. has_filial_access adicionado (§11).';
+  'Alterna extratos_bancarios.reconciliado para um extrato SEM vínculo de conciliação (F7) — "ignorar"/"reativar" ruído do extrato. Recusa extrato vinculado (1:1/lote/divisão); use fin_desconciliar nesses casos. has_filial_access adicionado (§9.83).';
