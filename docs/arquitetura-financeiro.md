@@ -5226,6 +5226,27 @@ nesta branch agora têm `has_filial_access` (exceto o helper
 `fin_validar_fk_filial`, STABLE, fora do escopo B.9 por design). O backlog
 §11 abaixo permanece válido pros itens **nunca tocados** por esta PR.
 
+### 9.83 Fase 1 do plano HFA — 4 RPCs triviais
+
+Plano "Fechar `has_filial_access` nas 7 RPCs + RLS de `extratos_bancarios`"
+(Getnet pausado). Ordem por risco crescente; esta é a **Fase 1** (menor
+risco, sem recurso secundário). Migration `20260804100000`.
+
+| RPC | Recurso | Check |
+|---|---|---|
+| `fin_desconciliar` | `transacoes_financeiras` | `has_filial_access(v_igreja, v_trx.filial_id)` |
+| `fin_alterar_status_lancamento` | `transacoes_financeiras` | `has_filial_access(v_igreja, v_atual.filial_id)` |
+| `fin_alternar_conferencia_manual` | `transacoes_financeiras` | idem |
+| `fin_marcar_extrato_ignorado` | `extratos_bancarios` | `has_filial_access(v_igreja, v_atual.filial_id)` |
+
+Inserido logo após `SELECT ... FOR UPDATE`, antes de `FIN_CONCILIADO`/
+validações de negócio. Assinaturas inalteradas.
+
+**Próximas fases do plano (NÃO nesta PR):**
+- Fase 2 — `fin_estornar_transferencia`, `fin_ajustar_saldo`
+- Fase 3 — RLS de `extratos_bancarios`
+- Fase 4 — `fin_confirmar_conciliacao`
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
@@ -5241,21 +5262,22 @@ nesta branch agora têm `has_filial_access` (exceto o helper
   NUNCA tocadas por esta PR) sem NENHUM check de `has_filial_access`**
   (§9.68, lista reduzida em §9.74; `fin_recalcular_saldo_conta` corrigida
   em §9.81; `fin_excluir_lancamento` corrigida em §9.82) —
-  `fin_alterar_status_lancamento`,
   `fin_estornar_transferencia`, `fin_ajustar_saldo`,
-  `fin_confirmar_conciliacao`, `fin_desconciliar`,
-  `fin_alternar_conferencia_manual`, `fin_marcar_extrato_ignorado`. Um
-  tesoureiro restrito a UMA filial consegue editar/pagar/ajustar saldo/
+  `fin_confirmar_conciliacao`. Um
+  tesoureiro restrito a UMA filial consegue estornar/ajustar saldo/
   conciliar de QUALQUER transação/conta do tenant inteiro através
   dessas RPCs. **Risco de segurança mais sério identificado nesta
   sessão — prioridade alta pra uma fase dedicada.** Fix: mesmo padrão já
   usado em `fin_conferencia_totais_getnet`/`fin_criar_lancamento`/
   `fin_atualizar_lancamento`/`fin_criar_transferencia`/`fin_alterar_
   competencia_grupo`/`fin_vincular_lote_antecipacao`/`fin_excluir_
-  lancamento` (já corrigidas) —
+  lancamento` (já corrigidas) e nas 4 da Fase 1 HFA (§9.83) —
   `has_filial_access` contra a filial EFETIVA do recurso sendo operado,
   testado no canal JWT/web real (o gap só se manifesta lá, não em
   service_role).
+  **Fase 1 HFA CORRIGIDA em §9.83** (`fin_desconciliar`,
+  `fin_alterar_status_lancamento`, `fin_alternar_conferencia_manual`,
+  `fin_marcar_extrato_ignorado`): saíram desta lista.
   **`fin_excluir_lancamento` CORRIGIDA em §9.82**: saiu desta lista (era
   o único caso "reescrita nesta PR sem HFA" — violação B.9 fechada).
   **`fin_recalcular_saldo_conta` CORRIGIDA em §9.81**: saiu desta lista.
