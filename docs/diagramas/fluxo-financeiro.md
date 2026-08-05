@@ -763,24 +763,23 @@ flowchart TD
     CRIADO -.-> C3
 ```
 
-## Fase 0 — Conciliação Cartão Getnet: estanca alarme falso (§9.87)
+## Fase 1 — Hop 2 candidatos Oferta ↔ Venda Getnet (§9.88)
 
-O card `ConferenciaTotaisGetnetCard` (aba Lotes de Antecipação) parava de
-mostrar "Diferença não explicada" porque o comparativo contra `Σ Banco
-creditado` era estruturalmente errado: `fin_conferencia_totais_getnet`
-soma todo crédito da conta no período, sem join de volta ao Getnet.
-Número real do usuário: −R$23.585,40. Fase 0 só mexe na UI; a RPC fica
-intocada até a Fase 4 reescrevê-la com join por
-`getnet_recebivel_lancamentos.extrato_bancario_id`.
+Só leitura. CSV real do portal fechou: `valor_venda` repete o bruto por
+parcela (usar 1× por NSU); `bandeira_modalidade` é texto com Crédito/
+Débito (`ILIKE` / regex). Writer do vínculo = Fase 2.
 
 ```mermaid
 flowchart TD
-    CARD["ConferenciaTotaisGetnetCard"]
-    CARD --> RPC["fin_conferencia_totais_getnet\n(intocada nesta fase)"]
-    RPC --> SHOW["UI mostra:\nΣ Oferta bruto cartão\n− Σ MDR\n− Σ deságio lançado\n= Esperado no banco"]
-    RPC --> HIDE["UI NÃO mostra mais:\nΣ Banco creditado\nDiferença não explicada"]
-    HIDE --> WHY["Motivo: banco_creditado = Σ TODO\ncrédito da conta (Pix, depósito…)\nsem filtro Getnet — alarme falso"]
-    SHOW --> NEXT["Comparação linha a linha\nvolta na Fase 4 do plano\nConciliação Cartão Getnet"]
+    CSV["getnet_recebivel_lancamentos\ntransacao_financeira_id IS NULL\ndata_venda no período"]
+    CSV --> DIR{"bandeira / lançamento\ncr[eé]dito ou d[eé]bito?"}
+    DIR -->|sem direção| SKIP["ignora linha"]
+    DIR -->|ok| NSU["por NSU:\nMAX(valor_venda) 1×\n(não soma parcelas)"]
+    NSU --> GRP["grupo:\ndata_venda + direção + filial_id\nΣ valor_venda dos NSUs"]
+    GRP --> MATCH["casa oferta:\nentrada + ILIKE %cart%\nnao_conciliado\nvalor ±0,01\ndata_vencimento ±1d\ndireção da forma bate"]
+    MATCH --> OUT["candidato\nscore 1.0 ou 0.85\n+ recebivel_ids[]"]
+    HFA["has_filial_access\nintegração + recebível + oferta"] -.-> CSV
+    HFA -.-> MATCH
 ```
 
 ## Competência de grupo em lançamentos parcelados — D10 (jul/2026)

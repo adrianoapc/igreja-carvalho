@@ -5392,27 +5392,41 @@ audit_logs` gravando a filial do ATOR (não do recurso).
 Com esta fase, todo o backlog de §11 (7 RPCs + RLS de `extratos_
 bancarios` + `fin_confirmar_conciliacao`) está corrigido.
 
-### 9.87 Fase 0 — Conciliação Cartão Getnet: estanca alarme falso no card
-de conferência
+### 9.88 Fase 1 — Conciliação Cartão Getnet: Hop 2 candidatos
+(Oferta ↔ Venda, só leitura)
 
-Primeira fatia do plano de Conciliação Cartão Getnet (Hops oferta↔venda↔
-banco), desbloqueada depois que o backlog HFA de §9.83–§9.86 mergeou e
-deployou. Sem migration: só UI.
+Primeira fatia de backend do plano Conciliação Cartão Getnet (Fase 0 =
+UI do card de conferência, §9.87 / PR #76). Migration
+`20260805100000_fin_candidatos_oferta_venda_getnet.sql`:
 
-`ConferenciaTotaisGetnetCard` mostrava "Diferença não explicada" comparando
-o esperado da Oferta cartão contra `Σ Banco creditado` — e a RPC
-`fin_conferencia_totais_getnet` (vigente `20260731230000`) soma **todo**
-crédito da conta no período (Pix, depósito, etc.), sem join de volta pro
-Getnet. Número real do usuário: −R$23.585,40 (R$1.786 oferta vs R$25.339
-créditos totais) — assustava sem significado.
+1. **`getnet_recebivel_lancamentos.transacao_financeira_id`** (FK
+   `ON DELETE SET NULL`) — coluna de vínculo Hop 2; writer é a Fase 2.
+   Esta fase só filtra `IS NULL`.
+2. Índice `(integracao_id, data_venda)`.
+3. **`fin_gerar_candidatos_oferta_venda_getnet`** (`STABLE` +
+   `SECURITY DEFINER`) — NÃO reaproveita `fin_gerar_candidatos_conciliacao`
+   (hardcoded pra extrato×transação).
 
-**Fix:** remove as linhas `Σ Banco creditado` e `Diferença não explicada`
-do card; mantém os 4 números isoladamente corretos (Σ oferta bruto cartão,
-Σ MDR, Σ deságio lançado, = esperado no banco); nota estática aponta que a
-comparação linha a linha chega nas fases seguintes. RPC e demais
-call-sites intactos (só este componente consome `conferenciaTotaisGetnet`).
-A reescrita real da RPC (join por `getnet_recebivel_lancamentos.extrato_
-bancario_id`) fica pra Fase 4 do mesmo plano.
+**Regras fechadas com CSV real do portal** (ago/2025 + set–nov/2025):
+- `valor_venda` **repete o bruto** em cada parcela do mesmo NSU (`1 de 7`
+  e `2 de 7` ambos com 1.441,66) → por NSU usa `MAX(valor_venda)` uma
+  vez, nunca soma as linhas.
+- `bandeira_modalidade` é texto (`Mastercard Crédito`, `Visa Débito`,
+  `Elo Débito`) → direção via regex `cr[eé]dito` / `d[eé]bito`.
+- Agrupa por `data_venda` + direção + `filial_id`; casa contra oferta
+  (`tipo=entrada`, `ILIKE '%cart%'`, `nao_conciliado`) com
+  `data_vencimento` ±1 dia e valor ±R$0,01. Forma que declara crédito/
+  débito não mistura com o grupo oposto.
+- `has_filial_access` na integração, em cada recebível e em cada oferta;
+  `p_filial_id` opcional (UI "Todas" = NULL) com
+  `.or(filial, is.null)` implícito no filtro de escopo.
+
+Harness Postgres (`harness_v32`, 8 cenários): soma bate (parcelado 1×
+NSU), soma fora do corte, venda já vinculada não reaparece, direção não
+mistura, isolamento filial, cross-tenant, `recebivel_ids` das parcelas
+parciais na janela, admin vê todas. Wrapper TS:
+`gerarCandidatosOfertaVendaGetnet` em `getnetRecebivel.api.ts` (sem UI
+nesta fase — Fase 6).
 
 ## 11. Riscos
 
