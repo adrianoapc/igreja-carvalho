@@ -811,7 +811,7 @@ Discrepância de valor: score 0.5 nos candidatos; warning no writer.
 flowchart TD
     CSV["getnet_recebivel_lancamentos\ncontrato_registradora IS NULL\nextrato_bancario_id IS NULL"]
     CSV --> GRP["grupo: data_vencimento + filial\nΣ líquido por linha"]
-    GRP --> MATCH["casa crédito da conta:\ntipo=credito · reconciliado=false\ndata ±1d · valor ±0,01 (1.0/0.85)\nou discrepância ≤5%/R$1 (0.5)"]
+    GRP --> MATCH["casa crédito da conta:\ntipo=credito · reconciliado=false\nNOT IN getnet_antecipacao_lotes\ndata ±1d · valor ±0,01 (1.0/0.85)\nou discrepância ≤5%/R$1 (0.5)"]
     MATCH --> CAND["candidato + recebivel_ids[]"]
     CAND --> VIN["fin_vincular_venda_banco_getnet"]
     VIN --> G["guards: HFA · livre · sem contrato\nfilial mista só c/ âncora"]

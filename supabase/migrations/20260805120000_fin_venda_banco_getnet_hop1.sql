@@ -163,6 +163,13 @@ BEGIN
      AND e.conta_id = p_conta_id
      AND e.tipo = 'credito'
      AND e.reconciliado IS NOT TRUE
+     -- fin_vincular_lote_antecipacao NÃO marca reconciliado — excluir
+     -- créditos já tomados por lote (evita double-booking Hop 1 × antecipação).
+     AND NOT EXISTS (
+       SELECT 1
+         FROM public.getnet_antecipacao_lotes l
+        WHERE l.extrato_bancario_id = e.id
+     )
      AND e.data_transacao BETWEEN (p_periodo_inicio - 1) AND (p_periodo_fim + 1)
      AND public.has_filial_access(v_igreja, e.filial_id)
      AND (
@@ -221,7 +228,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.fin_gerar_candidatos_venda_banco_getnet(uuid, uuid, date, date, jsonb, uuid) IS
-  'Fase 3 Conciliação Cartão Getnet (Hop 1, só leitura): agrupa getnet_recebivel_lancamentos sem antecipação (contrato_registradora IS NULL) e sem extrato_bancario_id por data_vencimento+filial, soma líquido, casa contra créditos não reconciliados da conta. Discrepância de valor ≤5%/R$1 entra com score 0.5 (sinalizada). has_filial_access em integração, conta, recebível e extrato.';
+  'Fase 3 Conciliação Cartão Getnet (Hop 1, só leitura): agrupa getnet_recebivel_lancamentos sem antecipação (contrato_registradora IS NULL) e sem extrato_bancario_id por data_vencimento+filial, soma líquido, casa contra créditos não reconciliados da conta (exclui extratos já em getnet_antecipacao_lotes — antecipação não marca reconciliado). Discrepância de valor ≤5%/R$1 entra com score 0.5 (sinalizada). has_filial_access em integração, conta, recebível e extrato.';
 
 GRANT EXECUTE ON FUNCTION public.fin_gerar_candidatos_venda_banco_getnet(uuid, uuid, date, date, jsonb, uuid)
   TO authenticated, service_role;
@@ -289,6 +296,14 @@ BEGIN
   END IF;
   IF v_ext.reconciliado IS TRUE THEN
     RAISE EXCEPTION 'FIN_VALIDACAO: extrato já reconciliado';
+  END IF;
+  -- Antecipação não seta reconciliado — bloquear double-booking aqui também.
+  IF EXISTS (
+    SELECT 1
+      FROM public.getnet_antecipacao_lotes l
+     WHERE l.extrato_bancario_id = p_extrato_bancario_id
+  ) THEN
+    RAISE EXCEPTION 'FIN_VALIDACAO: extrato já vinculado a lote de antecipação';
   END IF;
 
   -- Âncora de filial: extrato entra no conjunto (guardrail #13).
@@ -405,7 +420,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.fin_vincular_venda_banco_getnet(uuid, uuid[], jsonb) IS
-  'Fase 3 Conciliação Cartão Getnet (Hop 1): vincula recebíveis sem antecipação ao crédito bancário, grava extrato_bancario_id, marca reconciliado=true. Discrepância de valor vira warning (não bloqueia). has_filial_access no extrato e em cada recebível; filial mista só com âncora compartilhada (guardrail #13). Não chama fin_confirmar_conciliacao.';
+  'Fase 3 Conciliação Cartão Getnet (Hop 1): vincula recebíveis sem antecipação ao crédito bancário, grava extrato_bancario_id, marca reconciliado=true. Recusa extrato já em getnet_antecipacao_lotes (antecipação não marca reconciliado). Discrepância de valor vira warning (não bloqueia). has_filial_access no extrato e em cada recebível; filial mista só com âncora compartilhada (guardrail #13). Não chama fin_confirmar_conciliacao.';
 
 GRANT EXECUTE ON FUNCTION public.fin_vincular_venda_banco_getnet(uuid, uuid[], jsonb)
   TO authenticated, service_role;

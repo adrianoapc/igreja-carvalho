@@ -5479,19 +5479,22 @@ Sem antecipação (`contrato_registradora IS NULL`). Migration
    `SECURITY DEFINER`) — agrupa por `data_vencimento`+`filial_id`, Σ
    líquido (`valor_liquido_parcela` → `valor_liquido` → parcela−desconto),
    casa contra `extratos_bancarios` (`tipo='credito'`, `reconciliado` falso,
-   `p_conta_id`). Score 1.0/0.85 no match ±0,01/±1d; discrepância de valor
-   ≤5% ou R$1 entra com score 0.5 (sinalizada). NÃO reaproveita
+   `p_conta_id`, e **sem** vínculo em `getnet_antecipacao_lotes` —
+   `fin_vincular_lote_antecipacao` nunca marca `reconciliado`). Score
+   1.0/0.85 no match ±0,01/±1d; discrepância de valor ≤5% ou R$1 entra
+   com score 0.5 (sinalizada). NÃO reaproveita
    `fin_gerar_candidatos_conciliacao`. HFA em integração, conta, recebível
    e extrato — nunca `.from("extratos_bancarios")` no client.
 3. **`fin_vincular_venda_banco_getnet`** — locks `FOR NO KEY UPDATE` +
-   `ORDER BY id`; rejeita antecipação / já reconciliado / filial mista sem
-   âncora (guardrail #13); grava `extrato_bancario_id`; marca
-   `reconciliado=true`. Discrepância de valor → warning (não bloqueia).
-   Não chama `fin_confirmar_conciliacao`.
+   `ORDER BY id`; rejeita antecipação / já reconciliado / extrato já em
+   lote de antecipação / filial mista sem âncora (guardrail #13); grava
+   `extrato_bancario_id`; marca `reconciliado=true`. Discrepância de
+   valor → warning (não bloqueia). Não chama `fin_confirmar_conciliacao`.
 
-Harness Postgres (`harness_v34`, 9 cenários): candidatos 1.0; vínculo OK;
+Harness Postgres (`harness_v34`, 10 cenários): candidatos 1.0; vínculo OK;
 já reconciliado; antecipação excluída; cross-filial; filial mista; âncora;
-discrepância com warning; auditoria. Wrappers TS:
+discrepância com warning; auditoria; double-booking com lote bloqueado.
+Wrappers TS:
 `gerarCandidatosVendaBancoGetnet` / `vincularVendaBancoGetnet` (sem UI —
 Fase 6).
 
