@@ -8,10 +8,11 @@ flowchart TD
         SESSAO["fin_lancar_sessao"] --> FPID
     end
 
-    subgraph LOTES["Lotes de Antecipação (Reconciliação Bancária)"]
+    subgraph LOTES["Lotes de Antecipação (Reconciliação Bancária) — Fase 5 §9.92"]
         LISTA["getnet_antecipacao_lotes\nstatus: pendente_vinculo"]
-        VDLG["VincularExtratoLoteDialog\nsugere por data±30d + descrição\n(sem auto-selecionar)"]
-        LISTA --> VDLG
+        CAND["fin_gerar_candidatos_lote_antecipacao_getnet\nSECURITY DEFINER · score 0..100\nexclui Hop1 / outro lote / reconciliado"]
+        VDLG["VincularExtratoLoteDialog\nlista candidatos da RPC\n(sem auto-selecionar)"]
+        LISTA --> CAND --> VDLG
         VDLG -->|"escolha manual"| VINC2["fin_vincular_lote_antecipacao\ndeságio = valor_atual_contrato - extrato.valor\n(nunca persistido, sempre recalculado)"]
         VINC2 --> VINCULADO["status: vinculado"]
         VINCULADO --> LDLG["LancarDesagioDialog\nescolhe conta + categoria saída"]
