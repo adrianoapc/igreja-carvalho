@@ -148,3 +148,31 @@ export async function gerarCandidatosOfertaVendaGetnet(
   if (error) throw error;
   return (data ?? []) as CandidatoOfertaVendaGetnet[];
 }
+
+/** Resultado de fin_vincular_venda_getnet_oferta (Hop 2 confirmação). */
+export interface VincularVendaGetnetOfertaResultado extends FinResultado {
+  id?: string;
+  recebivel_ids?: string[];
+  parcelado?: boolean;
+  filhas?: string[];
+  taxas_administrativas?: number;
+  valor_liquido?: number;
+  warnings?: string[];
+}
+
+/**
+ * → fin_vincular_venda_getnet_oferta (Fase 2 + 2b).
+ * Vincula recebíveis à oferta: grava transacao_financeira_id, atualiza
+ * taxa/líquido/data/status via fin_atualizar_lancamento, marca
+ * conciliado_manual. Fase 2b: NSU com N>1 (conjunto 1..N completo)
+ * converte a oferta em 1/N e cria irmãs 2..N. Sem UI nesta fase — Fase 6.
+ */
+export function vincularVendaGetnetOferta(
+  transacaoId: string,
+  recebivelIds: string[],
+): Promise<VincularVendaGetnetOfertaResultado> {
+  return callFinRpc("fin_vincular_venda_getnet_oferta", {
+    p_transacao_id: transacaoId,
+    p_recebivel_ids: recebivelIds,
+  }) as Promise<VincularVendaGetnetOfertaResultado>;
+}
