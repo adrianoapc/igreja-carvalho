@@ -176,3 +176,73 @@ export function vincularVendaGetnetOferta(
     p_recebivel_ids: recebivelIds,
   }) as Promise<VincularVendaGetnetOfertaResultado>;
 }
+
+/** Candidato Hop 1 (Venda ↔ Banco) — fin_gerar_candidatos_venda_banco_getnet. */
+export interface CandidatoVendaBancoGetnet {
+  data_vencimento: string;
+  filial_id: string | null;
+  valor_liquido: number;
+  recebivel_ids: string[];
+  extrato_id: string;
+  score: number;
+  features: Record<string, unknown>;
+}
+
+export interface CandidatosVendaBancoGetnetParams {
+  contaId: string;
+  integracaoId: string;
+  periodoInicio: string;
+  periodoFim: string;
+  /** `null`/omitido = todas as filiais no teto do usuário. */
+  filialId?: string | null;
+}
+
+/**
+ * → fin_gerar_candidatos_venda_banco_getnet (Fase 3, só leitura).
+ * Agrupa recebíveis sem antecipação (contrato_registradora IS NULL) por
+ * data_vencimento+filial, soma líquido, casa contra créditos não
+ * reconciliados da conta. Sem UI nesta fase — Fase 6.
+ */
+export async function gerarCandidatosVendaBancoGetnet(
+  params: CandidatosVendaBancoGetnetParams,
+): Promise<CandidatoVendaBancoGetnet[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)(
+    "fin_gerar_candidatos_venda_banco_getnet",
+    {
+      p_conta_id: params.contaId,
+      p_integracao_id: params.integracaoId,
+      p_periodo_inicio: params.periodoInicio,
+      p_periodo_fim: params.periodoFim,
+      p_filial_id: params.filialId ?? null,
+    },
+  );
+  if (error) throw error;
+  return (data ?? []) as CandidatoVendaBancoGetnet[];
+}
+
+/** Resultado de fin_vincular_venda_banco_getnet (Hop 1 confirmação). */
+export interface VincularVendaBancoGetnetResultado extends FinResultado {
+  id?: string;
+  recebivel_ids?: string[];
+  valor_liquido?: number;
+  valor_extrato?: number;
+  delta_valor?: number;
+  warnings?: string[];
+}
+
+/**
+ * → fin_vincular_venda_banco_getnet (Fase 3).
+ * Vincula recebíveis ao crédito bancário: grava extrato_bancario_id,
+ * marca reconciliado=true. Discrepância de valor vira warning (não
+ * bloqueia). Sem UI nesta fase — Fase 6.
+ */
+export function vincularVendaBancoGetnet(
+  extratoBancarioId: string,
+  recebivelIds: string[],
+): Promise<VincularVendaBancoGetnetResultado> {
+  return callFinRpc("fin_vincular_venda_banco_getnet", {
+    p_extrato_bancario_id: extratoBancarioId,
+    p_recebivel_ids: recebivelIds,
+  }) as Promise<VincularVendaBancoGetnetResultado>;
+}
