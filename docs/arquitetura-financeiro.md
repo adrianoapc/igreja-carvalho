@@ -5428,6 +5428,39 @@ parciais na janela, admin vê todas. Wrapper TS:
 `gerarCandidatosOfertaVendaGetnet` em `getnetRecebivel.api.ts` (sem UI
 nesta fase — Fase 6).
 
+### 9.89 Fase 2 (+2b) — Conciliação Cartão Getnet: Hop 2 confirmação
+(Oferta ↔ Venda)
+
+Writer do vínculo aberto na Fase 1 (`transacao_financeira_id`). Migration
+`20260805110000_fin_vincular_venda_getnet_oferta.sql`:
+
+**`fin_vincular_venda_getnet_oferta(p_transacao_id, p_recebivel_ids,
+p_contexto)`** (`SECURITY DEFINER`):
+
+1. **Contexto + locks**: `fin_resolver_contexto`; lock oferta + recebíveis
+   `FOR NO KEY UPDATE` com `ORDER BY id` (anti-deadlock).
+2. **Guards**: oferta = `entrada` + `nao_conciliado` + tenant;
+   `has_filial_access` na oferta e em cada recebível; recebíveis livres
+   (`transacao_financeira_id IS NULL`); dedupe de ids.
+3. **À vista** (1 de 1 / vários NSUs à vista): bruto 1×/NSU deve bater
+   com `oferta.valor` ±0,01; Σ taxas/líquido das linhas; link todos →
+   oferta; `fin_atualizar_lancamento` (taxas/líquido/`data_pagamento`/
+   `status=pago`); `conciliacao_status='conciliado_manual'`.
+4. **Fase 2b parcelado** (um NSU, N>1): exige conjunto completo `1..N`
+   (parcial → `FIN_VALIDACAO`). Oferta vira parcela 1/N (preserva id/
+   `sessao_id`); INSERT irmãs 2..N com `lancamento_pai_id` +
+   `conciliado_manual`; link 1:1 linha CSV → parcela. Não usa
+   `fin_confirmar_conciliacao` (esse caminho é extrato →
+   `conciliado_extrato`).
+5. **Auditoria**: `fin_registrar_auditoria` com
+   `tipo_match=oferta_venda_getnet`.
+
+Harness Postgres (`harness_v33`, 8 cenários): à vista OK; bruto diverge;
+já vinculado; parcial parcelado rejeita; 3/3 parcelado cria irmãs;
+cross-tenant; filial sem acesso; concorrência (2ª sessão vê ocupado).
+Wrapper TS: `vincularVendaGetnetOferta` em `getnetRecebivel.api.ts`
+(sem UI — Fase 6).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

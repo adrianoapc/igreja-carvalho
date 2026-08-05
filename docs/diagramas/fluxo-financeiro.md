@@ -782,6 +782,26 @@ flowchart TD
     HFA -.-> MATCH
 ```
 
+## Fase 2 (+2b) — Hop 2 confirmação Oferta ↔ Venda Getnet (§9.89)
+
+Writer: grava `transacao_financeira_id`, atualiza oferta, marca
+`conciliado_manual`. Parcelado exige 1..N completo.
+
+```mermaid
+flowchart TD
+    IN["fin_vincular_venda_getnet_oferta\np_transacao_id + p_recebivel_ids"]
+    IN --> CTX["fin_resolver_contexto\n+ FOR NO KEY UPDATE ORDER BY id"]
+    CTX --> G["guards:\nentrada · nao_conciliado\nhas_filial_access\nrecebível livre"]
+    G --> P{"mesmo NSU com N>1?"}
+    P -->|não · à vista| AV["bruto 1×/NSU ≈ oferta ±0,01\nΣ taxas/líquido das linhas\nlink todos → oferta\nfin_atualizar_lancamento\n(taxas · líquido · data · pago)"]
+    P -->|sim · 2b| COMP{"conjunto 1..N\ncompleto?"}
+    COMP -->|não| REJ["FIN_VALIDACAO"]
+    COMP -->|sim| PAR["oferta → parcela 1/N\nINSERT irmãs 2..N\n(lancamento_pai_id)\nlink 1:1 CSV→parcela"]
+    AV --> CM["conciliacao_status =\nconciliado_manual"]
+    PAR --> CM
+    CM --> AUD["fin_registrar_auditoria\ntipo_match=oferta_venda_getnet"]
+```
+
 ## Competência de grupo em lançamentos parcelados — D10 (jul/2026)
 
 Ver §9.19 do `arquitetura-financeiro.md`. Fecha o cenário B ("Despesa
