@@ -802,6 +802,24 @@ flowchart TD
     CM --> AUD["fin_registrar_auditoria\ntipo_match=oferta_venda_getnet"]
 ```
 
+## Fase 3 — Hop 1 Venda ↔ Banco Getnet (§9.90)
+
+Sem antecipação. Coluna `extrato_bancario_id` independente do Hop 2.
+Discrepância de valor: score 0.5 nos candidatos; warning no writer.
+
+```mermaid
+flowchart TD
+    CSV["getnet_recebivel_lancamentos\ncontrato_registradora IS NULL\nextrato_bancario_id IS NULL"]
+    CSV --> GRP["grupo: data_vencimento + filial\nΣ líquido por linha"]
+    GRP --> MATCH["casa crédito da conta:\ntipo=credito · reconciliado=false\ndata ±1d · valor ±0,01 (1.0/0.85)\nou discrepância ≤5%/R$1 (0.5)"]
+    MATCH --> CAND["candidato + recebivel_ids[]"]
+    CAND --> VIN["fin_vincular_venda_banco_getnet"]
+    VIN --> G["guards: HFA · livre · sem contrato\nfilial mista só c/ âncora"]
+    G --> W["grava extrato_bancario_id\nextrato.reconciliado=true\ndelta>0,01 → warning"]
+    HFA["has_filial_access\nintegração · conta · recebível · extrato"] -.-> CSV
+    HFA -.-> MATCH
+```
+
 ## Competência de grupo em lançamentos parcelados — D10 (jul/2026)
 
 Ver §9.19 do `arquitetura-financeiro.md`. Fecha o cenário B ("Despesa

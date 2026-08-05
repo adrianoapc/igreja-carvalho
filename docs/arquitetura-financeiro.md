@@ -5467,6 +5467,34 @@ rejeita; âncora compartilhada permite; auditoria.
 Wrapper TS: `vincularVendaGetnetOferta` em `getnetRecebivel.api.ts`
 (sem UI — Fase 6).
 
+### 9.90 Fase 3 — Conciliação Cartão Getnet: Hop 1 (Venda ↔ Banco)
+
+Sem antecipação (`contrato_registradora IS NULL`). Migration
+`20260805120000_fin_venda_banco_getnet_hop1.sql`:
+
+1. **`getnet_recebivel_lancamentos.extrato_bancario_id`** (FK
+   `ON DELETE SET NULL`) — vínculo Hop 1, independente de
+   `transacao_financeira_id` (Hop 2).
+2. **`fin_gerar_candidatos_venda_banco_getnet`** (`STABLE` +
+   `SECURITY DEFINER`) — agrupa por `data_vencimento`+`filial_id`, Σ
+   líquido (`valor_liquido_parcela` → `valor_liquido` → parcela−desconto),
+   casa contra `extratos_bancarios` (`tipo='credito'`, `reconciliado` falso,
+   `p_conta_id`). Score 1.0/0.85 no match ±0,01/±1d; discrepância de valor
+   ≤5% ou R$1 entra com score 0.5 (sinalizada). NÃO reaproveita
+   `fin_gerar_candidatos_conciliacao`. HFA em integração, conta, recebível
+   e extrato — nunca `.from("extratos_bancarios")` no client.
+3. **`fin_vincular_venda_banco_getnet`** — locks `FOR NO KEY UPDATE` +
+   `ORDER BY id`; rejeita antecipação / já reconciliado / filial mista sem
+   âncora (guardrail #13); grava `extrato_bancario_id`; marca
+   `reconciliado=true`. Discrepância de valor → warning (não bloqueia).
+   Não chama `fin_confirmar_conciliacao`.
+
+Harness Postgres (`harness_v34`, 9 cenários): candidatos 1.0; vínculo OK;
+já reconciliado; antecipação excluída; cross-filial; filial mista; âncora;
+discrepância com warning; auditoria. Wrappers TS:
+`gerarCandidatosVendaBancoGetnet` / `vincularVendaBancoGetnet` (sem UI —
+Fase 6).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
