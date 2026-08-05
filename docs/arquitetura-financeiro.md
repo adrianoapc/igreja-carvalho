@@ -5490,11 +5490,15 @@ Sem antecipação (`contrato_registradora IS NULL`). Migration
    lote de antecipação / filial mista sem âncora (guardrail #13); grava
    `extrato_bancario_id`; marca `reconciliado=true`. Discrepância de
    valor → warning (não bloqueia). Não chama `fin_confirmar_conciliacao`.
+4. **Direção contrária** (`20260805130000_fin_vincular_lote_bloqueia_
+   hop1.sql`): `fin_vincular_lote_antecipacao` passa a recusar extrato
+   `reconciliado` ou já apontado por `getnet_recebivel_lancamentos.
+   extrato_bancario_id` (lock `FOR NO KEY UPDATE` no extrato). Fecha o
+   double-booking bidirecional Hop 1 ↔ antecipação — gap pré-existente
+   que só ficou alcançável com o segundo consumidor do mesmo crédito.
 
-Harness Postgres (`harness_v34`, 10 cenários): candidatos 1.0; vínculo OK;
-já reconciliado; antecipação excluída; cross-filial; filial mista; âncora;
-discrepância com warning; auditoria; double-booking com lote bloqueado.
-Wrappers TS:
+Harness Postgres: `harness_v34` (10) + `harness_v35` (4, direção
+contrária no lote). Wrappers TS:
 `gerarCandidatosVendaBancoGetnet` / `vincularVendaBancoGetnet` (sem UI —
 Fase 6).
 
