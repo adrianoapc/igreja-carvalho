@@ -5550,13 +5550,17 @@ p_busca, p_limite)`** (`STABLE` + `SECURITY DEFINER`):
   (`getnet_recebivel_lancamentos.extrato_bancario_id`) ou
   `reconciliado=true`.
 - `has_filial_access` no lote e em cada extrato; lote com filial concreta
-  só vê extrato da mesma filial ou global.
+  só vê extrato da **mesma** filial (espelha o writer — extrato global
+  `filial_id IS NULL` seria rejeitado no vínculo).
+- Com janela de data: teto 5000 (cobre ±5/+30); sem âncora: teto 100
+  (só score ≥15 / busca).
 - **Não auto-seleciona** — confirmação continua em
   `fin_vincular_lote_antecipacao`.
 
 Wrapper TS: `gerarCandidatosLoteAntecipacaoGetnet`. Harness
-(`harness_v37`, 6 cenários): topo Getnet; Hop1/lote/reconciliado fora;
-Pix score menor; cross-filial; sem âncora+busca; HFA no lote.
+(`harness_v37`, 7 cenários): topo Getnet; Hop1/lote/reconciliado fora;
+Pix score menor; cross-filial; sem âncora+busca; HFA no lote; extrato
+global fora quando lote tem filial.
 
 ## 11. Riscos
 

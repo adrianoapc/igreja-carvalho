@@ -53,12 +53,14 @@ export function VincularExtratoLoteDialog({
   // outro lote / reconciliado). Sem auto-selecionar — escolha continua manual.
   const buscaRpc = searchTerm.trim() || null;
   const { data: candidatos = [], isLoading } = useQuery({
-    queryKey: ["candidatos-lote-antecipacao-getnet", lote.id, buscaRpc],
+    queryKey: ["candidatos-lote-antecipacao-getnet", lote.id, buscaRpc, !!dateWindow],
     queryFn: () =>
       gerarCandidatosLoteAntecipacaoGetnet({
         loteId: lote.id,
         busca: buscaRpc,
-        limite: 100,
+        // Com janela: cobre a faixa ±5/+30 inteira (RPC default 5000).
+        // Sem âncora: top pontuados / busca (RPC default 100).
+        limite: dateWindow ? 5000 : 100,
       }),
     enabled: open,
   });

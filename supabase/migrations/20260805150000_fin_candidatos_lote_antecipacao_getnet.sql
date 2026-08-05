@@ -46,7 +46,6 @@ BEGIN
 
   v_ctx := public.fin_resolver_contexto(p_contexto, NULL);
   v_igreja := (v_ctx ->> 'igreja_id')::uuid;
-  v_limite := GREATEST(1, LEAST(COALESCE(p_limite, 100), 500));
   v_busca := NULLIF(btrim(COALESCE(p_busca, '')), '');
 
   SELECT * INTO v_lote
@@ -66,6 +65,14 @@ BEGIN
   v_ancora := v_lote.data_contratacao_contrato;
   v_valor := v_lote.valor_atual_contrato;
 
+  -- Com janela de data: teto alto (janela ±5/+30 é estreita — o client antigo
+  -- paginava tudo nela). Sem âncora: teto baixo (só score≥15 / busca).
+  IF v_ancora IS NOT NULL THEN
+    v_limite := GREATEST(1, LEAST(COALESCE(NULLIF(p_limite, 0), 5000), 5000));
+  ELSE
+    v_limite := GREATEST(1, LEAST(COALESCE(NULLIF(p_limite, 0), 100), 500));
+  END IF;
+
   RETURN QUERY
   WITH
   base AS (
@@ -81,10 +88,11 @@ BEGIN
      AND e.tipo = 'credito'
      AND e.reconciliado IS NOT TRUE
      AND public.has_filial_access(v_igreja, e.filial_id)
-     -- Filial do lote concreta → só mesma filial (ou extrato global).
+     -- Espelha fin_vincular_lote_antecipacao: lote com filial concreta
+     -- exige extrato da MESMA filial (NULL IS DISTINCT FROM A → writer
+     -- rejeita; não sugerir o que o writer recusa — §9.65/§9.78/§9.79).
      AND (
        v_lote.filial_id IS NULL
-       OR e.filial_id IS NULL
        OR e.filial_id = v_lote.filial_id
      )
      -- Janela ±5/+30 em torno da contratação; sem âncora = histórico (filtrado por score/busca).
@@ -162,7 +170,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.fin_gerar_candidatos_lote_antecipacao_getnet(uuid, jsonb, text, integer) IS
-  'Fase 5 Conciliação Cartão Getnet (só leitura): sugere créditos bancários pra vincular a um lote de antecipação. Score 0..100 (texto/data/valor). Exclui extratos em outro lote, Hop 1 ou reconciliado. has_filial_access no lote e em cada extrato. Confirmação continua manual (fin_vincular_lote_antecipacao).';
+  'Fase 5 Conciliação Cartão Getnet (só leitura): sugere créditos bancários pra vincular a um lote de antecipação. Score 0..100 (texto/data/valor). Exclui extratos em outro lote, Hop 1 ou reconciliado. Lote com filial concreta exige extrato da mesma filial (espelha fin_vincular_lote_antecipacao). has_filial_access no lote e em cada extrato. Confirmação continua manual.';
 
 GRANT EXECUTE ON FUNCTION public.fin_gerar_candidatos_lote_antecipacao_getnet(uuid, jsonb, text, integer)
   TO authenticated, service_role;
