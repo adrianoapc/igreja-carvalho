@@ -47,10 +47,43 @@ export function importarRecebivelGetnet(
 }
 
 /**
- * Wrappers da Fase B (vínculo manual com extrato bancário + lançamento do
- * deságio de antecipação). Sem match/conciliação automática — a escolha de
- * qual linha do extrato corresponde ao lote é sempre manual.
+ * Wrappers da Fase B / Fase 5 (lote de antecipação). Confirmação do vínculo
+ * continua manual — a Fase 5 só sugere candidatos via SECURITY DEFINER.
  */
+
+/** Candidato de crédito pra lote — fin_gerar_candidatos_lote_antecipacao_getnet. */
+export interface CandidatoLoteAntecipacaoGetnet {
+  extrato_id: string;
+  data_transacao: string;
+  descricao: string;
+  valor: number;
+  /** 0..100 (texto / data / valor), compatível com badges da UI. */
+  score: number;
+  features: Record<string, unknown>;
+}
+
+/**
+ * → fin_gerar_candidatos_lote_antecipacao_getnet (Fase 5, só leitura).
+ * Sugere créditos livres (não em outro lote, Hop 1 ou reconciliado).
+ * Não auto-seleciona — UI confirma via fin_vincular_lote_antecipacao.
+ */
+export async function gerarCandidatosLoteAntecipacaoGetnet(params: {
+  loteId: string;
+  busca?: string | null;
+  limite?: number;
+}): Promise<CandidatoLoteAntecipacaoGetnet[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)(
+    "fin_gerar_candidatos_lote_antecipacao_getnet",
+    {
+      p_lote_id: params.loteId,
+      p_busca: params.busca ?? null,
+      p_limite: params.limite ?? 100,
+    },
+  );
+  if (error) throw error;
+  return (data ?? []) as CandidatoLoteAntecipacaoGetnet[];
+}
 
 /** → fin_vincular_lote_antecipacao. Retorna { desagio, extrato_valor, extrato_data }. */
 export function vincularLoteAntecipacao(

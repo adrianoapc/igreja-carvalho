@@ -5532,6 +5532,36 @@ Harness Postgres (`harness_v36`, 7 cenários): Pix excluído; lote entra;
 sem vínculo → banco 0; HFA; N→1 sem double-count; origem irrelevante;
 deságio em conta de despesa diferente ainda conta na conta do extrato.
 
+### 9.92 Fase 5 — Sugestão de crédito pro lote de antecipação
+
+Migration `20260805150000_fin_candidatos_lote_antecipacao_getnet.sql`.
+
+**`fin_gerar_candidatos_lote_antecipacao_getnet(p_lote_id, p_contexto,
+p_busca, p_limite)`** (`STABLE` + `SECURITY DEFINER`):
+
+- Substitui o `.from("extratos_bancarios")` de `VincularExtratoLoteDialog`
+  (read-path direto frágil de filial — plano exigia RPC).
+- Score 0..100 espelhando a heurística legada: texto
+  (`antecipa`/`getnet`) + proximidade de `data_contratacao_contrato`
+  (±5/+30 janela) + proximidade de `valor_atual_contrato`.
+- Sem âncora de data: só devolve score ≥15 ou linhas que batem em
+  `p_busca` (evita dump do histórico).
+- Exclui extratos em outro lote, Hop 1
+  (`getnet_recebivel_lancamentos.extrato_bancario_id`) ou
+  `reconciliado=true`.
+- `has_filial_access` no lote e em cada extrato; lote com filial concreta
+  só vê extrato da **mesma** filial (espelha o writer — extrato global
+  `filial_id IS NULL` seria rejeitado no vínculo).
+- Com janela de data: teto 5000 (cobre ±5/+30); sem âncora: teto 100
+  (só score ≥15 / busca).
+- **Não auto-seleciona** — confirmação continua em
+  `fin_vincular_lote_antecipacao`.
+
+Wrapper TS: `gerarCandidatosLoteAntecipacaoGetnet`. Harness
+(`harness_v37`, 7 cenários): topo Getnet; Hop1/lote/reconciliado fora;
+Pix score menor; cross-filial; sem âncora+busca; HFA no lote; extrato
+global fora quando lote tem filial.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
