@@ -5392,6 +5392,28 @@ audit_logs` gravando a filial do ATOR (não do recurso).
 Com esta fase, todo o backlog de §11 (7 RPCs + RLS de `extratos_
 bancarios` + `fin_confirmar_conciliacao`) está corrigido.
 
+### 9.87 Fase 0 — Conciliação Cartão Getnet: estanca alarme falso no card
+de conferência
+
+Primeira fatia do plano de Conciliação Cartão Getnet (Hops oferta↔venda↔
+banco), desbloqueada depois que o backlog HFA de §9.83–§9.86 mergeou e
+deployou. Sem migration: só UI.
+
+`ConferenciaTotaisGetnetCard` mostrava "Diferença não explicada" comparando
+o esperado da Oferta cartão contra `Σ Banco creditado` — e a RPC
+`fin_conferencia_totais_getnet` (vigente `20260731230000`) soma **todo**
+crédito da conta no período (Pix, depósito, etc.), sem join de volta pro
+Getnet. Número real do usuário: −R$23.585,40 (R$1.786 oferta vs R$25.339
+créditos totais) — assustava sem significado.
+
+**Fix:** remove as linhas `Σ Banco creditado` e `Diferença não explicada`
+do card; mantém os 4 números isoladamente corretos (Σ oferta bruto cartão,
+Σ MDR, Σ deságio lançado, = esperado no banco); nota estática aponta que a
+comparação linha a linha chega nas fases seguintes. RPC e demais
+call-sites intactos (só este componente consome `conferenciaTotaisGetnet`).
+A reescrita real da RPC (join por `getnet_recebivel_lancamentos.extrato_
+bancario_id`) fica pra Fase 4 do mesmo plano.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

@@ -16,9 +16,7 @@ import { useHideValues } from "@/hooks/useHideValues";
 import { useFilialId } from "@/hooks/useFilialId";
 import { getPeriodoRange } from "@/features/financeiro/core/lib/periodo";
 import { conferenciaTotaisGetnet } from "@/features/financeiro/core/api/getnetRecebivel.api";
-import { Scale, AlertTriangle, CheckCircle2 } from "lucide-react";
-
-const CENTAVOS_TOLERANCIA = 0.01;
+import { Scale } from "lucide-react";
 
 export function ConferenciaTotaisGetnetCard() {
   const { formatValue } = useHideValues();
@@ -59,9 +57,6 @@ export function ConferenciaTotaisGetnetCard() {
     enabled: !!contaId,
   });
 
-  const diferenca = totais?.diferenca_nao_explicada ?? 0;
-  const bate = Math.abs(diferenca) <= CENTAVOS_TOLERANCIA;
-
   return (
     <Card>
       <CardHeader>
@@ -72,12 +67,12 @@ export function ConferenciaTotaisGetnetCard() {
       <CardContent className="space-y-4">
         <Alert>
           <AlertDescription className="text-xs">
-            Não é match registro-a-registro — é um somatório simples que aponta
-            diferença entre o que a Oferta (cartão) deveria render líquido e o
-            que o banco realmente creditou no período. Diferença ≠ 0 pode
-            significar lote de antecipação ainda não vinculado, deságio de
-            outra origem, ou erro de digitação — não decide sozinho, só torna
-            visível.
+            Somatório do lado da Oferta (cartão): bruto − MDR − deságio já
+            lançado = esperado no banco. A comparação linha a linha com os
+            créditos reais do extrato chega nas próximas fases da Conciliação
+            Cartão Getnet — até lá, o card não mostra “diferença não
+            explicada” (o número antigo somava todo crédito da conta, Pix e
+            depósitos inclusos, e assustava sem significado).
           </AlertDescription>
         </Alert>
 
@@ -127,21 +122,10 @@ export function ConferenciaTotaisGetnetCard() {
               <span>= Esperado no banco</span>
               <span>{formatValue(totais.esperado_banco)}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Σ Banco creditado (mesma conta/período)</span>
-              <span>{formatValue(totais.banco_creditado)}</span>
-            </div>
-            <div
-              className={`flex justify-between items-center font-bold border-t pt-2 ${
-                bate ? "text-green-600" : "text-destructive"
-              }`}
-            >
-              <span className="flex items-center gap-1.5">
-                {bate ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-                Diferença não explicada
-              </span>
-              <span>{formatValue(diferenca)}</span>
-            </div>
+            <p className="text-xs text-muted-foreground border-t pt-2">
+              Comparação com créditos do extrato (linha a linha, só Getnet)
+              chega nas fases seguintes da Conciliação Cartão.
+            </p>
           </div>
         ) : null}
       </CardContent>

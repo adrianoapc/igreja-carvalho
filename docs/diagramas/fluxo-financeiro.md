@@ -753,15 +753,34 @@ flowchart TD
         RPC3 --> C1["Σ Oferta bruto\n(forma_pagamento_id → nome ILIKE '%cart%')"]
         RPC3 --> C2["− Σ taxa MDR"]
         RPC3 --> C3["− Σ deságio lançado no período\n(getnet_antecipacao_lotes.status=lancamento_criado)"]
-        RPC3 --> C4["Σ Banco creditado\n(extratos_bancarios, mesma conta/período)"]
-        C1 --> DIFF["Diferença não explicada\n(sinaliza, não decide a causa)"]
-        C2 --> DIFF
-        C3 --> DIFF
-        C4 --> DIFF
+        C1 --> ESP["= Esperado no banco\n(C1 − C2 − C3)"]
+        C2 --> ESP
+        C3 --> ESP
+        ESP --> NOTA["UI (Fase 0 §9.87):\nsó mostra o lado da Oferta.\nΣ Banco creditado / Diferença\nnão explicada removidos — a RPC\nainda soma TODO crédito da conta\n(Pix/depósito inclusos); comparação\nlinha a linha volta na Fase 4"]
     end
 
     FPID -.->|"join confiável"| C1
     CRIADO -.-> C3
+```
+
+## Fase 0 — Conciliação Cartão Getnet: estanca alarme falso (§9.87)
+
+O card `ConferenciaTotaisGetnetCard` (aba Lotes de Antecipação) parava de
+mostrar "Diferença não explicada" porque o comparativo contra `Σ Banco
+creditado` era estruturalmente errado: `fin_conferencia_totais_getnet`
+soma todo crédito da conta no período, sem join de volta ao Getnet.
+Número real do usuário: −R$23.585,40. Fase 0 só mexe na UI; a RPC fica
+intocada até a Fase 4 reescrevê-la com join por
+`getnet_recebivel_lancamentos.extrato_bancario_id`.
+
+```mermaid
+flowchart TD
+    CARD["ConferenciaTotaisGetnetCard"]
+    CARD --> RPC["fin_conferencia_totais_getnet\n(intocada nesta fase)"]
+    RPC --> SHOW["UI mostra:\nΣ Oferta bruto cartão\n− Σ MDR\n− Σ deságio lançado\n= Esperado no banco"]
+    RPC --> HIDE["UI NÃO mostra mais:\nΣ Banco creditado\nDiferença não explicada"]
+    HIDE --> WHY["Motivo: banco_creditado = Σ TODO\ncrédito da conta (Pix, depósito…)\nsem filtro Getnet — alarme falso"]
+    SHOW --> NEXT["Comparação linha a linha\nvolta na Fase 4 do plano\nConciliação Cartão Getnet"]
 ```
 
 ## Competência de grupo em lançamentos parcelados — D10 (jul/2026)
