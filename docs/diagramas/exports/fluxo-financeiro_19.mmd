@@ -24,11 +24,10 @@ flowchart TD
         RPC3 --> C1["Σ Oferta bruto\n(forma_pagamento_id → nome ILIKE '%cart%')"]
         RPC3 --> C2["− Σ taxa MDR"]
         RPC3 --> C3["− Σ deságio lançado no período\n(getnet_antecipacao_lotes.status=lancamento_criado)"]
-        RPC3 --> C4["Σ Banco creditado\n(extratos_bancarios, mesma conta/período)"]
-        C1 --> DIFF["Diferença não explicada\n(sinaliza, não decide a causa)"]
-        C2 --> DIFF
-        C3 --> DIFF
-        C4 --> DIFF
+        C1 --> ESP["= Esperado no banco\n(C1 − C2 − C3)"]
+        C2 --> ESP
+        C3 --> ESP
+        ESP --> NOTA["UI (Fase 0 §9.87):\nsó mostra o lado da Oferta.\nΣ Banco creditado / Diferença\nnão explicada removidos — a RPC\nainda soma TODO crédito da conta\n(Pix/depósito inclusos); comparação\nlinha a linha volta na Fase 4"]
     end
 
     FPID -.->|"join confiável"| C1

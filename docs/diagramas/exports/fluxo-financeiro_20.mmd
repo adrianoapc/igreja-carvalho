@@ -1,22 +1,10 @@
 flowchart TD
-    EDIT["fin_atualizar_lancamento\np_patch com data_competencia"]
-    CHECK{"tipo_lancamento='parcelado'\ne tem irmãs (lancamento_pai_id\nou total_parcelas>1)?"}
-    EDIT --> CHECK
-    CHECK -->|não| APLICA["aplica normalmente\n(inclui recorrente — competência\nprópria por ocorrência)"]
-    CHECK -->|"sim, sem _permitir_divergencia_competencia"| BLOQ["rejeita:\nFIN_COMPETENCIA_GRUPO"]
-    CHECK -->|"sim, com _permitir_divergencia_competencia=true"| ESCAPE["aplica só nesta parcela\n(exceção pontual, não exposta na UI)"]
-
-    BLOQ --> UI["TransacaoDialog.tsx\ncatch detecta o erro nomeado"]
-    UI --> CONFIRMA["AlertDialog:\nsincronizar competência do grupo?"]
-    CONFIRMA -->|confirma| SYNC["fin_alterar_competencia_grupo\np_lancamento_id, p_nova_competencia"]
-
-    SYNC --> CONCILIADA{"alguma parcela do grupo\njá conciliada?"}
-    CONCILIADA -->|sim| REJ["rejeita: FIN_CONCILIADO\n(lista os ids)"]
-    CONCILIADA -->|não| UPDATE["UPDATE em todas as parcelas\n(id=pai OU lancamento_pai_id=pai)\nnuma única transação"]
-    UPDATE --> WARN{"alguma parcela\njá paga?"}
-    WARN -->|sim| AVISO["warning: revisar DRE por\ncompetência do período afetado"]
-    WARN -->|não| OK["ok"]
-
-    RECLASS["reclass-transacoes\n(lote)"] -->|"data_competencia\nem updateFields"| GRUPO{"todas as parcelas\nirmãs estão na seleção?"}
-    GRUPO -->|não| REJ2["409 GRUPO_PARCELADO_INCOMPLETO\n(lista ids_irmas_faltantes)"]
-    GRUPO -->|sim| APLICA2["aplica no lote normalmente"]
+    CSV["getnet_recebivel_lancamentos\ntransacao_financeira_id IS NULL\ndata_venda no período"]
+    CSV --> DIR{"bandeira / lançamento\ncr[eé]dito ou d[eé]bito?"}
+    DIR -->|sem direção| SKIP["ignora linha"]
+    DIR -->|ok| NSU["por NSU:\nMAX(valor_venda) 1×\n(não soma parcelas)"]
+    NSU --> GRP["grupo:\ndata_venda + direção + filial_id\nΣ valor_venda dos NSUs"]
+    GRP --> MATCH["casa oferta:\nentrada + ILIKE %cart%\nnao_conciliado\nvalor ±0,01\ndata_vencimento ±1d\ndireção da forma bate"]
+    MATCH --> OUT["candidato\nscore 1.0 ou 0.85\n+ recebivel_ids[]"]
+    HFA["has_filial_access\nintegração + recebível + oferta"] -.-> CSV
+    HFA -.-> MATCH
