@@ -764,6 +764,25 @@ flowchart TD
     CRIADO -.-> C3
 ```
 
+## Fase 1 — Hop 2 candidatos Oferta ↔ Venda Getnet (§9.88)
+
+Só leitura. CSV real do portal fechou: `valor_venda` repete o bruto por
+parcela (usar 1× por NSU); `bandeira_modalidade` é texto com Crédito/
+Débito (`ILIKE` / regex). Writer do vínculo = Fase 2.
+
+```mermaid
+flowchart TD
+    CSV["getnet_recebivel_lancamentos\ntransacao_financeira_id IS NULL\ndata_venda no período"]
+    CSV --> DIR{"bandeira / lançamento\ncr[eé]dito ou d[eé]bito?"}
+    DIR -->|sem direção| SKIP["ignora linha"]
+    DIR -->|ok| NSU["por NSU:\nMAX(valor_venda) 1×\n(não soma parcelas)"]
+    NSU --> GRP["grupo:\ndata_venda + direção + filial_id\nΣ valor_venda dos NSUs"]
+    GRP --> MATCH["casa oferta:\nentrada + ILIKE %cart%\nnao_conciliado\nvalor ±0,01\ndata_vencimento ±1d\ndireção da forma bate"]
+    MATCH --> OUT["candidato\nscore 1.0 ou 0.85\n+ recebivel_ids[]"]
+    HFA["has_filial_access\nintegração + recebível + oferta"] -.-> CSV
+    HFA -.-> MATCH
+```
+
 ## Competência de grupo em lançamentos parcelados — D10 (jul/2026)
 
 Ver §9.19 do `arquitetura-financeiro.md`. Fecha o cenário B ("Despesa

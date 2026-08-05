@@ -5392,6 +5392,42 @@ audit_logs` gravando a filial do ATOR (não do recurso).
 Com esta fase, todo o backlog de §11 (7 RPCs + RLS de `extratos_
 bancarios` + `fin_confirmar_conciliacao`) está corrigido.
 
+### 9.88 Fase 1 — Conciliação Cartão Getnet: Hop 2 candidatos
+(Oferta ↔ Venda, só leitura)
+
+Primeira fatia de backend do plano Conciliação Cartão Getnet (Fase 0 =
+UI do card de conferência, §9.87 / PR #76). Migration
+`20260805100000_fin_candidatos_oferta_venda_getnet.sql`:
+
+1. **`getnet_recebivel_lancamentos.transacao_financeira_id`** (FK
+   `ON DELETE SET NULL`) — coluna de vínculo Hop 2; writer é a Fase 2.
+   Esta fase só filtra `IS NULL`.
+2. Índice `(integracao_id, data_venda)`.
+3. **`fin_gerar_candidatos_oferta_venda_getnet`** (`STABLE` +
+   `SECURITY DEFINER`) — NÃO reaproveita `fin_gerar_candidatos_conciliacao`
+   (hardcoded pra extrato×transação).
+
+**Regras fechadas com CSV real do portal** (ago/2025 + set–nov/2025):
+- `valor_venda` **repete o bruto** em cada parcela do mesmo NSU (`1 de 7`
+  e `2 de 7` ambos com 1.441,66) → por NSU usa `MAX(valor_venda)` uma
+  vez, nunca soma as linhas.
+- `bandeira_modalidade` é texto (`Mastercard Crédito`, `Visa Débito`,
+  `Elo Débito`) → direção via regex `cr[eé]dito` / `d[eé]bito`.
+- Agrupa por `data_venda` + direção + `filial_id`; casa contra oferta
+  (`tipo=entrada`, `ILIKE '%cart%'`, `nao_conciliado`) com
+  `data_vencimento` ±1 dia e valor ±R$0,01. Forma que declara crédito/
+  débito não mistura com o grupo oposto.
+- `has_filial_access` na integração, em cada recebível e em cada oferta;
+  `p_filial_id` opcional (UI "Todas" = NULL) com
+  `.or(filial, is.null)` implícito no filtro de escopo.
+
+Harness Postgres (`harness_v32`, 8 cenários): soma bate (parcelado 1×
+NSU), soma fora do corte, venda já vinculada não reaparece, direção não
+mistura, isolamento filial, cross-tenant, `recebivel_ids` das parcelas
+parciais na janela, admin vê todas. Wrapper TS:
+`gerarCandidatosOfertaVendaGetnet` em `getnetRecebivel.api.ts` (sem UI
+nesta fase — Fase 6).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

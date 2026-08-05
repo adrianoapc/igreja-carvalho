@@ -1,4 +1,5 @@
 import { callFinRpc, type FinResultado } from "./finRpc";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Wrapper da porta única de importação do Recebível Extrato Detalhado
@@ -100,4 +101,50 @@ export async function conferenciaTotaisGetnet(
     p_data_fim: dataFim,
   });
   return res as unknown as ConferenciaTotaisGetnet;
+}
+
+/** Candidato Hop 2 (Oferta ↔ Venda Getnet) — fin_gerar_candidatos_oferta_venda_getnet. */
+export interface CandidatoOfertaVendaGetnet {
+  data_venda: string;
+  /** `credito` | `debito` — derivado de bandeira_modalidade / lançamento. */
+  direcao: "credito" | "debito";
+  filial_id: string | null;
+  valor_bruto: number;
+  recebivel_ids: string[];
+  nsus: string[];
+  transacao_id: string;
+  score: number;
+  features: Record<string, unknown>;
+}
+
+export interface CandidatosOfertaVendaGetnetParams {
+  integracaoId: string;
+  periodoInicio: string;
+  periodoFim: string;
+  /** `null`/omitido = todas as filiais no teto do usuário. */
+  filialId?: string | null;
+}
+
+/**
+ * → fin_gerar_candidatos_oferta_venda_getnet (Fase 1, só leitura).
+ * Agrupa recebíveis por data_venda+direção+filial (valor_venda 1× por NSU —
+ * CSV do portal repete o bruto em cada parcela) e casa contra ofertas cartão
+ * nao_conciliadas. Sem UI nesta fase — wrapper pra harness/SQL e Fase 6.
+ */
+export async function gerarCandidatosOfertaVendaGetnet(
+  params: CandidatosOfertaVendaGetnetParams,
+): Promise<CandidatoOfertaVendaGetnet[]> {
+  // fin_* ainda não está nos tipos gerados; cast único, como em conciliacao.api.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)(
+    "fin_gerar_candidatos_oferta_venda_getnet",
+    {
+      p_integracao_id: params.integracaoId,
+      p_periodo_inicio: params.periodoInicio,
+      p_periodo_fim: params.periodoFim,
+      p_filial_id: params.filialId ?? null,
+    },
+  );
+  if (error) throw error;
+  return (data ?? []) as CandidatoOfertaVendaGetnet[];
 }
