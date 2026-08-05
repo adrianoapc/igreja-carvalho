@@ -5442,22 +5442,28 @@ p_contexto)`** (`SECURITY DEFINER`):
 2. **Guards**: oferta = `entrada` + `nao_conciliado` + tenant;
    `has_filial_access` na oferta e em cada recebível; recebíveis livres
    (`transacao_financeira_id IS NULL`); dedupe de ids.
-3. **À vista** (1 de 1 / vários NSUs à vista): bruto 1×/NSU deve bater
+3. **Filial mista** (guardrail #13 / §9.86): rejeita ≥2 filiais concretas
+   distintas entre oferta + recebíveis sem âncora compartilhada
+   (`filial_id IS NULL`). `has_filial_access` sozinho não basta — admin
+   com multi-filial poderia cruzar A↔B fora do que a Fase 1 propõe.
+4. **À vista** (1 de 1 / vários NSUs à vista): bruto 1×/NSU deve bater
    com `oferta.valor` ±0,01; Σ taxas/líquido das linhas; link todos →
    oferta; `fin_atualizar_lancamento` (taxas/líquido/`data_pagamento`/
    `status=pago`); `conciliacao_status='conciliado_manual'`.
-4. **Fase 2b parcelado** (um NSU, N>1): exige conjunto completo `1..N`
+5. **Fase 2b parcelado** (um NSU, N>1): exige conjunto completo `1..N`
    (parcial → `FIN_VALIDACAO`). Oferta vira parcela 1/N (preserva id/
    `sessao_id`); INSERT irmãs 2..N com `lancamento_pai_id` +
-   `conciliado_manual`; link 1:1 linha CSV → parcela. Não usa
-   `fin_confirmar_conciliacao` (esse caminho é extrato →
+   `conciliado_manual`; fallback de valor alinhado à parcela 1
+   (`valor_parcela` → `valor_venda`); link 1:1 linha CSV → parcela. Não
+   usa `fin_confirmar_conciliacao` (esse caminho é extrato →
    `conciliado_extrato`).
-5. **Auditoria**: `fin_registrar_auditoria` com
+6. **Auditoria**: `fin_registrar_auditoria` com
    `tipo_match=oferta_venda_getnet`.
 
-Harness Postgres (`harness_v33`, 8 cenários): à vista OK; bruto diverge;
+Harness Postgres (`harness_v33`, 10 cenários): à vista OK; bruto diverge;
 já vinculado; parcial parcelado rejeita; 3/3 parcelado cria irmãs;
-cross-tenant; filial sem acesso; concorrência (2ª sessão vê ocupado).
+cross-tenant; filial sem acesso; filial mista (admin multi-filial)
+rejeita; âncora compartilhada permite; auditoria.
 Wrapper TS: `vincularVendaGetnetOferta` em `getnetRecebivel.api.ts`
 (sem UI — Fase 6).
 

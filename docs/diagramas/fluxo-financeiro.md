@@ -791,7 +791,7 @@ Writer: grava `transacao_financeira_id`, atualiza oferta, marca
 flowchart TD
     IN["fin_vincular_venda_getnet_oferta\np_transacao_id + p_recebivel_ids"]
     IN --> CTX["fin_resolver_contexto\n+ FOR NO KEY UPDATE ORDER BY id"]
-    CTX --> G["guards:\nentrada · nao_conciliado\nhas_filial_access\nrecebível livre"]
+    CTX --> G["guards:\nentrada · nao_conciliado\nhas_filial_access\nrecebível livre\nfilial mista só c/ âncora"]
     G --> P{"mesmo NSU com N>1?"}
     P -->|não · à vista| AV["bruto 1×/NSU ≈ oferta ±0,01\nΣ taxas/líquido das linhas\nlink todos → oferta\nfin_atualizar_lancamento\n(taxas · líquido · data · pago)"]
     P -->|sim · 2b| COMP{"conjunto 1..N\ncompleto?"}

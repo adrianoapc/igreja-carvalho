@@ -53,6 +53,8 @@ DECLARE
   v_filhas uuid[] := '{}';
   v_desc_base text;
   v_competencia date;
+  v_filiais_distintas uuid[] := '{}';
+  v_tem_filial_compartilhada boolean := false;
 BEGIN
   IF p_transacao_id IS NULL THEN
     RAISE EXCEPTION 'FIN_VALIDACAO: p_transacao_id é obrigatório';
@@ -97,6 +99,13 @@ BEGIN
     RAISE EXCEPTION 'FIN_VALIDACAO: lançamento já conciliado (% )', v_trx.conciliacao_status;
   END IF;
 
+  -- Âncora de filial: oferta entra no conjunto (guardrail #13 / §9.86).
+  IF v_trx.filial_id IS NULL THEN
+    v_tem_filial_compartilhada := true;
+  ELSE
+    v_filiais_distintas := ARRAY[v_trx.filial_id];
+  END IF;
+
   -- Trava recebíveis.
   PERFORM 1
     FROM public.getnet_recebivel_lancamentos g
@@ -124,6 +133,11 @@ BEGIN
     IF NOT public.has_filial_access(v_igreja, v_rec.filial_id) THEN
       RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial do recebível %', v_rec.id;
     END IF;
+    IF v_rec.filial_id IS NULL THEN
+      v_tem_filial_compartilhada := true;
+    ELSIF NOT (v_rec.filial_id = ANY (v_filiais_distintas)) THEN
+      v_filiais_distintas := v_filiais_distintas || v_rec.filial_id;
+    END IF;
     IF v_rec.transacao_financeira_id IS NOT NULL THEN
       RAISE EXCEPTION 'FIN_VALIDACAO: recebível % já vinculado a %',
         v_rec.id, v_rec.transacao_financeira_id;
@@ -133,6 +147,13 @@ BEGIN
         v_rec.id;
     END IF;
   END LOOP;
+
+  -- Filial mista: rejeita ≥2 filiais concretas sem âncora compartilhada
+  -- (filial_id IS NULL). Mesma regra de fin_confirmar_conciliacao (§9.86).
+  IF coalesce(array_length(v_filiais_distintas, 1), 0) > 1
+     AND NOT v_tem_filial_compartilhada THEN
+    RAISE EXCEPTION 'FIN_VALIDACAO: oferta e recebíveis de filiais diferentes não podem ser vinculados juntos';
+  END IF;
 
   -- Detecta parcelado: um único NSU com total N>1 e rótulos "k de N".
   SELECT count(DISTINCT g.nsu) INTO v_nsu_count
@@ -253,8 +274,9 @@ BEGIN
        ORDER BY (regexp_match(COALESCE(g.parcelas, '1 de 1'), '(\d+)\s+de\s+(\d+)'))[1]::int, g.id
     LOOP
       v_taxas := abs(COALESCE(v_linha.descontos, 0));
+      -- Mesmo fallback da parcela 1: valor_parcela → valor_venda (nunca 0).
       v_liquido := COALESCE(v_linha.valor_liquido_parcela,
-                            COALESCE(v_linha.valor_parcela, 0) - v_taxas);
+                            COALESCE(v_linha.valor_parcela, v_linha.valor_venda) - v_taxas);
 
       INSERT INTO public.transacoes_financeiras (
         tipo, tipo_lancamento, descricao, valor, valor_liquido,
@@ -270,7 +292,7 @@ BEGIN
       ) VALUES (
         v_trx.tipo, 'parcelado',
         v_desc_base || format(' (%s/%s)', v_linha.num_parc, v_total_parcelas),
-        COALESCE(v_linha.valor_parcela, 0),
+        COALESCE(v_linha.valor_parcela, v_linha.valor_venda),
         v_liquido,
         v_linha.data_vencimento,
         v_competencia,
@@ -381,7 +403,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.fin_vincular_venda_getnet_oferta(uuid, uuid[], jsonb) IS
-  'Fase 2 Conciliação Cartão Getnet (Hop 2): vincula recebíveis à oferta, atualiza taxa/líquido/pagamento via fin_atualizar_lancamento, marca conciliado_manual. Fase 2b: NSU com N>1 parcelas (conjunto completo) converte a oferta em parcela 1/N e cria irmãs 2..N. has_filial_access na oferta e em cada recebível.';
+  'Fase 2 Conciliação Cartão Getnet (Hop 2): vincula recebíveis à oferta, atualiza taxa/líquido/pagamento via fin_atualizar_lancamento, marca conciliado_manual. Fase 2b: NSU com N>1 parcelas (conjunto completo) converte a oferta em parcela 1/N e cria irmãs 2..N. has_filial_access na oferta e em cada recebível; filial mista só com âncora compartilhada (guardrail #13).';
 
 GRANT EXECUTE ON FUNCTION public.fin_vincular_venda_getnet_oferta(uuid, uuid[], jsonb)
   TO authenticated, service_role;
