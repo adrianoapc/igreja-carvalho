@@ -5502,6 +5502,30 @@ contrária no lote). Wrappers TS:
 `gerarCandidatosVendaBancoGetnet` / `vincularVendaBancoGetnet` (sem UI —
 Fase 6).
 
+### 9.91 Fase 4 — Conciliação Cartão Getnet: `fin_conferencia_totais_getnet`
+de verdade
+
+Migration `20260805140000_fin_conferencia_totais_getnet_hop1.sql`.
+Reescreve o cálculo de `banco_creditado` (causa do alarme falso −R$23k /
+Fase 0 §9.87):
+
+- **Antes**: Σ todo crédito da conta no período (Pix/depósito inclusos).
+- **Agora**: Σ créditos com vínculo Getnet real — Hop 1
+  (`getnet_recebivel_lancamentos.extrato_bancario_id`) **ou** lote de
+  antecipação (`getnet_antecipacao_lotes.extrato_bancario_id`). Nunca
+  filtra por `extratos_bancarios.origem` (EDI tipo 5 pode espelhar).
+- N recebíveis → mesmo extrato contam 1× o valor do crédito.
+- Devolve também `liquido_vinculado` (Σ líquido Hop 1 no período, por
+  `data_vencimento` do recebível — não da oferta).
+- Lado Oferta (`oferta_bruto` / MDR / deságio / `esperado_banco`)
+  inalterado; `diferenca_nao_explicada = esperado − banco_creditado`.
+
+UI: `ConferenciaTotaisGetnetCard` reativa Σ Banco creditado (Getnet
+vinculado) + Diferença não explicada (bloco removido na Fase 0).
+
+Harness Postgres (`harness_v36`, 6 cenários): Pix excluído; lote entra;
+sem vínculo → banco 0; HFA; N→1 sem double-count; origem irrelevante.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

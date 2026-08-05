@@ -16,7 +16,9 @@ import { useHideValues } from "@/hooks/useHideValues";
 import { useFilialId } from "@/hooks/useFilialId";
 import { getPeriodoRange } from "@/features/financeiro/core/lib/periodo";
 import { conferenciaTotaisGetnet } from "@/features/financeiro/core/api/getnetRecebivel.api";
-import { Scale } from "lucide-react";
+import { Scale, AlertTriangle, CheckCircle2 } from "lucide-react";
+
+const CENTAVOS_TOLERANCIA = 0.01;
 
 export function ConferenciaTotaisGetnetCard() {
   const { formatValue } = useHideValues();
@@ -25,10 +27,8 @@ export function ConferenciaTotaisGetnetCard() {
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
 
-  // fin_conferencia_totais_getnet só valida igreja_id, não filial — trocar
-  // de igreja/filial com o card montado sem limpar contaId faria continuar
-  // mostrando os totais da conta antiga (de outra filial) em silêncio, já
-  // que o RPC nem rejeitaria a chamada (achado do /code-review).
+  // Trocar de igreja/filial com o card montado sem limpar contaId faria
+  // continuar mostrando totais da conta antiga em silêncio.
   useEffect(() => {
     setContaId("");
   }, [igrejaId, filialId, isAllFiliais]);
@@ -40,9 +40,7 @@ export function ConferenciaTotaisGetnetCard() {
     queryFn: async () => {
       if (!igrejaId) return [];
       let query = supabase.from("contas").select("id, nome").eq("ativo", true).eq("igreja_id", igrejaId).order("nome");
-      // Conta compartilhada (filial_id NULL) é visível em qualquer filial
-      // (mesma convenção de RLS de sempre) e fin_conferencia_totais_getnet
-      // não restringe por filial — eq() sozinho excluiria as compartilhadas.
+      // Conta compartilhada (filial_id NULL) é visível em qualquer filial.
       if (!isAllFiliais && filialId) query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
       const { data, error } = await query;
       if (error) throw error;
@@ -57,6 +55,9 @@ export function ConferenciaTotaisGetnetCard() {
     enabled: !!contaId,
   });
 
+  const diferenca = totais?.diferenca_nao_explicada ?? 0;
+  const bate = Math.abs(diferenca) <= CENTAVOS_TOLERANCIA;
+
   return (
     <Card>
       <CardHeader>
@@ -67,12 +68,11 @@ export function ConferenciaTotaisGetnetCard() {
       <CardContent className="space-y-4">
         <Alert>
           <AlertDescription className="text-xs">
-            Somatório do lado da Oferta (cartão): bruto − MDR − deságio já
-            lançado = esperado no banco. A comparação linha a linha com os
-            créditos reais do extrato chega nas próximas fases da Conciliação
-            Cartão Getnet — até lá, o card não mostra “diferença não
-            explicada” (o número antigo somava todo crédito da conta, Pix e
-            depósitos inclusos, e assustava sem significado).
+            Oferta (cartão) bruto − MDR − deságio = esperado no banco, comparado
+            só aos créditos com vínculo Getnet (Hop 1 ou lote de antecipação) —
+            não soma Pix/depósito. Diferença ≠ 0 pode significar venda ainda
+            sem Hop 1, lote sem vínculo ou erro de digitação; não decide
+            sozinho, só torna visível.
           </AlertDescription>
         </Alert>
 
@@ -122,10 +122,21 @@ export function ConferenciaTotaisGetnetCard() {
               <span>= Esperado no banco</span>
               <span>{formatValue(totais.esperado_banco)}</span>
             </div>
-            <p className="text-xs text-muted-foreground border-t pt-2">
-              Comparação com créditos do extrato (linha a linha, só Getnet)
-              chega nas fases seguintes da Conciliação Cartão.
-            </p>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Σ Banco creditado (Getnet vinculado)</span>
+              <span>{formatValue(totais.banco_creditado)}</span>
+            </div>
+            <div
+              className={`flex justify-between items-center font-bold border-t pt-2 ${
+                bate ? "text-green-600" : "text-destructive"
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                {bate ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+                Diferença não explicada
+              </span>
+              <span>{formatValue(diferenca)}</span>
+            </div>
           </div>
         ) : null}
       </CardContent>
