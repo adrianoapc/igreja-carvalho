@@ -1,22 +1,12 @@
 flowchart TD
-    EDIT["fin_atualizar_lancamento\np_patch com data_competencia"]
-    CHECK{"tipo_lancamento='parcelado'\ne tem irmãs (lancamento_pai_id\nou total_parcelas>1)?"}
-    EDIT --> CHECK
-    CHECK -->|não| APLICA["aplica normalmente\n(inclui recorrente — competência\nprópria por ocorrência)"]
-    CHECK -->|"sim, sem _permitir_divergencia_competencia"| BLOQ["rejeita:\nFIN_COMPETENCIA_GRUPO"]
-    CHECK -->|"sim, com _permitir_divergencia_competencia=true"| ESCAPE["aplica só nesta parcela\n(exceção pontual, não exposta na UI)"]
-
-    BLOQ --> UI["TransacaoDialog.tsx\ncatch detecta o erro nomeado"]
-    UI --> CONFIRMA["AlertDialog:\nsincronizar competência do grupo?"]
-    CONFIRMA -->|confirma| SYNC["fin_alterar_competencia_grupo\np_lancamento_id, p_nova_competencia"]
-
-    SYNC --> CONCILIADA{"alguma parcela do grupo\njá conciliada?"}
-    CONCILIADA -->|sim| REJ["rejeita: FIN_CONCILIADO\n(lista os ids)"]
-    CONCILIADA -->|não| UPDATE["UPDATE em todas as parcelas\n(id=pai OU lancamento_pai_id=pai)\nnuma única transação"]
-    UPDATE --> WARN{"alguma parcela\njá paga?"}
-    WARN -->|sim| AVISO["warning: revisar DRE por\ncompetência do período afetado"]
-    WARN -->|não| OK["ok"]
-
-    RECLASS["reclass-transacoes\n(lote)"] -->|"data_competencia\nem updateFields"| GRUPO{"todas as parcelas\nirmãs estão na seleção?"}
-    GRUPO -->|não| REJ2["409 GRUPO_PARCELADO_INCOMPLETO\n(lista ids_irmas_faltantes)"]
-    GRUPO -->|sim| APLICA2["aplica no lote normalmente"]
+    IN["fin_vincular_venda_getnet_oferta\np_transacao_id + p_recebivel_ids"]
+    IN --> CTX["fin_resolver_contexto\n+ FOR NO KEY UPDATE ORDER BY id"]
+    CTX --> G["guards:\nentrada · nao_conciliado\nhas_filial_access\nrecebível livre\nfilial mista só c/ âncora"]
+    G --> P{"mesmo NSU com N>1?"}
+    P -->|não · à vista| AV["bruto 1×/NSU ≈ oferta ±0,01\nΣ taxas/líquido das linhas\nlink todos → oferta\nfin_atualizar_lancamento\n(taxas · líquido · data · pago)"]
+    P -->|sim · 2b| COMP{"conjunto 1..N\ncompleto?"}
+    COMP -->|não| REJ["FIN_VALIDACAO"]
+    COMP -->|sim| PAR["oferta → parcela 1/N\nINSERT irmãs 2..N\n(lancamento_pai_id)\nlink 1:1 CSV→parcela"]
+    AV --> CM["conciliacao_status =\nconciliado_manual"]
+    PAR --> CM
+    CM --> AUD["fin_registrar_auditoria\ntipo_match=oferta_venda_getnet"]
