@@ -20,18 +20,61 @@ import { Scale, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 const CENTAVOS_TOLERANCIA = 0.01;
 
-export function ConferenciaTotaisGetnetCard() {
+export interface ConferenciaTotaisGetnetCardProps {
+  /** Conta controlada pelo pai (Fase 6 — filtros compartilhados). */
+  contaId?: string;
+  onContaIdChange?: (id: string) => void;
+  selectedMonth?: Date;
+  onSelectedMonthChange?: (month: Date) => void;
+  customRange?: { from: Date; to: Date } | null;
+  onCustomRangeChange?: (range: { from: Date; to: Date } | null) => void;
+  /** Esconde o seletor interno quando o pai já mostra os filtros. */
+  hideFilters?: boolean;
+}
+
+export function ConferenciaTotaisGetnetCard({
+  contaId: contaIdProp,
+  onContaIdChange,
+  selectedMonth: selectedMonthProp,
+  onSelectedMonthChange,
+  customRange: customRangeProp,
+  onCustomRangeChange,
+  hideFilters = false,
+}: ConferenciaTotaisGetnetCardProps = {}) {
   const { formatValue } = useHideValues();
   const { igrejaId, filialId, isAllFiliais } = useFilialId();
-  const [contaId, setContaId] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
-  const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
+  const [contaIdInterno, setContaIdInterno] = useState("");
+  const [selectedMonthInterno, setSelectedMonthInterno] = useState<Date>(new Date());
+  const [customRangeInterno, setCustomRangeInterno] = useState<{
+    from: Date;
+    to: Date;
+  } | null>(null);
+
+  const controlled = onContaIdChange != null;
+  const contaId = controlled ? (contaIdProp ?? "") : contaIdInterno;
+  const setContaId = controlled ? onContaIdChange! : setContaIdInterno;
+
+  const monthControlled = onSelectedMonthChange != null;
+  const selectedMonth = monthControlled
+    ? (selectedMonthProp ?? new Date())
+    : selectedMonthInterno;
+  const setSelectedMonth = monthControlled
+    ? onSelectedMonthChange!
+    : setSelectedMonthInterno;
+
+  const rangeControlled = onCustomRangeChange != null;
+  const customRange = rangeControlled
+    ? (customRangeProp ?? null)
+    : customRangeInterno;
+  const setCustomRange = rangeControlled
+    ? onCustomRangeChange!
+    : setCustomRangeInterno;
 
   // Trocar de igreja/filial com o card montado sem limpar contaId faria
   // continuar mostrando totais da conta antiga em silêncio.
   useEffect(() => {
-    setContaId("");
-  }, [igrejaId, filialId, isAllFiliais]);
+    if (!controlled) setContaIdInterno("");
+  }, [igrejaId, filialId, isAllFiliais, controlled]);
 
   const periodo = getPeriodoRange(selectedMonth, customRange);
 
@@ -46,7 +89,7 @@ export function ConferenciaTotaisGetnetCard() {
       if (error) throw error;
       return data;
     },
-    enabled: !!igrejaId,
+    enabled: !!igrejaId && !hideFilters,
   });
 
   const { data: totais, isLoading } = useQuery({
@@ -76,29 +119,31 @@ export function ConferenciaTotaisGetnetCard() {
           </AlertDescription>
         </Alert>
 
-        <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Conta</Label>
-            <Select value={contaId} onValueChange={setContaId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a conta" />
-              </SelectTrigger>
-              <SelectContent>
-                {contas.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {!hideFilters && (
+          <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Conta</Label>
+              <Select value={contaId} onValueChange={setContaId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {contas.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <MonthPicker
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+              customRange={customRange}
+              onCustomRangeChange={setCustomRange}
+            />
           </div>
-          <MonthPicker
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-            customRange={customRange}
-            onCustomRangeChange={setCustomRange}
-          />
-        </div>
+        )}
 
         {!contaId ? (
           <p className="text-sm text-muted-foreground">Selecione uma conta para ver a conferência.</p>
