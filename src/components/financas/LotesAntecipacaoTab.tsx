@@ -148,6 +148,10 @@ export function LotesAntecipacaoTab() {
           lote={loteVinculando}
           onVinculado={() => {
             refetch();
+            // Fase 4: banco_creditado passa a incluir o extrato do lote —
+            // sem invalidar, o card ficava stale até trocar conta/período
+            // (Bugbot / mesma classe do onLancado abaixo).
+            queryClient.invalidateQueries({ queryKey: ["conferencia-totais-getnet"] });
             setLoteVinculando(null);
           }}
         />

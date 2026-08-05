@@ -81,14 +81,18 @@ export interface ConferenciaTotaisGetnet {
   taxa_mdr: number;
   desagio_lancado: number;
   esperado_banco: number;
+  /** Σ créditos com vínculo Hop 1 ou lote de antecipação (não todo o extrato). */
   banco_creditado: number;
+  /** Σ líquido das linhas Hop 1 vinculadas no período (transparência). */
+  liquido_vinculado?: number;
   diferenca_nao_explicada: number;
 }
 
 /**
- * → fin_conferencia_totais_getnet. Só leitura — soma Oferta bruto (cartão) −
- * MDR − deságio lançado, compara contra o banco creditado no período. Não
- * decide a causa da diferença, só a torna visível.
+ * → fin_conferencia_totais_getnet (Fase 4). Só leitura — Oferta bruto −
+ * MDR − deságio = esperado; compara contra créditos com vínculo Getnet
+ * real (Hop 1 / lote), nunca todo crédito da conta. Não decide a causa
+ * da diferença, só a torna visível.
  */
 export async function conferenciaTotaisGetnet(
   contaId: string,
