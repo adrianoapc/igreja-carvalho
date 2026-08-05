@@ -64,13 +64,17 @@ BEGIN
      AND t.data_vencimento BETWEEN p_data_inicio AND p_data_fim
      AND COALESCE(fp.nome, t.forma_pagamento) ILIKE '%cart%';
 
+  -- Deságio pela conta do EXTRATO do lote (mesma fonte de banco_creditado),
+  -- não pela conta onde a despesa foi lançada — fin_lancar_desagio_antecipacao
+  -- aceita p_conta_id livre (conta de despesa ≠ conta que recebeu o crédito).
   SELECT COALESCE(SUM(tf.valor), 0)
     INTO v_desagio_lancado
     FROM public.getnet_antecipacao_lotes lote
     JOIN public.transacoes_financeiras tf ON tf.id = lote.lancamento_desagio_id
+    JOIN public.extratos_bancarios eb ON eb.id = lote.extrato_bancario_id
    WHERE lote.igreja_id = v_igreja
      AND lote.status = 'lancamento_criado'
-     AND tf.conta_id = p_conta_id
+     AND eb.conta_id = p_conta_id
      AND tf.data_vencimento BETWEEN p_data_inicio AND p_data_fim;
 
   -- Banco Getnet: join real (Hop 1 e/ou lote). DISTINCT por extrato —

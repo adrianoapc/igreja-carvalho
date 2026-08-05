@@ -5517,14 +5517,20 @@ Fase 0 §9.87):
 - N recebíveis → mesmo extrato contam 1× o valor do crédito.
 - Devolve também `liquido_vinculado` (Σ líquido Hop 1 no período, por
   `data_vencimento` do recebível — não da oferta).
-- Lado Oferta (`oferta_bruto` / MDR / deságio / `esperado_banco`)
-  inalterado; `diferenca_nao_explicada = esperado − banco_creditado`.
+- Lado Oferta (`oferta_bruto` / MDR) inalterado; `desagio_lancado` filtra
+  pela conta do **extrato** do lote (não pela conta da despesa — gap
+  pré-existente: deságio lançado em conta de despesas sumia do esperado
+  da conta que recebeu o crédito); `diferenca_nao_explicada = esperado −
+  banco_creditado`.
 
 UI: `ConferenciaTotaisGetnetCard` reativa Σ Banco creditado (Getnet
 vinculado) + Diferença não explicada (bloco removido na Fase 0).
+`LotesAntecipacaoTab` invalida a query também em `onVinculado` (não só
+em `onLancado`).
 
-Harness Postgres (`harness_v36`, 6 cenários): Pix excluído; lote entra;
-sem vínculo → banco 0; HFA; N→1 sem double-count; origem irrelevante.
+Harness Postgres (`harness_v36`, 7 cenários): Pix excluído; lote entra;
+sem vínculo → banco 0; HFA; N→1 sem double-count; origem irrelevante;
+deságio em conta de despesa diferente ainda conta na conta do extrato.
 
 ## 11. Riscos
 
