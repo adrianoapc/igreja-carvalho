@@ -90,7 +90,14 @@ export function Hop2OfertaVendaSection({ filters }: { filters: SharedFilters }) 
     filters.filialId,
   ] as const;
 
-  const { data: candidatos = [], isLoading, isFetching, refetch } = useQuery({
+  const {
+    data: candidatos = [],
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey,
     queryFn: () =>
       gerarCandidatosOfertaVendaGetnet({
@@ -108,13 +115,31 @@ export function Hop2OfertaVendaSection({ filters }: { filters: SharedFilters }) 
     return map;
   }, [candidatos]);
 
+  // Refetch pode esvaziar/alterar a lista — poda keys stale pra o botão
+  // Confirmar não ficar habilitado sem candidatos reais (Bugbot #82).
+  useEffect(() => {
+    setSelected((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const k of prev) {
+        if (byKey.has(k)) next.add(k);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [byKey]);
+
   const confirmar = useMutation({
     mutationFn: async (keys: string[]) => {
       let ok = 0;
       const erros: string[] = [];
+      let stale = 0;
       for (const key of keys) {
         const c = byKey.get(key);
-        if (!c) continue;
+        if (!c) {
+          stale += 1;
+          continue;
+        }
         try {
           const res = await vincularVendaGetnetOferta(c.transacao_id, c.recebivel_ids);
           ok += 1;
@@ -126,9 +151,9 @@ export function Hop2OfertaVendaSection({ filters }: { filters: SharedFilters }) 
           erros.push(msg);
         }
       }
-      return { ok, erros };
+      return { ok, erros, stale };
     },
-    onSuccess: ({ ok, erros }) => {
+    onSuccess: ({ ok, erros, stale }) => {
       if (ok > 0) {
         toast.success(
           ok === 1 ? "1 vínculo Hop 2 confirmado" : `${ok} vínculos Hop 2 confirmados`,
@@ -141,6 +166,13 @@ export function Hop2OfertaVendaSection({ filters }: { filters: SharedFilters }) 
             : `${erros.length} falhas — primeira: ${erros[0]}`,
         );
       }
+      if (ok === 0 && erros.length === 0) {
+        toast.error(
+          stale > 0
+            ? "Seleção desatualizada — atualize a lista e tente de novo"
+            : "Nenhum vínculo confirmado",
+        );
+      }
       setSelected(new Set());
       refetch();
       queryClient.invalidateQueries({ queryKey: ["conferencia-totais-getnet"] });
@@ -151,8 +183,12 @@ export function Hop2OfertaVendaSection({ filters }: { filters: SharedFilters }) 
     },
   });
 
-  const nSel = selected.size;
   const allKeys = candidatos.map(hop2Key);
+  const selectedValid = useMemo(
+    () => [...selected].filter((k) => byKey.has(k)),
+    [selected, byKey],
+  );
+  const nSel = selectedValid.length;
   const allSelected = allKeys.length > 0 && allKeys.every((k) => selected.has(k));
 
   if (!filters.integracaoId) {
@@ -172,13 +208,13 @@ export function Hop2OfertaVendaSection({ filters }: { filters: SharedFilters }) 
     <SectionShell
       title="Hop 2 — Oferta ↔ Venda Getnet"
       icon={<CreditCard className="w-4 h-4" />}
-      count={candidatos.length}
+      count={isError ? undefined : candidatos.length}
       actions={
         <>
           <Button
             size="sm"
             variant="outline"
-            disabled={candidatos.length === 0 || confirmar.isPending}
+            disabled={candidatos.length === 0 || confirmar.isPending || isError}
             onClick={() =>
               setSelected(allSelected ? new Set() : new Set(allKeys))
             }
@@ -187,8 +223,8 @@ export function Hop2OfertaVendaSection({ filters }: { filters: SharedFilters }) 
           </Button>
           <Button
             size="sm"
-            disabled={nSel === 0 || confirmar.isPending}
-            onClick={() => confirmar.mutate([...selected])}
+            disabled={nSel === 0 || confirmar.isPending || isError}
+            onClick={() => confirmar.mutate(selectedValid)}
           >
             {confirmar.isPending ? (
               <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
@@ -204,6 +240,11 @@ export function Hop2OfertaVendaSection({ filters }: { filters: SharedFilters }) 
         <div className="flex items-center justify-center p-8">
           <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
         </div>
+      ) : isError ? (
+        <p className="text-sm text-destructive px-3 py-4">
+          Não foi possível carregar sugestões
+          {error instanceof Error && error.message ? `: ${error.message}` : "."}
+        </p>
       ) : candidatos.length === 0 ? (
         <p className="text-sm text-muted-foreground px-3 py-4">
           Nenhuma sugestão pendente de Oferta ↔ Venda neste período.
@@ -286,7 +327,14 @@ export function Hop1VendaBancoSection({ filters }: { filters: SharedFilters }) {
     filters.filialId,
   ] as const;
 
-  const { data: candidatos = [], isLoading, isFetching, refetch } = useQuery({
+  const {
+    data: candidatos = [],
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey,
     queryFn: () =>
       gerarCandidatosVendaBancoGetnet({
@@ -305,13 +353,31 @@ export function Hop1VendaBancoSection({ filters }: { filters: SharedFilters }) {
     return map;
   }, [candidatos]);
 
+  // Refetch pode esvaziar/alterar a lista — poda keys stale pra o botão
+  // Confirmar não ficar habilitado sem candidatos reais (Bugbot #82).
+  useEffect(() => {
+    setSelected((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const k of prev) {
+        if (byKey.has(k)) next.add(k);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [byKey]);
+
   const confirmar = useMutation({
     mutationFn: async (keys: string[]) => {
       let ok = 0;
       const erros: string[] = [];
+      let stale = 0;
       for (const key of keys) {
         const c = byKey.get(key);
-        if (!c) continue;
+        if (!c) {
+          stale += 1;
+          continue;
+        }
         try {
           const res = await vincularVendaBancoGetnet(c.extrato_id, c.recebivel_ids);
           ok += 1;
@@ -323,9 +389,9 @@ export function Hop1VendaBancoSection({ filters }: { filters: SharedFilters }) {
           erros.push(msg);
         }
       }
-      return { ok, erros };
+      return { ok, erros, stale };
     },
-    onSuccess: ({ ok, erros }) => {
+    onSuccess: ({ ok, erros, stale }) => {
       if (ok > 0) {
         toast.success(
           ok === 1 ? "1 vínculo Hop 1 confirmado" : `${ok} vínculos Hop 1 confirmados`,
@@ -338,6 +404,13 @@ export function Hop1VendaBancoSection({ filters }: { filters: SharedFilters }) {
             : `${erros.length} falhas — primeira: ${erros[0]}`,
         );
       }
+      if (ok === 0 && erros.length === 0) {
+        toast.error(
+          stale > 0
+            ? "Seleção desatualizada — atualize a lista e tente de novo"
+            : "Nenhum vínculo confirmado",
+        );
+      }
       setSelected(new Set());
       refetch();
       queryClient.invalidateQueries({ queryKey: ["conferencia-totais-getnet"] });
@@ -347,8 +420,12 @@ export function Hop1VendaBancoSection({ filters }: { filters: SharedFilters }) {
     },
   });
 
-  const nSel = selected.size;
   const allKeys = candidatos.map(hop1Key);
+  const selectedValid = useMemo(
+    () => [...selected].filter((k) => byKey.has(k)),
+    [selected, byKey],
+  );
+  const nSel = selectedValid.length;
   const allSelected = allKeys.length > 0 && allKeys.every((k) => selected.has(k));
 
   if (!filters.integracaoId || !filters.contaId) {
@@ -368,13 +445,13 @@ export function Hop1VendaBancoSection({ filters }: { filters: SharedFilters }) {
     <SectionShell
       title="Hop 1 — Venda ↔ Banco (sem antecipação)"
       icon={<Landmark className="w-4 h-4" />}
-      count={candidatos.length}
+      count={isError ? undefined : candidatos.length}
       actions={
         <>
           <Button
             size="sm"
             variant="outline"
-            disabled={candidatos.length === 0 || confirmar.isPending}
+            disabled={candidatos.length === 0 || confirmar.isPending || isError}
             onClick={() =>
               setSelected(allSelected ? new Set() : new Set(allKeys))
             }
@@ -383,8 +460,8 @@ export function Hop1VendaBancoSection({ filters }: { filters: SharedFilters }) {
           </Button>
           <Button
             size="sm"
-            disabled={nSel === 0 || confirmar.isPending}
-            onClick={() => confirmar.mutate([...selected])}
+            disabled={nSel === 0 || confirmar.isPending || isError}
+            onClick={() => confirmar.mutate(selectedValid)}
           >
             {confirmar.isPending ? (
               <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
@@ -400,6 +477,11 @@ export function Hop1VendaBancoSection({ filters }: { filters: SharedFilters }) {
         <div className="flex items-center justify-center p-8">
           <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
         </div>
+      ) : isError ? (
+        <p className="text-sm text-destructive px-3 py-4">
+          Não foi possível carregar sugestões
+          {error instanceof Error && error.message ? `: ${error.message}` : "."}
+        </p>
       ) : candidatos.length === 0 ? (
         <p className="text-sm text-muted-foreground px-3 py-4">
           Nenhuma sugestão pendente de Venda ↔ Banco neste período.

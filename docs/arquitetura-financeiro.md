@@ -5570,18 +5570,23 @@ Cartão”** — em vez de criar aba nova.
 
 `LotesAntecipacaoTab.tsx` passa a ser a tela consolidada por período:
 
-1. **Filtros compartilhados**: integração Getnet ativa, conta (Hop 1 +
-   conferência) e `MonthPicker` (mês ou range). Filial do contexto
-   (`useFilialId`) é repassada às RPCs de candidatos; contas usam
-   `.or(filial_id.eq.X, filial_id.is.null)`.
+1. **Filtros compartilhados**: integração Getnet ativa (escopo de
+   filial via `.or(filial_id.eq.X, filial_id.is.null)` — RLS da tabela
+   é só tenant; sem isso o dropdown oferecia integração de outra
+   filial que o RPC rejeita), conta (Hop 1 + conferência) e
+   `MonthPicker` (mês ou range). Filial do contexto (`useFilialId`) é
+   repassada às RPCs de candidatos; contas usam o mesmo `.or`.
 2. **Hop 2 — Oferta ↔ Venda**: lista
    `fin_gerar_candidatos_oferta_venda_getnet`; checkbox + “Confirmar N
    selecionados” chama `fin_vincular_venda_getnet_oferta` em sequência
-   (sem auto-selecionar). Propaga `err.message` / `warnings[]`.
+   (sem auto-selecionar). Propaga `err.message` / `warnings[]`. Erro
+   do `useQuery` (ex.: `FIN_TENANT`) vira mensagem na seção — não
+   “nenhuma sugestão”. Seleção é podada quando a lista muda (evita
+   Confirmar habilitado com keys stale).
 3. **Hop 1 — Venda ↔ Banco (sem antecipação)**: lista
    `fin_gerar_candidatos_venda_banco_getnet` (exige conta + integração);
-   mesmo padrão de lote; `fin_vincular_venda_banco_getnet`. Destaca
-   `features.discrepancia`.
+   mesmo padrão de lote + surface de erro + poda de seleção;
+   `fin_vincular_venda_banco_getnet`. Destaca `features.discrepancia`.
 4. **Lotes de antecipação** (já existente): vínculo/deságio continuam por
    dialog (`VincularExtratoLoteDialog` / `LancarDesagioDialog`) — cada
    lote precisa da escolha explícita do crédito entre candidatos (Fase 5).

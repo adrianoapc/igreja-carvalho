@@ -89,15 +89,24 @@ export function LotesAntecipacaoTab() {
   const filialFiltro = !isAllFiliais && filialId ? filialId : null;
 
   const { data: integracoes = [] } = useQuery<IntegracaoOption[]>({
-    queryKey: ["integracoes-getnet-conciliacao-cartao", igrejaId],
+    // RLS de integracoes_financeiras é só tenant-scoped — o filtro de
+    // filial precisa ser client-side (mesma classe §9.65 / review #82).
+    queryKey: ["integracoes-getnet-conciliacao-cartao", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from("integracoes_financeiras")
         .select("id, cnpj")
         .eq("igreja_id", igrejaId)
         .eq("provedor", "getnet")
         .eq("status", "ativo");
+      // Integração compartilhada (filial_id NULL) é visível em qualquer filial.
+      // Sem .or(), tesoureiro de filial B selecionava integração da A e o RPC
+      // rejeitava com FIN_TENANT — UI mostrava "nenhuma sugestão" (review #82).
+      if (!isAllFiliais && filialId) {
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return (data || []).map((i) => ({ id: i.id, nome: `Getnet · ${i.cnpj}` }));
     },
@@ -106,6 +115,10 @@ export function LotesAntecipacaoTab() {
   });
 
   useEffect(() => {
+    if (integracaoId && integracoes.length > 0 && !integracoes.some((i) => i.id === integracaoId)) {
+      setIntegracaoId("");
+      return;
+    }
     if (!integracaoId && integracoes.length === 1) {
       setIntegracaoId(integracoes[0].id);
     }
@@ -132,6 +145,10 @@ export function LotesAntecipacaoTab() {
   });
 
   useEffect(() => {
+    if (contaId && contas.length > 0 && !contas.some((c) => c.id === contaId)) {
+      setContaId("");
+      return;
+    }
     if (!contaId && contas.length === 1) {
       setContaId(contas[0].id);
     }
