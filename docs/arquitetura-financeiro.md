@@ -5597,6 +5597,43 @@ Invalidação pós-confirmação: `conferencia-totais-getnet` e a query irmã
 de candidatos. Nenhuma escrita direta nas tabelas core — só wrappers
 `fin_*` das Fases 1–5.
 
+### 9.94 Fase 7a — RPCs de leitura do ledger unificado
+
+Migrations `20260806100000_fin_ledger_conciliacao_cartao.sql` +
+`20260806110000_fin_buscar_recebiveis_getnet_oferta.sql`. Só leitura
+(`STABLE` + `SECURITY DEFINER`); writers inalterados. UI do ledger =
+Fase 7b.
+
+**`fin_listar_ledger_conciliacao_cartao(p_integracao_id, p_conta_id,
+p_periodo_inicio, p_periodo_fim, p_contexto, p_filial_id)`** → jsonb
+`{resumo, lancamentos, lotes}`:
+
+- Grupo = raiz (`lancamento_pai_id IS NULL`) + filhas; ofertas
+  `ILIKE '%cart%'`, `conta_id = p_conta_id` (paridade com
+  `fin_conferencia_totais_getnet`).
+- Status de linha (≠ enum de lote): `sem_hop2` / `aguardando_banco` /
+  `fechado` / `divergencia`. Parcela: `hop1_status` ∈
+  `fechado`|`antecipada`|`aguardando` (antecipada = lote
+  vinculado/lançado; crédito no lote, sem exigir
+  `extrato_bancario_id` no recebível).
+- `fechado` só se `n_batidas = n_recebiveis >= n_membros` (Hop 2
+  incompleto não fecha).
+- Sugestão Hop 2: **1** call
+  `fin_gerar_candidatos_oferta_venda_getnet(..., v_ctx, v_scope)` +
+  `DISTINCT ON (transacao_id) ORDER BY score DESC`.
+- Escopo `integracao_id` em recebíveis/lotes/`vendas_origem`.
+- Extrato do lote e metadados de oferta em `vendas_origem` exigem
+  `has_filial_access` (não vazam via lote/recebível global).
+- Divergência: Σ `valor_liquido` tenant-wide por
+  `extrato_bancario_id` vs `extratos_bancarios.valor`, tol. R$0,01.
+- Lotes `pendente_vinculo` aparecem sem filtro de conta (ação Vincular).
+
+**`fin_buscar_recebiveis_getnet_oferta(p_transacao_id, p_integracao_id,
+p_contexto, p_busca, p_limite)`**: busca manual de recebíveis livres do
+EC; score 0..100 (40 direção + data/valor); direção da oferta via
+`LEFT JOIN formas_pagamento` + `COALESCE` com texto legado; guardrail
+#13 de filial mista. Confirmação = `fin_vincular_venda_getnet_oferta`.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

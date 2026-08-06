@@ -9,6 +9,9 @@
 -- p_busca/p_limite/teto sem dump de histórico. Confirmação continua manual
 -- via fin_vincular_venda_getnet_oferta (já existente, inalterado).
 --
+-- p_integracao_id: obrigatório — mesma regra do ledger / Hop 2 candidatos
+-- (igreja com 2 CNPJs Getnet não mistura NSUs de outro EC).
+--
 -- Score 0..100, mesma escala/corte 60/30 da família lote de antecipação
 -- (Fase 7b reaproveita o ScoreBadge unificado). Componente "categórico" (40
 -- pts) não pode ser literalmente o texto 'antecipa'/'getnet' do lote (não
@@ -17,10 +20,19 @@
 -- oferta, mesmo sinal categórico que fin_gerar_candidatos_oferta_venda_
 -- getnet já usa pra não misturar grupo de direção oposta. Date/valor mantêm
 -- os mesmos pesos/janelas (30/20/10 e 30/15).
+--
+-- Direção da oferta: COALESCE(fp.nome, t.forma_pagamento) via LEFT JOIN —
+-- ofertas só com rótulo texto (forma_pagamento_id NULL) ainda pontuam
+-- (review #83).
 -- ============================================================================
+
+-- Drop da assinatura do 1º commit da PR (sem p_integracao_id), se existir —
+-- CREATE OR REPLACE com args diferentes cria overload, não substitui.
+DROP FUNCTION IF EXISTS public.fin_buscar_recebiveis_getnet_oferta(uuid, jsonb, text, integer);
 
 CREATE OR REPLACE FUNCTION public.fin_buscar_recebiveis_getnet_oferta(
   p_transacao_id uuid,
+  p_integracao_id uuid,
   p_contexto jsonb DEFAULT NULL,
   p_busca text DEFAULT NULL,
   p_limite integer DEFAULT 100
@@ -43,6 +55,7 @@ DECLARE
   v_ctx jsonb;
   v_igreja uuid;
   v_trx public.transacoes_financeiras%ROWTYPE;
+  v_integracao record;
   v_direcao_oferta text;
   v_limite int;
   v_busca text;
@@ -50,10 +63,28 @@ BEGIN
   IF p_transacao_id IS NULL THEN
     RAISE EXCEPTION 'FIN_VALIDACAO: p_transacao_id é obrigatório';
   END IF;
+  IF p_integracao_id IS NULL THEN
+    RAISE EXCEPTION 'FIN_VALIDACAO: p_integracao_id é obrigatório';
+  END IF;
 
   v_ctx := public.fin_resolver_contexto(p_contexto, NULL);
   v_igreja := (v_ctx ->> 'igreja_id')::uuid;
   v_busca := NULLIF(btrim(COALESCE(p_busca, '')), '');
+
+  SELECT i.id, i.igreja_id, i.filial_id, i.provedor
+    INTO v_integracao
+    FROM public.integracoes_financeiras i
+   WHERE i.id = p_integracao_id;
+
+  IF v_integracao.id IS NULL OR v_integracao.igreja_id IS DISTINCT FROM v_igreja THEN
+    RAISE EXCEPTION 'FIN_FK: integração inexistente ou fora do tenant';
+  END IF;
+  IF v_integracao.provedor IS DISTINCT FROM 'getnet' THEN
+    RAISE EXCEPTION 'FIN_VALIDACAO: integração % não é do provedor getnet', p_integracao_id;
+  END IF;
+  IF NOT public.has_filial_access(v_igreja, v_integracao.filial_id) THEN
+    RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial da integração';
+  END IF;
 
   SELECT t.* INTO v_trx
     FROM public.transacoes_financeiras t
@@ -72,14 +103,16 @@ BEGIN
     RAISE EXCEPTION 'FIN_JA_LANCADO: lançamento já conciliado (%); não há recebíveis para buscar', v_trx.conciliacao_status;
   END IF;
 
+  -- LEFT JOIN + COALESCE: forma_pagamento_id NULL ainda usa o texto legado
+  -- (mesmo padrão de fin_gerar_candidatos_oferta_venda_getnet).
   SELECT CASE
            WHEN COALESCE(fp.nome, v_trx.forma_pagamento, '') ~* 'cr[eé]dito' THEN 'credito'
            WHEN COALESCE(fp.nome, v_trx.forma_pagamento, '') ~* 'd[eé]bito' THEN 'debito'
            ELSE NULL
          END
     INTO v_direcao_oferta
-    FROM public.formas_pagamento fp
-   WHERE fp.id = v_trx.forma_pagamento_id;
+    FROM (SELECT 1) AS _
+    LEFT JOIN public.formas_pagamento fp ON fp.id = v_trx.forma_pagamento_id;
 
   -- Sempre há âncora (data_vencimento/valor da oferta) — teto moderado,
   -- mesmo default/corte da busca textual do lote de antecipação.
@@ -107,6 +140,7 @@ BEGIN
       END AS direcao
     FROM public.getnet_recebivel_lancamentos g
    WHERE g.igreja_id = v_igreja
+     AND g.integracao_id = p_integracao_id
      AND g.transacao_financeira_id IS NULL
      AND g.nsu IS NOT NULL
      AND g.nsu <> ''
@@ -181,10 +215,10 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.fin_buscar_recebiveis_getnet_oferta(uuid, jsonb, text, integer) IS
-  'Fase 7a Conciliação Cartão Getnet (só leitura): busca manual de getnet_recebivel_lancamentos ainda livres (transacao_financeira_id IS NULL) pra vincular a uma oferta específica. Espelha fin_gerar_candidatos_lote_antecipacao_getnet (p_busca/p_limite, teto sem dump). Score 0..100: 40 direção crédito/débito bate + 30/20/10 proximidade de data + 30/15 proximidade de valor. Filial mista segue o guardrail #13 (recebível global ou da mesma filial da oferta). Confirmação continua via fin_vincular_venda_getnet_oferta.';
+COMMENT ON FUNCTION public.fin_buscar_recebiveis_getnet_oferta(uuid, uuid, jsonb, text, integer) IS
+  'Fase 7a Conciliação Cartão Getnet (só leitura): busca manual de getnet_recebivel_lancamentos ainda livres (transacao_financeira_id IS NULL) pra vincular a uma oferta específica, escopada por p_integracao_id. Espelha fin_gerar_candidatos_lote_antecipacao_getnet (p_busca/p_limite, teto sem dump). Score 0..100: 40 direção crédito/débito bate + 30/20/10 proximidade de data + 30/15 proximidade de valor. Direção da oferta via LEFT JOIN formas_pagamento + COALESCE com texto legado. Filial mista segue o guardrail #13. Confirmação continua via fin_vincular_venda_getnet_oferta.';
 
-GRANT EXECUTE ON FUNCTION public.fin_buscar_recebiveis_getnet_oferta(uuid, jsonb, text, integer)
+GRANT EXECUTE ON FUNCTION public.fin_buscar_recebiveis_getnet_oferta(uuid, uuid, jsonb, text, integer)
   TO authenticated, service_role;
-REVOKE ALL ON FUNCTION public.fin_buscar_recebiveis_getnet_oferta(uuid, jsonb, text, integer)
+REVOKE ALL ON FUNCTION public.fin_buscar_recebiveis_getnet_oferta(uuid, uuid, jsonb, text, integer)
   FROM anon;

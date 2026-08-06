@@ -26,6 +26,14 @@
 -- extrato" precisa enxergar, e LotesAntecipacaoTab hoje já lista sem escopo
 -- de conta pro mesmo caso).
 --
+-- Papel de p_integracao_id: escopo do EC Getnet. Recebíveis, lotes e
+-- vendas_origem filtram por integracao_id = p_integracao_id (mesma regra
+-- dos candidatos Hop 1/2) — igreja com 2 CNPJs não mistura cadeias.
+--
+-- Extrato do lote: LEFT JOIN extratos_bancarios só devolve
+-- credito_banco/data_liquidacao quando has_filial_access no extrato
+-- (lote global + extrato de outra filial não vaza valor — §9.78/§9.79).
+--
 -- Sugestões Hop 2: 1 chamada de fin_gerar_candidatos_oferta_venda_getnet por
 -- período inteiro (contexto repassado, nunca NULL), join único nos
 -- lançamentos sem_hop2 por transacao_id (DISTINCT ON transacao_id ORDER BY
@@ -43,6 +51,9 @@
 -- Double-count do CSV: valor_venda repete o bruto por parcela do mesmo NSU —
 -- nunca usado aqui. Parcelas/vendas_origem usam
 -- COALESCE(valor_liquido_parcela, valor_liquido, valor_parcela−descontos).
+--
+-- Status fechado: n_batidas = n_recebiveis AND n_recebiveis >= n_membros —
+-- evita marcar fechado com Hop 2 incompleto (parcelas-filhas sem recebível).
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.fin_listar_ledger_conciliacao_cartao(
@@ -183,6 +194,7 @@ BEGIN
     JOIN public.getnet_recebivel_lancamentos g
       ON g.transacao_financeira_id = m.trans_id
      AND g.igreja_id = v_igreja
+     AND g.integracao_id = p_integracao_id
      AND public.has_filial_access(v_igreja, g.filial_id)
   ),
   recebiveis_status AS (
@@ -194,15 +206,19 @@ BEGIN
          AND EXISTS (
                SELECT 1 FROM public.getnet_antecipacao_lotes l
                 WHERE l.igreja_id = v_igreja
+                  AND l.integracao_id = p_integracao_id
                   AND l.contrato_registradora = rg.contrato_registradora
                   AND l.status IN ('vinculado', 'lancamento_criado')
+                  AND public.has_filial_access(v_igreja, l.filial_id)
              ) THEN 'antecipada'
         ELSE 'aguardando'
       END AS hop1_status,
       (
         SELECT l.id FROM public.getnet_antecipacao_lotes l
          WHERE l.igreja_id = v_igreja
+           AND l.integracao_id = p_integracao_id
            AND l.contrato_registradora = rg.contrato_registradora
+           AND public.has_filial_access(v_igreja, l.filial_id)
       ) AS lote_id
     FROM recebiveis_grupo rg
   ),
@@ -280,7 +296,10 @@ BEGIN
       CASE
         WHEN COALESCE(gs.n_recebiveis, 0) = 0 THEN 'sem_hop2'
         WHEN r.id IN (SELECT grupo_id FROM divergencia_grupo) THEN 'divergencia'
-        WHEN gs.n_batidas = gs.n_recebiveis THEN 'fechado'
+        -- Exige cobrir todos os membros do grupo (raiz+filhas), não só os
+        -- recebíveis já linkados — Hop 2 incompleto não vira "fechado".
+        WHEN gs.n_batidas = gs.n_recebiveis
+         AND gs.n_recebiveis >= ga.n_membros THEN 'fechado'
         ELSE 'aguardando_banco'
       END AS status,
       COALESCE(pa.parcelas, '[]'::jsonb) AS parcelas,
@@ -326,6 +345,7 @@ BEGIN
     SELECT l.*
       FROM public.getnet_antecipacao_lotes l
      WHERE l.igreja_id = v_igreja
+       AND l.integracao_id = p_integracao_id
        AND public.has_filial_access(v_igreja, l.filial_id)
        AND (v_scope IS NULL OR l.filial_id IS NULL OR l.filial_id = v_scope)
        AND (
@@ -333,6 +353,7 @@ BEGIN
              OR EXISTS (
                   SELECT 1 FROM public.getnet_recebivel_lancamentos g
                    WHERE g.igreja_id = v_igreja
+                     AND g.integracao_id = p_integracao_id
                      AND g.contrato_registradora = l.contrato_registradora
                      AND g.data_venda BETWEEN p_periodo_inicio AND p_periodo_fim
                 )
@@ -372,15 +393,30 @@ BEGIN
             (regexp_match(COALESCE(g.parcelas, '1 de 1'), '(\d+)\s+de\s+(\d+)'))[2]::int,
             1
           ),
-          'oferta_lancamento_id', g.transacao_financeira_id,
-          'oferta_descricao', ot.descricao,
-          'oferta_data_vencimento', ot.data_vencimento
+          -- Sem HFA na oferta: nullar metadados (não vazar descrição/data
+          -- de filial inacessível via recebível global).
+          'oferta_lancamento_id', CASE
+            WHEN ot.id IS NULL THEN NULL
+            WHEN public.has_filial_access(v_igreja, ot.filial_id) THEN ot.id
+            ELSE NULL
+          END,
+          'oferta_descricao', CASE
+            WHEN ot.id IS NOT NULL AND public.has_filial_access(v_igreja, ot.filial_id)
+              THEN ot.descricao
+            ELSE NULL
+          END,
+          'oferta_data_vencimento', CASE
+            WHEN ot.id IS NOT NULL AND public.has_filial_access(v_igreja, ot.filial_id)
+              THEN ot.data_vencimento
+            ELSE NULL
+          END
         )
         ORDER BY g.data_venda, g.id
       ) AS vendas_origem
     FROM lotes_candidatos lc
     JOIN public.getnet_recebivel_lancamentos g
       ON g.igreja_id = v_igreja
+     AND g.integracao_id = p_integracao_id
      AND g.contrato_registradora = lc.contrato_registradora
      AND public.has_filial_access(v_igreja, g.filial_id)
     LEFT JOIN public.transacoes_financeiras ot ON ot.id = g.transacao_financeira_id
@@ -402,7 +438,11 @@ BEGIN
              ORDER BY lc.data_contratacao_contrato NULLS LAST, lc.id
            ) AS arr
       FROM lotes_candidatos lc
-      LEFT JOIN public.extratos_bancarios eb ON eb.id = lc.extrato_bancario_id
+      -- HFA no extrato: lote global + extrato de outra filial não vaza
+      -- credito_banco/data_liquidacao (review #83 / §9.78).
+      LEFT JOIN public.extratos_bancarios eb
+        ON eb.id = lc.extrato_bancario_id
+       AND public.has_filial_access(v_igreja, eb.filial_id)
       LEFT JOIN vendas_origem_agg voa ON voa.lote_id = lc.id
   )
   SELECT jsonb_build_object(
@@ -431,7 +471,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.fin_listar_ledger_conciliacao_cartao(uuid, uuid, date, date, jsonb, uuid) IS
-  'Fase 7a Conciliação Cartão Getnet (só leitura): monta o ledger unificado Oferta→Venda→Banco + lotes de antecipação por período. Status de linha (sem_hop2/aguardando_banco/fechado/divergencia) deliberadamente distinto do enum getnet_antecipacao_lotes.status. Sugestão Hop 2 via 1 chamada de fin_gerar_candidatos_oferta_venda_getnet por período (join único por transacao_id, DISTINCT ON score DESC). Divergência = Σ valor_liquido tenant-wide por extrato vs extratos_bancarios.valor, tolerância R$0,01. lancamentos escopados por transacoes_financeiras.conta_id = p_conta_id; lotes vinculados só entram se o extrato é da mesma conta, lotes pendente_vinculo aparecem sem escopo de conta. has_filial_access em integração, conta, p_filial_id, cada lançamento/recebível/lote/venda_origem.';
+  'Fase 7a Conciliação Cartão Getnet (só leitura): monta o ledger unificado Oferta→Venda→Banco + lotes de antecipação por período. Status de linha (sem_hop2/aguardando_banco/fechado/divergencia) deliberadamente distinto do enum getnet_antecipacao_lotes.status. Sugestão Hop 2 via 1 chamada de fin_gerar_candidatos_oferta_venda_getnet por período (join único por transacao_id, DISTINCT ON score DESC). Divergência = Σ valor_liquido tenant-wide por extrato vs extratos_bancarios.valor, tolerância R$0,01. lancamentos escopados por transacoes_financeiras.conta_id = p_conta_id; recebíveis/lotes/vendas_origem por integracao_id = p_integracao_id; lotes vinculados só entram se o extrato é da mesma conta, lotes pendente_vinculo aparecem sem escopo de conta. Extrato do lote e metadados de oferta em vendas_origem exigem has_filial_access. fechado exige n_batidas = n_recebiveis >= n_membros.';
 
 GRANT EXECUTE ON FUNCTION public.fin_listar_ledger_conciliacao_cartao(uuid, uuid, date, date, jsonb, uuid)
   TO authenticated, service_role;
