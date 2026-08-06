@@ -47,6 +47,11 @@
 -- agrupa por data_vencimento, não por lançamento; um crédito pode cobrir
 -- parcelas de mais de uma oferta do mesmo dia). Tolerância R$0,01
 -- (CENTAVOS_TOLERANCIA, mesma constante de ConferenciaTotaisGetnetCard.tsx).
+-- has_filial_access no extrato (eb) E em cada recebível somado (g2), mesmo
+-- padrão do LEFT JOIN de extrato em lotes_final: sem acesso à filial do
+-- extrato, a linha não pode virar "divergencia" nem a soma pode ser
+-- contaminada por um recebível de filial inacessível — vazaria o valor de
+-- outra filial via 1 bit correlacionado (review #83).
 --
 -- Double-count do CSV: valor_venda repete o bruto por parcela do mesmo NSU —
 -- nunca usado aqui. Parcelas/vendas_origem usam
@@ -231,11 +236,18 @@ BEGIN
     GROUP BY grupo_id
   ),
   -- ─── Divergência: soma TENANT-WIDE por extrato (Hop 1 agrupa por dia, não
-  -- por lançamento — um crédito pode cobrir parcelas de mais de uma oferta) ─
+  -- por lançamento — um crédito pode cobrir parcelas de mais de uma oferta).
+  -- HFA no extrato (mesmo padrão de lotes_final): oferta de filial A casada
+  -- com recebível global cujo extrato é de filial B não pode calcular
+  -- divergencia usando eb.valor de uma filial que o chamador não acessa —
+  -- vazaria 1 bit correlacionado com o valor daquele extrato (review #83).
+  -- Escopo de integracao_id no g2 pela mesma razão do resto do arquivo.
   divergencia_grupo AS (
     SELECT DISTINCT rs.grupo_id
     FROM recebiveis_status rs
-    JOIN public.extratos_bancarios eb ON eb.id = rs.extrato_bancario_id
+    JOIN public.extratos_bancarios eb
+      ON eb.id = rs.extrato_bancario_id
+     AND public.has_filial_access(v_igreja, eb.filial_id)
    WHERE rs.extrato_bancario_id IS NOT NULL
      AND abs(
            (
@@ -249,6 +261,8 @@ BEGIN
                FROM public.getnet_recebivel_lancamentos g2
               WHERE g2.extrato_bancario_id = rs.extrato_bancario_id
                 AND g2.igreja_id = v_igreja
+                AND g2.integracao_id = p_integracao_id
+                AND public.has_filial_access(v_igreja, g2.filial_id)
            ) - eb.valor
          ) > 0.01
   ),
@@ -471,7 +485,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.fin_listar_ledger_conciliacao_cartao(uuid, uuid, date, date, jsonb, uuid) IS
-  'Fase 7a Conciliação Cartão Getnet (só leitura): monta o ledger unificado Oferta→Venda→Banco + lotes de antecipação por período. Status de linha (sem_hop2/aguardando_banco/fechado/divergencia) deliberadamente distinto do enum getnet_antecipacao_lotes.status. Sugestão Hop 2 via 1 chamada de fin_gerar_candidatos_oferta_venda_getnet por período (join único por transacao_id, DISTINCT ON score DESC). Divergência = Σ valor_liquido tenant-wide por extrato vs extratos_bancarios.valor, tolerância R$0,01. lancamentos escopados por transacoes_financeiras.conta_id = p_conta_id; recebíveis/lotes/vendas_origem por integracao_id = p_integracao_id; lotes vinculados só entram se o extrato é da mesma conta, lotes pendente_vinculo aparecem sem escopo de conta. Extrato do lote e metadados de oferta em vendas_origem exigem has_filial_access. fechado exige n_batidas = n_recebiveis >= n_membros.';
+  'Fase 7a Conciliação Cartão Getnet (só leitura): monta o ledger unificado Oferta→Venda→Banco + lotes de antecipação por período. Status de linha (sem_hop2/aguardando_banco/fechado/divergencia) deliberadamente distinto do enum getnet_antecipacao_lotes.status. Sugestão Hop 2 via 1 chamada de fin_gerar_candidatos_oferta_venda_getnet por período (join único por transacao_id, DISTINCT ON score DESC). Divergência = Σ valor_liquido tenant-wide por extrato vs extratos_bancarios.valor, tolerância R$0,01, com has_filial_access no extrato (eb) e em cada recebível somado (g2) — sem acesso à filial do extrato a linha não pode virar divergencia nem a soma pode ser contaminada por recebível de filial inacessível (review #83). lancamentos escopados por transacoes_financeiras.conta_id = p_conta_id; recebíveis/lotes/vendas_origem por integracao_id = p_integracao_id; lotes vinculados só entram se o extrato é da mesma conta, lotes pendente_vinculo aparecem sem escopo de conta. Extrato do lote e metadados de oferta em vendas_origem exigem has_filial_access. fechado exige n_batidas = n_recebiveis >= n_membros.';
 
 GRANT EXECUTE ON FUNCTION public.fin_listar_ledger_conciliacao_cartao(uuid, uuid, date, date, jsonb, uuid)
   TO authenticated, service_role;
