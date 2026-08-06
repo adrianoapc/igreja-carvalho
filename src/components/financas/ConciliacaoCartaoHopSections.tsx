@@ -59,6 +59,17 @@ function toggleKey(set: Set<string>, key: string, checked: boolean): Set<string>
   return next;
 }
 
+/** Supabase/PostgREST rejeita com objeto `{ message }`, não `instanceof Error`. */
+function rpcErrorMessage(err: unknown): string | null {
+  if (err instanceof Error && err.message) return err.message;
+  if (err && typeof err === "object" && "message" in err) {
+    const msg = (err as { message: unknown }).message;
+    if (typeof msg === "string" && msg.trim()) return msg;
+  }
+  if (typeof err === "string" && err.trim()) return err;
+  return null;
+}
+
 interface SharedFilters {
   integracaoId: string;
   contaId: string;
@@ -147,7 +158,7 @@ export function Hop2OfertaVendaSection({ filters }: { filters: SharedFilters }) 
             toast.warning(res.warnings.join("; "));
           }
         } catch (err) {
-          const msg = err instanceof Error ? err.message : "Erro ao vincular oferta ↔ venda";
+          const msg = rpcErrorMessage(err) ?? "Erro ao vincular oferta ↔ venda";
           erros.push(msg);
         }
       }
@@ -179,7 +190,7 @@ export function Hop2OfertaVendaSection({ filters }: { filters: SharedFilters }) 
       queryClient.invalidateQueries({ queryKey: ["candidatos-venda-banco-getnet"] });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Erro ao confirmar Hop 2");
+      toast.error(rpcErrorMessage(err) ?? "Erro ao confirmar Hop 2");
     },
   });
 
@@ -190,6 +201,7 @@ export function Hop2OfertaVendaSection({ filters }: { filters: SharedFilters }) 
   );
   const nSel = selectedValid.length;
   const allSelected = allKeys.length > 0 && allKeys.every((k) => selected.has(k));
+  const queryErrorMsg = isError ? rpcErrorMessage(error) : null;
 
   if (!filters.integracaoId) {
     return (
@@ -243,7 +255,7 @@ export function Hop2OfertaVendaSection({ filters }: { filters: SharedFilters }) 
       ) : isError ? (
         <p className="text-sm text-destructive px-3 py-4">
           Não foi possível carregar sugestões
-          {error instanceof Error && error.message ? `: ${error.message}` : "."}
+          {queryErrorMsg ? `: ${queryErrorMsg}` : "."}
         </p>
       ) : candidatos.length === 0 ? (
         <p className="text-sm text-muted-foreground px-3 py-4">
@@ -385,7 +397,7 @@ export function Hop1VendaBancoSection({ filters }: { filters: SharedFilters }) {
             toast.warning(res.warnings.join("; "));
           }
         } catch (err) {
-          const msg = err instanceof Error ? err.message : "Erro ao vincular venda ↔ banco";
+          const msg = rpcErrorMessage(err) ?? "Erro ao vincular venda ↔ banco";
           erros.push(msg);
         }
       }
@@ -416,7 +428,7 @@ export function Hop1VendaBancoSection({ filters }: { filters: SharedFilters }) {
       queryClient.invalidateQueries({ queryKey: ["conferencia-totais-getnet"] });
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Erro ao confirmar Hop 1");
+      toast.error(rpcErrorMessage(err) ?? "Erro ao confirmar Hop 1");
     },
   });
 
@@ -480,7 +492,10 @@ export function Hop1VendaBancoSection({ filters }: { filters: SharedFilters }) {
       ) : isError ? (
         <p className="text-sm text-destructive px-3 py-4">
           Não foi possível carregar sugestões
-          {error instanceof Error && error.message ? `: ${error.message}` : "."}
+          {(() => {
+            const msg = rpcErrorMessage(error);
+            return msg ? `: ${msg}` : ".";
+          })()}
         </p>
       ) : candidatos.length === 0 ? (
         <p className="text-sm text-muted-foreground px-3 py-4">
