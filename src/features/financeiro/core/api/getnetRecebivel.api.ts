@@ -166,7 +166,7 @@ export interface CandidatosOfertaVendaGetnetParams {
  * → fin_gerar_candidatos_oferta_venda_getnet (Fase 1, só leitura).
  * Agrupa recebíveis por data_venda+direção+filial (valor_venda 1× por NSU —
  * CSV do portal repete o bruto em cada parcela) e casa contra ofertas cartão
- * nao_conciliadas. Sem UI nesta fase — wrapper pra harness/SQL e Fase 6.
+ * nao_conciliadas. UI: aba Conciliação Cartão (Fase 6).
  */
 export async function gerarCandidatosOfertaVendaGetnet(
   params: CandidatosOfertaVendaGetnetParams,
@@ -202,7 +202,7 @@ export interface VincularVendaGetnetOfertaResultado extends FinResultado {
  * Vincula recebíveis à oferta: grava transacao_financeira_id, atualiza
  * taxa/líquido/data/status via fin_atualizar_lancamento, marca
  * conciliado_manual. Fase 2b: NSU com N>1 (conjunto 1..N completo)
- * converte a oferta em 1/N e cria irmãs 2..N. Sem UI nesta fase — Fase 6.
+ * converte a oferta em 1/N e cria irmãs 2..N. UI: Conciliação Cartão (Fase 6).
  */
 export function vincularVendaGetnetOferta(
   transacaoId: string,
@@ -238,7 +238,7 @@ export interface CandidatosVendaBancoGetnetParams {
  * → fin_gerar_candidatos_venda_banco_getnet (Fase 3, só leitura).
  * Agrupa recebíveis sem antecipação (contrato_registradora IS NULL) por
  * data_vencimento+filial, soma líquido, casa contra créditos não
- * reconciliados da conta. Sem UI nesta fase — Fase 6.
+ * reconciliados da conta. UI: Conciliação Cartão (Fase 6).
  */
 export async function gerarCandidatosVendaBancoGetnet(
   params: CandidatosVendaBancoGetnetParams,
@@ -272,7 +272,7 @@ export interface VincularVendaBancoGetnetResultado extends FinResultado {
  * → fin_vincular_venda_banco_getnet (Fase 3).
  * Vincula recebíveis ao crédito bancário: grava extrato_bancario_id,
  * marca reconciliado=true. Discrepância de valor vira warning (não
- * bloqueia). Sem UI nesta fase — Fase 6.
+ * bloqueia). UI: Conciliação Cartão (Fase 6).
  */
 export function vincularVendaBancoGetnet(
   extratoBancarioId: string,

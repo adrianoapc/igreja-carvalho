@@ -63,7 +63,7 @@ export default function Reconciliacao() {
             Relatório
           </TabsTrigger>
           <TabsTrigger value="antecipacao" className="shrink-0 sm:shrink">
-            Lotes de Antecipação
+            Conciliação Cartão
           </TabsTrigger>
         </TabsList>
         <TabsContent value="dashboard">

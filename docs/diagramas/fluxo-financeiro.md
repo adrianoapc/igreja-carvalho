@@ -823,6 +823,28 @@ flowchart TD
     HFA -.-> MATCH
 ```
 
+## Fase 6 — UI consolidada Conciliação Cartão (§9.93)
+
+Sem migration. A aba “Lotes de Antecipação” vira “Conciliação Cartão”:
+filtros por período + 3 seções. Hop 1/2 confirmam em lote (checkbox);
+lotes de antecipação seguem dialog por item.
+
+```mermaid
+flowchart TD
+    TAB["Aba Conciliação Cartão\n(Reconciliacao · value=antecipacao)"]
+    TAB --> FILT["Filtros: integração · conta · período · filial contexto"]
+    FILT --> H2["Hop 2 candidatos\nfin_gerar_candidatos_oferta_venda_getnet"]
+    FILT --> H1["Hop 1 candidatos\nfin_gerar_candidatos_venda_banco_getnet"]
+    FILT --> LOTES["Lotes antecipação\n(tabela existente)"]
+    FILT --> CONF["ConferenciaTotaisGetnetCard\nfiltros controlados"]
+    H2 -->|"checkbox + confirmar N"| W2["fin_vincular_venda_getnet_oferta"]
+    H1 -->|"checkbox + confirmar N"| W1["fin_vincular_venda_banco_getnet"]
+    LOTES -->|"dialog por lote"| W3["fin_vincular_lote_antecipacao\n+ fin_lancar_desagio_antecipacao"]
+    W2 -.-> CONF
+    W1 -.-> CONF
+    W3 -.-> CONF
+```
+
 ## Competência de grupo em lançamentos parcelados — D10 (jul/2026)
 
 Ver §9.19 do `arquitetura-financeiro.md`. Fecha o cenário B ("Despesa

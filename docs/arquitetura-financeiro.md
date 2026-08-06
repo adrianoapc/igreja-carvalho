@@ -5562,6 +5562,41 @@ Wrapper TS: `gerarCandidatosLoteAntecipacaoGetnet`. Harness
 Pix score menor; cross-filial; sem âncora+busca; HFA no lote; extrato
 global fora quando lote tem filial.
 
+### 9.93 Fase 6 — UI consolidada “Conciliação Cartão”
+
+Sem migration. Evolui a aba já existente em Reconciliação Bancária
+(`value="antecipacao"`) — label **“Lotes de Antecipação” → “Conciliação
+Cartão”** — em vez de criar aba nova.
+
+`LotesAntecipacaoTab.tsx` passa a ser a tela consolidada por período:
+
+1. **Filtros compartilhados**: integração Getnet ativa (escopo de
+   filial via `.or(filial_id.eq.X, filial_id.is.null)` — RLS da tabela
+   é só tenant; sem isso o dropdown oferecia integração de outra
+   filial que o RPC rejeita), conta (Hop 1 + conferência) e
+   `MonthPicker` (mês ou range). Filial do contexto (`useFilialId`) é
+   repassada às RPCs de candidatos; contas usam o mesmo `.or`.
+2. **Hop 2 — Oferta ↔ Venda**: lista
+   `fin_gerar_candidatos_oferta_venda_getnet`; checkbox + “Confirmar N
+   selecionados” chama `fin_vincular_venda_getnet_oferta` em sequência
+   (sem auto-selecionar). Propaga `err.message` / `warnings[]`. Erro
+   do `useQuery` (ex.: `FIN_TENANT`) vira mensagem na seção — não
+   “nenhuma sugestão”. Seleção é podada quando a lista muda (evita
+   Confirmar habilitado com keys stale).
+3. **Hop 1 — Venda ↔ Banco (sem antecipação)**: lista
+   `fin_gerar_candidatos_venda_banco_getnet` (exige conta + integração);
+   mesmo padrão de lote + surface de erro + poda de seleção;
+   `fin_vincular_venda_banco_getnet`. Destaca `features.discrepancia`.
+4. **Lotes de antecipação** (já existente): vínculo/deságio continuam por
+   dialog (`VincularExtratoLoteDialog` / `LancarDesagioDialog`) — cada
+   lote precisa da escolha explícita do crédito entre candidatos (Fase 5).
+5. **`ConferenciaTotaisGetnetCard`**: aceita filtros controlados
+   (`hideFilters`) pra alinhar conta/período com as seções Hop.
+
+Invalidação pós-confirmação: `conferencia-totais-getnet` e a query irmã
+de candidatos. Nenhuma escrita direta nas tabelas core — só wrappers
+`fin_*` das Fases 1–5.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
