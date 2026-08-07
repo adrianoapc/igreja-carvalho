@@ -5636,7 +5636,62 @@ EC; score 0..100 (40 direção + data/valor); direção da oferta via
 `LEFT JOIN formas_pagamento` + `COALESCE` com texto legado; guardrail
 #13 de filial mista. Confirmação = `fin_vincular_venda_getnet_oferta`.
 
-### 9.95 Hotfix — drift `getnet_recebivel_lancamentos.parcelas` (text→integer)
+### 9.95 Fase 7b — UI do ledger unificado (Conciliação Cartão)
+
+Substitui as 3 seções empilhadas da Fase 6 (`Hop2OfertaVendaSection`,
+`Hop1VendaBancoSection`, tabela de lotes em `LotesAntecipacaoTab`) por
+`ConciliacaoCartaoLedger`, consumindo as RPCs de §9.94. Writers
+inalterados (`fin_vincular_venda_getnet_oferta`,
+`fin_vincular_venda_banco_getnet`, `fin_vincular_lote_antecipacao`,
+`fin_lancar_desagio_antecipacao`).
+
+**Componentes**
+
+- `ConciliacaoCartaoLedger.tsx` — tira de resumo (4 status), lançamentos
+  agrupados por dia, linha expansível Oferta→Venda→Banco (pilha de
+  parcelas + tag antecipada), seção de lotes com `vendas_origem`,
+  bulk-confirm só pra `sem_hop2` com sugestão, busca manual via
+  `fin_buscar_recebiveis_getnet_oferta`.
+- `BuscaManualDialog.tsx` — diálogo compartilhado (ledger Getnet,
+  `VincularExtratoLoteDialog`, `VincularTransacaoDialog`). Seleção por
+  grupo/NSU (conjunto 1..N). `serverSearch` (default) debounced 300ms;
+  `serverSearch={false}` + `matchesSearch` pra filtro local sem rede
+  (`VincularTransacaoDialog`).
+- `ScoreBadge.tsx` — thresholds sempre explícitos por call-site (Hop
+  1/2 = 85/50, lote/busca manual = 60/30, vínculo genérico = 80/50).
+
+**Hop 1 no ledger (sem seção própria)**
+
+Uma chamada `fin_gerar_candidatos_venda_banco_getnet` por período,
+casada na UI por `data_vencimento_real` + filial compartilhada. Parcelas
+com `lote_id` são ignoradas no rematch: `hop1_status` fica `aguardando`
+enquanto o lote está `pendente_vinculo`, mas a RPC Hop 1 exclui
+`contrato_registradora IS NOT NULL` — casar só por data ofereceria
+crédito de outras vendas do mesmo dia. Cada candidato (extrato ×
+data+filial) só aparece em **uma** linha; o botão deixa explícito que o
+vínculo é do bucket do dia (a RPC Hop 1 agrega recebíveis). Ledger ainda
+não expõe `recebivel_id` por parcela (RPC ordena por ele, mas não
+serializa).
+
+**Invalidação pós-vínculo**
+
+Além do refetch do ledger e de `conferencia-totais-getnet`, invalida
+`candidatos-venda-banco-getnet` (Hop 2 confirmado → novos candidatos
+Hop 1 no período; sem isso o botão só aparece após remount/focus —
+regressão vs Fase 6) e `getnet-antecipacao-lotes` (diálogos de lote).
+Enquanto `isFetching`/mutation pendente, confirmações ficam travadas
+(snapshot antigo ainda na tela). Refetch com erro mantém o cache e
+mostra banner com retry — não falha em silêncio. Lote sem dados ricos
+após o fetch distingue loading / erro / fora do filtro de filial (não
+fica eterno em “Carregando…”).
+
+**Paleta de status**
+
+Local ao componente: good/warning/serious/critical (skill dataviz),
+sempre ícone + rótulo + cor. O par âmbar/vermelho genérico do app não
+separava Divergência de Aguardando banco (ΔE &lt; 15).
+
+### 9.96 Hotfix — drift `getnet_recebivel_lancamentos.parcelas` (text→integer)
 
 Migration **nova** `20260807100000_fin_getnet_recebivel_parcelas_integer_drift.sql`
 (única forward desta PR). Em produção a coluna já era `integer`
@@ -5661,7 +5716,7 @@ novos). O hotfix concentra:
 4. `CREATE OR REPLACE` de `fin_importar_recebivel_getnet` — CSV "N de M"
    → `NULL` (só grava integer puro se o payload já vier normalizado).
 
-### 9.96 Fix — ledger da Fase 7a incluía lançamento fechado por outro canal como "sem_hop2"
+### 9.97 Fix — ledger da Fase 7a incluía lançamento fechado por outro canal como "sem_hop2"
 
 Migration **nova** `20260807120000_fin_ledger_exclui_conciliado_extrato.sql`
 (guardrail 6b — `fin_listar_ledger_conciliacao_cartao` já deployada desde
