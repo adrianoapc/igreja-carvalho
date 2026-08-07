@@ -23,7 +23,10 @@ import {
   listarLedgerConciliacaoCartao,
   buscarRecebiveisGetnetOferta,
   vincularVendaGetnetOferta,
+  gerarCandidatosVendaBancoGetnet,
+  vincularVendaBancoGetnet,
   type CandidatoBuscaRecebivelOferta,
+  type CandidatoVendaBancoGetnet,
   type LedgerCartaoLancamento,
   type LedgerCartaoLote,
 } from "@/features/financeiro/core/api/getnetRecebivel.api";
@@ -36,9 +39,11 @@ import { LancarDesagioDialog } from "@/components/financas/LancarDesagioDialog";
 // família "lote de antecipação" — mesmo corte 60/30 (não é Hop 1/2, que usa
 // 85/50 numa escala 0..1 tolerante).
 const BUSCA_MANUAL_THRESHOLDS = { alta: 60, media: 30 };
-// Sugestão embutida no ledger vem de fin_gerar_candidatos_oferta_venda_getnet
-// (família Hop 1/2, mesmo corte 85/50 que ConciliacaoCartaoHopSections usava).
-const SUGESTAO_HOP2_THRESHOLDS = { alta: 85, media: 50 };
+// Sugestões Hop 1 (fin_gerar_candidatos_venda_banco_getnet) e Hop 2
+// (fin_gerar_candidatos_oferta_venda_getnet) — mesma família/escala 0..1
+// tolerante, mesmo corte 85/50 que ConciliacaoCartaoHopSections usava pras
+// duas.
+const SUGESTAO_HOP_THRESHOLDS = { alta: 85, media: 50 };
 
 const PILL_OK = "bg-green-500 text-white";
 const PILL_WAIT = "bg-amber-500 text-white";
@@ -64,6 +69,41 @@ function formatDateSafe(iso: string | null | undefined, pattern = "dd/MM/yyyy"):
 
 function nBatidas(l: LedgerCartaoLancamento): number {
   return l.parcelas.filter((p) => p.hop1_status === "fechado" || p.hop1_status === "antecipada").length;
+}
+
+/**
+ * Casa a linha `aguardando_banco` com uma sugestão Hop 1
+ * (fin_gerar_candidatos_venda_banco_getnet, que agrupa por
+ * data_vencimento+filial no nível conta/período — não por lançamento; um
+ * crédito pode cobrir parcelas de mais de uma oferta do mesmo dia, mesmo
+ * comportamento que Hop1VendaBancoSection já tinha). Como o ledger não
+ * carrega `recebivel_id` por parcela, o cruzamento é por
+ * `data_vencimento_real` da parcela ainda `aguardando` (ignora `fechado`/
+ * `antecipada`, já batidas) + filial compartilhada (`filial_id` null em
+ * qualquer lado é "global", mesma regra do resto do domínio).
+ *
+ * Percorre as parcelas na ordem (`numero_parcela` — já vem ordenado do
+ * RPC) e devolve o PRIMEIRO candidato encontrado: a linha tem 1 botão só,
+ * não 1 por parcela. Se parcelas diferentes da mesma linha "aguardando"
+ * apontarem pra datas distintas com candidatos diferentes, só a primeira
+ * é oferecida — a ação continua individual (mesmo escopo que
+ * Hop1VendaBancoSection sempre teve, um vínculo de cada vez).
+ */
+function encontrarCandidatoHop1(
+  l: LedgerCartaoLancamento,
+  candidatosPorData: Map<string, CandidatoVendaBancoGetnet[]>,
+): CandidatoVendaBancoGetnet | null {
+  for (const p of l.parcelas) {
+    if (p.hop1_status !== "aguardando" || !p.data_vencimento_real) continue;
+    const candidatos = candidatosPorData.get(p.data_vencimento_real);
+    if (!candidatos || candidatos.length === 0) continue;
+    const compativeis = candidatos.filter(
+      (c) => c.filial_id === l.filial_id || c.filial_id == null || l.filial_id == null,
+    );
+    if (compativeis.length === 0) continue;
+    return compativeis.reduce((melhor, c) => (c.score > melhor.score ? c : melhor));
+  }
+  return null;
 }
 
 function statusPill(l: LedgerCartaoLancamento): { label: string; className: string } {
@@ -184,6 +224,50 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
     return map;
   }, [lancamentos]);
 
+  // Sugestões Hop 1 (venda ↔ banco sem antecipação) — repõe a ação que
+  // Hop1VendaBancoSection oferecia antes de ser removida. 1 chamada pro
+  // período inteiro (mesma disciplina da sugestão Hop 2 acima, nunca 1 por
+  // linha), casada por data_vencimento_real+filial dentro do render.
+  const { data: candidatosHop1 = [] } = useQuery({
+    queryKey: [
+      "candidatos-venda-banco-getnet",
+      filters.contaId,
+      filters.integracaoId,
+      filters.periodoInicio,
+      filters.periodoFim,
+      filters.filialId,
+    ],
+    queryFn: () =>
+      gerarCandidatosVendaBancoGetnet({
+        contaId: filters.contaId,
+        integracaoId: filters.integracaoId,
+        periodoInicio: filters.periodoInicio,
+        periodoFim: filters.periodoFim,
+        filialId: filters.filialId,
+      }),
+    enabled: filters.enabled && !!filters.integracaoId && !!filters.contaId,
+  });
+
+  const candidatosHop1PorData = useMemo(() => {
+    const map = new Map<string, CandidatoVendaBancoGetnet[]>();
+    for (const c of candidatosHop1) {
+      const arr = map.get(c.data_vencimento);
+      if (arr) arr.push(c);
+      else map.set(c.data_vencimento, [c]);
+    }
+    return map;
+  }, [candidatosHop1]);
+
+  const sugestoesHop1PorGrupo = useMemo(() => {
+    const map = new Map<string, CandidatoVendaBancoGetnet>();
+    for (const l of lancamentos) {
+      if (l.status !== "aguardando_banco") continue;
+      const candidato = encontrarCandidatoHop1(l, candidatosHop1PorData);
+      if (candidato) map.set(l.grupo_id, candidato);
+    }
+    return map;
+  }, [lancamentos, candidatosHop1PorData]);
+
   // Poda seleção stale após refetch (mesmo padrão de Hop2OfertaVendaSection
   // — Bugbot #82 — evita Confirmar habilitado sobre linha que sumiu/mudou).
   useEffect(() => {
@@ -244,6 +328,19 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
     },
     onError: (err) => {
       toast.error(rpcErrorMessage(err) ?? "Erro ao confirmar sugestão");
+    },
+  });
+
+  const confirmarHop1 = useMutation({
+    mutationFn: (candidato: CandidatoVendaBancoGetnet) =>
+      vincularVendaBancoGetnet(candidato.extrato_id, candidato.recebivel_ids),
+    onSuccess: (res) => {
+      toast.success("Vínculo com o banco confirmado");
+      if (res.warnings?.length) toast.warning(res.warnings.join("; "));
+      invalidateAfterVinculo();
+    },
+    onError: (err) => {
+      toast.error(rpcErrorMessage(err) ?? "Erro ao confirmar vínculo com o banco");
     },
   });
 
@@ -329,6 +426,12 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
                         onConfirmarSugestao={() => confirmarSugestoes.mutate([l.grupo_id])}
                         onBuscarManualmente={() => setBuscaManualFor(l)}
                         confirmando={confirmarSugestoes.isPending}
+                        sugestaoHop1={sugestoesHop1PorGrupo.get(l.grupo_id) ?? null}
+                        onConfirmarHop1={() => {
+                          const candidato = sugestoesHop1PorGrupo.get(l.grupo_id);
+                          if (candidato) confirmarHop1.mutate(candidato);
+                        }}
+                        confirmandoHop1={confirmarHop1.isPending}
                       />
                     ))}
                   </div>
@@ -520,6 +623,9 @@ function LancamentoRow({
   onConfirmarSugestao,
   onBuscarManualmente,
   confirmando,
+  sugestaoHop1,
+  onConfirmarHop1,
+  confirmandoHop1,
 }: {
   lancamento: LedgerCartaoLancamento;
   open: boolean;
@@ -531,6 +637,9 @@ function LancamentoRow({
   onConfirmarSugestao: () => void;
   onBuscarManualmente: () => void;
   confirmando: boolean;
+  sugestaoHop1: CandidatoVendaBancoGetnet | null;
+  onConfirmarHop1: () => void;
+  confirmandoHop1: boolean;
 }) {
   const pill = statusPill(l);
   const batidas = nBatidas(l);
@@ -573,7 +682,7 @@ function LancamentoRow({
                   <ChainLink />
                   <ChainNode label="Sugestão" value={formatValue(l.valor_bruto)}>
                     <div className="mt-1 flex items-center gap-2">
-                      <ScoreBadge score={l.sugestao.score} thresholds={SUGESTAO_HOP2_THRESHOLDS} />
+                      <ScoreBadge score={l.sugestao.score} thresholds={SUGESTAO_HOP_THRESHOLDS} />
                       <span className="text-xs text-muted-foreground">
                         {l.sugestao.recebivel_ids.length} recebível
                         {l.sugestao.recebivel_ids.length === 1 ? "" : "is"}
@@ -640,7 +749,14 @@ function LancamentoRow({
                         ? "Confirmado"
                         : undefined
                   }
-                />
+                >
+                  {l.status === "aguardando_banco" && sugestaoHop1 && (
+                    <div className="mt-1 flex items-center gap-2">
+                      <ScoreBadge score={sugestaoHop1.score} thresholds={SUGESTAO_HOP_THRESHOLDS} />
+                      <span className="text-xs text-muted-foreground">sugestão de crédito</span>
+                    </div>
+                  )}
+                </ChainNode>
               </>
             )}
           </div>
@@ -657,6 +773,19 @@ function LancamentoRow({
               </Button>
               <Button size="sm" variant="outline" onClick={onBuscarManualmente}>
                 <Search className="w-3.5 h-3.5 mr-1" /> Buscar manualmente
+              </Button>
+            </div>
+          )}
+
+          {l.status === "aguardando_banco" && sugestaoHop1 && (
+            <div className="flex gap-2 pt-1">
+              <Button size="sm" disabled={confirmandoHop1} onClick={onConfirmarHop1}>
+                {confirmandoHop1 ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                )}
+                Confirmar sugestão
               </Button>
             </div>
           )}
