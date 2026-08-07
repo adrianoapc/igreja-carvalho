@@ -225,6 +225,17 @@ DEFINER`:**
    numa cópia anterior na conversa, apagou o guard D10
    (`FIN_COMPETENCIA_GRUPO`) que uma migration intermediária já tinha
    adicionado.
+6b. **Hotfix de corpo de RPC já deployada: NÃO edite a migration
+   histórica no git — escreva `CREATE OR REPLACE` numa migration NOVA
+   (forward).** `supabase db push` só aplica arquivos que ainda não
+   estão em `supabase_migrations.schema_migrations`. Alterar
+   `20260805110000_...sql` depois que produção já rodou esse timestamp
+   deixa o git "certo" e o banco com o corpo velho. Achado real: hotfix
+   do drift `getnet_recebivel_lancamentos.parcelas` (§9.95) — a 1ª
+   versão corrigia `fin_vincular_venda_getnet_oferta` /
+   `fin_listar_ledger_conciliacao_cartao` nos arquivos já aplicados e
+   só mandava `ALTER COLUMN` na migration nova; o deploy de produção
+   teria formalizado o tipo e **mantido as RPCs quebradas** (`22P02`).
 7. **RPC que materializa VÁRIAS linhas relacionadas num `FOR ... LOOP`
    (parcelas, ocorrências): todo campo que devia ser IGUAL entre elas
    precisa ser calculado UMA VEZ, fora do loop** — nunca dentro, mesmo
@@ -317,8 +328,26 @@ DEFINER`:**
     lote/divisão legítimos. Mix de filiais concretas SEM recurso
     compartilhado continua `FIN_VALIDACAO` (§9.86).
 
+14. **Toda RPC que lista/filtra `transacoes_financeiras` por
+    `conciliacao_status` precisa de um allow-list explícito do que É
+    aceito, nunca um deny-list de um valor específico** — o enum tem 4
+    valores reais (`nao_conciliado` | `conciliado_manual` |
+    `conciliado_extrato` | `conciliado_bot`, confirmado no schema real via
+    `\d+ transacoes_financeiras`, não só por leitura de migration
+    histórica), e ~15 RPCs `fin_*` já tratam `conciliado_bot` como
+    sinônimo de `conciliado_extrato` ("fechado por outro canal, não pode
+    reeditar"). Um filtro `<> 'conciliado_extrato'` deixa `conciliado_bot`
+    vazar pelo mesmo buraco que motivou o fix. Achado real:
+    `fin_listar_ledger_conciliacao_cartao` não filtrava
+    `conciliacao_status` na CTE `raizes` — lançamento fechado via extrato
+    bancário (canal fora da cadeia Getnet Hop1/Hop2, nunca ganha
+    `getnet_recebivel_lancamentos`) aparecia como `sem_hop2` com botões
+    "Buscar manualmente"/"Confirmar sugestão" que SEMPRE rejeitam com
+    `FIN_JA_LANCADO` — fix é `IN ('nao_conciliado', 'conciliado_manual')`
+    (§9.96).
+
 Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.65, §9.67,
-§9.73, §9.74, §9.80, §9.81, §9.82, §9.86, checklist completo na memória de sessão.
+§9.73, §9.74, §9.80, §9.81, §9.82, §9.86, §9.96, checklist completo na memória de sessão.
 
 ---
 

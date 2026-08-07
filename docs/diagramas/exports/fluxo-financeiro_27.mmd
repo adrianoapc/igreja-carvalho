@@ -1,24 +1,14 @@
 flowchart TD
-    CALL["fin_confirmar_conciliacao\np_vinculo: extrato_ids[], transacao_ids[], divisoes[]?"]
-    CALL --> LE["loop extratos: ORDER BY id, FOR UPDATE\n+ filial_id no SELECT"]
-    LE --> HFAE{"has_filial_access\npor item?"}
-    HFAE -->|não| REJ1["FIN_TENANT"]
-    HFAE -->|sim| ACE["filial_id NULL? marca âncora compartilhada\nfilial_id concreta? acumula em v_filiais_distintas"]
-    ACE --> LT["loop transações: ORDER BY id, FOR UPDATE\n+ filial_id no SELECT"]
-    LT --> HFAT{"has_filial_access\npor item?"}
-    HFAT -->|não| REJ1
-    HFAT -->|sim| ACT["mesma acumulação\n(âncora / v_filiais_distintas)"]
+    Q["supabase.from(\"extratos_bancarios\")\n.select(...) — 15 call-sites, 11 arquivos"]
+    Q --> RLS{"policy SELECT:\nrole IN (admin*,tesoureiro)\nAND has_filial_access(igreja_id, filial_id)"}
+    RLS -->|"filial do JWT\nou user_filial_access"| VE["vê a linha"]
+    RLS -->|"outra filial,\nsem permissão explícita"| INV["linha invisível\n(RLS filtra, sem erro)"]
+    RLS -->|"filial_id IS NULL\n(registro global)"| VE
+    RLS -->|"has_role(admin)"| VEALL["vê tudo do tenant\n(e de outros tenants —\ngap herdado, fora de escopo)"]
 
-    ACT --> MISTA{"≥2 filiais concretas\nDISTINTAS?"}
-    MISTA -->|"sim, SEM âncora compartilhada"| REJM["FIN_VALIDACAO:\nfiliais diferentes"]
-    MISTA -->|"sim, COM âncora (filial_id IS NULL\nem algum item)"| NULO["v_filial_efetiva = NULL\n(espelha o motor F4)"]
-    MISTA -->|não, só 1 filial| UNICA["v_filial_efetiva = essa filial"]
-
-    NULO --> FORMATO
-    UNICA --> FORMATO{"1:1 / N:1 (lote) /\n1:N (divisão)"}
-
-    FORMATO -->|"1:N"| BYPASS{"divisoes[].transacao_id\n≡ transacao_ids?"}
-    BYPASS -->|não| REJD["FIN_VALIDACAO:\ndivergência divisoes×transacao_ids\n(fecha bypass de tenant/filial)"]
-    BYPASS -->|sim| WRITE
-
-    FORMATO -->|"1:1 / N:1"| WRITE["conciliacoes_lote/divisao:\nfilial_id = v_filial_efetiva (RECURSO)\n\nreconciliacao_audit_logs/\nconciliacao_ml_feedback:\nfilial_id = v_ctx (ATOR — RelatorioCobertura\nfiltra por isso, .or(eq,is.null))"]
+    subgraph "Único caso intencionalmente cross-filial"
+      VLD["VincularExtratoLoteDialog.tsx"]
+      VLD -->|"lote com filial própria"| C1["eq(filial_id, lote.filial_id)"]
+      VLD -->|"lote global + filial restrita"| C2["or(filial_id.eq.X,\nfilial_id.is.null)"]
+      VLD -->|"todas as filiais"| C3["sem filtro client-side"]
+    end

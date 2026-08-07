@@ -40,7 +40,14 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinada em 2026-08-07: `latest` resolveu pra v2.112.0 (lançada hoje,
+          # 10:08 UTC) e quebrou `supabase link` com um SchemaError de data na
+          # resposta da API — regressão da CLI, não do nosso código (runs
+          # anteriores no mesmo dia, antes das 10:08 UTC, funcionaram normal
+          # com a versão estável anterior). v2.111.0 é a última stable
+          # confirmada funcionando. Reavaliar `latest` depois que a Supabase
+          # publicar um patch — checar https://github.com/supabase/cli/releases.
+          version: 2.111.0
 
       - name: Read project ref from supabase/config.toml
         id: project
