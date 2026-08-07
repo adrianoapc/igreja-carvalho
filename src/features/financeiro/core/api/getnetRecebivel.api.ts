@@ -283,3 +283,161 @@ export function vincularVendaBancoGetnet(
     p_recebivel_ids: recebivelIds,
   }) as Promise<VincularVendaBancoGetnetResultado>;
 }
+
+/**
+ * Wrappers da Fase 7a — ledger unificado de Conciliação Cartão Getnet
+ * (só leitura). UI: ConciliacaoCartaoLedger (Fase 7b).
+ */
+
+export interface LedgerCartaoResumo {
+  fechados: number;
+  aguardando_banco: number;
+  sem_hop2: number;
+  divergencia: number;
+}
+
+/** hop1_status por parcela — `antecipada` só existe neste escopo, nunca vira status de linha. */
+export type LedgerCartaoHop1Status = "fechado" | "antecipada" | "aguardando";
+
+export interface LedgerCartaoParcela {
+  numero_parcela: number;
+  total_parcelas: number;
+  nsu: string | null;
+  valor_liquido: number | null;
+  data_vencimento_real: string | null;
+  hop1_status: LedgerCartaoHop1Status;
+  extrato_bancario_id: string | null;
+  lote_id: string | null;
+}
+
+export interface LedgerCartaoSugestao {
+  recebivel_ids: string[];
+  score: number;
+  features: Record<string, unknown>;
+}
+
+/**
+ * Status do LANÇAMENTO — deliberadamente diferente do enum de
+ * `getnet_antecipacao_lotes.status` (pendente_vinculo/vinculado/
+ * lancamento_criado). A UI pode exibir "Pendente vínculo" pra `sem_hop2`
+ * (só o rótulo — a chave interna não usa a mesma palavra do status de lote).
+ */
+export type LedgerCartaoStatusLancamento =
+  | "sem_hop2"
+  | "aguardando_banco"
+  | "fechado"
+  | "divergencia";
+
+export interface LedgerCartaoLancamento {
+  grupo_id: string;
+  descricao: string;
+  data_vencimento: string;
+  filial_id: string | null;
+  valor_bruto: number;
+  parcelado: boolean;
+  total_parcelas: number;
+  status: LedgerCartaoStatusLancamento;
+  parcelas: LedgerCartaoParcela[];
+  sugestao: LedgerCartaoSugestao | null;
+}
+
+export interface LedgerCartaoVendaOrigem {
+  nsu: string | null;
+  valor_parcela_liquido: number | null;
+  numero_parcela: number;
+  total_parcelas: number;
+  oferta_lancamento_id: string | null;
+  oferta_descricao: string | null;
+  oferta_data_vencimento: string | null;
+}
+
+/** Enum real de `getnet_antecipacao_lotes.status` — não confundir com `LedgerCartaoStatusLancamento`. */
+export type LedgerCartaoStatusLote = "pendente_vinculo" | "vinculado" | "lancamento_criado";
+
+export interface LedgerCartaoLote {
+  lote_id: string;
+  contrato_registradora: string;
+  status: LedgerCartaoStatusLote;
+  filial_id: string | null;
+  valor_contrato: number | null;
+  desagio: number | null;
+  credito_banco: number | null;
+  data_liquidacao: string | null;
+  vendas_origem: LedgerCartaoVendaOrigem[];
+}
+
+export interface LedgerConciliacaoCartao {
+  resumo: LedgerCartaoResumo;
+  lancamentos: LedgerCartaoLancamento[];
+  lotes: LedgerCartaoLote[];
+}
+
+export interface ListarLedgerConciliacaoCartaoParams {
+  integracaoId: string;
+  contaId: string;
+  periodoInicio: string;
+  periodoFim: string;
+  /** `null`/omitido = todas as filiais no teto do usuário. */
+  filialId?: string | null;
+}
+
+/**
+ * → fin_listar_ledger_conciliacao_cartao (Fase 7a, só leitura).
+ * Monta o ledger unificado Oferta→Venda→Banco + lotes de antecipação por
+ * período — substitui a agregação client-side das 3 queries antigas
+ * (Hop 2 + Hop 1 + tabela de lotes). UI: ConciliacaoCartaoLedger (Fase 7b).
+ */
+export async function listarLedgerConciliacaoCartao(
+  params: ListarLedgerConciliacaoCartaoParams,
+): Promise<LedgerConciliacaoCartao> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)("fin_listar_ledger_conciliacao_cartao", {
+    p_integracao_id: params.integracaoId,
+    p_conta_id: params.contaId,
+    p_periodo_inicio: params.periodoInicio,
+    p_periodo_fim: params.periodoFim,
+    p_filial_id: params.filialId ?? null,
+  });
+  if (error) throw error;
+  return data as LedgerConciliacaoCartao;
+}
+
+/** Candidato de busca manual pra oferta — fin_buscar_recebiveis_getnet_oferta. */
+export interface CandidatoBuscaRecebivelOferta {
+  recebivel_id: string;
+  nsu: string | null;
+  data_venda: string | null;
+  valor_venda: number;
+  bandeira_modalidade: string | null;
+  /** 0..100, mesmo corte 60/30 da família lote de antecipação. */
+  score: number;
+  features: Record<string, unknown>;
+}
+
+export interface BuscarRecebiveisGetnetOfertaParams {
+  transacaoId: string;
+  integracaoId: string;
+  busca?: string | null;
+  limite?: number;
+}
+
+/**
+ * → fin_buscar_recebiveis_getnet_oferta (Fase 7a, só leitura).
+ * Busca manual de recebíveis Getnet livres pra vincular a uma oferta
+ * específica — fecha o botão "Buscar manualmente" da linha "Pendente
+ * vínculo" do ledger. Confirmação continua via
+ * fin_vincular_venda_getnet_oferta (já existente, inalterado).
+ */
+export async function buscarRecebiveisGetnetOferta(
+  params: BuscarRecebiveisGetnetOfertaParams,
+): Promise<CandidatoBuscaRecebivelOferta[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)("fin_buscar_recebiveis_getnet_oferta", {
+    p_transacao_id: params.transacaoId,
+    p_integracao_id: params.integracaoId,
+    p_busca: params.busca ?? null,
+    p_limite: params.limite ?? 100,
+  });
+  if (error) throw error;
+  return (data ?? []) as CandidatoBuscaRecebivelOferta[];
+}
