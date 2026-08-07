@@ -845,6 +845,28 @@ flowchart TD
     W3 -.-> CONF
 ```
 
+## Fase 7a — Ledger unificado (RPCs de leitura) (§9.94)
+
+Só leitura. UI do ledger = Fase 7b. Writers inalterados.
+
+```mermaid
+flowchart TD
+    LED["fin_listar_ledger_conciliacao_cartao\nintegração · conta · período · filial"]
+    LED --> RAIZ["raízes cartão\nconta_id + lancamento_pai_id IS NULL"]
+    RAIZ --> GRP["grupo = raiz ∪ filhas"]
+    GRP --> REC["recebíveis\nintegracao_id + HFA"]
+    REC --> ST{"status linha"}
+    ST -->|sem recebível| S2["sem_hop2\n+ sugestão Hop 2\n1 call/período DISTINCT ON"]
+    ST -->|batidas ≥ membros| FE["fechado"]
+    ST -->|parcial| AG["aguardando_banco"]
+    ST -->|Σ líquido ≠ extrato >0,01| DIV["divergencia"]
+    REC --> PAR["hop1_status:\nfechado · antecipada · aguardando"]
+    LED --> LOT["lotes integracao_id\nextrato só c/ HFA"]
+    LOT --> VO["vendas_origem\nlíquido parcela\noferta meta c/ HFA"]
+    BUS["fin_buscar_recebiveis_getnet_oferta\np_integracao_id + p_busca"] --> LIV["livres do EC\nscore 0..100"]
+    LIV -.->|"confirma"| W2["fin_vincular_venda_getnet_oferta"]
+```
+
 ## Competência de grupo em lançamentos parcelados — D10 (jul/2026)
 
 Ver §9.19 do `arquitetura-financeiro.md`. Fecha o cenário B ("Despesa
