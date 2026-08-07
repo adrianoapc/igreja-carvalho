@@ -398,16 +398,16 @@ BEGIN
             g.valor_liquido,
             COALESCE(g.valor_parcela, g.valor_venda) - abs(COALESCE(g.descontos, 0))
           ),
-          -- g.parcelas é `integer` (drift de schema fechado em
-          -- 20260807100000; produção nunca teve o rótulo texto "N de M" —
-          -- coluna 100% NULL nas linhas reais). Um integer isolado não
-          -- permite reconstruir "parcela atual DE total" sem uma 2ª coluna
-          -- que não existe — não tenta mais extrair via regex; cai direto
-          -- no fallback 1, que é o comportamento real hoje (ot.numero_
-          -- parcela/ot.total_parcelas de transacoes_financeiras seguem
-          -- confiáveis quando a venda já tem oferta vinculada).
-          'numero_parcela', COALESCE(ot.numero_parcela, 1),
-          'total_parcelas', COALESCE(ot.total_parcelas, 1),
+          'numero_parcela', COALESCE(
+            ot.numero_parcela,
+            (regexp_match(COALESCE(g.parcelas, '1 de 1'), '(\d+)\s+de\s+(\d+)'))[1]::int,
+            1
+          ),
+          'total_parcelas', COALESCE(
+            ot.total_parcelas,
+            (regexp_match(COALESCE(g.parcelas, '1 de 1'), '(\d+)\s+de\s+(\d+)'))[2]::int,
+            1
+          ),
           -- Sem HFA na oferta: nullar metadados (não vazar descrição/data
           -- de filial inacessível via recebível global).
           'oferta_lancamento_id', CASE

@@ -5636,6 +5636,31 @@ EC; score 0..100 (40 direção + data/valor); direção da oferta via
 `LEFT JOIN formas_pagamento` + `COALESCE` com texto legado; guardrail
 #13 de filial mista. Confirmação = `fin_vincular_venda_getnet_oferta`.
 
+### 9.95 Hotfix — drift `getnet_recebivel_lancamentos.parcelas` (text→integer)
+
+Migration **nova** `20260807100000_fin_getnet_recebivel_parcelas_integer_drift.sql`
+(única forward desta PR). Em produção a coluna já era `integer`
+(confirmado via `information_schema`); o git ainda assumia `text` da
+criação (`20260729100000`) — drift não rastreado. RPCs com
+`COALESCE(g.parcelas, '1 de 1')` falhavam no **planejamento** (`22P02`),
+100% das vezes (Hop 2 `fin_vincular_venda_getnet_oferta` e ledger
+`fin_listar_ledger_conciliacao_cartao`).
+
+**Por que tudo na migration nova:** `20260805110000` e `20260806100000`
+já estão aplicadas em produção — editar o arquivo no git **não**
+reescreve o corpo da função no `supabase db push` (só roda arquivos
+novos). O hotfix concentra:
+
+1. `ALTER COLUMN parcelas TYPE integer` com `USING` que aceita partida
+   `text` (replay do zero) **ou** `integer` (prod).
+2. `CREATE OR REPLACE` de `fin_vincular_venda_getnet_oferta` —
+   `v_parcelado := false` (detecção via rótulo "N de M" desativada;
+   caminho à vista).
+3. `CREATE OR REPLACE` de `fin_listar_ledger_conciliacao_cartao` —
+   `numero_parcela`/`total_parcelas` via `transacoes_financeiras` ou `1`.
+4. `CREATE OR REPLACE` de `fin_importar_recebivel_getnet` — CSV "N de M"
+   → `NULL` (só grava integer puro se o payload já vier normalizado).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
