@@ -1,8 +1,24 @@
 flowchart TD
-    DRIFT["prod: parcelas integer\ngit: assumia text"] --> BUG["COALESCE(parcelas, '1 de 1')\n22P02 no planejamento"]
-    BUG --> HOP2["fin_vincular_venda_getnet_oferta"]
-    BUG --> LED["fin_listar_ledger_conciliacao_cartao"]
-    FWD["20260807100000 forward"] --> ALTER["ALTER COLUMN integer\nUSING text|integer"]
-    FWD --> R1["CREATE OR REPLACE Hop 2\nv_parcelado := false"]
-    FWD --> R2["CREATE OR REPLACE ledger\nparcela via oferta ou 1"]
-    FWD --> R3["CREATE OR REPLACE importar\n'N de M' → NULL"]
+    CALL["fin_confirmar_conciliacao\np_vinculo: extrato_ids[], transacao_ids[], divisoes[]?"]
+    CALL --> LE["loop extratos: ORDER BY id, FOR UPDATE\n+ filial_id no SELECT"]
+    LE --> HFAE{"has_filial_access\npor item?"}
+    HFAE -->|não| REJ1["FIN_TENANT"]
+    HFAE -->|sim| ACE["filial_id NULL? marca âncora compartilhada\nfilial_id concreta? acumula em v_filiais_distintas"]
+    ACE --> LT["loop transações: ORDER BY id, FOR UPDATE\n+ filial_id no SELECT"]
+    LT --> HFAT{"has_filial_access\npor item?"}
+    HFAT -->|não| REJ1
+    HFAT -->|sim| ACT["mesma acumulação\n(âncora / v_filiais_distintas)"]
+
+    ACT --> MISTA{"≥2 filiais concretas\nDISTINTAS?"}
+    MISTA -->|"sim, SEM âncora compartilhada"| REJM["FIN_VALIDACAO:\nfiliais diferentes"]
+    MISTA -->|"sim, COM âncora (filial_id IS NULL\nem algum item)"| NULO["v_filial_efetiva = NULL\n(espelha o motor F4)"]
+    MISTA -->|não, só 1 filial| UNICA["v_filial_efetiva = essa filial"]
+
+    NULO --> FORMATO
+    UNICA --> FORMATO{"1:1 / N:1 (lote) /\n1:N (divisão)"}
+
+    FORMATO -->|"1:N"| BYPASS{"divisoes[].transacao_id\n≡ transacao_ids?"}
+    BYPASS -->|não| REJD["FIN_VALIDACAO:\ndivergência divisoes×transacao_ids\n(fecha bypass de tenant/filial)"]
+    BYPASS -->|sim| WRITE
+
+    FORMATO -->|"1:1 / N:1"| WRITE["conciliacoes_lote/divisao:\nfilial_id = v_filial_efetiva (RECURSO)\n\nreconciliacao_audit_logs/\nconciliacao_ml_feedback:\nfilial_id = v_ctx (ATOR — RelatorioCobertura\nfiltra por isso, .or(eq,is.null))"]

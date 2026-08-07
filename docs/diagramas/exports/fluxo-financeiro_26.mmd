@@ -1,22 +1,8 @@
 flowchart TD
-    EDIT["fin_atualizar_lancamento\np_patch com data_competencia"]
-    CHECK{"tipo_lancamento='parcelado'\ne tem irmãs (lancamento_pai_id\nou total_parcelas>1)?"}
-    EDIT --> CHECK
-    CHECK -->|não| APLICA["aplica normalmente\n(inclui recorrente — competência\nprópria por ocorrência)"]
-    CHECK -->|"sim, sem _permitir_divergencia_competencia"| BLOQ["rejeita:\nFIN_COMPETENCIA_GRUPO"]
-    CHECK -->|"sim, com _permitir_divergencia_competencia=true"| ESCAPE["aplica só nesta parcela\n(exceção pontual, não exposta na UI)"]
-
-    BLOQ --> UI["TransacaoDialog.tsx\ncatch detecta o erro nomeado"]
-    UI --> CONFIRMA["AlertDialog:\nsincronizar competência do grupo?"]
-    CONFIRMA -->|confirma| SYNC["fin_alterar_competencia_grupo\np_lancamento_id, p_nova_competencia"]
-
-    SYNC --> CONCILIADA{"alguma parcela do grupo\njá conciliada?"}
-    CONCILIADA -->|sim| REJ["rejeita: FIN_CONCILIADO\n(lista os ids)"]
-    CONCILIADA -->|não| UPDATE["UPDATE em todas as parcelas\n(id=pai OU lancamento_pai_id=pai)\nnuma única transação"]
-    UPDATE --> WARN{"alguma parcela\njá paga?"}
-    WARN -->|sim| AVISO["warning: revisar DRE por\ncompetência do período afetado"]
-    WARN -->|não| OK["ok"]
-
-    RECLASS["reclass-transacoes\n(lote)"] -->|"data_competencia\nem updateFields"| GRUPO{"todas as parcelas\nirmãs estão na seleção?"}
-    GRUPO -->|não| REJ2["409 GRUPO_PARCELADO_INCOMPLETO\n(lista ids_irmas_faltantes)"]
-    GRUPO -->|sim| APLICA2["aplica no lote normalmente"]
+    DRIFT["prod: parcelas integer\ngit: assumia text"] --> BUG["COALESCE(parcelas, '1 de 1')\n22P02 no planejamento"]
+    BUG --> HOP2["fin_vincular_venda_getnet_oferta"]
+    BUG --> LED["fin_listar_ledger_conciliacao_cartao"]
+    FWD["20260807100000 forward"] --> ALTER["ALTER COLUMN integer\nUSING text|integer"]
+    FWD --> R1["CREATE OR REPLACE Hop 2\nv_parcelado := false"]
+    FWD --> R2["CREATE OR REPLACE ledger\nparcela via oferta ou 1"]
+    FWD --> R3["CREATE OR REPLACE importar\n'N de M' → NULL"]
