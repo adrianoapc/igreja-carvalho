@@ -1,14 +1,22 @@
 flowchart TD
-    Q["supabase.from(\"extratos_bancarios\")\n.select(...) — 15 call-sites, 11 arquivos"]
-    Q --> RLS{"policy SELECT:\nrole IN (admin*,tesoureiro)\nAND has_filial_access(igreja_id, filial_id)"}
-    RLS -->|"filial do JWT\nou user_filial_access"| VE["vê a linha"]
-    RLS -->|"outra filial,\nsem permissão explícita"| INV["linha invisível\n(RLS filtra, sem erro)"]
-    RLS -->|"filial_id IS NULL\n(registro global)"| VE
-    RLS -->|"has_role(admin)"| VEALL["vê tudo do tenant\n(e de outros tenants —\ngap herdado, fora de escopo)"]
+    EDIT["fin_atualizar_lancamento\np_patch com data_competencia"]
+    CHECK{"tipo_lancamento='parcelado'\ne tem irmãs (lancamento_pai_id\nou total_parcelas>1)?"}
+    EDIT --> CHECK
+    CHECK -->|não| APLICA["aplica normalmente\n(inclui recorrente — competência\nprópria por ocorrência)"]
+    CHECK -->|"sim, sem _permitir_divergencia_competencia"| BLOQ["rejeita:\nFIN_COMPETENCIA_GRUPO"]
+    CHECK -->|"sim, com _permitir_divergencia_competencia=true"| ESCAPE["aplica só nesta parcela\n(exceção pontual, não exposta na UI)"]
 
-    subgraph "Único caso intencionalmente cross-filial"
-      VLD["VincularExtratoLoteDialog.tsx"]
-      VLD -->|"lote com filial própria"| C1["eq(filial_id, lote.filial_id)"]
-      VLD -->|"lote global + filial restrita"| C2["or(filial_id.eq.X,\nfilial_id.is.null)"]
-      VLD -->|"todas as filiais"| C3["sem filtro client-side"]
-    end
+    BLOQ --> UI["TransacaoDialog.tsx\ncatch detecta o erro nomeado"]
+    UI --> CONFIRMA["AlertDialog:\nsincronizar competência do grupo?"]
+    CONFIRMA -->|confirma| SYNC["fin_alterar_competencia_grupo\np_lancamento_id, p_nova_competencia"]
+
+    SYNC --> CONCILIADA{"alguma parcela do grupo\njá conciliada?"}
+    CONCILIADA -->|sim| REJ["rejeita: FIN_CONCILIADO\n(lista os ids)"]
+    CONCILIADA -->|não| UPDATE["UPDATE em todas as parcelas\n(id=pai OU lancamento_pai_id=pai)\nnuma única transação"]
+    UPDATE --> WARN{"alguma parcela\njá paga?"}
+    WARN -->|sim| AVISO["warning: revisar DRE por\ncompetência do período afetado"]
+    WARN -->|não| OK["ok"]
+
+    RECLASS["reclass-transacoes\n(lote)"] -->|"data_competencia\nem updateFields"| GRUPO{"todas as parcelas\nirmãs estão na seleção?"}
+    GRUPO -->|não| REJ2["409 GRUPO_PARCELADO_INCOMPLETO\n(lista ids_irmas_faltantes)"]
+    GRUPO -->|sim| APLICA2["aplica no lote normalmente"]
