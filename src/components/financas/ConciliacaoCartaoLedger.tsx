@@ -277,7 +277,13 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
   // data_contratacao_contrato/extratos_bancarios.filial_id). Escopo do
   // ledger.lotes (período+conta) filtra QUAIS mostrar; os dados ricos vêm
   // daqui, casados por id.
-  const { data: lotesFull = [], refetch: refetchLotesFull } = useLotesAntecipacao();
+  const {
+    data: lotesFull = [],
+    refetch: refetchLotesFull,
+    isLoading: lotesLoading,
+    isFetched: lotesFetched,
+    isError: lotesError,
+  } = useLotesAntecipacao();
   const loteFullById = useMemo(() => new Map(lotesFull.map((l) => [l.id, l])), [lotesFull]);
 
   const lancamentos = ledger?.lancamentos ?? [];
@@ -324,12 +330,21 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
     return map;
   }, [candidatosHop1]);
 
+  // Cada candidato Hop 1 (extrato × bucket data+filial) só aparece em UMA
+  // linha do ledger — a RPC já agrega todos os recebíveis do dia; mostrar o
+  // mesmo botão em N ofertas do mesmo vencimento sugeria vínculo por oferta
+  // e permitia cliques repetidos no mesmo crédito (Bugbot #84).
   const sugestoesHop1PorGrupo = useMemo(() => {
     const map = new Map<string, CandidatoVendaBancoGetnet>();
+    const usados = new Set<string>();
     for (const l of lancamentos) {
       if (l.status !== "aguardando_banco") continue;
       const candidato = encontrarCandidatoHop1(l, candidatosHop1PorData);
-      if (candidato) map.set(l.grupo_id, candidato);
+      if (!candidato) continue;
+      const chave = `${candidato.extrato_id}:${candidato.data_vencimento}:${candidato.filial_id ?? ""}`;
+      if (usados.has(chave)) continue;
+      usados.add(chave);
+      map.set(l.grupo_id, candidato);
     }
     return map;
   }, [lancamentos, candidatosHop1PorData]);
@@ -442,6 +457,11 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
   };
 
   const errorMsg = isError ? rpcErrorMessage(error) : null;
+  // Enquanto o ledger/Hop1 refetcha após um vínculo, a UI ainda mostra o
+  // snapshot antigo — trava confirmações pra não reenviar o mesmo vínculo
+  // (Bugbot #84, stale duplicate confirms).
+  const actionsLocked =
+    isFetching || confirmarSugestoes.isPending || confirmarHop1.isPending;
 
   return (
     <div className="space-y-4 pb-16">
@@ -473,6 +493,18 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
             <SummaryCell label="Divergência" value={resumo.divergencia} tone="critical" />
           </div>
 
+          {isError && ledger && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              <span>
+                Falha ao atualizar o ledger{errorMsg ? `: ${errorMsg}` : "."} Exibindo a última
+                versão carregada.
+              </span>
+              <Button size="sm" variant="outline" onClick={() => refetch()}>
+                Tentar de novo
+              </Button>
+            </div>
+          )}
+
           {lancamentos.length === 0 && lotes.length === 0 ? (
             <div className="border rounded-lg p-12 text-center text-sm text-muted-foreground">
               Nenhum lançamento em cartão neste período.
@@ -490,7 +522,7 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
                         open={expanded.has(l.grupo_id)}
                         onToggle={() => toggleExpanded(l.grupo_id)}
                         selected={selected.has(l.grupo_id)}
-                        selectable={l.status === "sem_hop2" && !!l.sugestao}
+                        selectable={l.status === "sem_hop2" && !!l.sugestao && !actionsLocked}
                         onSelectChange={(checked) =>
                           setSelected((prev) => {
                             const next = new Set(prev);
@@ -502,13 +534,13 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
                         formatValue={formatValue}
                         onConfirmarSugestao={() => confirmarSugestoes.mutate([l.grupo_id])}
                         onBuscarManualmente={() => setBuscaManualFor(l)}
-                        confirmando={confirmarSugestoes.isPending}
+                        confirmando={actionsLocked}
                         sugestaoHop1={sugestoesHop1PorGrupo.get(l.grupo_id) ?? null}
                         onConfirmarHop1={() => {
                           const candidato = sugestoesHop1PorGrupo.get(l.grupo_id);
                           if (candidato) confirmarHop1.mutate(candidato);
                         }}
-                        confirmandoHop1={confirmarHop1.isPending}
+                        confirmandoHop1={actionsLocked}
                       />
                     ))}
                   </div>
@@ -519,18 +551,28 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
                 <div className="space-y-2">
                   <SectionLabel>Antecipação — lotes do período</SectionLabel>
                   <div className="space-y-2">
-                    {lotes.map((lote) => (
-                      <LoteRow
-                        key={lote.lote_id}
-                        lote={lote}
-                        open={expanded.has(lote.lote_id)}
-                        onToggle={() => toggleExpanded(lote.lote_id)}
-                        formatValue={formatValue}
-                        onVincularExtrato={() => setLoteVinculando(lote)}
-                        onLancarSaida={() => setLoteLancando(lote)}
-                        temDadosCompletos={loteFullById.has(lote.lote_id)}
-                      />
-                    ))}
+                    {lotes.map((lote) => {
+                      const temDados = loteFullById.has(lote.lote_id);
+                      const dadosStatus: LoteDadosStatus = temDados
+                        ? "ready"
+                        : !lotesFetched || lotesLoading
+                          ? "loading"
+                          : lotesError
+                            ? "error"
+                            : "missing";
+                      return (
+                        <LoteRow
+                          key={lote.lote_id}
+                          lote={lote}
+                          open={expanded.has(lote.lote_id)}
+                          onToggle={() => toggleExpanded(lote.lote_id)}
+                          formatValue={formatValue}
+                          onVincularExtrato={() => setLoteVinculando(lote)}
+                          onLancarSaida={() => setLoteLancando(lote)}
+                          dadosStatus={dadosStatus}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -551,7 +593,7 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
           <Button
             size="sm"
             onClick={() => confirmarSugestoes.mutate([...selected])}
-            disabled={confirmarSugestoes.isPending}
+            disabled={actionsLocked}
           >
             {confirmarSugestoes.isPending ? (
               <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
@@ -843,22 +885,26 @@ function LancamentoRow({
                 )}
                 Confirmar sugestão
               </Button>
-              <Button size="sm" variant="outline" onClick={onBuscarManualmente}>
+              <Button size="sm" variant="outline" disabled={confirmando} onClick={onBuscarManualmente}>
                 <Search className="w-3.5 h-3.5 mr-1" /> Buscar manualmente
               </Button>
             </div>
           )}
 
           {l.status === "aguardando_banco" && sugestaoHop1 && (
-            <div className="flex gap-2 pt-1">
-              <Button size="sm" disabled={confirmandoHop1} onClick={onConfirmarHop1}>
+            <div className="flex flex-col gap-1 pt-1">
+              <Button size="sm" className="self-start" disabled={confirmandoHop1} onClick={onConfirmarHop1}>
                 {confirmandoHop1 ? (
                   <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
                 ) : (
                   <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
                 )}
-                Confirmar sugestão
+                Confirmar crédito do dia
               </Button>
+              <span className="text-xs text-muted-foreground max-w-[48ch]">
+                Hop 1 agrupa por vencimento + filial — confirma o crédito bancário para todos os
+                recebíveis desse bucket ({sugestaoHop1.recebivel_ids.length}), não só esta oferta.
+              </span>
             </div>
           )}
         </div>
@@ -867,6 +913,8 @@ function LancamentoRow({
   );
 }
 
+type LoteDadosStatus = "loading" | "ready" | "missing" | "error";
+
 function LoteRow({
   lote,
   open,
@@ -874,7 +922,7 @@ function LoteRow({
   formatValue,
   onVincularExtrato,
   onLancarSaida,
-  temDadosCompletos,
+  dadosStatus,
 }: {
   lote: LedgerCartaoLote;
   open: boolean;
@@ -882,13 +930,14 @@ function LoteRow({
   formatValue: (v: number) => string;
   onVincularExtrato: () => void;
   onLancarSaida: () => void;
-  temDadosCompletos: boolean;
+  dadosStatus: LoteDadosStatus;
 }) {
   const meta = LOTE_STATUS_META[lote.status];
   const desagioCalc =
     lote.desagio != null ? lote.desagio : lote.valor_contrato != null && lote.credito_banco != null
       ? lote.valor_contrato - lote.credito_banco
       : null;
+  const temDadosCompletos = dadosStatus === "ready";
 
   return (
     <Collapsible open={open} onOpenChange={onToggle} className="border rounded-lg bg-card shadow-sm overflow-hidden">
@@ -962,7 +1011,7 @@ function LoteRow({
             </div>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
             {lote.status === "pendente_vinculo" && (
               <Button size="sm" variant="outline" onClick={onVincularExtrato} disabled={!temDadosCompletos}>
                 <Link2 className="w-3.5 h-3.5 mr-1" /> Vincular extrato
@@ -985,7 +1034,12 @@ function LoteRow({
             )}
             {!temDadosCompletos && lote.status !== "lancamento_criado" && (
               <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5" /> Carregando dados do lote…
+                <AlertCircle className="w-3.5 h-3.5" />
+                {dadosStatus === "loading"
+                  ? "Carregando dados do lote…"
+                  : dadosStatus === "error"
+                    ? "Falha ao carregar dados do lote — recarregue a aba."
+                    : "Dados do lote indisponíveis neste filtro de filial."}
               </span>
             )}
           </div>

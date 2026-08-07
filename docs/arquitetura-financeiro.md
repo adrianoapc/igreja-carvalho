@@ -5667,8 +5667,11 @@ casada na UI por `data_vencimento_real` + filial compartilhada. Parcelas
 com `lote_id` são ignoradas no rematch: `hop1_status` fica `aguardando`
 enquanto o lote está `pendente_vinculo`, mas a RPC Hop 1 exclui
 `contrato_registradora IS NOT NULL` — casar só por data ofereceria
-crédito de outras vendas do mesmo dia. Ledger ainda não expõe
-`recebivel_id` por parcela (RPC ordena por ele, mas não serializa).
+crédito de outras vendas do mesmo dia. Cada candidato (extrato ×
+data+filial) só aparece em **uma** linha; o botão deixa explícito que o
+vínculo é do bucket do dia (a RPC Hop 1 agrega recebíveis). Ledger ainda
+não expõe `recebivel_id` por parcela (RPC ordena por ele, mas não
+serializa).
 
 **Invalidação pós-vínculo**
 
@@ -5676,6 +5679,11 @@ Além do refetch do ledger e de `conferencia-totais-getnet`, invalida
 `candidatos-venda-banco-getnet` (Hop 2 confirmado → novos candidatos
 Hop 1 no período; sem isso o botão só aparece após remount/focus —
 regressão vs Fase 6) e `getnet-antecipacao-lotes` (diálogos de lote).
+Enquanto `isFetching`/mutation pendente, confirmações ficam travadas
+(snapshot antigo ainda na tela). Refetch com erro mantém o cache e
+mostra banner com retry — não falha em silêncio. Lote sem dados ricos
+após o fetch distingue loading / erro / fora do filtro de filial (não
+fica eterno em “Carregando…”).
 
 **Paleta de status**
 
