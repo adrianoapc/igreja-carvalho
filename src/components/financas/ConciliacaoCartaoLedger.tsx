@@ -4,7 +4,9 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
+  Clock,
   Landmark,
   Link2,
   Loader2,
@@ -45,9 +47,55 @@ const BUSCA_MANUAL_THRESHOLDS = { alta: 60, media: 30 };
 // duas.
 const SUGESTAO_HOP_THRESHOLDS = { alta: 85, media: 50 };
 
-const PILL_OK = "bg-green-500 text-white";
-const PILL_WAIT = "bg-amber-500 text-white";
-const PILL_GAP = "bg-destructive text-destructive-foreground";
+/**
+ * Paleta de status validada (skill dataviz, references/palette.md) — 4 cores
+ * reservadas, cada uma com ícone + rótulo (nunca só cor). O par âmbar/vermelho
+ * herdado do app (`--destructive`) e do mockup original não separa (ΔE < 15
+ * entre os dois, medido com `validate_palette.js` — abaixo do piso de visão
+ * normal, não só daltonismo). Divergência é o status mais crítico da feature
+ * (mismatch contábil real que a Fase 0-4 existe pra detectar), por isso ganhou
+ * cor própria em vez de herdar o `--destructive` genérico do app — mudança
+ * local a este componente, não toca o token global.
+ */
+const STATUS_COLOR = {
+  good: "#0ca30c",
+  warning: "#fab219",
+  serious: "#ec835a",
+  critical: "#d03b3b",
+} as const;
+
+type StatusTone = keyof typeof STATUS_COLOR;
+
+// Contraste de texto medido por swatch (WCAG relative luminance) — preto
+// (tom "primary ink" do skill) pra good/warning/serious, branco só pra
+// critical (é o único em que branco vence: 4.80:1 vs 4.37:1 de preto).
+const STATUS_TEXT: Record<StatusTone, string> = {
+  good: "#0b0b0b",
+  warning: "#0b0b0b",
+  serious: "#0b0b0b",
+  critical: "#ffffff",
+};
+
+function pillStyle(tone: StatusTone): { backgroundColor: string; color: string } {
+  return { backgroundColor: STATUS_COLOR[tone], color: STATUS_TEXT[tone] };
+}
+
+const STATUS_ICON: Record<StatusTone, typeof CheckCircle2> = {
+  good: CheckCircle2,
+  warning: Clock,
+  serious: AlertTriangle,
+  critical: AlertCircle,
+};
+
+function StatusPillBadge({ tone, label }: { tone: StatusTone; label: string }) {
+  const Icon = STATUS_ICON[tone];
+  return (
+    <Badge style={pillStyle(tone)} className="whitespace-nowrap gap-1">
+      <Icon className="w-3 h-3" />
+      {label}
+    </Badge>
+  );
+}
 
 interface LedgerFilters {
   integracaoId: string;
@@ -106,35 +154,47 @@ function encontrarCandidatoHop1(
   return null;
 }
 
-function statusPill(l: LedgerCartaoLancamento): { label: string; className: string } {
+function statusPill(l: LedgerCartaoLancamento): { label: string; tone: StatusTone } {
   switch (l.status) {
     case "fechado":
-      return { label: "Fechado", className: PILL_OK };
+      return { label: "Fechado", tone: "good" };
     case "divergencia":
-      return { label: "Divergência", className: PILL_GAP };
+      return { label: "Divergência", tone: "critical" };
     case "sem_hop2":
       // Rótulo de exibição só — a chave interna (`sem_hop2`) não usa a
       // palavra do enum de lote (pendente_vinculo/vinculado/lancamento_criado).
-      return { label: "Pendente vínculo", className: PILL_WAIT };
+      // Tom "serious", não "warning": Hop 2 nunca casou (precisa de ação do
+      // tesoureiro), diferente de aguardando_banco (já casou, só falta o
+      // banco confirmar sozinho).
+      return { label: "Pendente vínculo", tone: "serious" };
     case "aguardando_banco":
       return {
         label: `Aguardando banco (${nBatidas(l)}/${l.total_parcelas})`,
-        className: PILL_WAIT,
+        tone: "warning",
       };
     default:
-      return { label: l.status, className: PILL_WAIT };
+      return { label: l.status, tone: "warning" };
   }
 }
 
-const LOTE_STATUS_META: Record<LedgerCartaoLote["status"], { label: string; className: string }> = {
-  lancamento_criado: { label: "Concluído", className: PILL_OK },
-  vinculado: { label: "Vinculado — aguardando lançamento", className: PILL_WAIT },
-  pendente_vinculo: { label: "Pendente vínculo", className: PILL_WAIT },
+// Lotes não têm conceito de "crítico" (não há mismatch contábil possível
+// nesse enum) — usa só good/warning da mesma paleta, pra manter o vocabulário
+// de cor consistente com o resto do componente.
+const LOTE_STATUS_META: Record<LedgerCartaoLote["status"], { label: string; tone: StatusTone }> = {
+  lancamento_criado: { label: "Concluído", tone: "good" },
+  vinculado: { label: "Vinculado — aguardando lançamento", tone: "warning" },
+  pendente_vinculo: { label: "Pendente vínculo", tone: "warning" },
 };
 
-function ChainLink({ tone = "pending" }: { tone?: "ok" | "pending" | "gap" }) {
-  const color = tone === "ok" ? "text-green-600" : tone === "gap" ? "text-destructive" : "text-muted-foreground";
-  return <span className={`flex items-center justify-center w-8 shrink-0 ${color}`}>→</span>;
+function ChainLink({ tone = "pending" }: { tone?: "good" | "pending" | "critical" }) {
+  if (tone === "pending") {
+    return <span className="flex items-center justify-center w-8 shrink-0 text-muted-foreground">→</span>;
+  }
+  return (
+    <span className="flex items-center justify-center w-8 shrink-0" style={{ color: STATUS_COLOR[tone] }}>
+      →
+    </span>
+  );
 }
 
 function ChainNode({
@@ -390,10 +450,10 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
         <>
           {/* Tira de resumo — 4 células */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-lg border overflow-hidden bg-border">
-            <SummaryCell label="Fechados" value={resumo.fechados} tone="ok" />
-            <SummaryCell label="Aguardando banco" value={resumo.aguardando_banco} tone="wait" />
-            <SummaryCell label="Pendente vínculo" value={resumo.sem_hop2} tone="wait" />
-            <SummaryCell label="Divergência" value={resumo.divergencia} tone="gap" />
+            <SummaryCell label="Fechados" value={resumo.fechados} tone="good" />
+            <SummaryCell label="Aguardando banco" value={resumo.aguardando_banco} tone="warning" />
+            <SummaryCell label="Pendente vínculo" value={resumo.sem_hop2} tone="serious" />
+            <SummaryCell label="Divergência" value={resumo.divergencia} tone="critical" />
           </div>
 
           {lancamentos.length === 0 && lotes.length === 0 ? (
@@ -585,19 +645,14 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
   );
 }
 
-function SummaryCell({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "ok" | "wait" | "gap";
-}) {
-  const color = tone === "ok" ? "text-green-600" : tone === "gap" ? "text-destructive" : "text-amber-600";
+function SummaryCell({ label, value, tone }: { label: string; value: number; tone: StatusTone }) {
+  const Icon = STATUS_ICON[tone];
   return (
     <div className="bg-card p-4">
-      <span className={`block text-2xl font-semibold ${color}`}>{value}</span>
+      <span className="flex items-center gap-1.5 text-2xl font-semibold" style={{ color: STATUS_COLOR[tone] }}>
+        <Icon className="w-4 h-4" />
+        {value}
+      </span>
       <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
     </div>
   );
@@ -667,7 +722,7 @@ function LancamentoRow({
               </p>
             </div>
             <span className="text-sm font-semibold whitespace-nowrap">{formatValue(l.valor_bruto)}</span>
-            <Badge className={`${pill.className} whitespace-nowrap`}>{pill.label}</Badge>
+            <StatusPillBadge tone={pill.tone} label={pill.label} />
             <span className={`text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`}>▸</span>
           </button>
         </CollapsibleTrigger>
@@ -698,7 +753,7 @@ function LancamentoRow({
               )
             ) : l.parcelado ? (
               <>
-                <ChainLink tone="ok" />
+                <ChainLink tone="good" />
                 <div className="flex-none min-w-[220px] max-w-[280px] rounded-lg border bg-muted/30 p-3">
                   <div className="text-[0.7rem] uppercase tracking-wide text-muted-foreground mb-2">
                     Venda Getnet — {l.total_parcelas} parcelas
@@ -728,7 +783,7 @@ function LancamentoRow({
               </>
             ) : (
               <>
-                <ChainLink tone="ok" />
+                <ChainLink tone="good" />
                 <ChainNode
                   label="Venda Getnet"
                   value={formatValue(l.parcelas[0]?.valor_liquido ?? l.valor_bruto)}
@@ -738,7 +793,7 @@ function LancamentoRow({
             )}
             {l.status !== "sem_hop2" && (
               <>
-                <ChainLink tone={l.status === "fechado" ? "ok" : l.status === "divergencia" ? "gap" : "pending"} />
+                <ChainLink tone={l.status === "fechado" ? "good" : l.status === "divergencia" ? "critical" : "pending"} />
                 <ChainNode
                   label="Crédito no banco"
                   value={`${batidas} de ${l.total_parcelas} batidas`}
@@ -834,7 +889,7 @@ function LoteRow({
             <span className="text-sm font-semibold whitespace-nowrap">
               {formatValue(lote.valor_contrato ?? 0)}
             </span>
-            <Badge className={`${meta.className} whitespace-nowrap`}>{meta.label}</Badge>
+            <StatusPillBadge tone={meta.tone} label={meta.label} />
             <span className={`text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`}>▸</span>
           </button>
         </CollapsibleTrigger>
@@ -843,13 +898,13 @@ function LoteRow({
         <div className="border-t px-4 py-4 space-y-4">
           <div className="flex items-stretch gap-0 overflow-x-auto pb-1">
             <ChainNode label="Valor do contrato" value={formatValue(lote.valor_contrato ?? 0)} />
-            <ChainLink tone={desagioCalc != null ? "ok" : "pending"} />
+            <ChainLink tone={desagioCalc != null ? "good" : "pending"} />
             <ChainNode
               label="Deságio lançado"
               value={desagioCalc != null ? formatValue(desagioCalc) : "—"}
               sub="saída · antecipação Getnet"
             />
-            <ChainLink tone={lote.credito_banco != null ? "ok" : "pending"} />
+            <ChainLink tone={lote.credito_banco != null ? "good" : "pending"} />
             <ChainNode
               label="Crédito no banco"
               value={lote.credito_banco != null ? formatValue(lote.credito_banco) : "—"}
