@@ -114,7 +114,14 @@ export function VincularTransacaoDialog({
         dateWindow.inicio,
         dateWindow.fim,
       ]}
-      queryFn={async (busca) => {
+      // Busca client-side (janela ±60d já vem inteira) — serverSearch=false
+      // evita re-fetch do Supabase a cada tecla (comportamento pré-extração).
+      serverSearch={false}
+      matchesSearch={(t, term) =>
+        t.descricao.toLowerCase().includes(term) ||
+        (t.categorias_financeiras?.nome?.toLowerCase().includes(term) ?? false)
+      }
+      queryFn={async () => {
         if (!igrejaId) return [];
 
         let transacaoQuery = supabase
@@ -177,16 +184,7 @@ export function VincularTransacaoDialog({
           return { ...t, score };
         });
 
-        const buscaLower = busca?.toLowerCase() ?? null;
-        return comScore
-          .filter((t) => {
-            if (!buscaLower) return true;
-            return (
-              t.descricao.toLowerCase().includes(buscaLower) ||
-              t.categorias_financeiras?.nome.toLowerCase().includes(buscaLower)
-            );
-          })
-          .sort((a, b) => b.score - a.score);
+        return comScore.sort((a, b) => b.score - a.score);
       }}
       getId={(t) => t.id}
       getScore={(t) => t.score}

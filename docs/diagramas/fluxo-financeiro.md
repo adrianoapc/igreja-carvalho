@@ -867,6 +867,30 @@ flowchart TD
     LIV -.->|"confirma"| W2["fin_vincular_venda_getnet_oferta"]
 ```
 
+## Fase 7b — UI do ledger unificado (§9.95)
+
+Substitui Hop 2 / Hop 1 / tabela de lotes empilhados por uma linha
+expansível por lançamento. Writers inalterados.
+
+```mermaid
+flowchart TD
+    TAB["LotesAntecipacaoTab\nfiltros + ConferenciaTotais"] --> LEDGER["ConciliacaoCartaoLedger"]
+    LEDGER -->|"1 call"| LRPC["fin_listar_ledger_conciliacao_cartao"]
+    LEDGER -->|"1 call/período"| H1["fin_gerar_candidatos_venda_banco_getnet"]
+    H1 --> MATCH{"rematch UI:\ndata_vencimento_real + filial\nignora parcela com lote_id"}
+    MATCH -->|"aguardando_banco"| BTN1["Confirmar sugestão Hop 1"]
+    LEDGER -->|"sem_hop2 + sugestão"| BTN2["Confirmar / bulk"]
+    LEDGER -->|"Buscar manualmente"| BUSCA["BuscaManualDialog\nfin_buscar_recebiveis_getnet_oferta"]
+    BTN2 --> W2["fin_vincular_venda_getnet_oferta"]
+    BUSCA --> W2
+    BTN1 --> W1["fin_vincular_venda_banco_getnet"]
+    LEDGER --> LOTES["lotes do período"]
+    LOTES --> W3["fin_vincular_lote_antecipacao\n+ fin_lancar_desagio_antecipacao"]
+    W2 -.-> INV["invalidate:\nledger · Hop1 · conferência · lotes"]
+    W1 -.-> INV
+    W3 -.-> INV
+```
+
 ## Competência de grupo em lançamentos parcelados — D10 (jul/2026)
 
 Ver §9.19 do `arquitetura-financeiro.md`. Fecha o cenário B ("Despesa

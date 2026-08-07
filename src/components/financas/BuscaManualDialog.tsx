@@ -54,6 +54,15 @@ export interface BuscaManualDialogProps<T> {
   renderItem: (item: T) => BuscaManualRenderedItem;
   /** Dica extra dentro de um grupo com >1 item (ex.: "3 parcelas do NSU X"). */
   renderGroupHint?: (items: T[]) => ReactNode;
+  /**
+   * Default `true`: termo debounced vai pra `queryFn`/queryKey (RPC ou query
+   * server-side). `false`: `queryFn(null)` uma vez; filtre com
+   * `matchesSearch` no cliente — evita re-fetch a cada tecla em call-sites
+   * que já trazem a janela inteira (ex.: VincularTransacaoDialog).
+   */
+  serverSearch?: boolean;
+  /** Obrigatório quando `serverSearch={false}`. */
+  matchesSearch?: (item: T, term: string) => boolean;
   onConfirm: (ids: string[], items: T[]) => Promise<{ successMessage: string; warnings?: string[] }>;
   onConfirmed?: () => void;
   confirmLabel?: string;
@@ -77,6 +86,8 @@ export function BuscaManualDialog<T>({
   scoreThresholds,
   renderItem,
   renderGroupHint,
+  serverSearch = true,
+  matchesSearch,
   onConfirm,
   onConfirmed,
   confirmLabel = "Confirmar vínculo",
@@ -89,25 +100,35 @@ export function BuscaManualDialog<T>({
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
 
-  // Debounce de 300ms — sem isso, cada tecla digitada refaz queryFn (RPC ou
-  // query direta ao Supabase, dependendo do call-site), gerando 1 round-trip
-  // de rede por caractere. Input continua respondendo na hora (searchTerm),
-  // só a busca em si atrasa.
+  const resetSearchState = () => {
+    setSelectedGroupKey(null);
+    setSearchTerm("");
+    setDebouncedSearchTerm("");
+  };
+
+  // Debounce de 300ms — só relevante com serverSearch (cada tecla refaria
+  // queryFn). Input continua respondendo na hora (searchTerm).
   useEffect(() => {
+    if (!serverSearch) return;
     const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
     return () => clearTimeout(timer);
-  }, [searchTerm]);
+  }, [searchTerm, serverSearch]);
 
-  const buscaRpc = debouncedSearchTerm.trim() || null;
+  const buscaRpc = serverSearch ? debouncedSearchTerm.trim() || null : null;
   const { data: itens = [], isLoading, isFetching } = useQuery({
-    queryKey: [...queryKey, buscaRpc],
+    queryKey: serverSearch ? [...queryKey, buscaRpc] : queryKey,
     queryFn: () => queryFn(buscaRpc),
     enabled: open,
   });
 
   const groups = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    const filtrados =
+      !serverSearch && term && matchesSearch
+        ? itens.filter((item) => matchesSearch(item, term))
+        : itens;
     const map = new Map<string, T[]>();
-    for (const item of itens) {
+    for (const item of filtrados) {
       const key = getGroupKey ? getGroupKey(item) : getId(item);
       const arr = map.get(key);
       if (arr) arr.push(item);
@@ -120,7 +141,7 @@ export function BuscaManualDialog<T>({
         score: Math.max(...items.map(getScore)),
       }))
       .sort((a, b) => b.score - a.score);
-  }, [itens, getGroupKey, getId, getScore]);
+  }, [itens, getGroupKey, getId, getScore, serverSearch, matchesSearch, searchTerm]);
 
   const selectedGroup = groups.find((g) => g.key === selectedGroupKey) ?? null;
 
@@ -139,8 +160,7 @@ export function BuscaManualDialog<T>({
       }
       onConfirmed?.();
       onOpenChange(false);
-      setSelectedGroupKey(null);
-      setSearchTerm("");
+      resetSearchState();
     } catch (err) {
       console.error(err);
       toast.error(rpcErrorMessage(err) ?? "Erro ao confirmar vínculo");
@@ -153,10 +173,7 @@ export function BuscaManualDialog<T>({
     <ResponsiveDialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) {
-          setSelectedGroupKey(null);
-          setSearchTerm("");
-        }
+        if (!next) resetSearchState();
         onOpenChange(next);
       }}
       trigger={null}

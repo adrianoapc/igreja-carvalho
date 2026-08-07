@@ -130,6 +130,12 @@ function nBatidas(l: LedgerCartaoLancamento): number {
  * `antecipada`, já batidas) + filial compartilhada (`filial_id` null em
  * qualquer lado é "global", mesma regra do resto do domínio).
  *
+ * Ignora parcela com `lote_id`: hop1_status fica `aguardando` enquanto o
+ * lote de antecipação ainda está `pendente_vinculo`, mas a RPC Hop 1
+ * exclui `contrato_registradora IS NOT NULL` — casar só por data colocaria
+ * "Confirmar sugestão" numa linha de antecipação apontando pra crédito
+ * de outras vendas do mesmo dia.
+ *
  * Percorre as parcelas na ordem (`numero_parcela` — já vem ordenado do
  * RPC) e devolve o PRIMEIRO candidato encontrado: a linha tem 1 botão só,
  * não 1 por parcela. Se parcelas diferentes da mesma linha "aguardando"
@@ -142,7 +148,7 @@ function encontrarCandidatoHop1(
   candidatosPorData: Map<string, CandidatoVendaBancoGetnet[]>,
 ): CandidatoVendaBancoGetnet | null {
   for (const p of l.parcelas) {
-    if (p.hop1_status !== "aguardando" || !p.data_vencimento_real) continue;
+    if (p.hop1_status !== "aguardando" || !p.data_vencimento_real || p.lote_id) continue;
     const candidatos = candidatosPorData.get(p.data_vencimento_real);
     if (!candidatos || candidatos.length === 0) continue;
     const compativeis = candidatos.filter(
@@ -345,7 +351,12 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
 
   const invalidateAfterVinculo = () => {
     refetch();
+    // Hop 2 confirmado → linha vira aguardando_banco e novos candidatos Hop 1
+    // entram no período; sem invalidar, o botão só aparece após remount/focus
+    // (regressão vs Hop2OfertaVendaSection da Fase 6).
+    queryClient.invalidateQueries({ queryKey: ["candidatos-venda-banco-getnet"] });
     queryClient.invalidateQueries({ queryKey: ["conferencia-totais-getnet"] });
+    queryClient.invalidateQueries({ queryKey: ["getnet-antecipacao-lotes"] });
   };
 
   const confirmarSugestoes = useMutation({
@@ -438,18 +449,24 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
         <div className="border rounded-lg p-8 text-center text-sm text-muted-foreground">
           Selecione integração Getnet e conta bancária para carregar o ledger.
         </div>
-      ) : isLoading || isFetching ? (
+      ) : isLoading && !ledger ? (
         <div className="flex items-center justify-center p-12">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
         </div>
-      ) : isError ? (
+      ) : isError && !ledger ? (
         <div className="border rounded-lg p-8 text-center text-sm text-destructive">
           Não foi possível carregar o ledger{errorMsg ? `: ${errorMsg}` : "."}
         </div>
       ) : (
         <>
-          {/* Tira de resumo — 4 células */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-lg border overflow-hidden bg-border">
+          {/* Tira de resumo — 4 células; refetch pós-vínculo não troca o
+              ledger inteiro por spinner (só a carga inicial faz isso). */}
+          <div className="relative grid grid-cols-2 sm:grid-cols-4 gap-px rounded-lg border overflow-hidden bg-border">
+            {isFetching && (
+              <div className="absolute top-2 right-2 z-10">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+              </div>
+            )}
             <SummaryCell label="Fechados" value={resumo.fechados} tone="good" />
             <SummaryCell label="Aguardando banco" value={resumo.aguardando_banco} tone="warning" />
             <SummaryCell label="Pendente vínculo" value={resumo.sem_hop2} tone="serious" />
