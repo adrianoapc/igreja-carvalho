@@ -27,10 +27,23 @@
 -- estão em migrations separadas (mesma leva de hotfix):
 --   - fin_listar_ledger_conciliacao_cartao (vendas_origem_agg)
 --   - fin_vincular_venda_getnet_oferta (detecção de parcelamento Fase 2b)
+--
+-- USING precisa funcionar nos DOIS estados possíveis da coluna no momento em
+-- que esta migration roda: `integer` (produção real, drift já presente) ou
+-- `text` (replay do zero a partir do histórico do git, coluna ainda não
+-- alterada). `NULLIF(parcelas, '')::integer` ingênuo QUEBRA contra uma coluna
+-- já `integer` (o mesmo erro 22P02 que este hotfix inteiro existe pra
+-- resolver — comprovado em Docker: ALTER numa tabela `integer` com esse
+-- USING falha na hora). O CASE abaixo primeiro converte pra texto (round-trip
+-- seguro nos dois sentidos: text→text é no-op, integer→text sempre
+-- funciona), só aceita quando o resultado é 100% dígitos, e descarta
+-- qualquer outra coisa (incluindo o formato antigo "N de M", que nunca foi
+-- usado de verdade em produção) como NULL em vez de estourar.
 -- ============================================================================
 
 ALTER TABLE public.getnet_recebivel_lancamentos
-  ALTER COLUMN parcelas TYPE integer USING NULLIF(parcelas, '')::integer;
+  ALTER COLUMN parcelas TYPE integer
+  USING CASE WHEN parcelas::text ~ '^[0-9]+$' THEN parcelas::text::integer ELSE NULL END;
 
 COMMENT ON COLUMN public.getnet_recebivel_lancamentos.parcelas IS
   'Coluna integer (drift de schema fechado em 20260807100000 — produção real já era integer, git assumia text desde a criação da tabela). Hoje sempre NULL nas linhas reais: não guarda mais o rótulo bruto "N de M" do portal (isso exigiria uma 2ª coluna, que não existe). RPCs fin_* não tratam mais este campo como texto "parcela atual de total" — ver fin_listar_ledger_conciliacao_cartao/fin_vincular_venda_getnet_oferta.';
