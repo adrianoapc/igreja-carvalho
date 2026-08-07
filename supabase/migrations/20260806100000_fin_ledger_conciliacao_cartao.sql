@@ -41,17 +41,20 @@
 -- lançamento).
 --
 -- Override de divergência: soma valor_liquido de TODO getnet_recebivel_
--- lancamentos do tenant apontando pro mesmo extrato_bancario_id (não só o
--- subconjunto deste grupo) vs extratos_bancarios.valor — mesma agregação que
--- fin_vincular_venda_banco_getnet já fez ao escrever esse vínculo (Hop 1
--- agrupa por data_vencimento, não por lançamento; um crédito pode cobrir
--- parcelas de mais de uma oferta do mesmo dia). Tolerância R$0,01
--- (CENTAVOS_TOLERANCIA, mesma constante de ConferenciaTotaisGetnetCard.tsx).
--- has_filial_access no extrato (eb) E em cada recebível somado (g2), mesmo
--- padrão do LEFT JOIN de extrato em lotes_final: sem acesso à filial do
--- extrato, a linha não pode virar "divergencia" nem a soma pode ser
--- contaminada por um recebível de filial inacessível — vazaria o valor de
--- outra filial via 1 bit correlacionado (review #83).
+-- lancamentos do EC (integracao_id) apontando pro mesmo extrato_bancario_id
+-- (não só o subconjunto deste grupo) vs extratos_bancarios.valor — mesma
+-- agregação que fin_vincular_venda_banco_getnet já fez ao escrever esse
+-- vínculo (Hop 1 agrupa por data_vencimento, não por lançamento; um crédito
+-- pode cobrir parcelas de mais de uma oferta do mesmo dia). Tolerância
+-- R$0,01 (CENTAVOS_TOLERANCIA, mesma constante de
+-- ConferenciaTotaisGetnetCard.tsx).
+-- Gate de vazamento = has_filial_access no extrato (eb), mesmo padrão de
+-- lotes_final: sem acesso à filial do extrato, a linha não vira
+-- "divergencia". A soma g2 NÃO filtra HFA por recebível — com âncora
+-- compartilhada (#13: extrato global + recebíveis de filiais distintas) a
+-- conta precisa ser completa vs eb.valor; filtrar g2 por HFA gerava
+-- divergencia falsa (Bugbot "Partial sum versus full extrato", review #83).
+-- g2 não é devolvido linha a linha — só alimenta o bit de status.
 --
 -- Double-count do CSV: valor_venda repete o bruto por parcela do mesmo NSU —
 -- nunca usado aqui. Parcelas/vendas_origem usam
@@ -235,13 +238,12 @@ BEGIN
     FROM recebiveis_status
     GROUP BY grupo_id
   ),
-  -- ─── Divergência: soma TENANT-WIDE por extrato (Hop 1 agrupa por dia, não
-  -- por lançamento — um crédito pode cobrir parcelas de mais de uma oferta).
-  -- HFA no extrato (mesmo padrão de lotes_final): oferta de filial A casada
-  -- com recebível global cujo extrato é de filial B não pode calcular
-  -- divergencia usando eb.valor de uma filial que o chamador não acessa —
-  -- vazaria 1 bit correlacionado com o valor daquele extrato (review #83).
-  -- Escopo de integracao_id no g2 pela mesma razão do resto do arquivo.
+  -- ─── Divergência: soma completa do EC por extrato (Hop 1 agrupa por dia,
+  -- não por lançamento — um crédito pode cobrir parcelas de mais de uma
+  -- oferta). Gate = HFA no extrato (eb). Soma g2 NÃO filtra HFA: com âncora
+  -- compartilhada (#13) a conta vs eb.valor tem que ser completa — HFA em
+  -- g2 gerava divergencia falsa (Bugbot review #83). Escopo integracao_id
+  -- no g2 pela mesma razão do resto do arquivo.
   divergencia_grupo AS (
     SELECT DISTINCT rs.grupo_id
     FROM recebiveis_status rs
@@ -262,7 +264,6 @@ BEGIN
               WHERE g2.extrato_bancario_id = rs.extrato_bancario_id
                 AND g2.igreja_id = v_igreja
                 AND g2.integracao_id = p_integracao_id
-                AND public.has_filial_access(v_igreja, g2.filial_id)
            ) - eb.valor
          ) > 0.01
   ),
@@ -485,7 +486,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.fin_listar_ledger_conciliacao_cartao(uuid, uuid, date, date, jsonb, uuid) IS
-  'Fase 7a Conciliação Cartão Getnet (só leitura): monta o ledger unificado Oferta→Venda→Banco + lotes de antecipação por período. Status de linha (sem_hop2/aguardando_banco/fechado/divergencia) deliberadamente distinto do enum getnet_antecipacao_lotes.status. Sugestão Hop 2 via 1 chamada de fin_gerar_candidatos_oferta_venda_getnet por período (join único por transacao_id, DISTINCT ON score DESC). Divergência = Σ valor_liquido tenant-wide por extrato vs extratos_bancarios.valor, tolerância R$0,01, com has_filial_access no extrato (eb) e em cada recebível somado (g2) — sem acesso à filial do extrato a linha não pode virar divergencia nem a soma pode ser contaminada por recebível de filial inacessível (review #83). lancamentos escopados por transacoes_financeiras.conta_id = p_conta_id; recebíveis/lotes/vendas_origem por integracao_id = p_integracao_id; lotes vinculados só entram se o extrato é da mesma conta, lotes pendente_vinculo aparecem sem escopo de conta. Extrato do lote e metadados de oferta em vendas_origem exigem has_filial_access. fechado exige n_batidas = n_recebiveis >= n_membros.';
+  'Fase 7a Conciliação Cartão Getnet (só leitura): monta o ledger unificado Oferta→Venda→Banco + lotes de antecipação por período. Status de linha (sem_hop2/aguardando_banco/fechado/divergencia) deliberadamente distinto do enum getnet_antecipacao_lotes.status. Sugestão Hop 2 via 1 chamada de fin_gerar_candidatos_oferta_venda_getnet por período (join único por transacao_id, DISTINCT ON score DESC). Divergência = Σ valor_liquido do EC por extrato vs extratos_bancarios.valor, tol. R$0,01; gate has_filial_access só no extrato (eb) — soma g2 completa (igreja+integracao, sem HFA por recebível) pra não gerar divergencia falsa com âncora compartilhada #13 (review #83). lancamentos escopados por transacoes_financeiras.conta_id = p_conta_id; recebíveis/lotes/vendas_origem por integracao_id = p_integracao_id; lotes vinculados só entram se o extrato é da mesma conta, lotes pendente_vinculo aparecem sem escopo de conta. Extrato do lote e metadados de oferta em vendas_origem exigem has_filial_access. fechado exige n_batidas = n_recebiveis >= n_membros.';
 
 GRANT EXECUTE ON FUNCTION public.fin_listar_ledger_conciliacao_cartao(uuid, uuid, date, date, jsonb, uuid)
   TO authenticated, service_role;

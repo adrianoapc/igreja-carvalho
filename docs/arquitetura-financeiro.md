@@ -5624,8 +5624,10 @@ p_periodo_inicio, p_periodo_fim, p_contexto, p_filial_id)`** → jsonb
 - Escopo `integracao_id` em recebíveis/lotes/`vendas_origem`.
 - Extrato do lote e metadados de oferta em `vendas_origem` exigem
   `has_filial_access` (não vazam via lote/recebível global).
-- Divergência: Σ `valor_liquido` tenant-wide por
-  `extrato_bancario_id` vs `extratos_bancarios.valor`, tol. R$0,01.
+- Divergência: gate `has_filial_access` no extrato; Σ `valor_liquido`
+  completa do EC (`igreja_id` + `integracao_id`) vs
+  `extratos_bancarios.valor`, tol. R$0,01 — sem HFA por recebível na
+  soma (âncora #13: soma parcial gerava `divergencia` falsa).
 - Lotes `pendente_vinculo` aparecem sem filtro de conta (ação Vincular).
 
 **`fin_buscar_recebiveis_getnet_oferta(p_transacao_id, p_integracao_id,
