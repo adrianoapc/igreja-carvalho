@@ -155,37 +155,41 @@ BEGIN
     RAISE EXCEPTION 'FIN_VALIDACAO: oferta e recebíveis de filiais diferentes não podem ser vinculados juntos';
   END IF;
 
-  -- Detecta parcelado: um único NSU com total N>1 e rótulos "k de N".
+  -- Detecção de parcelamento via g.parcelas DESATIVADA (hotfix 2026-08-07).
+  -- g.parcelas virou `integer` (drift de schema fechado em
+  -- 20260807100000_fin_getnet_recebivel_parcelas_integer_drift.sql) —
+  -- produção nunca teve de fato o rótulo texto "k de N" que este bloco
+  -- assumia; a coluna é 100% NULL nas 129 linhas reais hoje. Um integer
+  -- isolado NÃO permite reconstruir "parcela atual DE total" sem uma 2ª
+  -- coluna que não existe — tentar via regexp_match(COALESCE(g.parcelas,
+  -- '1 de 1'), ...) falha no PLANEJAMENTO da query (COALESCE(integer,
+  -- text), erro de tipo 22P02), sempre, independente de dado. Ou seja,
+  -- Hop 2 nunca completou com sucesso em produção desde que essa coluna é
+  -- integer (todo NSU único cai em v_nsu_count = 1, que executava o bloco
+  -- que falhava).
+  --
+  -- Fix: v_parcelado fica sempre false — segue o caminho à vista (mais
+  -- simples, já existia, sempre funcionou). Não é regressão: é o
+  -- comportamento que já deveria estar acontecendo (parcelamento via
+  -- g.parcelas nunca teve dado real pra detectar). A estrutura da Fase 2b
+  -- abaixo (`IF v_parcelado THEN ...`) fica preservada, mas inerte —
+  -- inalcançável enquanto v_parcelado nunca vira true. Se um dia
+  -- g.parcelas (integer) passar a carregar um dado confiável (não "k de
+  -- N"), a detecção precisa ser reescrita do zero para o novo formato —
+  -- não reative este bloco como estava.
   SELECT count(DISTINCT g.nsu) INTO v_nsu_count
     FROM public.getnet_recebivel_lancamentos g
    WHERE g.id = ANY (v_ids);
 
   IF v_nsu_count = 1 THEN
-    SELECT g.nsu,
-           MAX(g.valor_venda),
-           MAX((regexp_match(COALESCE(g.parcelas, '1 de 1'), '(\d+)\s+de\s+(\d+)'))[2]::int),
-           MIN((regexp_match(COALESCE(g.parcelas, '1 de 1'), '(\d+)\s+de\s+(\d+)'))[1]::int),
-           MAX((regexp_match(COALESCE(g.parcelas, '1 de 1'), '(\d+)\s+de\s+(\d+)'))[1]::int),
-           count(DISTINCT COALESCE(g.parcelas, '1 de 1'))
-      INTO v_nsu, v_bruto_nsu, v_total_parcelas, v_min_parcela, v_max_parcela, v_n_distintas
+    SELECT g.nsu INTO v_nsu
       FROM public.getnet_recebivel_lancamentos g
      WHERE g.id = ANY (v_ids)
-     GROUP BY g.nsu;
-
-    v_parcelado := COALESCE(v_total_parcelas, 1) > 1;
-  ELSIF v_nsu_count > 1 THEN
-    -- Vários NSUs: só à vista (todas total 1). Misturar com parcelado N>1
-    -- no mesmo vínculo é ambíguo.
-    IF EXISTS (
-      SELECT 1
-        FROM public.getnet_recebivel_lancamentos g
-       WHERE g.id = ANY (v_ids)
-         AND COALESCE((regexp_match(COALESCE(g.parcelas, '1 de 1'), '(\d+)\s+de\s+(\d+)'))[2]::int, 1) > 1
-    ) THEN
-      RAISE EXCEPTION 'FIN_VALIDACAO: não misture NSU parcelado (N>1) com outros NSUs no mesmo vínculo';
-    END IF;
-    v_parcelado := false;
+     LIMIT 1;
   END IF;
+
+  v_parcelado := false;
+  v_total_parcelas := 1;
 
   IF v_parcelado THEN
     -- 2b: conjunto completo 1..N obrigatório.
