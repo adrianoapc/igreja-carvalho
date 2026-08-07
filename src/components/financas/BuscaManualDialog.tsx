@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Search, Link2, CheckCircle2, AlertCircle } from "lucide-react";
@@ -87,9 +87,19 @@ export function BuscaManualDialog<T>({
   const [loading, setLoading] = useState(false);
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
 
-  const buscaRpc = searchTerm.trim() || null;
-  const { data: itens = [], isLoading } = useQuery({
+  // Debounce de 300ms — sem isso, cada tecla digitada refaz queryFn (RPC ou
+  // query direta ao Supabase, dependendo do call-site), gerando 1 round-trip
+  // de rede por caractere. Input continua respondendo na hora (searchTerm),
+  // só a busca em si atrasa.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const buscaRpc = debouncedSearchTerm.trim() || null;
+  const { data: itens = [], isLoading, isFetching } = useQuery({
     queryKey: [...queryKey, buscaRpc],
     queryFn: () => queryFn(buscaRpc),
     enabled: open,
@@ -173,7 +183,7 @@ export function BuscaManualDialog<T>({
         </div>
 
         <ScrollArea className="flex-1 min-h-0 max-h-[280px] border rounded-lg">
-          {isLoading ? (
+          {isLoading || isFetching ? (
             <div className="flex items-center justify-center h-full p-6">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
