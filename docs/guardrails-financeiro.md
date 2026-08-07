@@ -328,8 +328,26 @@ DEFINER`:**
     lote/divisão legítimos. Mix de filiais concretas SEM recurso
     compartilhado continua `FIN_VALIDACAO` (§9.86).
 
+14. **Toda RPC que lista/filtra `transacoes_financeiras` por
+    `conciliacao_status` precisa de um allow-list explícito do que É
+    aceito, nunca um deny-list de um valor específico** — o enum tem 4
+    valores reais (`nao_conciliado` | `conciliado_manual` |
+    `conciliado_extrato` | `conciliado_bot`, confirmado no schema real via
+    `\d+ transacoes_financeiras`, não só por leitura de migration
+    histórica), e ~15 RPCs `fin_*` já tratam `conciliado_bot` como
+    sinônimo de `conciliado_extrato` ("fechado por outro canal, não pode
+    reeditar"). Um filtro `<> 'conciliado_extrato'` deixa `conciliado_bot`
+    vazar pelo mesmo buraco que motivou o fix. Achado real:
+    `fin_listar_ledger_conciliacao_cartao` não filtrava
+    `conciliacao_status` na CTE `raizes` — lançamento fechado via extrato
+    bancário (canal fora da cadeia Getnet Hop1/Hop2, nunca ganha
+    `getnet_recebivel_lancamentos`) aparecia como `sem_hop2` com botões
+    "Buscar manualmente"/"Confirmar sugestão" que SEMPRE rejeitam com
+    `FIN_JA_LANCADO` — fix é `IN ('nao_conciliado', 'conciliado_manual')`
+    (§9.96).
+
 Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.65, §9.67,
-§9.73, §9.74, §9.80, §9.81, §9.82, §9.86, checklist completo na memória de sessão.
+§9.73, §9.74, §9.80, §9.81, §9.82, §9.86, §9.96, checklist completo na memória de sessão.
 
 ---
 

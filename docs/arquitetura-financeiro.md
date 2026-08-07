@@ -5661,6 +5661,62 @@ novos). O hotfix concentra:
 4. `CREATE OR REPLACE` de `fin_importar_recebivel_getnet` — CSV "N de M"
    → `NULL` (só grava integer puro se o payload já vier normalizado).
 
+### 9.96 Fix — ledger da Fase 7a incluía lançamento fechado por outro canal como "sem_hop2"
+
+Migration **nova** `20260807120000_fin_ledger_exclui_conciliado_extrato.sql`
+(guardrail 6b — `fin_listar_ledger_conciliacao_cartao` já deployada desde
+20260807100000). Reproduzido com dado real de produção: ledger carregava OK,
+mas clicar "Buscar manualmente" numa linha `sem_hop2` disparava
+`fin_buscar_recebiveis_getnet_oferta` → `FIN_JA_LANCADO: lançamento já
+conciliado (conciliado_extrato); não há recebíveis para buscar`.
+
+Causa: a CTE `raizes` filtra tipo/status/forma/tenant/filial mas nunca olhou
+`conciliacao_status` — incluía lançamentos fechados por um canal
+TOTALMENTE diferente (batidos direto contra o extrato bancário via Modo
+Inteligente/conciliação manual, nunca passaram pela cadeia Getnet
+Hop1/Hop2). Sem recebível Getnet vinculado, caem em `sem_hop2` com ações que
+SEMPRE falham.
+
+**Fix**: `raizes` ganha `AND t.conciliacao_status IN ('nao_conciliado',
+'conciliado_manual')` — allow-list explícito, não `<> 'conciliado_extrato'`.
+
+**Achado que valida a escolha do allow-list**: o enum real de
+`conciliacao_status` (conferido no harness via `\d+ transacoes_financeiras`,
+não só por leitura de migration) tem **4** valores, não 3 —
+`nao_conciliado` | `conciliado_manual` | `conciliado_extrato` |
+`conciliado_bot` (coluna adicionada em `20260213201114`). Nenhuma RPC deste
+repo escreve `conciliado_bot` hoje, mas ~15 RPCs `fin_*` já tratam esse
+valor como sinônimo de `conciliado_extrato` no idioma `conciliacao_status IN
+('conciliado_extrato', 'conciliado_bot')` (guard de "não pode reeditar" —
+`fin_atualizar_lancamento`, `fin_saldo_conta_sempre_recalcula`,
+`fin_confirmar_conciliacao`, etc.). Um deny-list `<> 'conciliado_extrato'`
+teria deixado `conciliado_bot` vazar pela CTE `raizes` do mesmo jeito que o
+bug original deixava `conciliado_extrato` vazar — mesma classe de bug, valor
+diferente. `conciliado_manual` continua incluído: é o status setado por
+`fin_vincular_venda_getnet_oferta` quando o Hop 2 via Getnet É confirmado —
+excluí-lo quebraria `fechado`/`aguardando_banco`/`divergencia`.
+
+**Caso de borda documentado, não corrigido (não é regressão)**:
+`conciliado_manual` sem nenhum recebível Getnet vinculado (ex.: legado do
+backfill de `20260213201114` que promovia `conferido_manual=true` de caixa
+pré-existente) continua aparecendo como `sem_hop2` — comportamento idêntico
+antes/depois desta migration (o allow-list sempre incluiu
+`conciliado_manual`). Não é um estado alcançável por nenhuma RPC ativa hoje
+(a única escrita de `conciliado_manual` é `fin_vincular_venda_getnet_oferta`,
+sempre no mesmo `UPDATE` que vincula o recebível) — fora de escopo deste fix.
+
+Harness Postgres (Docker, réplica cronológica de `supabase/migrations`):
+lançamento `conciliado_extrato` E `conciliado_bot` (ambos sem recebível)
+ausentes de `lancamentos`/`resumo.sem_hop2`; `nao_conciliado` sem recebível
+continua `sem_hop2`; `conciliado_manual` com recebível+extrato continua
+`fechado` (prova que o fix errado — filtrar só `nao_conciliado` — quebraria
+esse caso); reprodução isolada do erro original via
+`fin_buscar_recebiveis_getnet_oferta` contra a linha `conciliado_extrato`
+(`FIN_JA_LANCADO`, confirmando o sintoma relatado); smoke de T1/T2/E1-E5/S1-
+S4 da Fase 7a sem regressão. Teste de controle: os mesmos asserts rodados
+contra a função PRÉ-fix (20260807100000) falham como esperado (prova que o
+harness detecta o bug, não só que não quebra nada).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
