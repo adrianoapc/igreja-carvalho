@@ -225,6 +225,17 @@ DEFINER`:**
    numa cópia anterior na conversa, apagou o guard D10
    (`FIN_COMPETENCIA_GRUPO`) que uma migration intermediária já tinha
    adicionado.
+6b. **Hotfix de corpo de RPC já deployada: NÃO edite a migration
+   histórica no git — escreva `CREATE OR REPLACE` numa migration NOVA
+   (forward).** `supabase db push` só aplica arquivos que ainda não
+   estão em `supabase_migrations.schema_migrations`. Alterar
+   `20260805110000_...sql` depois que produção já rodou esse timestamp
+   deixa o git "certo" e o banco com o corpo velho. Achado real: hotfix
+   do drift `getnet_recebivel_lancamentos.parcelas` (§9.95) — a 1ª
+   versão corrigia `fin_vincular_venda_getnet_oferta` /
+   `fin_listar_ledger_conciliacao_cartao` nos arquivos já aplicados e
+   só mandava `ALTER COLUMN` na migration nova; o deploy de produção
+   teria formalizado o tipo e **mantido as RPCs quebradas** (`22P02`).
 7. **RPC que materializa VÁRIAS linhas relacionadas num `FOR ... LOOP`
    (parcelas, ocorrências): todo campo que devia ser IGUAL entre elas
    precisa ser calculado UMA VEZ, fora do loop** — nunca dentro, mesmo

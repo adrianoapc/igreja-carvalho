@@ -867,6 +867,22 @@ flowchart TD
     LIV -.->|"confirma"| W2["fin_vincular_venda_getnet_oferta"]
 ```
 
+## Hotfix — drift `parcelas` text→integer (§9.95)
+
+Tudo numa migration **nova** (`20260807100000`): `supabase db push` não
+reaplica migrations históricas já aplicadas.
+
+```mermaid
+flowchart TD
+    DRIFT["prod: parcelas integer\ngit: assumia text"] --> BUG["COALESCE(parcelas, '1 de 1')\n22P02 no planejamento"]
+    BUG --> HOP2["fin_vincular_venda_getnet_oferta"]
+    BUG --> LED["fin_listar_ledger_conciliacao_cartao"]
+    FWD["20260807100000 forward"] --> ALTER["ALTER COLUMN integer\nUSING text|integer"]
+    FWD --> R1["CREATE OR REPLACE Hop 2\nv_parcelado := false"]
+    FWD --> R2["CREATE OR REPLACE ledger\nparcela via oferta ou 1"]
+    FWD --> R3["CREATE OR REPLACE importar\n'N de M' → NULL"]
+```
+
 ## Competência de grupo em lançamentos parcelados — D10 (jul/2026)
 
 Ver §9.19 do `arquitetura-financeiro.md`. Fecha o cenário B ("Despesa
