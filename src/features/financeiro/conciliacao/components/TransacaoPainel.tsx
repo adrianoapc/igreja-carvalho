@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RotateCcw } from "lucide-react";
-import { MonthPicker } from "@/components/financas/MonthPicker";
 import { TransacaoListItem } from "./TransacaoListItem";
 import type { TransacaoItemComScore } from "./TransacaoListItem";
 import type { Conta } from "../hooks/useConciliacaoInteligente";
@@ -13,12 +12,6 @@ interface TransacaoPainelProps {
   selectedTransacoes: string[];
   /** Usado só para resolver o nome exibido no badge de conta de cada item. */
   contas?: Conta[];
-  mesTransacoes: Date;
-  onMesTransacoesChange: (date: Date) => void;
-  transacoesCustomRange: { from: Date; to: Date } | null;
-  onTransacoesCustomRangeChange: (
-    range: { from: Date; to: Date } | null,
-  ) => void;
   onSelect: (id: string) => void;
   onLimparSelecao: () => void;
   onAjustarValores: (item: TransacaoItemComScore) => void;
@@ -36,10 +29,6 @@ export function TransacaoPainel({
   loading,
   selectedTransacoes,
   contas,
-  mesTransacoes,
-  onMesTransacoesChange,
-  transacoesCustomRange,
-  onTransacoesCustomRangeChange,
   onSelect,
   onLimparSelecao,
   onAjustarValores,
@@ -63,13 +52,6 @@ export function TransacaoPainel({
         <div className="flex items-center justify-between mb-0.5">
           <h3 className="font-semibold text-sm">Sistema</h3>
           <div className="flex items-center gap-1">
-            <MonthPicker
-              selectedMonth={mesTransacoes}
-              onMonthChange={onMesTransacoesChange}
-              customRange={transacoesCustomRange}
-              onCustomRangeChange={onTransacoesCustomRangeChange}
-              className="text-xs"
-            />
             <Button
               size="icon"
               variant="ghost"

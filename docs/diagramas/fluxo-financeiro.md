@@ -472,28 +472,37 @@ lado-a-lado, "inutilizável em celular") decomposto para
 `ConciliacaoManual`/`DashboardConciliacao`/`HistoricoExtratos` (ver §9.8 do
 `arquitetura-financeiro.md`).
 
+**C2-0 (ago/2026, §9.98):** um único `MonthPicker` na barra de filtros
+(compartilhado pelos dois painéis); `SugestaoTag` unifica visual ML + F4
+sem badge de %; trocar período zera seleção (evita Confirmar sobre IDs
+ocultos — totais só contam linhas filtradas).
+
 ```mermaid
 flowchart TD
     subgraph HOOK["hooks/useConciliacaoInteligente.ts"]
-        Q["3 queries (extratos · transações ·\ncandidatos motor F4) + filtros derivados"]
-        M["mutations: confirmarConciliacao ·\nmarcarConferenciaManual · rejeitarSugestao"]
+        P["periodoMes / periodoCustomRange\n(único — limpa seleção ao mudar)"]
+        Q["3 queries (extratos · transações ·\ncandidatos motor F4) no mesmo período"]
+        M["mutations: confirmarConciliacao ·\nmarcarConferenciaManual · rejeitarSugestao\n(só IDs visíveis + toast = contagem enviada)"]
     end
 
-    subgraph ORQ["ConciliacaoInteligente.tsx (orquestrador, 203 l.)"]
+    subgraph ORQ["ConciliacaoInteligente.tsx (orquestrador)"]
+        FILT["ConciliacaoInteligenteFiltros\n+ MonthPicker único"]
         MOBILE{useIsMobile}
     end
     HOOK --> ORQ
+    P --> FILT
+    P --> Q
 
     subgraph DESKTOP["≥768px — 3 colunas (layout original)"]
         D1[ExtratoPainel]
-        D2["ConciliacaoInteligenteBalanco\nvariant=sidebar"]
+        D2["ConciliacaoInteligenteBalanco\nhasSelecaoConfirmavel"]
         D3[TransacaoPainel]
     end
 
-    subgraph MOBILE_UI["<768px — Tabs (padrão de ConciliacaoManual:552)"]
+    subgraph MOBILE_UI["<768px — Tabs (padrão de ConciliacaoManual)"]
         T1["Tab Banco → ExtratoPainel"]
         T2["Tab Sistema → TransacaoPainel"]
-        F["ConciliacaoInteligenteBalanco\nvariant=footer (fixo, independe da aba ativa)"]
+        F["ConciliacaoInteligenteBalanco\nvariant=footer"]
     end
 
     MOBILE -->|false| DESKTOP
@@ -503,7 +512,9 @@ flowchart TD
     D3 -.mesmo componente.-> T2
 
     ExtratoPainel --> ExtratoListItem
+    ExtratoListItem --> SugestaoTag
     TransacaoPainel --> TransacaoListItem
+    TransacaoListItem --> SugestaoTag
 ```
 
 ## Decomposição — ConciliacaoManual + DashboardConciliacao (F7 sub-frente 2/5, item 3, jul/2026)

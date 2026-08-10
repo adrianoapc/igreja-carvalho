@@ -1,9 +1,10 @@
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Check, X, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { parseLocalDate } from '@/utils/dateUtils'
+import { SugestaoTag, SUGESTAO_BORDA_CLASS } from '@/components/financas/SugestaoTag'
+import { cn } from '@/lib/utils'
 
 interface ExtratoSugestaoMLAProps {
   extratoId: string
@@ -39,21 +40,19 @@ export function ExtratoSugestaoMLA({ extratoId, valor, data, descricao, tipo, su
       </div>
       
       {sugestao && (
-        <div className="mt-1 p-1.5 rounded bg-yellow-50 border border-yellow-200 space-y-1">
+        <div className={cn('mt-1 p-1.5 rounded border space-y-1', SUGESTAO_BORDA_CLASS)}>
           {/* Descrição da Transação de forma compacta */}
           <div className="text-xs">
             <span className="text-muted-foreground">Encontrado: </span>
-            <span className="font-medium text-gray-800">{sugestao.transacaoDescricao}</span>
+            <span className="font-medium text-gray-800 dark:text-gray-200">{sugestao.transacaoDescricao}</span>
           </div>
           <div className="text-xs text-muted-foreground">
             {sugestao.transacaoValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em {parseLocalDate(sugestao.transacaoData) ? format(parseLocalDate(sugestao.transacaoData)!, 'dd/MM', { locale: ptBR }) : '-'}
           </div>
-          
-          {/* Badge de confiança inline com botões */}
+
+          {/* Tag de sugestão (sem percentual, C2-0) inline com botões */}
           <div className="flex items-center gap-1">
-            <Badge variant="outline" className="text-[10px] bg-yellow-100 border-yellow-300 px-1 py-0">
-              {Math.round(sugestao.score * 100)}%
-            </Badge>
+            <SugestaoTag />
             <Button
               size="sm"
               variant="ghost"

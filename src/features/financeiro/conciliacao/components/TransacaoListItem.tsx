@@ -5,6 +5,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { parseLocalDate } from "@/utils/dateUtils";
 import { useHideValues } from "@/hooks/useHideValues";
+import { SugestaoTag, SUGESTAO_BORDA_CLASS } from "@/components/financas/SugestaoTag";
 import type { TransacaoItem } from "../hooks/useConciliacaoInteligente";
 
 export interface TransacaoItemComScore extends TransacaoItem {
@@ -40,18 +41,21 @@ export function TransacaoListItem({
         selected
           ? "bg-blue-100 dark:bg-blue-900 border-blue-400"
           : item.isSuggestion
-            ? "bg-yellow-50 dark:bg-yellow-900/30 border-yellow-300 hover:bg-yellow-100 dark:hover:bg-yellow-900/40"
+            ? cn(SUGESTAO_BORDA_CLASS, "hover:bg-amber-100/60 dark:hover:bg-amber-900/20")
             : "border-border hover:bg-slate-50 dark:hover:bg-slate-800",
       )}
     >
       <div onClick={() => onSelect(item.id)}>
         <div className="flex items-center justify-between gap-1">
           <p className="font-medium truncate">{item.descricao}</p>
-          {item.status === "pendente" && (
-            <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0 rounded whitespace-nowrap">
-              pendente
-            </span>
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            {!selected && item.isSuggestion && <SugestaoTag />}
+            {item.status === "pendente" && (
+              <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0 rounded whitespace-nowrap">
+                pendente
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex justify-between items-center gap-1">
           <span className="flex items-center gap-1 min-w-0">

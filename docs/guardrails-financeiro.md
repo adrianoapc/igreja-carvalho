@@ -615,8 +615,18 @@ Referências: §9.35, §9.39, §9.51, §9.53, §9.73, §9.77.
    você TEM mas não consegue restaurar por outra razão (RPC exige
    não-nulo, por exemplo) — dê uma mensagem honesta sobre ESSE motivo
    específico, não a mensagem genérica de "desconhecido" (§9.57).
+5. **Totais/Confirmar que só somam linhas filtradas NÃO podem confiar
+   só no array de IDs selecionados.** Trocar período/filtro (ou um
+   period-picker compartilhado entre painéis) esconde linhas sem limpar
+   a seleção — o balanço vira 0×0, `hasSelecao` fica true e Confirmar
+   habilita sobre IDs ocultos. Em 1:1 `fin_confirmar_conciliacao` só
+   linka (não valida valor): o gate da UI é o único freio. Ao mudar o
+   filtro que redefine o universo visível, zere a seleção; exija
+   seleção visível nos dois lados pra habilitar Confirmar; e no
+   `mutate`/toast use só os IDs (e a contagem) efetivamente enviados
+   (§9.98 — Modo Inteligente C2-0).
 
-Referências: §9.40, §9.41, §9.56, §9.57, §9.58, §9.59.
+Referências: §9.40, §9.41, §9.56, §9.57, §9.58, §9.59, §9.98.
 
 ---
 

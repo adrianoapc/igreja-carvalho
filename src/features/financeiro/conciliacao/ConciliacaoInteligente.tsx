@@ -68,9 +68,7 @@ export function ConciliacaoInteligente() {
       totalExtratos={data.totalExtratos}
       totalTransacoes={data.totalTransacoes}
       diferenca={data.diferenca}
-      hasSelecao={
-        data.selectedExtratos.length > 0 || data.selectedTransacoes.length > 0
-      }
+      hasSelecao={data.hasSelecaoConfirmavel}
       confirming={data.confirmarConciliacao.isPending}
       onConfirmar={() => data.confirmarConciliacao.mutate()}
       variant={isMobile ? "footer" : "sidebar"}
@@ -85,10 +83,6 @@ export function ConciliacaoInteligente() {
       selectedExtratos={data.selectedExtratos}
       sugestoesMap={data.sugestoesMap}
       isRejectingSugestao={data.rejeitarSugestao.isPending}
-      mesExtratos={data.mesExtratos}
-      onMesExtratosChange={data.setMesExtratos}
-      extratosCustomRange={data.extratosCustomRange}
-      onExtratosCustomRangeChange={data.setExtratosCustomRange}
       onSelect={data.handleSelectExtrato}
       onLimparSelecao={() => data.setSelectedExtratos([])}
       onAceitarSugestao={handleAceitarSugestao}
@@ -108,10 +102,6 @@ export function ConciliacaoInteligente() {
       loading={data.loadingTransacoes}
       selectedTransacoes={data.selectedTransacoes}
       contas={data.contasComInativas}
-      mesTransacoes={data.mesTransacoes}
-      onMesTransacoesChange={data.setMesTransacoes}
-      transacoesCustomRange={data.transacoesCustomRange}
-      onTransacoesCustomRangeChange={data.setTransacoesCustomRange}
       onSelect={data.handleSelectTransacao}
       onLimparSelecao={() => data.setSelectedTransacoes([])}
       onAjustarValores={handleAjustarValores}
@@ -136,6 +126,10 @@ export function ConciliacaoInteligente() {
         onSearchExtratoChange={data.setSearchExtrato}
         gerando={data.gerando}
         onRegenerarSugestoes={data.regenerarSugestoes}
+        periodoMes={data.periodoMes}
+        onPeriodoMesChange={data.setPeriodoMes}
+        periodoCustomRange={data.periodoCustomRange}
+        onPeriodoCustomRangeChange={data.setPeriodoCustomRange}
       />
 
       {isMobile ? (
