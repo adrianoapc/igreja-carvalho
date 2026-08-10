@@ -294,7 +294,7 @@ export function useConciliacaoManualData() {
         const search = searchTerm.toLowerCase();
         if (
           !e.descricao.toLowerCase().includes(search) &&
-          !e.contas?.nome.toLowerCase().includes(search)
+          !e.contas?.nome?.toLowerCase().includes(search)
         ) {
           return false;
         }
@@ -457,6 +457,8 @@ export function useConciliacaoManualData() {
     origemFiltro,
     setOrigemFiltro,
     extratosFiltrados,
+    /** Contagem residual SEM filtros client-side (busca/tipo/origem) — banner de empty state. */
+    totalExtratosSemCandidato: extratosSemCandidato.length,
     paginatedExtratos,
     loadingExtratos,
     currentPage,
