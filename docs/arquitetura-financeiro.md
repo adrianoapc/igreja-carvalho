@@ -5772,6 +5772,31 @@ S4 da Fase 7a sem regressão. Teste de controle: os mesmos asserts rodados
 contra a função PRÉ-fix (20260807100000) falham como esperado (prova que o
 harness detecta o bug, não só que não quebra nada).
 
+### 9.98 Ciclo 2 C2-0 — Modo Inteligente: period-picker único + SugestaoTag
+
+UI-only (sem migration). Unifica os dois `MonthPicker` independentes
+(painéis Banco/Sistema) num único period-picker em
+`ConciliacaoInteligenteFiltros` (`periodoMes` / `periodoCustomRange`) —
+extratos, transações, regeneração ML e candidatos F4 usam o mesmo
+intervalo. Remove o badge numérico de score (%) da sugestão ML e
+unifica a aparência ML + motor F4 via `SugestaoTag` +
+`SUGESTAO_BORDA_CLASS` (âmbar, sem percentual).
+
+**Seleção vs filtro (review Codex/Bugbot):** totais do balanço só
+contam linhas filtradas; `fin_confirmar_conciliacao` em 1:1 não valida
+valor. Trocar o período sem limpar seleção deixava Confirmar habilitado
+sobre IDs ocultos (0×0). Fix: handlers de período zeram
+`selectedExtratos`/`selectedTransacoes`; `hasSelecaoConfirmavel` exige
+seleção **visível** nos dois lados; `mutate` e o toast de sucesso usam
+só os IDs (e a contagem) efetivamente enviados à RPC.
+
+**Trade-off documentado:** o motor F4 continua olhando txs em
+`±30 dias` fora do período do extrato; o painel Sistema agora restringe
+ao período único — pares na borda do mês ficam mais difíceis de
+revisar juntos (antes dava pra navegar Sistema sozinho). Follow-up
+possível: expandir a janela de txs exibidas ou filtrar ML cuja trx não
+está no período.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

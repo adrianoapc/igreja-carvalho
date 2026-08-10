@@ -471,10 +471,11 @@ export function useConciliacaoInteligente() {
       }
 
       await confirmarConciliacaoRpc(vinculo);
+      return extratoIdsVisiveis.length;
     },
-    onSuccess: () => {
+    onSuccess: (nExtratos) => {
       toast.success(
-        `${selectedExtratos.length} extrato(s) conciliado(s) com sucesso!`,
+        `${nExtratos} extrato(s) conciliado(s) com sucesso!`,
       );
       setSelectedExtratos([]);
       setSelectedTransacoes([]);
