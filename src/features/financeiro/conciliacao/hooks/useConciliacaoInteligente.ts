@@ -79,14 +79,12 @@ export function useConciliacaoInteligente() {
   const [tipoFiltro, setTipoFiltro] = useState<string>("all");
   const [searchExtrato, setSearchExtrato] = useState("");
 
-  // Month pickers independentes
-  const [mesExtratos, setMesExtratos] = useState(new Date());
-  const [mesTransacoes, setMesTransacoes] = useState(new Date());
-  const [extratosCustomRange, setExtratosCustomRange] = useState<{
-    from: Date;
-    to: Date;
-  } | null>(null);
-  const [transacoesCustomRange, setTransacoesCustomRange] = useState<{
+  // Period picker único, compartilhado pelos dois painéis (Banco/Sistema) —
+  // C2-0: antes eram 4 estados independentes (mesExtratos/mesTransacoes +
+  // 2 custom ranges), navegação e período podiam divergir entre os painéis
+  // sem nenhum motivo de negócio pra isso.
+  const [periodoMes, setPeriodoMes] = useState(new Date());
+  const [periodoCustomRange, setPeriodoCustomRange] = useState<{
     from: Date;
     to: Date;
   } | null>(null);
@@ -97,14 +95,14 @@ export function useConciliacaoInteligente() {
       igreja_id: igrejaId,
       conta_id: contaFiltro !== "all" ? contaFiltro : undefined,
       mes_inicio: formatLocalDate(
-        extratosCustomRange?.from
-          ? extratosCustomRange.from
-          : startOfMonthLocal(mesExtratos),
+        periodoCustomRange?.from
+          ? periodoCustomRange.from
+          : startOfMonthLocal(periodoMes),
       ),
       mes_fim: formatLocalDate(
-        extratosCustomRange?.to
-          ? extratosCustomRange.to
-          : endOfMonthLocal(mesExtratos),
+        periodoCustomRange?.to
+          ? periodoCustomRange.to
+          : endOfMonthLocal(periodoMes),
       ),
       score_minimo: 0.7,
     });
@@ -114,7 +112,7 @@ export function useConciliacaoInteligente() {
   useEffect(() => {
     regenerarSugestoes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [igrejaId, contaFiltro, mesExtratos, extratosCustomRange]);
+  }, [igrejaId, contaFiltro, periodoMes, periodoCustomRange]);
 
   // Fetch accounts (só ativas — usada no filtro "Todas as contas"; não faz
   // sentido deixar o usuário filtrar por uma conta desativada).
@@ -158,18 +156,18 @@ export function useConciliacaoInteligente() {
       igrejaId,
       filialId,
       isAllFiliais,
-      mesExtratos,
-      extratosCustomRange,
+      periodoMes,
+      periodoCustomRange,
     ],
     queryFn: async (): Promise<ExtratoItem[]> => {
       if (!igrejaId) return [];
 
-      const inicio = extratosCustomRange?.from
-        ? extratosCustomRange.from
-        : startOfMonthLocal(mesExtratos);
-      const fim = extratosCustomRange?.to
-        ? extratosCustomRange.to
-        : endOfMonthLocal(mesExtratos);
+      const inicio = periodoCustomRange?.from
+        ? periodoCustomRange.from
+        : startOfMonthLocal(periodoMes);
+      const fim = periodoCustomRange?.to
+        ? periodoCustomRange.to
+        : endOfMonthLocal(periodoMes);
 
       let query = supabase
         .from("extratos_bancarios")
@@ -210,15 +208,12 @@ export function useConciliacaoInteligente() {
       igrejaId,
       filialId,
       isAllFiliais,
-      mesTransacoes,
-      transacoesCustomRange,
+      periodoMes,
+      periodoCustomRange,
       contaFiltro,
     ],
     queryFn: async (): Promise<TransacaoItem[]> => {
       if (!igrejaId) return [];
-
-      const inicio = startOfMonthLocal(mesTransacoes);
-      const fim = endOfMonthLocal(mesTransacoes);
 
       // Buscar IDs de transações já vinculadas (conciliação 1:1 ou N:1)
       const { data: extratosVinculados } = await supabase
@@ -262,12 +257,12 @@ export function useConciliacaoInteligente() {
           if (t.conciliacao_status && t.conciliacao_status !== "nao_conciliado")
             return false;
 
-          const inicio = transacoesCustomRange?.from
-            ? transacoesCustomRange.from
-            : startOfMonthLocal(mesTransacoes);
-          const fim = transacoesCustomRange?.to
-            ? transacoesCustomRange.to
-            : endOfMonthLocal(mesTransacoes);
+          const inicio = periodoCustomRange?.from
+            ? periodoCustomRange.from
+            : startOfMonthLocal(periodoMes);
+          const fim = periodoCustomRange?.to
+            ? periodoCustomRange.to
+            : endOfMonthLocal(periodoMes);
 
           if (t.status === "pendente") {
             const dataVenc = parseLocalDate(t.data_vencimento);
@@ -299,17 +294,17 @@ export function useConciliacaoInteligente() {
       filialId,
       isAllFiliais,
       contaFiltro,
-      mesExtratos,
-      extratosCustomRange,
+      periodoMes,
+      periodoCustomRange,
     ],
     queryFn: async (): Promise<Map<string, Map<string, number>>> => {
       if (!igrejaId) return new Map();
-      const inicio = extratosCustomRange?.from
-        ? extratosCustomRange.from
-        : startOfMonthLocal(mesExtratos);
-      const fim = extratosCustomRange?.to
-        ? extratosCustomRange.to
-        : endOfMonthLocal(mesExtratos);
+      const inicio = periodoCustomRange?.from
+        ? periodoCustomRange.from
+        : startOfMonthLocal(periodoMes);
+      const fim = periodoCustomRange?.to
+        ? periodoCustomRange.to
+        : endOfMonthLocal(periodoMes);
       const rows = await gerarCandidatosConciliacao({
         contaId: contaFiltro !== "all" ? contaFiltro : null,
         periodoInicio: formatLocalDate(inicio),
@@ -342,12 +337,12 @@ export function useConciliacaoInteligente() {
   const extratosFiltrados = useMemo(() => {
     if (!extratos) return [];
 
-    const inicio = extratosCustomRange?.from
-      ? extratosCustomRange.from
-      : startOfMonthLocal(mesExtratos);
-    const fim = extratosCustomRange?.to
-      ? extratosCustomRange.to
-      : endOfMonthLocal(mesExtratos);
+    const inicio = periodoCustomRange?.from
+      ? periodoCustomRange.from
+      : startOfMonthLocal(periodoMes);
+    const fim = periodoCustomRange?.to
+      ? periodoCustomRange.to
+      : endOfMonthLocal(periodoMes);
 
     return extratos.filter((e) => {
       if (
@@ -364,7 +359,7 @@ export function useConciliacaoInteligente() {
       if (!dataExtrato) return false;
       return isWithinInterval(dataExtrato, { start: inicio, end: fim });
     });
-  }, [extratos, searchExtrato, tipoFiltro, mesExtratos, extratosCustomRange]);
+  }, [extratos, searchExtrato, tipoFiltro, periodoMes, periodoCustomRange]);
 
   const extratoIds = useMemo(() => {
     return extratosFiltrados.map((extrato) => extrato.id);
@@ -569,14 +564,15 @@ export function useConciliacaoInteligente() {
     setSearchExtrato,
     regenerarSugestoes,
     gerando,
+    // período — único, compartilhado pelos dois painéis (C2-0)
+    periodoMes,
+    setPeriodoMes,
+    periodoCustomRange,
+    setPeriodoCustomRange,
     // extratos
     extratosFiltrados,
     totalExtratosBrutos: extratos?.length ?? 0,
     loadingExtratos,
-    mesExtratos,
-    setMesExtratos,
-    extratosCustomRange,
-    setExtratosCustomRange,
     sugestoesMap,
     selectedExtratos,
     setSelectedExtratos,
@@ -584,10 +580,6 @@ export function useConciliacaoInteligente() {
     // transacoes
     sortedTransacoes,
     loadingTransacoes,
-    mesTransacoes,
-    setMesTransacoes,
-    transacoesCustomRange,
-    setTransacoesCustomRange,
     selectedTransacoes,
     setSelectedTransacoes,
     handleSelectTransacao,

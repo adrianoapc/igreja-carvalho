@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RotateCcw } from "lucide-react";
-import { MonthPicker } from "@/components/financas/MonthPicker";
 import { ExtratoListItem } from "./ExtratoListItem";
 import type { ExtratoItem } from "../hooks/useConciliacaoInteligente";
 import type { SugestaoExtrato } from "./ExtratoListItem";
@@ -13,10 +12,6 @@ interface ExtratoPainelProps {
   selectedExtratos: string[];
   sugestoesMap: Record<string, SugestaoExtrato>;
   isRejectingSugestao: boolean;
-  mesExtratos: Date;
-  onMesExtratosChange: (date: Date) => void;
-  extratosCustomRange: { from: Date; to: Date } | null;
-  onExtratosCustomRangeChange: (range: { from: Date; to: Date } | null) => void;
   onSelect: (id: string) => void;
   onLimparSelecao: () => void;
   onAceitarSugestao: (extratoId: string, transacaoId?: string) => void;
@@ -38,10 +33,6 @@ export function ExtratoPainel({
   selectedExtratos,
   sugestoesMap,
   isRejectingSugestao,
-  mesExtratos,
-  onMesExtratosChange,
-  extratosCustomRange,
-  onExtratosCustomRangeChange,
   onSelect,
   onLimparSelecao,
   onAceitarSugestao,
@@ -60,13 +51,6 @@ export function ExtratoPainel({
         <div className="flex items-center justify-between mb-0.5">
           <h3 className="font-semibold text-sm">Banco</h3>
           <div className="flex items-center gap-1">
-            <MonthPicker
-              selectedMonth={mesExtratos}
-              onMonthChange={onMesExtratosChange}
-              customRange={extratosCustomRange}
-              onCustomRangeChange={onExtratosCustomRangeChange}
-              className="text-xs"
-            />
             <Button
               size="icon"
               variant="ghost"

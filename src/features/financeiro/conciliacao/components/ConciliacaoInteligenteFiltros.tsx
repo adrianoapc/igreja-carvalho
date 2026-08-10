@@ -8,6 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, Search, Sparkles } from "lucide-react";
+import { MonthPicker } from "@/components/financas/MonthPicker";
 import type { Conta } from "../hooks/useConciliacaoInteligente";
 
 interface ConciliacaoInteligenteFiltrosProps {
@@ -20,6 +21,11 @@ interface ConciliacaoInteligenteFiltrosProps {
   onSearchExtratoChange: (value: string) => void;
   gerando: boolean;
   onRegenerarSugestoes: () => void;
+  /** Período único, compartilhado pelos painéis Banco/Sistema (C2-0). */
+  periodoMes: Date;
+  onPeriodoMesChange: (date: Date) => void;
+  periodoCustomRange: { from: Date; to: Date } | null;
+  onPeriodoCustomRangeChange: (range: { from: Date; to: Date } | null) => void;
 }
 
 /** Barra de filtros globais (busca, conta, tipo, regenerar sugestões ML). */
@@ -33,9 +39,13 @@ export function ConciliacaoInteligenteFiltros({
   onSearchExtratoChange,
   gerando,
   onRegenerarSugestoes,
+  periodoMes,
+  onPeriodoMesChange,
+  periodoCustomRange,
+  onPeriodoCustomRangeChange,
 }: ConciliacaoInteligenteFiltrosProps) {
   return (
-    <div className="flex flex-col sm:flex-row gap-2 sm:items-center p-3 bg-card border rounded-lg flex-shrink-0">
+    <div className="flex flex-col sm:flex-row gap-2 sm:items-center p-3 bg-card border rounded-lg shrink-0">
       <div className="flex-1 relative min-w-0">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
@@ -46,6 +56,12 @@ export function ConciliacaoInteligenteFiltros({
         />
       </div>
       <div className="flex gap-2">
+        <MonthPicker
+          selectedMonth={periodoMes}
+          onMonthChange={onPeriodoMesChange}
+          customRange={periodoCustomRange}
+          onCustomRangeChange={onPeriodoCustomRangeChange}
+        />
         <Select value={contaFiltro} onValueChange={onContaFiltroChange}>
           <SelectTrigger className="flex-1 sm:w-[180px]">
             <SelectValue placeholder="Todas as contas" />
