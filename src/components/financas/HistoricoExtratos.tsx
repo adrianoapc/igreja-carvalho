@@ -51,6 +51,7 @@ import { VincularTransacaoDialog } from "./VincularTransacaoDialog";
 
 import { anonymizePixDescription } from "@/utils/anonymization";
 import { ExtratoDetalheDrawer } from "./ExtratoDetalheDrawer";
+import { CartaoStatsCard } from "./CartaoStatsCard";
 
 interface ExtratoItem {
   id: string;
@@ -278,18 +279,17 @@ export function HistoricoExtratos() {
     });
   }, [extratos, searchTerm, statusFiltro, tipoFiltro, origemFiltro]);
 
-  // Reset page when filters change
-  useMemo(() => {
+  // Reset page when filters change — ajuste de estado durante o render
+  // (padrão recomendado pelo React em vez de useMemo/useEffect com setState
+  // no corpo: https://react.dev/learn/you-might-not-need-an-effect). Achado
+  // do lint ao tocar este arquivo na C2-2 — mesmo padrão da C2-1
+  // (useConciliacaoManualData.ts).
+  const filtrosKey = `${searchTerm}|${statusFiltro}|${tipoFiltro}|${origemFiltro}|${contaSelecionada}|${selectedMonth}|${customRange?.from}|${customRange?.to}`;
+  const [prevFiltrosKey, setPrevFiltrosKey] = useState(filtrosKey);
+  if (filtrosKey !== prevFiltrosKey) {
+    setPrevFiltrosKey(filtrosKey);
     setCurrentPage(1);
-  }, [
-    searchTerm,
-    statusFiltro,
-    tipoFiltro,
-    origemFiltro,
-    contaSelecionada,
-    selectedMonth,
-    customRange,
-  ]);
+  }
 
   // Pagination
   const totalPages = Math.ceil(extratosFiltrados.length / ITEMS_PER_PAGE);
@@ -635,6 +635,14 @@ export function HistoricoExtratos() {
           if (!open) setExtratoParaVisualizar(null);
         }}
       />
+      {/* Card "Cartão" (Ciclo 2, C2-2) — some se não houver integração Getnet ativa */}
+      <CartaoStatsCard
+        igrejaId={igrejaId}
+        filialId={filialId}
+        selectedMonth={selectedMonth}
+        customRange={customRange}
+      />
+
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="p-3">

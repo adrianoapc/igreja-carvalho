@@ -1015,3 +1015,17 @@ Fecha o backlog de `has_filial_access` nas 8 RPCs/policies `SECURITY
 DEFINER` de §11 — Fases 1-3 já mergeadas (RPCs triviais, transferência/
 ajuste/reembolso, RLS de `extratos_bancarios`).
 
+## Ciclo 2 (C2-2) — Card "Cartão" em Extratos/Histórico (§9.100)
+
+`COUNT(*)` conta parcela, não venda — o CSV repete o NSU uma vez por
+parcela. Fix: `COUNT(DISTINCT nsu)` nos três contadores.
+
+```mermaid
+flowchart TD
+    G["getnet_recebivel_lancamentos\n(1 linha por parcela)"] --> D{"COUNT(*) ingenuo"}
+    D --> BUG["venda 3x = 3\n(inflado)"]
+    G --> FIX["COUNT(DISTINCT nsu)"]
+    FIX --> OK["venda 3x = 1\n(correto)"]
+    FIX --> VINC["vinculada = QUALQUER parcela\ntem transacao_financeira_id/\nextrato_bancario_id"]
+```
+

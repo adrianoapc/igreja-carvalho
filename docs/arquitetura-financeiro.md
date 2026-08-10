@@ -5797,6 +5797,35 @@ revisar juntos (antes dava pra navegar Sistema sozinho). Follow-up
 possível: expandir a janela de txs exibidas ou filtrar ML cuja trx não
 está no período.
 
+### 9.100 Ciclo 2 (C2-2) — Card "Cartão" em Extratos/Histórico
+
+PR #89. `HistoricoExtratos` ganha um card "Cartão" (Vendas importadas /
+Vinculadas à oferta / Vinculadas ao banco), ao lado do card "Banco"
+já existente — completa o mockup original da Fase 7b, que desenhava os
+dois lado a lado.
+
+**Nova RPC `fin_stats_cartao_getnet`**
+(`20260810110000_fin_stats_cartao_getnet.sql`) — agregação read-only
+sobre `getnet_recebivel_lancamentos`, mesmos campos de vínculo
+(`transacao_financeira_id`/`extrato_bancario_id`) que
+`fin_listar_ledger_conciliacao_cartao` já usa — não é fonte de verdade
+paralela, só uma contagem direta.
+
+**Achado do `/code-review` antes do commit**: `COUNT(*)` conta parcela,
+não venda — o CSV do portal repete o NSU uma vez por parcela (mesmo
+padrão já documentado nas RPCs Hop 2, "valor_venda 1x por NSU"). Uma
+venda parcelada em 3x inflava "Vendas importadas" em 3, não 1. Fix:
+`COUNT(DISTINCT g.nsu)` nos três contadores — uma venda conta como
+vinculada se QUALQUER uma de suas parcelas já tem o vínculo. Validado em
+harness com uma venda parcelada 3x cruzando 3 meses de vencimento: conta
+2 vendas (não 4 linhas) em qualquer janela de período testada.
+
+**Múltiplas integrações Getnet ativas**: o card busca TODAS as
+integrações que casam tenant/filial (não só a primeira/`.limit(1)`) e
+soma os resultados — pegar uma arbitrariamente misturaria dado de filial
+errada se existir mais de uma integração ativa (ex.: compartilhada +
+específica de outra filial após migração de CNPJ).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
