@@ -5941,3 +5941,97 @@ está no período.
   no banco de produção, ou foi setada com nome diferente do que os jobs
   esperam) — prioridade média, importação automática de PIX/Getnet está
   parada até isso ser corrigido.
+
+### 9.98 Ciclo 2 (C2-0) — Modo Inteligente: period-picker único + remove badge de %
+
+PR #87. Retoma o que ficou fora do plano "Conciliação Cartão Getnet"
+(Fases 0-7, §9.88-9.97) por disciplina de escopo: redesenho de UI do
+mesmo mockup que originou a Fase 7b, cobrindo Modo Inteligente/Modo
+Clássico/Extratos.
+
+Os dois `MonthPicker` independentes de `ConciliacaoInteligente` (painéis
+Banco/Sistema, `ExtratoPainel.tsx`/`TransacaoPainel.tsx`) viram um único
+period-picker compartilhado, hospedado em `ConciliacaoInteligenteFiltros`
+— navegar os painéis em meses diferentes nunca teve motivo de negócio,
+só era assim porque a tela nasceu com os dois painéis independentes desde
+o início (F7 sub-frente 2/5).
+
+Remove o badge numérico de score (%) da sugestão ML (só existia no painel
+Banco, `ExtratoSugestaoMLA.tsx`) e unifica visualmente com o destaque do
+motor F4 (painel Sistema, que já não expunha número) via componente
+compartilhado `SugestaoTag`/`SUGESTAO_BORDA_CLASS`
+(`src/components/financas/SugestaoTag.tsx`) — os dois mecanismos
+continuam internamente diferentes (ML persistido com aceitar/rejeitar vs.
+score do motor F4 sob demanda, só quando 1 extrato está selecionado), só
+a aparência foi unificada.
+
+Reaproveitando a consolidação, removeu dead code em
+`useConciliacaoInteligente.ts`: `inicio`/`fim` computados na query de
+transações e nunca usados antes de serem sombreados por uma segunda
+declaração dentro do `.filter()`.
+
+### 9.99 Ciclo 2 (C2-1) — Modo Clássico como estado derivado
+
+PR #88. `ConciliacaoManual` (aba "Por Extrato") deixava de listar **todo**
+extrato `reconciliado=false`/`transacao_vinculada_id IS NULL`,
+indiscriminado quanto aos motores Cartão (Getnet) e Inteligente (F4) — um
+extrato podia estar em processamento por qualquer um dos dois e continuar
+aparecendo aqui como se estivesse solto. Passa a ser um **estado
+derivado**: só mostra o que sobrou depois que os outros dois motores já
+tentaram, com um campo `motivo` por item.
+
+**Nova RPC `fin_listar_extratos_sem_candidato`**
+(`20260810100000_fin_listar_extratos_sem_candidato.sql`) — reaproveita
+`fin_gerar_candidatos_conciliacao` (F4, §9.65-ish/ADR-030) como função de
+tabela, mesma resolução de tenant/filial/corte de score, sem duplicar a
+CTE de scoring nem o threshold. Exclui explicitamente extrato confirmado
+por lote de antecipação Getnet
+(`getnet_antecipacao_lotes.extrato_bancario_id`) — esse vínculo **não**
+marca `extratos_bancarios.reconciliado=true` (decisão histórica,
+`20260805130000`, pra não interferir no Hop 1), então sem exclusão
+explícita o extrato continuava "pendente" pro Modo Clássico mesmo já
+"tomado" pelo Cartão. Esse é o overlap real que motivou a fase — achado
+na investigação, não hipotético.
+
+**Escopo consciente, não corrigido**: candidatos do Cartão AINDA NÃO
+confirmados (sugestão em `fin_gerar_candidatos_venda_banco_getnet`, que
+exige `conta_id`+`integracao_id` específicos) não são excluídos — cruzar
+isso exigiria rodar essa RPC Getnet pra cada combinação conta×integração
+presente no período, escopo maior que o overlap concreto documentado
+acima.
+
+**Fluxo N:1 investigado, mantido separado**: a aba "Por Transação"
+(`ConciliacaoLoteDialog`/`useConciliacaoLote`) não foi dobrada dentro de
+`BuscaManualDialog` (Fase 7b, §9.95) — `BuscaManualDialog` agrupa por uma
+chave determinística no próprio dado (ex. NSU do motor Cartão); o N:1
+banco↔transação não tem chave de agrupamento natural equivalente, e a UX
+de soma/diferença ao vivo do `ConciliacaoLoteDialog` atual se perderia
+sem ganho real ao forçar o reuso.
+
+**4 rodadas de `/code-review` local encontraram e corrigiram, antes do
+commit**:
+1. "Reconciliar Automático" (`buscarCandidatosAutoReconciliar`) vazando
+   escopo pra fora do filtro de conta selecionado na tela — aplica de
+   verdade via `fin_confirmar_conciliacao`, sem confirmação por item, então
+   escapar do filtro visível seria ação financeira fora do que a tela
+   mostrava no momento do clique.
+2. `useConciliacaoLote.ts` invalidando a query key morta
+   `"extratos-pendentes"` (renomeada nesta fase pra
+   `"extratos-sem-candidato"`/`"extratos-pendentes-brutos"`) — conciliar
+   N:1 não atualizava mais a aba "Por Extrato".
+3. Três pontos de filial compartilhada (`filial_id IS NULL`) com `.eq()`
+   puro em vez de `.or("filial_id.eq.X,filial_id.is.null")` (guardrail
+   financeiro, seção A deste documento/`guardrails-financeiro.md`) — dois
+   no hook (`contas`, `extratosBrutos`), um na RPC nova. Conta/extrato
+   compartilhado sumia com uma filial concreta selecionada.
+4. Race de loading entre a lista derivada e a resolução de nome de conta
+   (a query nova dependia de `contas` já ter carregado pra rodar,
+   piscando o banner de "tudo conciliado" antes do dado real chegar) —
+   resolvido desacoplando as duas queries e combinando via `useMemo`.
+
+**Validado em harness Docker** (imagem `supabase/postgres`, réplica
+completa das migrations do repo, não Postgres genérico — precisa do
+schema `auth`/roles/extensões que só essa imagem já traz) — 5 cenários:
+sem candidato (aparece), com candidato F4 (excluído), vinculado a lote de
+antecipação (excluído), origem Getnet sem vínculo confirmado (motivo
+específico), conta compartilhada visível com filial concreta selecionada.

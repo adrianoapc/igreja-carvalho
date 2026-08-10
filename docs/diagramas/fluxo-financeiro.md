@@ -1015,3 +1015,38 @@ Fecha o backlog de `has_filial_access` nas 8 RPCs/policies `SECURITY
 DEFINER` de §11 — Fases 1-3 já mergeadas (RPCs triviais, transferência/
 ajuste/reembolso, RLS de `extratos_bancarios`).
 
+## Ciclo 2 (C2-0) — Modo Inteligente: period-picker único (§9.98)
+
+Os dois `MonthPicker` independentes (painéis Banco/Sistema) viram um
+único period-picker compartilhado — os painéis não tinham motivo de
+negócio pra navegar em meses diferentes.
+
+```mermaid
+flowchart TD
+    subgraph Antes
+        MP1["MonthPicker\n(painel Banco)"] --> Q1["query extratos"]
+        MP2["MonthPicker\n(painel Sistema)"] --> Q2["query transações"]
+    end
+    subgraph Depois["Depois (C2-0)"]
+        MPU["period-picker único\n(ConciliacaoInteligenteFiltros)"] --> Q1D["query extratos"]
+        MPU --> Q2D["query transações"]
+    end
+```
+
+## Ciclo 2 (C2-1) — Modo Clássico como estado derivado (§9.99)
+
+`ConciliacaoManual` (aba "Por Extrato") deixa de listar todo extrato
+`reconciliado=false` e passa a mostrar só o que sobrou depois dos motores
+Cartão (Getnet) e Inteligente (F4) já terem tentado.
+
+```mermaid
+flowchart TD
+    E["extratos_bancarios\nreconciliado=false"] --> F4["fin_gerar_candidatos_conciliacao\n(motor F4)"]
+    E --> LOTE{"getnet_antecipacao_lotes.\nextrato_bancario_id preenchido?"}
+    F4 -->|tem candidato| INT["fica no Modo Inteligente\n(sugestão a confirmar)"]
+    LOTE -->|sim, vinculado| CARTAO["já tomado pelo Cartão\n(reconciliado NÃO marcado — achado C2-1)"]
+    F4 -->|sem candidato| CLASSICO["fin_listar_extratos_sem_candidato"]
+    LOTE -->|não| CLASSICO
+    CLASSICO --> UI["Modo Clássico — 'Por Extrato'\ncom campo motivo"]
+```
+
