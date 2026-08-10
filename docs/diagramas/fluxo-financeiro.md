@@ -1015,29 +1015,12 @@ Fecha o backlog de `has_filial_access` nas 8 RPCs/policies `SECURITY
 DEFINER` de §11 — Fases 1-3 já mergeadas (RPCs triviais, transferência/
 ajuste/reembolso, RLS de `extratos_bancarios`).
 
-## Ciclo 2 (C2-0) — Modo Inteligente: period-picker único (§9.98)
-
-Os dois `MonthPicker` independentes (painéis Banco/Sistema) viram um
-único period-picker compartilhado — os painéis não tinham motivo de
-negócio pra navegar em meses diferentes.
-
-```mermaid
-flowchart TD
-    subgraph Antes
-        MP1["MonthPicker\n(painel Banco)"] --> Q1["query extratos"]
-        MP2["MonthPicker\n(painel Sistema)"] --> Q2["query transações"]
-    end
-    subgraph Depois["Depois (C2-0)"]
-        MPU["period-picker único\n(ConciliacaoInteligenteFiltros)"] --> Q1D["query extratos"]
-        MPU --> Q2D["query transações"]
-    end
-```
-
 ## Ciclo 2 (C2-1) — Modo Clássico como estado derivado (§9.99)
 
 `ConciliacaoManual` (aba "Por Extrato") deixa de listar todo extrato
 `reconciliado=false` e passa a mostrar só o que sobrou depois dos motores
-Cartão (Getnet) e Inteligente (F4) já terem tentado.
+Cartão (Getnet) e Inteligente (F4) já terem tentado. C2-0 (period-picker
+único no Modo Inteligente) está documentado na seção F7 acima (§9.98).
 
 ```mermaid
 flowchart TD
