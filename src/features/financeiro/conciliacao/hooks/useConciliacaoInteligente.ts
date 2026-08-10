@@ -89,6 +89,24 @@ export function useConciliacaoInteligente() {
     to: Date;
   } | null>(null);
 
+  // Trocar o período some com as linhas dos dois painéis; os IDs selecionados
+  // precisam sair junto — senão o balanço (só conta linhas filtradas) vira
+  // 0×0 com hasSelecao=true e Confirmar fica habilitado sobre IDs ocultos.
+  // fin_confirmar_conciliacao em 1:1 não valida igualdade de valor (só linka),
+  // então o gate da UI é o único freio.
+  const handlePeriodoMesChange = (date: Date) => {
+    setSelectedExtratos([]);
+    setSelectedTransacoes([]);
+    setPeriodoMes(date);
+  };
+  const handlePeriodoCustomRangeChange = (
+    range: { from: Date; to: Date } | null,
+  ) => {
+    setSelectedExtratos([]);
+    setSelectedTransacoes([]);
+    setPeriodoCustomRange(range);
+  };
+
   const regenerarSugestoes = () => {
     if (!igrejaId) return;
     gerarSugestoes({
@@ -417,7 +435,16 @@ export function useConciliacaoInteligente() {
 
   const confirmarConciliacao = useMutation({
     mutationFn: async () => {
-      if (selectedExtratos.length === 0 || selectedTransacoes.length === 0) {
+      // Só IDs ainda visíveis nos painéis — seleção stale (filtro/período)
+      // não pode entrar no vínculo. Em 1:1 a RPC não valida valor.
+      const extratoIdsVisiveis = selectedExtratos.filter((id) =>
+        extratosFiltrados.some((e) => e.id === id),
+      );
+      const transacaoIdsVisiveis = selectedTransacoes.filter((id) =>
+        (transacoesFiltradas ?? []).some((t) => t.id === id),
+      );
+
+      if (extratoIdsVisiveis.length === 0 || transacaoIdsVisiveis.length === 0) {
         throw new Error("Selecione pelo menos um item de cada lado");
       }
 
@@ -425,19 +452,19 @@ export function useConciliacaoInteligente() {
       // formato (1:1, N:1, 1:N) é inferido pela cardinalidade no banco, numa
       // única transação — substitui os ~6 updates sequenciais deste fluxo.
       const vinculo: VinculoConciliacao = {
-        extrato_ids: selectedExtratos,
-        transacao_ids: selectedTransacoes,
+        extrato_ids: extratoIdsVisiveis,
+        transacao_ids: transacaoIdsVisiveis,
       };
 
       // 1 extrato → N transações = divisão; o split usa o valor de cada uma.
-      if (selectedExtratos.length === 1 && selectedTransacoes.length > 1) {
-        vinculo.divisoes = selectedTransacoes.map((transacaoId) => {
+      if (extratoIdsVisiveis.length === 1 && transacaoIdsVisiveis.length > 1) {
+        vinculo.divisoes = transacaoIdsVisiveis.map((transacaoId) => {
           const transacao = transacoesFiltradas?.find(
             (t) => t.id === transacaoId,
           );
           return { transacao_id: transacaoId, valor: Number(transacao?.valor) || 0 };
         });
-      } else if (selectedExtratos.length > 1 && selectedTransacoes.length > 1) {
+      } else if (extratoIdsVisiveis.length > 1 && transacaoIdsVisiveis.length > 1) {
         throw new Error(
           "Múltiplos extratos com múltiplas transações não é suportado",
         );
@@ -523,34 +550,44 @@ export function useConciliacaoInteligente() {
     },
   });
 
-  const { totalExtratos, totalTransacoes, diferenca } = useMemo(() => {
-    const totalExtratos =
-      extratosFiltrados
-        ?.filter((e) => selectedExtratos.includes(e.id))
-        .reduce((acc, item) => {
-          return acc + (item.tipo === "credito" ? item.valor : -item.valor);
-        }, 0) ?? 0;
+  const { totalExtratos, totalTransacoes, diferenca, hasSelecaoConfirmavel } =
+    useMemo(() => {
+      const extratosVisiveis =
+        extratosFiltrados?.filter((e) => selectedExtratos.includes(e.id)) ?? [];
+      const transacoesVisiveis =
+        transacoesFiltradas?.filter((t) => selectedTransacoes.includes(t.id)) ??
+        [];
 
-    const totalTransacoes =
-      transacoesFiltradas
-        ?.filter((t) => selectedTransacoes.includes(t.id))
-        .reduce((acc, item) => {
-          return (
-            acc +
-            (item.tipo === "entrada"
-              ? (item.valor_liquido ?? item.valor)
-              : -(item.valor_liquido ?? item.valor))
-          );
-        }, 0) ?? 0;
+      const totalExtratos = extratosVisiveis.reduce((acc, item) => {
+        return acc + (item.tipo === "credito" ? item.valor : -item.valor);
+      }, 0);
 
-    const diferenca = totalExtratos - totalTransacoes;
-    return { totalExtratos, totalTransacoes, diferenca };
-  }, [
-    selectedExtratos,
-    selectedTransacoes,
-    extratosFiltrados,
-    transacoesFiltradas,
-  ]);
+      const totalTransacoes = transacoesVisiveis.reduce((acc, item) => {
+        return (
+          acc +
+          (item.tipo === "entrada"
+            ? (item.valor_liquido ?? item.valor)
+            : -(item.valor_liquido ?? item.valor))
+        );
+      }, 0);
+
+      // Confirmar exige seleção visível nos dois lados — IDs stale (fora do
+      // filtro) não contam, mesmo que ainda estejam no state.
+      const hasSelecaoConfirmavel =
+        extratosVisiveis.length > 0 && transacoesVisiveis.length > 0;
+      const diferenca = totalExtratos - totalTransacoes;
+      return {
+        totalExtratos,
+        totalTransacoes,
+        diferenca,
+        hasSelecaoConfirmavel,
+      };
+    }, [
+      selectedExtratos,
+      selectedTransacoes,
+      extratosFiltrados,
+      transacoesFiltradas,
+    ]);
 
   return {
     // filtros
@@ -566,9 +603,9 @@ export function useConciliacaoInteligente() {
     gerando,
     // período — único, compartilhado pelos dois painéis (C2-0)
     periodoMes,
-    setPeriodoMes,
+    setPeriodoMes: handlePeriodoMesChange,
     periodoCustomRange,
-    setPeriodoCustomRange,
+    setPeriodoCustomRange: handlePeriodoCustomRangeChange,
     // extratos
     extratosFiltrados,
     totalExtratosBrutos: extratos?.length ?? 0,
@@ -587,6 +624,7 @@ export function useConciliacaoInteligente() {
     totalExtratos,
     totalTransacoes,
     diferenca,
+    hasSelecaoConfirmavel,
     confirmarConciliacao,
     marcarConferenciaManual,
     rejeitarSugestao,

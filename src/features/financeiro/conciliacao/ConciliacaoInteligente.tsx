@@ -68,9 +68,7 @@ export function ConciliacaoInteligente() {
       totalExtratos={data.totalExtratos}
       totalTransacoes={data.totalTransacoes}
       diferenca={data.diferenca}
-      hasSelecao={
-        data.selectedExtratos.length > 0 || data.selectedTransacoes.length > 0
-      }
+      hasSelecao={data.hasSelecaoConfirmavel}
       confirming={data.confirmarConciliacao.isPending}
       onConfirmar={() => data.confirmarConciliacao.mutate()}
       variant={isMobile ? "footer" : "sidebar"}
