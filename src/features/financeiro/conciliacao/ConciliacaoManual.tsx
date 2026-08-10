@@ -43,6 +43,13 @@ const TIPO_OPTIONS_TRANSACAO = [
  * é sobretudo decomposição — 1037 l. num arquivo só viram orquestrador +
  * hook de dados + subcomponentes focados, com um pouco de polimento
  * responsivo nas listas/filtros/paginação.
+ *
+ * Ciclo 2 (C2-1): a aba "Por Extrato" virou estado DERIVADO — só mostra o que
+ * sobrou depois dos motores Cartão (Getnet) e Inteligente (F4) já terem
+ * tentado (`useConciliacaoManualData` → `fin_listar_extratos_sem_candidato`).
+ * A aba "Por Transação" (N:1) continua um fluxo separado de propósito — não
+ * tem chave de agrupamento natural (como o NSU do motor Cartão) que
+ * justifique reusar `BuscaManualDialog`; ver investigação da fase.
  */
 export function ConciliacaoManual() {
   const [activeTab, setActiveTab] = useState<string>("extrato");
@@ -97,6 +104,11 @@ export function ConciliacaoManual() {
 
           {/* Tab: Por Extrato */}
           <TabsContent value="extrato" className="space-y-4 mt-4">
+            <p className="text-xs text-muted-foreground">
+              Só aparece aqui o que nenhum motor conseguiu classificar
+              sozinho — cartão e sugestões automáticas ficam nas telas
+              Cartão/Inteligente até serem confirmados ou rejeitados lá.
+            </p>
             <ManualFiltrosBar
               selectedMonth={data.selectedMonth}
               onMonthChange={data.setSelectedMonth}

@@ -56,6 +56,42 @@ export async function gerarCandidatosConciliacao(
   return (data ?? []) as CandidatoConciliacao[];
 }
 
+/** Extrato pendente que sobrou depois dos motores Cartão e Inteligente — base do Modo Clássico (Ciclo 2, C2-1). */
+export interface ExtratoSemCandidato {
+  extrato_id: string;
+  data_transacao: string;
+  descricao: string;
+  valor: number;
+  tipo: string;
+  conta_id: string;
+  origem: string | null;
+  possivel_duplicata_de: string | null;
+  motivo: string;
+}
+
+/**
+ * Extratos pendentes SEM candidato dos motores Cartão (Getnet) e Inteligente
+ * (F4) — reaproveita fin_gerar_candidatos_conciliacao internamente, mesmos
+ * parâmetros de escopo/corte. Base do Modo Clássico como estado derivado.
+ */
+export async function listarExtratosSemCandidato(
+  params: CandidatosParams = {},
+): Promise<ExtratoSemCandidato[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)(
+    "fin_listar_extratos_sem_candidato",
+    {
+      p_conta_id: params.contaId ?? null,
+      p_periodo_inicio: params.periodoInicio ?? null,
+      p_periodo_fim: params.periodoFim ?? null,
+      p_score_minimo: params.scoreMinimo ?? null,
+      p_filial_id: params.filialId ?? null,
+    },
+  );
+  if (error) throw error;
+  return (data ?? []) as ExtratoSemCandidato[];
+}
+
 export interface DivisaoItem {
   transacao_id: string;
   valor: number;
