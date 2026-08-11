@@ -551,10 +551,14 @@ Deno.serve(async (req) => {
         // é validado em runtime (só tipado `number`) — um valor não
         // numérico viraria NaN e `.limit(NaN)` na query (achado do
         // code-review); `Number.isFinite` cai pro default 7 nesse caso.
+        // `Math.trunc` (achado Codex P2): um valor finito fracionário
+        // (ex.: 1.5) passava direto pro `.limit(batchSize)` — PostgREST
+        // exige limit inteiro, então um request válido virava erro de
+        // banco em vez de arredondar/truncar.
         batchSize: Math.max(
           1,
           Math.min(
-            Number.isFinite(payload.batch_size) ? (payload.batch_size as number) : 7,
+            Number.isFinite(payload.batch_size) ? Math.trunc(payload.batch_size as number) : 7,
             30,
           ),
         ),
@@ -697,10 +701,17 @@ Deno.serve(async (req) => {
         // que a correção nova ficou a poucas linhas desta): sem piso e sem
         // `Number.isFinite`, `batch_size:0` zerava `missing.slice(0,0)` e o
         // sync ainda reportava "success" sem processar nada; um valor não
-        // numérico virava NaN em `.limit(NaN)`.
+        // numérico virava NaN. `Math.trunc` (achado Codex P2 na
+        // backfill_resumo_cobranca, aplicado aqui por consistência): este
+        // batchSize só alimenta `.slice()` (JS trunca sozinho), mas manter
+        // os dois call sites idênticos evita o mesmo bug reaparecer se
+        // algum dia este valor passar a alimentar uma query `.limit()`.
         batchSize: Math.max(
           1,
-          Math.min(Number.isFinite(payload.batch_size) ? (payload.batch_size as number) : 7, 30),
+          Math.min(
+            Number.isFinite(payload.batch_size) ? Math.trunc(payload.batch_size as number) : 7,
+            30,
+          ),
         ),
       });
     }
