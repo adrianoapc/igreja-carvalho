@@ -26,8 +26,8 @@ const STATS_VAZIAS: StatsCartao = {
 /**
  * Card "Cartão" da tela de Extratos/Histórico (Ciclo 2, C2-2) — ao lado do
  * bloco de stats "Banco" já existente. Fonte: `fin_stats_cartao_getnet`
- * (agregação sobre `getnet_recebivel_lancamentos`, mesmos campos que o
- * ledger unificado usa — não é fonte de verdade paralela).
+ * (agregação sobre `getnet_recebivel_lancamentos`; banco = Hop 1 ou
+ * lote de antecipação — mesma semântica do ledger, não fonte paralela).
  *
  * Filtro de filial (`if (filialId)`, sem `isAllFiliais`) segue a convenção
  * já usada pelas OUTRAS queries deste mesmo arquivo (`contas`/`extratos`

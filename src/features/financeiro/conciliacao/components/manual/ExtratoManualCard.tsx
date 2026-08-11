@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Link2, Split, X } from "lucide-react";
+import { AlertTriangle, Search, Split, X } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useHideValues } from "@/hooks/useHideValues";
@@ -13,6 +13,18 @@ interface ExtratoManualCardProps {
   onDividir: (extrato: ExtratoItem) => void;
   onIgnorar: (extratoId: string) => void;
 }
+
+/**
+ * Rótulo legível pro `motivo` de `fin_listar_extratos_sem_candidato` (C2-1) —
+ * chaves batem com o CASE da RPC (`supabase/migrations/
+ * 20260810100000_fin_listar_extratos_sem_candidato.sql`).
+ */
+const MOTIVO_LABEL: Record<string, string> = {
+  venda_getnet_sem_vinculo_confirmado:
+    "Parece Getnet, mas nenhum motor confirmou o vínculo ainda",
+  sem_transacao_compativel_no_periodo:
+    "Nenhuma transação compatível encontrada no período",
+};
 
 /** Card de um extrato pendente na aba "Por Extrato" do Modo Clássico. */
 export function ExtratoManualCard({
@@ -65,6 +77,11 @@ export function ExtratoManualCard({
               </>
             )}
           </div>
+          {extrato.motivo && (
+            <p className="text-xs text-muted-foreground mt-1 italic">
+              {MOTIVO_LABEL[extrato.motivo] ?? extrato.motivo}
+            </p>
+          )}
         </div>
         <div className="text-right shrink-0">
           <p className={`font-bold ${isCredito ? "text-green-600" : "text-red-600"}`}>
@@ -75,8 +92,8 @@ export function ExtratoManualCard({
       </div>
       <div className="flex items-center gap-2 mt-3 flex-wrap">
         <Button size="sm" variant="default" onClick={() => onVincular(extrato)}>
-          <Link2 className="w-3 h-3 mr-1" />
-          Vincular
+          <Search className="w-3 h-3 mr-1" />
+          Buscar manualmente
         </Button>
         <Button size="sm" variant="outline" onClick={() => onDividir(extrato)}>
           <Split className="w-3 h-3 mr-1" />

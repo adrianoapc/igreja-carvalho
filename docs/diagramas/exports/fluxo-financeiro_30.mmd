@@ -1,0 +1,8 @@
+flowchart TD
+    E["extratos_bancarios\nreconciliado=false"] --> F4["fin_gerar_candidatos_conciliacao\n(motor F4)"]
+    E --> LOTE{"getnet_antecipacao_lotes.\nextrato_bancario_id preenchido?"}
+    F4 -->|tem candidato| INT["fica no Modo Inteligente\n(sugestão a confirmar)"]
+    LOTE -->|sim, vinculado| CARTAO["já tomado pelo Cartão\n(reconciliado NÃO marcado — achado C2-1)"]
+    F4 -->|sem candidato| CLASSICO["fin_listar_extratos_sem_candidato"]
+    LOTE -->|não| CLASSICO
+    CLASSICO --> UI["Modo Clássico — 'Por Extrato'\ncom campo motivo"]

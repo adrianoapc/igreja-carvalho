@@ -5797,6 +5797,35 @@ revisar juntos (antes dava pra navegar Sistema sozinho). Follow-up
 possível: expandir a janela de txs exibidas ou filtrar ML cuja trx não
 está no período.
 
+### 9.99 Ciclo 2 (C2-1) — Modo Clássico como estado derivado
+
+PR #88. `ConciliacaoManual` (aba "Por Extrato") deixa de listar **todo**
+extrato `reconciliado=false`/`transacao_vinculada_id IS NULL` e passa a
+ser **estado derivado**: só o que sobrou depois dos motores Cartão
+(Getnet) e Inteligente (F4), com campo `motivo` por item.
+
+**Nova RPC `fin_listar_extratos_sem_candidato`**
+(`20260810100000_fin_listar_extratos_sem_candidato.sql`) — reaproveita
+`fin_gerar_candidatos_conciliacao` como função de tabela (mesmo
+tenant/filial/corte de score). Exclui extrato em
+`getnet_antecipacao_lotes.extrato_bancario_id` (Hop lote **não** marca
+`reconciliado=true` — overlap real que motivou a fase). Filial
+compartilhada: `v_scope IS NULL OR e.filial_id = v_scope OR e.filial_id
+IS NULL`.
+
+**Escopo consciente:** candidatos Getnet Hop 1 ainda não confirmados
+não são excluídos (exigiria varredura conta×integração).
+
+**UI:** lista via `extratos-sem-candidato`; `extratos-pendentes-brutos`
+só para "Reconciliar Automático"/lookup. Empty state: residual vazio
+com brutos > 0 ≠ "tudo conciliado" (itens cobertos por Cartão/
+Inteligente). Busca: `contas?.nome?.toLowerCase()` (conta pode vir
+`null` enquanto o nome resolve).
+
+**Harness Docker** (5 cenários): sem candidato; com F4 (excluído);
+lote antecipação (excluído); origem Getnet sem vínculo; conta
+`filial_id NULL` visível com filial concreta.
+
 ### 9.100 Ciclo 2 (C2-2) — Card "Cartão" em Extratos/Histórico
 
 PR #89. `HistoricoExtratos` ganha um card "Cartão" (Vendas importadas /
@@ -5806,25 +5835,34 @@ dois lado a lado.
 
 **Nova RPC `fin_stats_cartao_getnet`**
 (`20260810110000_fin_stats_cartao_getnet.sql`) — agregação read-only
-sobre `getnet_recebivel_lancamentos`, mesmos campos de vínculo
-(`transacao_financeira_id`/`extrato_bancario_id`) que
-`fin_listar_ledger_conciliacao_cartao` já usa — não é fonte de verdade
-paralela, só uma contagem direta.
+sobre `getnet_recebivel_lancamentos`. Contadores:
 
-**Achado do `/code-review` antes do commit**: `COUNT(*)` conta parcela,
-não venda — o CSV do portal repete o NSU uma vez por parcela (mesmo
-padrão já documentado nas RPCs Hop 2, "valor_venda 1x por NSU"). Uma
-venda parcelada em 3x inflava "Vendas importadas" em 3, não 1. Fix:
-`COUNT(DISTINCT g.nsu)` nos três contadores — uma venda conta como
-vinculada se QUALQUER uma de suas parcelas já tem o vínculo. Validado em
-harness com uma venda parcelada 3x cruzando 3 meses de vencimento: conta
-2 vendas (não 4 linhas) em qualquer janela de período testada.
+- **Vinculadas à oferta**: `transacao_financeira_id` (Hop 2).
+- **Vinculadas ao banco**: Hop 1 direto (`extrato_bancario_id`) **ou**
+  antecipação via `getnet_antecipacao_lotes` (`contrato_registradora` +
+  lote `vinculado`/`lancamento_criado`) — mesma regra de fechamento do
+  ledger (`fin_listar_ledger_conciliacao_cartao` / conferência de totais).
+  Contar só `extrato_bancario_id` no recebível subcontava vendas
+  antecipadas (Bugbot #89).
+
+**Identidade da venda**: `COUNT(DISTINCT (data_venda, filial_id, nsu))`
+(não `nsu` sozinho) — alinhado ao Hop 2
+(`fin_gerar_candidatos_oferta_venda_getnet`), pra não colapsar NSUs
+iguais em dias/filiais diferentes. `COUNT(*)` ingenuo contava parcela,
+não venda (CSV repete NSU por parcela). Uma venda conta como vinculada
+se QUALQUER parcela já tem o vínculo. Validado em harness com venda
+parcelada 3x cruzando meses de vencimento.
 
 **Múltiplas integrações Getnet ativas**: o card busca TODAS as
 integrações que casam tenant/filial (não só a primeira/`.limit(1)`) e
 soma os resultados — pegar uma arbitrariamente misturaria dado de filial
 errada se existir mais de uma integração ativa (ex.: compartilhada +
 específica de outra filial após migração de CNPJ).
+
+**Métrica ≠ contagem de linhas do ledger**: o card agrega por venda/NSU
+na integração (sem `conta_id`); o ledger agrupa por oferta/conta. Smoke
+test deve bater a semântica de vínculo (oferta/banco), não o número de
+rows do ledger no mesmo período.
 
 ## 11. Riscos
 
@@ -5970,3 +6008,4 @@ específica de outra filial após migração de CNPJ).
   no banco de produção, ou foi setada com nome diferente do que os jobs
   esperam) — prioridade média, importação automática de PIX/Getnet está
   parada até isso ser corrigido.
+

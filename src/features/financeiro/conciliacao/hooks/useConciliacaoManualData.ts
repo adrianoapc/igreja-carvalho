@@ -5,7 +5,10 @@ import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { useFilialId } from "@/hooks/useFilialId";
 import { formatLocalDate } from "@/utils/dateUtils";
 import { marcarExtratoIgnorado } from "@/features/financeiro/core/api/extratos.api";
-import { gerarCandidatosConciliacao } from "@/features/financeiro/core/api/conciliacao.api";
+import {
+  gerarCandidatosConciliacao,
+  listarExtratosSemCandidato,
+} from "@/features/financeiro/core/api/conciliacao.api";
 import { toast } from "sonner";
 import type {
   ExtratoItem,
@@ -18,10 +21,16 @@ const ITEMS_PER_PAGE = 15;
 
 /**
  * Dados/filtros/paginação da tela Conciliação Manual (Modo Clássico) — F7
- * sub-frente 2/5. Mesmas query keys do arquivo original preservadas
- * ("extratos-pendentes", "transacoes-conciliacao", "transacoes-ja-vinculadas",
- * "contas-conciliacao") — "transacoes-conciliacao" é invalidada também pela
- * ConciliacaoInteligente ao marcar conferência manual.
+ * sub-frente 2/5. Query keys "transacoes-conciliacao"/"transacoes-ja-
+ * vinculadas"/"contas-conciliacao" preservadas do arquivo original —
+ * "transacoes-conciliacao" é invalidada também pela ConciliacaoInteligente
+ * ao marcar conferência manual.
+ *
+ * Ciclo 2 (C2-1): a aba "Por Extrato" passou de "tudo reconciliado=false" pra
+ * estado derivado — só o que sobrou depois dos motores Cartão e Inteligente
+ * (`extratosSemCandidato`, via `fin_listar_extratos_sem_candidato`). A query
+ * bruta antiga (`extratosBrutos`) continua existindo só para uso interno:
+ * lookup de nome/valor no resultado do "Reconciliar Automático".
  */
 export function useConciliacaoManualData() {
   const { igrejaId, loading: igrejaLoading } = useIgrejaId();
@@ -73,8 +82,13 @@ export function useConciliacaoManualData() {
         .select("id, nome, tipo")
         .eq("ativo", true)
         .eq("igreja_id", igrejaId);
+      // Filial compartilhada (filial_id NULL) precisa continuar visível com
+      // uma filial concreta selecionada — .eq() puro a esconderia (guardrail
+      // financeiro). Achado/corrigido na C2-1: esta lista virou base do nome
+      // de conta exibido em `extratosSemCandidato` e da varredura de contas
+      // do "Reconciliar Automático" — antes só alimentava um dropdown.
       if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
       }
       const { data, error } = await query;
       if (error) throw error;
@@ -83,13 +97,66 @@ export function useConciliacaoManualData() {
     enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
 
+  // Extratos SEM candidato dos motores Cartão e Inteligente — a lista que a
+  // aba "Por Extrato" realmente mostra (Ciclo 2, C2-1: Modo Clássico como
+  // estado derivado, não mais "tudo que está reconciliado=false"). Busca
+  // independente de `contas` de propósito (não entra no `enabled`/queryFn) —
+  // acoplar as duas faria essa query ficar `enabled:false` (isLoading=false,
+  // não "carregando") enquanto `contas` ainda não resolveu, piscando o banner
+  // de "tudo conciliado" antes do dado real chegar. Nome da conta é anexado
+  // depois, em `extratosSemCandidatoComConta`.
   const {
-    data: extratos,
+    data: extratosSemCandidatoBruto,
     isLoading: loadingExtratos,
-    refetch: refetchExtratos,
-  } = useQuery<ExtratoItem[]>({
+    refetch: refetchExtratosSemCandidato,
+  } = useQuery<Omit<ExtratoItem, "contas">[]>({
     queryKey: [
-      "extratos-pendentes",
+      "extratos-sem-candidato",
+      igrejaId,
+      filialId,
+      isAllFiliais,
+      selectedContaId,
+      dataInicio,
+      dataFim,
+    ],
+    queryFn: async () => {
+      if (!igrejaId) return [];
+      const rows = await listarExtratosSemCandidato({
+        contaId: selectedContaId !== "all" ? selectedContaId : null,
+        periodoInicio: dataInicio,
+        periodoFim: dataFim,
+        filialId: isAllFiliais ? null : filialId,
+      });
+      return rows.map((r) => ({
+        id: r.extrato_id,
+        conta_id: r.conta_id,
+        data_transacao: r.data_transacao,
+        descricao: r.descricao,
+        valor: Number(r.valor),
+        tipo: r.tipo,
+        reconciliado: false,
+        transacao_vinculada_id: null,
+        origem: r.origem,
+        possivel_duplicata_de: r.possivel_duplicata_de,
+        motivo: r.motivo,
+      }));
+    },
+    enabled: !igrejaLoading && !filialLoading && !!igrejaId,
+  });
+
+  // Extratos pendentes BRUTOS (sem excluir os que já têm candidato) — só pra
+  // uso interno: (1) exibir descrição/valor no resultado do "Reconciliar
+  // Automático" mesmo quando o item conciliado não aparece mais na lista
+  // derivada acima (ele tinha candidato, por isso sumiu de lá); (2) contagem
+  // de "pendentes" pro dialog de resultado. Mesmo filtro de conta que a
+  // aba usa — sem isso, "Reconciliar Automático" com uma conta selecionada
+  // mostraria contagem de TODAS as contas, não só a filtrada. NÃO é o que a
+  // aba "Por Extrato" renderiza.
+  const { data: extratosBrutos, refetch: refetchExtratosBrutos } = useQuery<
+    ExtratoItem[]
+  >({
+    queryKey: [
+      "extratos-pendentes-brutos",
       igrejaId,
       filialId,
       isAllFiliais,
@@ -107,11 +174,18 @@ export function useConciliacaoManualData() {
         .is("transacao_vinculada_id", null)
         .gte("data_transacao", dataInicio)
         .lte("data_transacao", dataFim)
-        .order("data_transacao", { ascending: false })
-        .limit(200);
+        .order("data_transacao", { ascending: false });
+      // Sem .limit() de propósito (achado do code-review C2-1): esta lista
+      // alimenta a contagem "pendentes" do dialog de resultado e a varredura
+      // de contas do auto-reconciliar — um teto aqui divergiria da contagem
+      // de `extratosSemCandidato` (a RPC não tem teto) e faria o
+      // auto-reconciliar pular contas cujo único pendente cai fora do corte.
 
       if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
+        // Filial compartilhada (filial_id NULL) precisa continuar visível —
+        // mesma correção aplicada em `contas` e na RPC nesta mesma fase
+        // (achado do code-review: esta query ficou .eq() puro pra trás).
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
       }
       if (selectedContaId !== "all") {
         query = query.eq("conta_id", selectedContaId);
@@ -122,6 +196,32 @@ export function useConciliacaoManualData() {
     },
     enabled: !igrejaLoading && !filialLoading && !!igrejaId,
   });
+
+  // Anexa nome da conta depois de buscada — desacoplado da query original de
+  // propósito (evita a race de loading comentada acima). Prioriza o nome já
+  // embutido em `extratosBrutos` (join SQL real via `contas(nome)`, sem
+  // filtro de conta ativa) — `contas` (a lista usada no dropdown de filtro)
+  // só teria conta ATIVA, então uma conta desativada com extrato pendente
+  // ficaria sem nome se essa fosse a única fonte (achado do code-review).
+  const extratosSemCandidato = useMemo<ExtratoItem[]>(() => {
+    if (!extratosSemCandidatoBruto) return [];
+    const contaNomeById = new Map<string, string>();
+    for (const c of contas ?? []) contaNomeById.set(c.id, c.nome);
+    for (const e of extratosBrutos ?? []) {
+      if (e.contas?.nome) contaNomeById.set(e.conta_id, e.contas.nome);
+    }
+    return extratosSemCandidatoBruto.map((e) => ({
+      ...e,
+      contas: contaNomeById.has(e.conta_id)
+        ? { nome: contaNomeById.get(e.conta_id)! }
+        : null,
+    }));
+  }, [extratosSemCandidatoBruto, extratosBrutos, contas]);
+
+  const refetchExtratos = () => {
+    refetchExtratosSemCandidato();
+    refetchExtratosBrutos();
+  };
 
   const { data: transacoes, isLoading: loadingTransacoes } = useQuery<
     TransacaoConciliacao[]
@@ -187,14 +287,14 @@ export function useConciliacaoManualData() {
   });
 
   const extratosFiltrados = useMemo(() => {
-    if (!extratos) return [];
-    return extratos.filter((e) => {
+    if (!extratosSemCandidato) return [];
+    return extratosSemCandidato.filter((e) => {
       if (e.descricao?.toUpperCase().includes("CONTAMAX")) return false;
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         if (
           !e.descricao.toLowerCase().includes(search) &&
-          !e.contas?.nome.toLowerCase().includes(search)
+          !e.contas?.nome?.toLowerCase().includes(search)
         ) {
           return false;
         }
@@ -211,7 +311,7 @@ export function useConciliacaoManualData() {
       if (origemFiltro !== "all" && e.origem !== origemFiltro) return false;
       return true;
     });
-  }, [extratos, searchTerm, tipoFiltro, origemFiltro]);
+  }, [extratosSemCandidato, searchTerm, tipoFiltro, origemFiltro]);
 
   const transacoesPendentes = useMemo(() => {
     if (!transacoes) return [];
@@ -245,14 +345,24 @@ export function useConciliacaoManualData() {
     transacaoOrigemFilter,
   ]);
 
-  // Reset pages on filter change
-  useMemo(() => {
+  // Reset pages on filter change — ajuste de estado durante o render (padrão
+  // recomendado pelo React pra "resetar estado quando outra coisa muda", sem
+  // useEffect: https://react.dev/learn/you-might-not-need-an-effect). Achado
+  // do lint ao tocar este arquivo na C2-1 — useMemo/useEffect com setState
+  // direto no corpo são ambos flagados pela config atual.
+  const extratoFiltrosKey = `${searchTerm}|${selectedContaId}|${tipoFiltro}|${origemFiltro}`;
+  const [prevExtratoFiltrosKey, setPrevExtratoFiltrosKey] = useState(extratoFiltrosKey);
+  if (extratoFiltrosKey !== prevExtratoFiltrosKey) {
+    setPrevExtratoFiltrosKey(extratoFiltrosKey);
     setCurrentPage(1);
-  }, [searchTerm, selectedContaId, tipoFiltro, origemFiltro]);
+  }
 
-  useMemo(() => {
+  const transacaoFiltrosKey = `${transacaoSearchTerm}|${transacaoContaFilter}|${transacaoTipoFilter}|${transacaoOrigemFilter}`;
+  const [prevTransacaoFiltrosKey, setPrevTransacaoFiltrosKey] = useState(transacaoFiltrosKey);
+  if (transacaoFiltrosKey !== prevTransacaoFiltrosKey) {
+    setPrevTransacaoFiltrosKey(transacaoFiltrosKey);
     setTransacaoPage(1);
-  }, [transacaoSearchTerm, transacaoContaFilter, transacaoTipoFilter, transacaoOrigemFilter]);
+  }
 
   const totalPages = Math.ceil(extratosFiltrados.length / ITEMS_PER_PAGE);
   const paginatedExtratos = useMemo(() => {
@@ -283,12 +393,20 @@ export function useConciliacaoManualData() {
     queryClient.invalidateQueries({ queryKey: ["transacoes-ja-vinculadas"] });
   };
 
-  /** Candidatos 1:1 do motor único, por conta, para o "Reconciliar Automático". */
+  /**
+   * Candidatos 1:1 do motor único, por conta, para o "Reconciliar Automático".
+   * Varre as contas de `extratosBrutos` (pendentes sem excluir quem já tem
+   * candidato, já respeitando `selectedContaId`) — não `contas` (varreria
+   * contas ativas sem nenhum pendente, N chamadas desperdiçadas) nem
+   * `extratosSemCandidato` (desde C2-1 essa lista já exclui quem tem
+   * candidato, que é justamente quem esta função busca e aplica
+   * automaticamente; usar aquela lista faria pular contas "consumidas").
+   */
   const buscarCandidatosAutoReconciliar = async (): Promise<
     AutoReconciliarCandidato[]
   > => {
-    if (!extratos || extratos.length === 0) return [];
-    const contaIds = [...new Set(extratos.map((e) => e.conta_id))];
+    if (!extratosBrutos || extratosBrutos.length === 0) return [];
+    const contaIds = [...new Set(extratosBrutos.map((e) => e.conta_id))];
     const out: AutoReconciliarCandidato[] = [];
     for (const contaId of contaIds) {
       try {
@@ -314,7 +432,9 @@ export function useConciliacaoManualData() {
     return out;
   };
 
-  const obterExtrato = (id: string) => extratos?.find((e) => e.id === id);
+  const obterExtrato = (id: string) =>
+    extratosBrutos?.find((e) => e.id === id) ??
+    extratosSemCandidato?.find((e) => e.id === id);
   const obterTransacao = (id: string) => {
     const t = transacoes?.find((tx) => tx.id === id);
     return t ? { descricao: t.descricao, valor: Number(t.valor) } : undefined;
@@ -337,6 +457,8 @@ export function useConciliacaoManualData() {
     origemFiltro,
     setOrigemFiltro,
     extratosFiltrados,
+    /** Contagem residual SEM filtros client-side (busca/tipo/origem) — banner de empty state. */
+    totalExtratosSemCandidato: extratosSemCandidato.length,
     paginatedExtratos,
     loadingExtratos,
     currentPage,
@@ -363,6 +485,6 @@ export function useConciliacaoManualData() {
     buscarCandidatosAutoReconciliar,
     obterExtrato,
     obterTransacao,
-    extratosBrutos: extratos,
+    extratosBrutos,
   };
 }

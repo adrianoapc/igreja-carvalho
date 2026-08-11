@@ -4,11 +4,19 @@
 -- `fin_stats_cartao_getnet` — agregação read-only sobre
 -- `getnet_recebivel_lancamentos` pro card "Cartão" da tela de Histórico
 -- (mockup original: "Vendas importadas / Vinculadas à oferta / Vinculadas
--- ao banco"). Mesma tabela e mesmos campos de vínculo
--- (`transacao_financeira_id`/`extrato_bancario_id`) que
--- `fin_listar_ledger_conciliacao_cartao` já usa pro ledger — não é uma
--- segunda fonte de verdade, só uma contagem direta, sem a lógica de
--- agrupamento por parcela/oferta que o ledger precisa e esta contagem não.
+-- ao banco"). Contadores alinhados à semântica do ledger unificado:
+--   • oferta  = transacao_financeira_id (Hop 2)
+--   • banco   = extrato_bancario_id (Hop 1) OU lote de antecipação
+--               (contrato_registradora + getnet_antecipacao_lotes em
+--               vinculado/lancamento_criado) — mesma regra de
+--               fin_listar_ledger_conciliacao_cartao /
+--               fin_conferencia_totais_getnet
+-- Não é fonte de verdade paralela; só contagem direta, sem agrupamento
+-- por oferta que o ledger precisa e esta tela não.
+--
+-- Identidade da venda = (data_venda, filial_id, nsu) — alinhado ao Hop 2
+-- (fin_gerar_candidatos_oferta_venda_getnet). COUNT(DISTINCT nsu) sozinho
+-- colapsa NSUs iguais em dias/filiais diferentes.
 --
 -- Contexto/filial seguem exatamente o padrão de
 -- `fin_gerar_candidatos_venda_banco_getnet` (mesma integração Getnet,
@@ -77,18 +85,35 @@ BEGIN
   END IF;
 
   -- COUNT(*) simples contaria parcela, não venda — o CSV repete o NSU uma
-  -- vez por parcela (mesmo padrão documentado nas RPCs Hop 2, comentário
-  -- "valor_venda 1x por NSU"). "Vendas importadas" precisa ser por NSU
-  -- distinto; uma venda conta como vinculada se QUALQUER uma das suas
-  -- parcelas já tem o vínculo (achado do code-review).
+  -- vez por parcela. Identidade = (data_venda, filial_id, nsu) como no
+  -- Hop 2. Uma venda conta como vinculada se QUALQUER parcela já tem o
+  -- vínculo. Banco = Hop 1 direto OU lote de antecipação (Bugbot #89).
   RETURN QUERY
   SELECT
-    COUNT(DISTINCT g.nsu)::integer AS vendas_importadas,
-    COUNT(DISTINCT g.nsu) FILTER (WHERE g.transacao_financeira_id IS NOT NULL)::integer AS vinculadas_oferta,
-    COUNT(DISTINCT g.nsu) FILTER (WHERE g.extrato_bancario_id IS NOT NULL)::integer AS vinculadas_banco
+    COUNT(DISTINCT (g.data_venda, g.filial_id, g.nsu))::integer AS vendas_importadas,
+    COUNT(DISTINCT (g.data_venda, g.filial_id, g.nsu))
+      FILTER (WHERE g.transacao_financeira_id IS NOT NULL)::integer AS vinculadas_oferta,
+    COUNT(DISTINCT (g.data_venda, g.filial_id, g.nsu))
+      FILTER (
+        WHERE g.extrato_bancario_id IS NOT NULL
+           OR (
+             g.contrato_registradora IS NOT NULL
+             AND EXISTS (
+               SELECT 1
+                 FROM public.getnet_antecipacao_lotes l
+                WHERE l.igreja_id = v_igreja
+                  AND l.integracao_id = p_integracao_id
+                  AND l.contrato_registradora = g.contrato_registradora
+                  AND l.status IN ('vinculado', 'lancamento_criado')
+                  AND public.has_filial_access(v_igreja, l.filial_id)
+             )
+           )
+      )::integer AS vinculadas_banco
   FROM public.getnet_recebivel_lancamentos g
   WHERE g.igreja_id = v_igreja
     AND g.integracao_id = p_integracao_id
+    AND g.nsu IS NOT NULL
+    AND g.nsu <> ''
     AND g.data_vencimento IS NOT NULL
     AND g.data_vencimento BETWEEN p_periodo_inicio AND p_periodo_fim
     AND public.has_filial_access(v_igreja, g.filial_id)
@@ -97,7 +122,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.fin_stats_cartao_getnet(uuid, date, date, uuid, jsonb) IS
-  'Agregação read-only sobre getnet_recebivel_lancamentos pro card "Cartão" de Extratos/Histórico (Ciclo 2, C2-2): total importado, vinculado à oferta, vinculado ao banco. Mesmos campos que o ledger unificado usa — não é fonte de verdade paralela.';
+  'Agregação read-only pro card Cartão de Extratos/Histórico (C2-2): vendas por (data_venda, filial_id, nsu); vinculadas_oferta via transacao_financeira_id; vinculadas_banco via extrato_bancario_id OU lote de antecipação (contrato_registradora).';
 
 GRANT EXECUTE ON FUNCTION public.fin_stats_cartao_getnet(uuid, date, date, uuid, jsonb) TO authenticated, service_role;
 REVOKE ALL ON FUNCTION public.fin_stats_cartao_getnet(uuid, date, date, uuid, jsonb) FROM anon;

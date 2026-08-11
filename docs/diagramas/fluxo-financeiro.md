@@ -1015,17 +1015,35 @@ Fecha o backlog de `has_filial_access` nas 8 RPCs/policies `SECURITY
 DEFINER` de §11 — Fases 1-3 já mergeadas (RPCs triviais, transferência/
 ajuste/reembolso, RLS de `extratos_bancarios`).
 
+## Ciclo 2 (C2-1) — Modo Clássico como estado derivado (§9.99)
+
+`ConciliacaoManual` (aba "Por Extrato") deixa de listar todo extrato
+`reconciliado=false` e passa a mostrar só o que sobrou depois dos motores
+Cartão (Getnet) e Inteligente (F4) já terem tentado. C2-0 (period-picker
+único no Modo Inteligente) está documentado na seção F7 acima (§9.98).
+
+```mermaid
+flowchart TD
+    E["extratos_bancarios\nreconciliado=false"] --> F4["fin_gerar_candidatos_conciliacao\n(motor F4)"]
+    E --> LOTE{"getnet_antecipacao_lotes.\nextrato_bancario_id preenchido?"}
+    F4 -->|tem candidato| INT["fica no Modo Inteligente\n(sugestão a confirmar)"]
+    LOTE -->|sim, vinculado| CARTAO["já tomado pelo Cartão\n(reconciliado NÃO marcado — achado C2-1)"]
+    F4 -->|sem candidato| CLASSICO["fin_listar_extratos_sem_candidato"]
+    LOTE -->|não| CLASSICO
+    CLASSICO --> UI["Modo Clássico — 'Por Extrato'\ncom campo motivo"]
+```
+
 ## Ciclo 2 (C2-2) — Card "Cartão" em Extratos/Histórico (§9.100)
 
-`COUNT(*)` conta parcela, não venda — o CSV repete o NSU uma vez por
-parcela. Fix: `COUNT(DISTINCT nsu)` nos três contadores.
+Identidade da venda = `(data_venda, filial_id, nsu)` — não `nsu` sozinho.
+"Vinculadas ao banco" inclui Hop 1 direto **e** lote de antecipação.
 
 ```mermaid
 flowchart TD
     G["getnet_recebivel_lancamentos\n(1 linha por parcela)"] --> D{"COUNT(*) ingenuo"}
     D --> BUG["venda 3x = 3\n(inflado)"]
-    G --> FIX["COUNT(DISTINCT nsu)"]
+    G --> FIX["COUNT DISTINCT\n(data_venda, filial_id, nsu)"]
     FIX --> OK["venda 3x = 1\n(correto)"]
-    FIX --> VINC["vinculada = QUALQUER parcela\ntem transacao_financeira_id/\nextrato_bancario_id"]
+    FIX --> VINC["vinculada banco =\nextrato_bancario_id\nOU lote antecipação\n(contrato_registradora)"]
 ```
 
