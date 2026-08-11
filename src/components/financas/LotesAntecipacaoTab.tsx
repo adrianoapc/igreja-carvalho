@@ -11,6 +11,7 @@ import {
 import { useFilialId } from "@/hooks/useFilialId";
 import { ConciliacaoCartaoLedger } from "@/components/financas/ConciliacaoCartaoLedger";
 import { ConferenciaTotaisGetnetCard } from "@/components/financas/ConferenciaTotaisGetnetCard";
+import { AjustesGetnetCard } from "@/components/financas/AjustesGetnetCard";
 import { MonthPicker } from "@/components/financas/MonthPicker";
 import { getPeriodoRange } from "@/features/financeiro/core/lib/periodo";
 import { supabase } from "@/integrations/supabase/client";
@@ -181,6 +182,15 @@ export function LotesAntecipacaoTab() {
         onCustomRangeChange={setCustomRange}
         hideFilters
       />
+
+      {integracaoId && (
+        <AjustesGetnetCard
+          integracaoId={integracaoId}
+          periodoInicio={periodo.inicio}
+          periodoFim={periodo.fim}
+          filialId={filialFiltro}
+        />
+      )}
 
       <ConciliacaoCartaoLedger filters={ledgerFilters} />
     </div>

@@ -154,13 +154,15 @@ export interface CandidatoOfertaVendaGetnet {
   features: Record<string, unknown>;
 }
 
-export interface CandidatosOfertaVendaGetnetParams {
+/** Shape recorrente das RPCs Getnet escopadas por integração+período+filial. */
+export interface GetnetPeriodoFilialParams {
   integracaoId: string;
   periodoInicio: string;
   periodoFim: string;
   /** `null`/omitido = todas as filiais no teto do usuário. */
   filialId?: string | null;
 }
+
 
 /**
  * → fin_gerar_candidatos_oferta_venda_getnet (Fase 1, só leitura).
@@ -169,7 +171,7 @@ export interface CandidatosOfertaVendaGetnetParams {
  * nao_conciliadas. UI: aba Conciliação Cartão (Fase 6).
  */
 export async function gerarCandidatosOfertaVendaGetnet(
-  params: CandidatosOfertaVendaGetnetParams,
+  params: GetnetPeriodoFilialParams,
 ): Promise<CandidatoOfertaVendaGetnet[]> {
   // fin_* ainda não está nos tipos gerados; cast único, como em conciliacao.api.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -225,13 +227,8 @@ export interface CandidatoVendaBancoGetnet {
   features: Record<string, unknown>;
 }
 
-export interface CandidatosVendaBancoGetnetParams {
+export interface CandidatosVendaBancoGetnetParams extends GetnetPeriodoFilialParams {
   contaId: string;
-  integracaoId: string;
-  periodoInicio: string;
-  periodoFim: string;
-  /** `null`/omitido = todas as filiais no teto do usuário. */
-  filialId?: string | null;
 }
 
 /**
@@ -372,13 +369,8 @@ export interface LedgerConciliacaoCartao {
   lotes: LedgerCartaoLote[];
 }
 
-export interface ListarLedgerConciliacaoCartaoParams {
-  integracaoId: string;
+export interface ListarLedgerConciliacaoCartaoParams extends GetnetPeriodoFilialParams {
   contaId: string;
-  periodoInicio: string;
-  periodoFim: string;
-  /** `null`/omitido = todas as filiais no teto do usuário. */
-  filialId?: string | null;
 }
 
 /**
@@ -440,4 +432,88 @@ export async function buscarRecebiveisGetnetOferta(
   });
   if (error) throw error;
   return (data ?? []) as CandidatoBuscaRecebivelOferta[];
+}
+
+/**
+ * Ajustes Getnet + linhas CI (Ciclo 2, C2-4) — read-only. Tabela II do
+ * manual (motivo_ajuste, 22 códigos) e indicador_tipo_pagamento=CI de
+ * getnet_resumo eram gravados desde sempre e nunca lidos por nenhuma tela.
+ */
+
+export interface AjusteGetnet {
+  ajuste_id: string;
+  arquivo_nome: string;
+  rv_ajustado: string;
+  data_rv: string | null;
+  data_pagamento_rv: string | null;
+  motivo_codigo: string | null;
+  motivo_descricao: string;
+  sinal: string | null;
+  valor_ajuste: number | null;
+  cartao_truncado: string | null;
+  rv_original: string | null;
+  nsu_cv: string | null;
+  numero_terminal: string | null;
+  data_transacao_original: string | null;
+}
+
+export type ListarAjustesGetnetParams = GetnetPeriodoFilialParams;
+
+/**
+ * → fin_listar_ajustes_getnet.
+ *
+ * ATENÇÃO (achado do code-review): diferente de todo outro `p_filial_id`
+ * deste arquivo (que filtra linhas de verdade — ver `listarResumoCiGetnet`
+ * abaixo), aqui `filialId` só VALIDA acesso do chamador — `getnet_ajustes`
+ * não tem coluna `filial_id`, então o retorno inclui toda linha da
+ * integração, mesmo pra integração compartilhada entre filiais. Não
+ * confiar neste parâmetro pra escopo de dado por filial nesta RPC
+ * específica (ver comentário completo na migration
+ * `20260811110000_fin_listar_ajustes_getnet.sql`).
+ */
+export async function listarAjustesGetnet(
+  params: ListarAjustesGetnetParams,
+): Promise<AjusteGetnet[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)("fin_listar_ajustes_getnet", {
+    p_integracao_id: params.integracaoId,
+    p_periodo_inicio: params.periodoInicio,
+    p_periodo_fim: params.periodoFim,
+    p_filial_id: params.filialId ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as AjusteGetnet[];
+}
+
+export interface ResumoCiGetnet {
+  resumo_id: string;
+  arquivo_nome: string;
+  rv: string;
+  data_rv: string;
+  data_pagamento_rv: string | null;
+  valor_bruto: number;
+  valor_liquido: number;
+  valor_liquido_cobranca: number | null;
+  id_baixa_cobranca_servico: string | null;
+  sinal: string | null;
+  banco: string | null;
+  agencia: string | null;
+  conta_corrente: string | null;
+}
+
+export type ListarResumoCiGetnetParams = GetnetPeriodoFilialParams;
+
+/** → fin_listar_resumo_ci_getnet. */
+export async function listarResumoCiGetnet(
+  params: ListarResumoCiGetnetParams,
+): Promise<ResumoCiGetnet[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)("fin_listar_resumo_ci_getnet", {
+    p_integracao_id: params.integracaoId,
+    p_periodo_inicio: params.periodoInicio,
+    p_periodo_fim: params.periodoFim,
+    p_filial_id: params.filialId ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as ResumoCiGetnet[];
 }
