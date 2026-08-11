@@ -6220,11 +6220,45 @@ corrigidos antes do merge**:
    3 combinações (preenchido / vazio+fallback / ambos vazios→'sem-chave').
 
 Novo helper `getnet_safe_uuid(text)` (`IMMUTABLE`, cast tolerante a
-`NULL`) centraliza a guarda de formato usada agora em 3 lugares (backfill
-das duas tabelas + fallback da view) — e precisou de `GRANT EXECUTE`
-explícito pra `authenticated`/`service_role`: com `security_invoker=true`
-na view, quem consulta executa a função como o próprio papel, não como o
-owner (achado do próprio harness ao testar como tesoureiro).
+`NULL`) centraliza a guarda de formato usada no backfill das duas
+tabelas + validação da FK abaixo.
+
+**2ª rodada do `@codex review` (contra o commit que corrigiu os 2 P1
+acima) achou mais 2 P1 reais, ambos corrigidos**:
+1. **Fallback pra config atual ainda sobrevivia pra linhas com
+   `conta_id IS NULL`**: o 1º fix parou de RE-LER a config só pra linhas
+   que JÁ tinham `conta_id` congelado — uma linha com `conta_id NULL`
+   (backfill sem match) reabria o mesmo bug SÓ pra ela. Fix: removeu o
+   `COALESCE` da view inteiramente — `conta_id IS NULL` fica `NULL` de
+   verdade, sem recálculo a cada consulta. Atribuição desconhecida agora
+   é um estado final honesto, não algo "resolvido" via config atual.
+2. **Nada validava `conta_id` antes de gravar nas colunas novas**: um
+   UUID sintaticamente válido mas de conta inexistente/de outra igreja
+   passava pelo INSERT de `getnet_resumo`/`getnet_financeiro_resumo`
+   (que roda ANTES do espelho) e só `fin_ingerir_extratos` (que TEM
+   validação de tenant) rejeitava depois — deixando a linha crua já
+   commitada com conta errada, presa pra sempre (`upsertChunks` usa
+   `ON CONFLICT DO NOTHING`, nunca corrige valor já gravado). Fix: FK de
+   verdade — `conta_id REFERENCES contas(id) ON DELETE SET NULL` nas
+   duas tabelas (não `CASCADE`: excluir uma conta bancária não deveria
+   apagar histórico de crédito Getnet, só sua atribuição — mesmo
+   princípio do NULL honesto do item 1). Backfill ajustado pra só
+   preencher via JOIN direto contra `contas` (existência + mesma
+   igreja), não só formato — senão a própria migration quebraria ao
+   adicionar a FK sobre um valor que não referencia nada. Confirmado no
+   harness: INSERT com `conta_id` de conta inexistente é rejeitado na
+   hora (`getnet_resumo_conta_id_fkey`), e a linha com `conta_id`
+   congelado sobrevive inalterada a uma mudança posterior na config —
+   agora sem exceção nenhuma.
+
+Cursor Bugbot, mesma rodada, achado Medium: gravar `contaId` bruto (sem
+guarda de formato) nas colunas novas podia quebrar o upsert de
+`getnet_resumo`/`getnet_financeiro_resumo` pra um `config.sftp.conta_id`
+malformado que hoje só quebra o passo do espelho — julgado **comportamento
+correto, não regressão**: a FK nova (achado 2 acima) É a validação
+pretendida, mesma garantia que `fin_ingerir_extratos` já dava pro espelho,
+agora também pro dado cru, falhando alto e cedo em vez de aceitar um
+valor ruim silenciosamente.
 
 ## 11. Riscos
 

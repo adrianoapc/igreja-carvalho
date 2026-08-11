@@ -127,6 +127,42 @@
 -- (cutover de consumidores): resolver isso — arquivar em vez de excluir,
 -- ou remover o cascade — antes de qualquer tela/RPC depender desta view
 -- como fonte durável.
+--
+-- (2ª rodada do `@codex review`, contra o commit que corrigiu os 2 P1
+-- acima — achados novos, aplicados abaixo)
+--
+-- **P1 — o fallback pra config atual ainda existia pra linhas com
+-- conta_id NULL.** O fix anterior parava de RE-LER a config pra linhas
+-- que JÁ tinham `conta_id` congelado, mas a view continuava com
+-- `COALESCE(r.conta_id, <config atual>)` — uma linha que ficasse com
+-- `conta_id IS NULL` (backfill sem match, ou uma falha futura) reabria
+-- exatamente o mesmo bug SÓ pra ela: mudar a config depois ainda movia
+-- essa linha específica. Fix: sem fallback nenhum na view — `conta_id
+-- IS NULL` fica `NULL` de verdade (atribuição desconhecida é um estado
+-- honesto, não algo pra "resolver" relendo a config a cada consulta).
+--
+-- **P1 — nada validava o conta_id antes de gravá-lo nas tabelas novas.**
+-- `contaId` (texto solto de `config.sftp.conta_id`, sem checagem de
+-- formato nem de existência) ia direto pras colunas `conta_id` novas,
+-- sem FK. Um UUID sintaticamente válido mas de uma conta inexistente/de
+-- outra igreja passava pelo INSERT de `getnet_resumo`/
+-- `getnet_financeiro_resumo` (que roda ANTES do espelho) e só o
+-- `fin_ingerir_extratos` (que TEM validação de tenant) rejeitava depois —
+-- deixando a linha crua já commitada com uma conta errada, presa lá pra
+-- sempre (reprocessamento usa upsert com `ON CONFLICT DO NOTHING`,
+-- nunca corrige um valor já gravado). Fix: FK de verdade —
+-- `conta_id REFERENCES public.contas(id) ON DELETE SET NULL` nas duas
+-- tabelas. Postgres passa a rejeitar o INSERT/UPDATE na origem (mesma
+-- garantia que `fin_ingerir_extratos` já dava pro espelho, agora
+-- também pro dado cru) em vez de aceitar um valor ruim silenciosamente;
+-- `ON DELETE SET NULL` (não CASCADE) porque excluir uma conta bancária
+-- não deveria apagar o histórico de crédito Getnet, só sua atribuição —
+-- mesmo princípio do achado P1 anterior (atribuição desconhecida = NULL
+-- honesto, não motivo pra apagar dado). Backfill best-effort ajustado
+-- pra só preencher quando a conta realmente existe NESTA igreja (join
+-- direto contra `contas`, não só formato) — senão a própria migration
+-- quebraria ao tentar adicionar a FK sobre um valor que não referencia
+-- nada.
 -- ============================================================================
 
 -- Cast seguro de uuid — evita repetir a guarda de formato em 3 lugares
@@ -145,10 +181,11 @@ $$;
 COMMENT ON FUNCTION public.getnet_safe_uuid(text) IS
   'Cast text->uuid que devolve NULL em vez de estourar erro pra valor malformado (ex.: config JSONB editável por operador). Usado no backfill/fallback de conta_id de getnet_credito_disponivel (C2-6).';
 
--- security_invoker=true na view abaixo: quem consulta a view executa esta
--- função como o próprio papel (authenticated), não como o owner — precisa
--- de EXECUTE explícito, senão a view falha com "permission denied" pra
--- todo mundo que não seja o owner/superuser.
+-- Só usado no backfill abaixo (migration roda como superuser) — a view
+-- final NÃO chama mais esta função (2ª rodada do @codex review removeu o
+-- fallback pra config atual, ver comentário no topo do arquivo), mas o
+-- GRANT fica pra reprocessamento/backfill futuro reaproveitar sem
+-- precisar de outra migration só pra isso.
 GRANT EXECUTE ON FUNCTION public.getnet_safe_uuid(text) TO authenticated, service_role;
 REVOKE ALL ON FUNCTION public.getnet_safe_uuid(text) FROM anon;
 
@@ -166,18 +203,39 @@ COMMENT ON COLUMN public.getnet_financeiro_resumo.conta_id IS
 -- Backfill best-effort das linhas históricas (só existe a config ATUAL
 -- pra usar; se a conta_id da integração já mudou desde algum import
 -- antigo, essas linhas ficam com o valor errado — limitação inerente,
--- documentada, mesmo padrão da C2-3).
+-- documentada, mesmo padrão da C2-3). Join direto contra `contas` (não só
+-- guarda de formato): só preenche quando a conta REALMENTE existe nesta
+-- igreja — precisa ser assim pra FK abaixo não quebrar a migration, e é
+-- o mesmo padrão que a FK vai exigir dali pra frente.
 UPDATE public.getnet_resumo r
-   SET conta_id = public.getnet_safe_uuid(i.config -> 'sftp' ->> 'conta_id')
+   SET conta_id = c.id
   FROM public.integracoes_financeiras i
+  JOIN public.contas c
+    ON c.id = public.getnet_safe_uuid(i.config -> 'sftp' ->> 'conta_id')
+   AND c.igreja_id = i.igreja_id
  WHERE i.id = r.integracao_id
    AND r.conta_id IS NULL;
 
 UPDATE public.getnet_financeiro_resumo f
-   SET conta_id = public.getnet_safe_uuid(i.config -> 'sftp' ->> 'conta_id')
+   SET conta_id = c.id
   FROM public.integracoes_financeiras i
+  JOIN public.contas c
+    ON c.id = public.getnet_safe_uuid(i.config -> 'sftp' ->> 'conta_id')
+   AND c.igreja_id = i.igreja_id
  WHERE i.id = f.integracao_id
    AND f.conta_id IS NULL;
+
+-- FK de verdade (achado Codex P1, 2ª rodada) — Postgres rejeita conta_id
+-- inexistente/de outra igreja NA ORIGEM, mesma garantia que
+-- fin_ingerir_extratos já dava só pro espelho. ON DELETE SET NULL, não
+-- CASCADE: excluir uma conta bancária não apaga histórico de crédito,
+-- só sua atribuição (mesmo princípio do NULL honesto acima).
+ALTER TABLE public.getnet_resumo
+  ADD CONSTRAINT getnet_resumo_conta_id_fkey
+  FOREIGN KEY (conta_id) REFERENCES public.contas(id) ON DELETE SET NULL;
+ALTER TABLE public.getnet_financeiro_resumo
+  ADD CONSTRAINT getnet_financeiro_resumo_conta_id_fkey
+  FOREIGN KEY (conta_id) REFERENCES public.contas(id) ON DELETE SET NULL;
 
 CREATE OR REPLACE VIEW public.getnet_credito_disponivel
 WITH (security_invoker = true) AS
@@ -186,7 +244,7 @@ WITH via_tipo1 AS (
     r.integracao_id,
     r.igreja_id,
     i.filial_id,
-    COALESCE(r.conta_id, public.getnet_safe_uuid(i.config -> 'sftp' ->> 'conta_id')) AS conta_id,
+    r.conta_id,
     r.arquivo_nome,
     COALESCE(r.data_pagamento_rv, r.data_rv) AS data_transacao,
     r.valor_liquido AS valor,
@@ -208,7 +266,7 @@ via_tipo5 AS (
     f.integracao_id,
     f.igreja_id,
     i.filial_id,
-    COALESCE(f.conta_id, public.getnet_safe_uuid(i.config -> 'sftp' ->> 'conta_id')) AS conta_id,
+    f.conta_id,
     f.arquivo_nome,
     COALESCE(f.data_credito_operacao, f.data_operacao) AS data_transacao,
     f.valor_liquido_operacao AS valor,
@@ -235,7 +293,7 @@ UNION ALL
 SELECT * FROM via_tipo5;
 
 COMMENT ON VIEW public.getnet_credito_disponivel IS
-  'Ciclo 2 C2-6: crédito Getnet disponível, direto de getnet_resumo (LQ)/getnet_financeiro_resumo (PG) — equivalente aditivo ao espelho hoje escrito em extratos_bancarios (origem getnet_sftp_txt/getnet_sftp_tipo5). Fonte por arquivo travada em getnet_arquivos.espelho_origem (allow-list explícita, LEFT JOIN — arquivo sem linha em getnet_arquivos cai no fallback tipo1, mesma regra do NULL). conta_id vem congelado no momento do import (coluna própria, não relida da config atual) — editar a integração depois não reatribui histórico. Puramente leitura; nenhum consumidor migrado ainda. BLOQUEIOS antes da C2-7 (cutover): (1) aplicar has_filial_access — filial_id aqui NÃO é filtrado por RLS; (2) resolver ON DELETE CASCADE de integracao_id nas tabelas base — excluir uma integração hoje apaga todo o histórico desta view, sem equivalente no espelho legado. security_invoker=true — herda RLS (só igreja_id) das tabelas base.';
+  'Ciclo 2 C2-6: crédito Getnet disponível, direto de getnet_resumo (LQ)/getnet_financeiro_resumo (PG) — equivalente aditivo ao espelho hoje escrito em extratos_bancarios (origem getnet_sftp_txt/getnet_sftp_tipo5). Fonte por arquivo travada em getnet_arquivos.espelho_origem (allow-list explícita, LEFT JOIN — arquivo sem linha em getnet_arquivos cai no fallback tipo1, mesma regra do NULL). conta_id vem SEMPRE da coluna própria (congelada no import, FK pra contas, ON DELETE SET NULL) — nunca relida da config atual; NULL é um estado final (atribuição desconhecida), não recalculado a cada consulta. Puramente leitura; nenhum consumidor migrado ainda. BLOQUEIOS antes da C2-7 (cutover): (1) aplicar has_filial_access — filial_id aqui NÃO é filtrado por RLS; (2) resolver ON DELETE CASCADE de integracao_id nas tabelas base — excluir uma integração hoje apaga todo o histórico desta view, sem equivalente no espelho legado. security_invoker=true — herda RLS (só igreja_id) das tabelas base.';
 
 GRANT SELECT ON public.getnet_credito_disponivel TO authenticated, service_role;
 REVOKE ALL ON public.getnet_credito_disponivel FROM anon;
