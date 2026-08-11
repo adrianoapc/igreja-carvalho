@@ -1,0 +1,19 @@
+flowchart TD
+    IMPORT["import_extrato/sync\n(arquivo novo)"] --> BRR["buildResumoRow"]
+    BRR --> INS["INSERT getnet_resumo\nvalor_liquido_cobranca + id_baixa_cobranca_servico"]
+    INS --> IGN{"upsertChunks\nignorou linha\n(ON CONFLICT)?"}
+    IGN -->|não| STAMP["getnet_arquivos.\nresumo_cobranca_backfilled_at = now()"]
+    IGN -->|sim| SKIP["marcador NÃO carimbado\n(elegível pro backfill)"]
+
+    ADMIN["action=backfill_resumo_cobranca\n(operador, fora do SFTP)"] --> SEL["getnet_arquivos\nWHERE resumo_cobranca_backfilled_at IS NULL\nAND storage_path IS NOT NULL\nORDER BY data_referencia LIMIT batchSize"]
+    SEL --> BEP["baixarEParsearDoBucket"]
+    BEP --> UPD["UPDATE getnet_resumo\npor rv+data_rv+indicador+arquivo_nome"]
+    UPD --> OUT{"outcome por linha"}
+    OUT -->|atualizada| OK["conta pra completo"]
+    OUT -->|pulada\n(chave em outro arquivo)| OK
+    OUT -->|nao_encontrada / erro| RETRY["reselecionado na próxima chamada\n(arquivos_restantes > 0)"]
+    OK --> COMPLETO{"todas resolvidas\nsem lacuna real?"}
+    COMPLETO -->|sim| MARK["UPDATE marcador\n(checa error antes de contar)"]
+    MARK -->|ok| STAMP
+    MARK -->|erro| RETRY
+    COMPLETO -->|não| RETRY
