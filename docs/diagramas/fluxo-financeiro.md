@@ -1106,4 +1106,26 @@ flowchart TD
     HFA -.->|valida + filtra via v_scope| RPC2
 ```
 
+## Ciclo 2 (C2-5) — Parser: campos de participante tipo5/tipo6 (§9.103)
+
+Gap de bytes 149-255 (tipo5) e 155-261 (tipo6) nunca extraído. Tabelas
+`getnet_financeiro_resumo`/`detalhe` vazias em produção hoje — sem amostra
+real pra verificar empiricamente, implementação segue o manual V10.1
+(decisão explícita do usuário), auditada linha a linha por agente
+independente contra o PDF.
+
+```mermaid
+flowchart TD
+    LINHA["linha posicional 400 bytes\ntipoRegistro = 5 ou 6"] --> TIPO{"charAt(0)"}
+    TIPO -->|"5"| RESUMO["LAYOUT_FIN_RESUMO\nparticipanteCnpjCpf 171-184\nparticipanteBanco 187-189\nparticipanteAgencia 190-195\nparticipanteContaCorrente 196-215\nparticipanteRazaoSocial 231-255"]
+    TIPO -->|"6"| DETALHE["LAYOUT_FIN_DETALHE\nparticipanteCnpjCpf 177-190\nparticipanteRazaoSocial 237-261\n(SEM banco/agência/conta —\nZEROS/ESPAÇO no manual)"]
+
+    RESUMO --> INS1["INSERT getnet_financeiro_resumo\n(vazia em produção — 0 linhas até hoje)"]
+    DETALHE --> INS2["INSERT getnet_financeiro_detalhe\n(vazia em produção — 0 linhas até hoje)"]
+
+    INS1 --> RPC["fin_buscar_financeiro_participante_getnet\n(by numero_operacao)"]
+    INS2 --> RPC
+    RPC -.->|reaproveitada quando destravar| C210["C2-10 (bloqueada — evento AC real)"]
+```
+
 

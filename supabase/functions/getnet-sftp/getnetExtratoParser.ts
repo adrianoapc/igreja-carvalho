@@ -197,6 +197,18 @@ const LAYOUT_FIN_RESUMO: FieldDef[] = [
   { name: "contaCorrente",              start: 125, len: 20, kind: "text"   },
   { name: "canalOperacao",              start: 145, len: 3,  kind: "text"   },
   { name: "tipoMovimento",              start: 148, len: 1,  kind: "text"   },
+  // C2-5: campos do participante (manual V10.1, Tabela Resumo Financeiro,
+  // seq 21/23-25/27, pág. 21-22) — capturados desde sempre pelo gap
+  // 149-255, nunca extraídos. Sem amostra real disponível pra confirmar
+  // empiricamente contra a doc (produção não tem nenhuma linha tipo5/6
+  // ainda — decisão explícita do usuário de confiar na doc Getnet e
+  // implementar mesmo assim, ver PR). Byte ranges direto do manual, não
+  // verificados contra dado real.
+  { name: "participanteCnpjCpf",       start: 171, len: 14, kind: "text" },
+  { name: "participanteBanco",         start: 187, len: 3,  kind: "text" },
+  { name: "participanteAgencia",       start: 190, len: 6,  kind: "text" },
+  { name: "participanteContaCorrente", start: 196, len: 20, kind: "text" },
+  { name: "participanteRazaoSocial",   start: 231, len: 25, kind: "text" },
   { name: "codigoArranjo",             start: 256, len: 2,  kind: "text"   },
   { name: "chaveUr",                    start: 258, len: 25, kind: "text"   },
 ];
@@ -214,6 +226,16 @@ const LAYOUT_FIN_DETALHE: FieldDef[] = [
   { name: "valorBrutoUr",              start: 111, len: 12, kind: "amount" },
   { name: "tipoContaEstabelecimento",   start: 123, len: 2,  kind: "text"   },
   { name: "tipoMovimento",              start: 154, len: 1,  kind: "text"   },
+  // C2-5: mesmos campos de participante do tipo5 (manual V10.1, Tabela
+  // Detalhe Financeiro, seq 21/27, pág. 23-25) — só CNPJ/CPF e Razão
+  // Social. Banco/Agência/Conta do domicílio bancário (seq 22-25, bytes
+  // 191-221) NÃO capturados aqui: o manual documenta essas posições como
+  // "ZEROS"/"ESPAÇO" (Antigo Tipo de conta/Banco/Agência/Conta do
+  // participante) no tipo6, diferente do tipo5 onde são campos vivos —
+  // não verificado empiricamente contra dado real (produção sem nenhuma
+  // linha tipo5/6 ainda), decisão explícita de confiar na doc Getnet.
+  { name: "participanteCnpjCpf",     start: 177, len: 14, kind: "text" },
+  { name: "participanteRazaoSocial", start: 237, len: 25, kind: "text" },
   { name: "chaveUr",                    start: 262, len: 25, kind: "text"   },
 ];
 
@@ -272,6 +294,8 @@ export interface FinResumoRecord {
   valorBrutoOperacao: number; valorCustoOperacao: number; valorLiquidoOperacao: number;
   taxaMensalOperacao: number; tipoContaEstabelecimento: string; banco: string;
   agencia: string; contaCorrente: string; canalOperacao: string; tipoMovimento: string;
+  participanteCnpjCpf: string; participanteBanco: string; participanteAgencia: string;
+  participanteContaCorrente: string; participanteRazaoSocial: string;
   codigoArranjo: string; chaveUr: string;
 }
 
@@ -367,6 +391,7 @@ export interface FinDetalheRecord {
   numeroOperacao: string; tipoOperacao: string; codigoProduto: string;
   dataVencimentoUr: string | null; valorLiquidoUr: number; valorCustoUr: number;
   valorBrutoUr: number; tipoContaEstabelecimento: string; tipoMovimento: string;
+  participanteCnpjCpf: string; participanteRazaoSocial: string;
   chaveUr: string;
 }
 
