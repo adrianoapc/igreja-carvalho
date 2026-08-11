@@ -325,11 +325,20 @@ function buildResumoRow(
   },
   integracao: { id: string; igreja_id: string; filial_id?: string | null },
   arquivoNome: string,
+  // C2-6 (achado Codex P1): conta_id da integração NO MOMENTO da
+  // importação — congelado aqui, não relido da config atual em consultas
+  // futuras (getnet_credito_disponivel), senão editar "Conta destino" da
+  // integração depois reatribuiria retroativamente todo o histórico já
+  // importado. Opcional/`null` só pra runBackfillResumoCobranca, que
+  // reusa esta função mas nunca grava conta_id (UPDATE ali só toca
+  // valor_liquido_cobranca/id_baixa_cobranca_servico).
+  contaId?: string | null,
 ) {
   return {
     integracao_id: integracao.id,
     igreja_id: integracao.igreja_id,
     filial_id: integracao.filial_id ?? null,
+    conta_id: contaId ?? null,
     arquivo_nome: arquivoNome,
     codigo_produto: r.codigoProduto || null,
     forma_captura: r.formaCaptura || null,
@@ -1093,7 +1102,7 @@ async function runExtratoEletronicoV10(args: {
       const { resumos, analiticos, ajustes, financeirosResumo, financeirosDetalhe, validacao } = parsed;
 
       // ── getnet_resumo (tipo 1) — chave inclui indicador para ciclo PF→LQ ─
-      const resumoRows = resumos.map((r) => buildResumoRow(r, integracao, arq.nome));
+      const resumoRows = resumos.map((r) => buildResumoRow(r, integracao, arq.nome, contaId));
       const resRes = await upsertChunks(
         supabaseAdmin, "getnet_resumo", resumoRows,
         "integracao_id,rv,data_rv,indicador_tipo_pagamento"
@@ -1170,6 +1179,9 @@ async function runExtratoEletronicoV10(args: {
         const finResRows = financeirosResumo.map((f) => ({
           integracao_id: integracao.id,
           igreja_id: integracao.igreja_id,
+          // C2-6 (achado Codex P1): mesma lógica de buildResumoRow — conta_id
+          // congelado no momento da importação, não relido depois.
+          conta_id: contaId,
           arquivo_nome: arq.nome,
           linha_num: f.linhaNum,
           numero_operacao: f.numeroOperacao,

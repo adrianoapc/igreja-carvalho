@@ -88,7 +88,96 @@
 -- malformado em `config->sftp->>conta_id` de QUALQUER integração Getnet
 -- (LQ/PG) derrubava a view inteira pra todo mundo (erro de cast não é
 -- por linha, é da query toda) — agora vira NULL em vez de estourar.
+--
+-- (achados do `@codex review` na PR, aplicados abaixo)
+--
+-- **P1 — conta_id precisa ser congelado no momento do import, não relido
+-- da config atual.** A versão original desta view resolvia `conta_id`
+-- via `integracoes_financeiras.config->sftp->>conta_id` em TEMPO DE
+-- CONSULTA — se um operador editar a "Conta destino" da integração
+-- depois (`IntegracoesCriarDialog.tsx` permite), TODO o histórico já
+-- importado reatribuiria retroativamente pra conta nova. O espelho
+-- legado em `extratos_bancarios` não tem esse problema porque
+-- `ingerirExtratos` grava o `conta_id` resolvido NAQUELE MOMENTO,
+-- congelado pra sempre. Fix: `getnet_resumo`/`getnet_financeiro_resumo`
+-- ganham coluna própria `conta_id`, populada por `buildResumoRow`/
+-- `finResRows` (`getnet-sftp/index.ts`) com o mesmo `contaId` já
+-- resolvido pra `ingerirExtratos` — nunca mais relida da config depois
+-- do import. Backfill das linhas históricas abaixo é best-effort (usa a
+-- config ATUAL, única fonte disponível — não há como recuperar
+-- retroativamente qual conta estava configurada em cada import
+-- passado); documentado, não escondido, mesmo padrão de limitação de
+-- backfill já usado na C2-3 (`valor_liquido_cobranca`).
+--
+-- **P1 — `ON DELETE CASCADE` de `integracao_id` é incompatível com esta
+-- view virar fonte de verdade durável (BLOQUEIA a C2-7, não corrigido
+-- nesta PR).** `getnet_resumo`/`getnet_financeiro_resumo`/
+-- `getnet_arquivos` referenciam `integracoes_financeiras(id) ON DELETE
+-- CASCADE` — excluir uma integração (`Integracoes.tsx` permite) apaga
+-- TODO o histórico de crédito dessas 3 tabelas, e com ele todo o
+-- histórico desta view. O espelho `extratos_bancarios` não tem FK pra
+-- `integracoes_financeiras` e sobrevive a essa exclusão hoje. Mudar o
+-- `ON DELETE` de FKs já existentes é o tipo de mudança que o guardrail J
+-- (`docs/guardrails-financeiro.md`) pede tratamento dedicado (efeito
+-- colateral fácil de não perceber) — decisão deliberada de NÃO misturar
+-- esse redesenho de durabilidade nesta PR aditiva. Hoje, excluir uma
+-- integração já tem exatamente este mesmo blast radius nas 3 tabelas
+-- (comportamento pré-existente, não introduzido aqui); esta view só
+-- herda essa fragilidade. **Pré-condição obrigatória antes da C2-7**
+-- (cutover de consumidores): resolver isso — arquivar em vez de excluir,
+-- ou remover o cascade — antes de qualquer tela/RPC depender desta view
+-- como fonte durável.
 -- ============================================================================
+
+-- Cast seguro de uuid — evita repetir a guarda de formato em 3 lugares
+-- (backfill de conta_id nas duas tabelas + fallback da view).
+CREATE OR REPLACE FUNCTION public.getnet_safe_uuid(p_value text)
+RETURNS uuid
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT CASE
+    WHEN p_value ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+    THEN p_value::uuid
+  END
+$$;
+
+COMMENT ON FUNCTION public.getnet_safe_uuid(text) IS
+  'Cast text->uuid que devolve NULL em vez de estourar erro pra valor malformado (ex.: config JSONB editável por operador). Usado no backfill/fallback de conta_id de getnet_credito_disponivel (C2-6).';
+
+-- security_invoker=true na view abaixo: quem consulta a view executa esta
+-- função como o próprio papel (authenticated), não como o owner — precisa
+-- de EXECUTE explícito, senão a view falha com "permission denied" pra
+-- todo mundo que não seja o owner/superuser.
+GRANT EXECUTE ON FUNCTION public.getnet_safe_uuid(text) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.getnet_safe_uuid(text) FROM anon;
+
+-- `conta_id` congelado no momento do import (achado Codex P1 acima).
+ALTER TABLE public.getnet_resumo
+  ADD COLUMN IF NOT EXISTS conta_id uuid;
+ALTER TABLE public.getnet_financeiro_resumo
+  ADD COLUMN IF NOT EXISTS conta_id uuid;
+
+COMMENT ON COLUMN public.getnet_resumo.conta_id IS
+  'Conta destino resolvida no momento do import (config->sftp->>conta_id da integração NAQUELE momento) — nunca relida depois, pra editar a integração não reatribuir histórico já importado. Linhas anteriores a esta coluna foram backfilled com a config atual (melhor esforço, ver migration 20260812120000).';
+COMMENT ON COLUMN public.getnet_financeiro_resumo.conta_id IS
+  'Mesma semântica de getnet_resumo.conta_id — ver comentário lá.';
+
+-- Backfill best-effort das linhas históricas (só existe a config ATUAL
+-- pra usar; se a conta_id da integração já mudou desde algum import
+-- antigo, essas linhas ficam com o valor errado — limitação inerente,
+-- documentada, mesmo padrão da C2-3).
+UPDATE public.getnet_resumo r
+   SET conta_id = public.getnet_safe_uuid(i.config -> 'sftp' ->> 'conta_id')
+  FROM public.integracoes_financeiras i
+ WHERE i.id = r.integracao_id
+   AND r.conta_id IS NULL;
+
+UPDATE public.getnet_financeiro_resumo f
+   SET conta_id = public.getnet_safe_uuid(i.config -> 'sftp' ->> 'conta_id')
+  FROM public.integracoes_financeiras i
+ WHERE i.id = f.integracao_id
+   AND f.conta_id IS NULL;
 
 CREATE OR REPLACE VIEW public.getnet_credito_disponivel
 WITH (security_invoker = true) AS
@@ -97,17 +186,13 @@ WITH via_tipo1 AS (
     r.integracao_id,
     r.igreja_id,
     i.filial_id,
-    CASE
-      WHEN i.config -> 'sftp' ->> 'conta_id' ~
-        '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-      THEN (i.config -> 'sftp' ->> 'conta_id')::uuid
-    END AS conta_id,
+    COALESCE(r.conta_id, public.getnet_safe_uuid(i.config -> 'sftp' ->> 'conta_id')) AS conta_id,
     r.arquivo_nome,
     COALESCE(r.data_pagamento_rv, r.data_rv) AS data_transacao,
     r.valor_liquido AS valor,
     CASE WHEN r.sinal = '-' THEN 'debito' ELSE 'credito' END AS tipo,
     'Getnet RV ' || r.rv AS descricao,
-    r.rv AS numero_documento,
+    NULLIF(r.rv, '') AS numero_documento,
     'getnet_sftp_txt'::text AS origem,
     'getnet_resumo'::text AS origem_tabela,
     r.id AS origem_id
@@ -123,17 +208,17 @@ via_tipo5 AS (
     f.integracao_id,
     f.igreja_id,
     i.filial_id,
-    CASE
-      WHEN i.config -> 'sftp' ->> 'conta_id' ~
-        '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-      THEN (i.config -> 'sftp' ->> 'conta_id')::uuid
-    END AS conta_id,
+    COALESCE(f.conta_id, public.getnet_safe_uuid(i.config -> 'sftp' ->> 'conta_id')) AS conta_id,
     f.arquivo_nome,
     COALESCE(f.data_credito_operacao, f.data_operacao) AS data_transacao,
     f.valor_liquido_operacao AS valor,
     'credito'::text AS tipo,
-    'Getnet PG ' || COALESCE(f.chave_ur, f.numero_operacao, 'sem-chave') AS descricao,
-    f.numero_operacao AS numero_documento,
+    -- Bugbot: COALESCE do SQL só pula NULL, não ''; sem NULLIF aqui uma
+    -- chave_ur vazia (não nula) nunca cairia pro fallback numero_operacao/
+    -- 'sem-chave', diferente do `||` do JS original (que trata '' como
+    -- falsy). NULLIF alinha os dois.
+    'Getnet PG ' || COALESCE(NULLIF(f.chave_ur, ''), NULLIF(f.numero_operacao, ''), 'sem-chave') AS descricao,
+    NULLIF(f.numero_operacao, '') AS numero_documento,
     'getnet_sftp_tipo5'::text AS origem,
     'getnet_financeiro_resumo'::text AS origem_tabela,
     f.id AS origem_id
@@ -150,7 +235,7 @@ UNION ALL
 SELECT * FROM via_tipo5;
 
 COMMENT ON VIEW public.getnet_credito_disponivel IS
-  'Ciclo 2 C2-6: crédito Getnet disponível, direto de getnet_resumo (LQ)/getnet_financeiro_resumo (PG) — equivalente aditivo ao espelho hoje escrito em extratos_bancarios (origem getnet_sftp_txt/getnet_sftp_tipo5). Fonte por arquivo travada em getnet_arquivos.espelho_origem (allow-list explícita, LEFT JOIN — arquivo sem linha em getnet_arquivos cai no fallback tipo1, mesma regra do NULL). Puramente leitura; nenhum consumidor migrado ainda (C2-7, que precisa aplicar has_filial_access — filial_id aqui NÃO é filtrado por RLS). security_invoker=true — herda RLS (só igreja_id) das tabelas base.';
+  'Ciclo 2 C2-6: crédito Getnet disponível, direto de getnet_resumo (LQ)/getnet_financeiro_resumo (PG) — equivalente aditivo ao espelho hoje escrito em extratos_bancarios (origem getnet_sftp_txt/getnet_sftp_tipo5). Fonte por arquivo travada em getnet_arquivos.espelho_origem (allow-list explícita, LEFT JOIN — arquivo sem linha em getnet_arquivos cai no fallback tipo1, mesma regra do NULL). conta_id vem congelado no momento do import (coluna própria, não relida da config atual) — editar a integração depois não reatribui histórico. Puramente leitura; nenhum consumidor migrado ainda. BLOQUEIOS antes da C2-7 (cutover): (1) aplicar has_filial_access — filial_id aqui NÃO é filtrado por RLS; (2) resolver ON DELETE CASCADE de integracao_id nas tabelas base — excluir uma integração hoje apaga todo o histórico desta view, sem equivalente no espelho legado. security_invoker=true — herda RLS (só igreja_id) das tabelas base.';
 
 GRANT SELECT ON public.getnet_credito_disponivel TO authenticated, service_role;
 REVOKE ALL ON public.getnet_credito_disponivel FROM anon;

@@ -6188,6 +6188,44 @@ agora aparece via fallback tipo1 (antes do fix, `INNER JOIN`
 descartava); 2ª integração com `conta_id` malformado não derruba mais a
 view — resolve `NULL` só naquela linha, as outras 3 continuam corretas.
 
+**2 achados P1 do `@codex review` no PR #94 + 1 do Cursor Bugbot,
+corrigidos antes do merge**:
+1. **`conta_id` congelado no momento do import** (Codex P1): a 1ª versão
+   da view resolvia `conta_id` de `integracoes_financeiras.config` em
+   TEMPO DE CONSULTA — editar a "Conta destino" da integração depois
+   reatribuiria retroativamente TODO o histórico já importado (o espelho
+   legado não tem esse problema porque `ingerirExtratos` grava o
+   `conta_id` resolvido no momento do import, congelado pra sempre). Fix:
+   coluna própria `conta_id` em `getnet_resumo`/`getnet_financeiro_resumo`,
+   populada por `buildResumoRow`/`finResRows` (`getnet-sftp/index.ts`) com
+   o mesmo `contaId` já resolvido pra `ingerirExtratos`; view passa a ler
+   a coluna (com fallback pra config atual só quando a coluna é NULL —
+   linhas históricas, backfilled best-effort na mesma migration, mesma
+   limitação de "não dá pra recuperar o passado" já documentada na C2-3).
+   Confirmado no harness: linha com `conta_id` gravado sobrevive
+   inalterada a uma mudança posterior na config da integração.
+2. **`ON DELETE CASCADE` de `integracao_id`** (Codex P1): excluir uma
+   integração hoje já apaga `getnet_resumo`/`getnet_financeiro_resumo`/
+   `getnet_arquivos` inteiros (comportamento pré-existente, não
+   introduzido por esta PR) — mas o espelho `extratos_bancarios` não tem
+   FK pra integração e sobrevive. Se a C2-7 fizer desta view a fonte
+   durável, excluir uma integração passa a apagar todo o histórico de
+   reconciliação. Decisão: **não corrigido nesta PR** (mudar `ON DELETE`
+   de FK já existente pede tratamento dedicado, guardrail J) — documentado
+   como pré-condição bloqueante da C2-7, não como "resolve depois" solto.
+3. **`COALESCE` do SQL não trata `''` como o `||` do JS** (Bugbot, low):
+   `chave_ur`/`numero_operacao` vazios (não `NULL`) escapavam do fallback
+   pretendido. Fix: `NULLIF(campo, '')` antes de cada `COALESCE`, nos dois
+   lugares (`descricao` e `numero_documento`). Confirmado no harness com
+   3 combinações (preenchido / vazio+fallback / ambos vazios→'sem-chave').
+
+Novo helper `getnet_safe_uuid(text)` (`IMMUTABLE`, cast tolerante a
+`NULL`) centraliza a guarda de formato usada agora em 3 lugares (backfill
+das duas tabelas + fallback da view) — e precisou de `GRANT EXECUTE`
+explícito pra `authenticated`/`service_role`: com `security_invoker=true`
+na view, quem consulta executa a função como o próprio papel, não como o
+owner (achado do próprio harness ao testar como tesoureiro).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
