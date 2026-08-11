@@ -5826,6 +5826,44 @@ Inteligente). Busca: `contas?.nome?.toLowerCase()` (conta pode vir
 lote antecipação (excluído); origem Getnet sem vínculo; conta
 `filial_id NULL` visível com filial concreta.
 
+### 9.100 Ciclo 2 (C2-2) — Card "Cartão" em Extratos/Histórico
+
+PR #89. `HistoricoExtratos` ganha um card "Cartão" (Vendas importadas /
+Vinculadas à oferta / Vinculadas ao banco), ao lado do card "Banco"
+já existente — completa o mockup original da Fase 7b, que desenhava os
+dois lado a lado.
+
+**Nova RPC `fin_stats_cartao_getnet`**
+(`20260810110000_fin_stats_cartao_getnet.sql`) — agregação read-only
+sobre `getnet_recebivel_lancamentos`. Contadores:
+
+- **Vinculadas à oferta**: `transacao_financeira_id` (Hop 2).
+- **Vinculadas ao banco**: Hop 1 direto (`extrato_bancario_id`) **ou**
+  antecipação via `getnet_antecipacao_lotes` (`contrato_registradora` +
+  lote `vinculado`/`lancamento_criado`) — mesma regra de fechamento do
+  ledger (`fin_listar_ledger_conciliacao_cartao` / conferência de totais).
+  Contar só `extrato_bancario_id` no recebível subcontava vendas
+  antecipadas (Bugbot #89).
+
+**Identidade da venda**: `COUNT(DISTINCT (data_venda, filial_id, nsu))`
+(não `nsu` sozinho) — alinhado ao Hop 2
+(`fin_gerar_candidatos_oferta_venda_getnet`), pra não colapsar NSUs
+iguais em dias/filiais diferentes. `COUNT(*)` ingenuo contava parcela,
+não venda (CSV repete NSU por parcela). Uma venda conta como vinculada
+se QUALQUER parcela já tem o vínculo. Validado em harness com venda
+parcelada 3x cruzando meses de vencimento.
+
+**Múltiplas integrações Getnet ativas**: o card busca TODAS as
+integrações que casam tenant/filial (não só a primeira/`.limit(1)`) e
+soma os resultados — pegar uma arbitrariamente misturaria dado de filial
+errada se existir mais de uma integração ativa (ex.: compartilhada +
+específica de outra filial após migração de CNPJ).
+
+**Métrica ≠ contagem de linhas do ledger**: o card agrega por venda/NSU
+na integração (sem `conta_id`); o ledger agrupa por oferta/conta. Smoke
+test deve bater a semântica de vínculo (oferta/banco), não o número de
+rows do ledger no mesmo período.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

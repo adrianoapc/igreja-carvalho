@@ -1033,3 +1033,17 @@ flowchart TD
     CLASSICO --> UI["Modo Clássico — 'Por Extrato'\ncom campo motivo"]
 ```
 
+## Ciclo 2 (C2-2) — Card "Cartão" em Extratos/Histórico (§9.100)
+
+Identidade da venda = `(data_venda, filial_id, nsu)` — não `nsu` sozinho.
+"Vinculadas ao banco" inclui Hop 1 direto **e** lote de antecipação.
+
+```mermaid
+flowchart TD
+    G["getnet_recebivel_lancamentos\n(1 linha por parcela)"] --> D{"COUNT(*) ingenuo"}
+    D --> BUG["venda 3x = 3\n(inflado)"]
+    G --> FIX["COUNT DISTINCT\n(data_venda, filial_id, nsu)"]
+    FIX --> OK["venda 3x = 1\n(correto)"]
+    FIX --> VINC["vinculada banco =\nextrato_bancario_id\nOU lote antecipação\n(contrato_registradora)"]
+```
+
