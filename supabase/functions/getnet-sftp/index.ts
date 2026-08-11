@@ -1567,6 +1567,7 @@ async function runBackfillResumoCobranca(args: {
         arquivos_processados: 0,
         arquivos_com_erro: 0,
         linhas_atualizadas: 0,
+        linhas_puladas: 0,
         linhas_nao_encontradas: 0,
         detalhes: [],
       });
@@ -1583,8 +1584,15 @@ async function runBackfillResumoCobranca(args: {
   let arquivosComErro = 0;
   let arquivosBackfilled = 0;
   let linhasAtualizadas = 0;
+  let linhasPuladas = 0;
   let linhasNaoEncontradas = 0;
-  const detalhes: Array<{ arquivo_nome: string; status: string; erro?: string; atualizadas?: number }> = [];
+  const detalhes: Array<{
+    arquivo_nome: string;
+    status: string;
+    erro?: string;
+    atualizadas?: number;
+    puladas?: number;
+  }> = [];
 
   // Atualiza 1 linha (chamada isolada — achado do code-review: o try/catch
   // original envolvia o arquivo INTEIRO, então uma linha com erro descartava
@@ -1593,7 +1601,10 @@ async function runBackfillResumoCobranca(args: {
   async function atualizarLinha(
     r: Parameters<typeof buildResumoRow>[0],
     arquivoNomeAtual: string,
-  ): Promise<{ ok: true; encontrada: boolean } | { ok: false; erro: string }> {
+  ): Promise<
+    | { ok: true; outcome: "atualizada" | "pulada" | "nao_encontrada" }
+    | { ok: false; erro: string }
+  > {
     // arquivo_nome ENTRA no WHERE (achado do code-review): a constraint de
     // unicidade de getnet_resumo é só integracao_id+rv+data_rv+
     // indicador_tipo_pagamento (não inclui arquivo_nome) — se a Getnet
@@ -1602,9 +1613,18 @@ async function runBackfillResumoCobranca(args: {
     // ganhou a corrida do upsert original (`ON CONFLICT DO NOTHING`), não
     // necessariamente o arquivo sendo reprocessado agora. Sem esse filtro,
     // um backfill do arquivo "perdedor" gravaria o valor de cobrança dele
-    // por cima de uma linha que fisicamente veio de outro arquivo — 0 rows
-    // batendo aqui vira `naoEncontradas` (correto: essa linha não pertence
-    // a este arquivo), não um UPDATE cego.
+    // por cima de uma linha que fisicamente veio de outro arquivo.
+    //
+    // 0 rows com arquivo_nome NÃO é automaticamente "não encontrada"
+    // (achado Codex P1 / review): a chave natural pode já pertencer a
+    // OUTRO arquivo. Tratar isso como permanente-pending nunca carimbava
+    // o perdedor, reselecionava oldest-first pra sempre e podia esgotar
+    // o batchSize faminto o resto do histórico. Distingue:
+    //   - atualizada: UPDATE bateu (linha deste arquivo)
+    //   - pulada: chave natural existe sob outro arquivo_nome → resolvida
+    //     (não sobrescreve; conta pra `completo`)
+    //   - nao_encontrada: chave natural ausente de verdade (import
+    //     incompleto) → NÃO carimba
     const row = buildResumoRow(r, integracao, arquivoNomeAtual);
     try {
       const { data: updated, error: updErr } = await supabaseAdmin
@@ -1620,7 +1640,23 @@ async function runBackfillResumoCobranca(args: {
         .eq("arquivo_nome", row.arquivo_nome)
         .select("id");
       if (updErr) return { ok: false, erro: updErr.message };
-      return { ok: true, encontrada: !!updated && updated.length > 0 };
+      if (updated && updated.length > 0) {
+        return { ok: true, outcome: "atualizada" };
+      }
+
+      const { data: existente, error: selErr } = await supabaseAdmin
+        .from("getnet_resumo")
+        .select("id, arquivo_nome")
+        .eq("integracao_id", row.integracao_id)
+        .eq("rv", row.rv)
+        .eq("data_rv", row.data_rv)
+        .eq("indicador_tipo_pagamento", row.indicador_tipo_pagamento)
+        .maybeSingle();
+      if (selErr) return { ok: false, erro: selErr.message };
+      if (existente && existente.arquivo_nome !== row.arquivo_nome) {
+        return { ok: true, outcome: "pulada" };
+      }
+      return { ok: true, outcome: "nao_encontrada" };
     } catch (err) {
       return { ok: false, erro: err instanceof Error ? err.message : String(err) };
     }
@@ -1634,7 +1670,12 @@ async function runBackfillResumoCobranca(args: {
   async function atualizarLinhasEmChunks(
     resumos: Array<Parameters<typeof buildResumoRow>[0]>,
     arquivoNomeAtual: string,
-  ): Promise<{ atualizadas: number; naoEncontradas: number; erros: string[] }> {
+  ): Promise<{
+    atualizadas: number;
+    puladas: number;
+    naoEncontradas: number;
+    erros: string[];
+  }> {
     // Dedupe pela chave natural (integracao_id+rv+data_rv+
     // indicador_tipo_pagamento) antes de disparar chunks concorrentes —
     // achado do code-review: duas linhas do MESMO arquivo com essa chave
@@ -1652,6 +1693,7 @@ async function runBackfillResumoCobranca(args: {
     const resumosSemDuplicata = Array.from(porChave.values());
 
     let atualizadas = 0;
+    let puladas = 0;
     let naoEncontradas = 0;
     const erros: string[] = [];
     for (let i = 0; i < resumosSemDuplicata.length; i += CHUNK_CONCORRENCIA) {
@@ -1659,11 +1701,12 @@ async function runBackfillResumoCobranca(args: {
       const resultados = await Promise.all(chunk.map((r) => atualizarLinha(r, arquivoNomeAtual)));
       for (const res of resultados) {
         if (!res.ok) erros.push(res.erro);
-        else if (res.encontrada) atualizadas++;
+        else if (res.outcome === "atualizada") atualizadas++;
+        else if (res.outcome === "pulada") puladas++;
         else naoEncontradas++;
       }
     }
-    return { atualizadas, naoEncontradas, erros };
+    return { atualizadas, puladas, naoEncontradas, erros };
   }
 
   for (const arq of arquivosAlvo) {
@@ -1672,40 +1715,59 @@ async function runBackfillResumoCobranca(args: {
 
       const resultado = await atualizarLinhasEmChunks(resumos, arq.arquivo_nome);
       linhasAtualizadas += resultado.atualizadas;
+      linhasPuladas += resultado.puladas;
       linhasNaoEncontradas += resultado.naoEncontradas;
       arquivosProcessados++;
 
       // Só marca backfilled quando TODA linha do arquivo foi resolvida sem
-      // erro E encontrou a linha correspondente em getnet_resumo (achado do
-      // code-review): "não encontrada" pode ser sintoma de um import
-      // original incompleto (upsertChunks retorna cedo se um chunk falha —
-      // ver linha ~397), não "nada a fazer aqui". Marcar como concluído
-      // nesse caso esconderia o gap pra sempre, já que o filtro
-      // `.is("resumo_cobranca_backfilled_at", null)` nunca mais revisitaria
-      // o arquivo.
-      const completo = resultado.erros.length === 0 && resultado.naoEncontradas === 0;
-      if (completo) {
-        await supabaseAdmin
+      // erro E sem lacuna real em getnet_resumo (achado do code-review):
+      // "não encontrada" pode ser sintoma de um import original incompleto
+      // (upsertChunks retorna cedo se um chunk falha — ver linha ~397), não
+      // "nada a fazer aqui". Linhas `puladas` (chave natural já pertencente
+      // a outro arquivo) contam como resolvidas — não bloqueiam o carimbo.
+      // Marcar como concluído com naoEncontradas>0 esconderia o gap pra
+      // sempre, já que o filtro `.is("resumo_cobranca_backfilled_at", null)`
+      // nunca mais revisitaria o arquivo.
+      const linhasOk = resultado.erros.length === 0 && resultado.naoEncontradas === 0;
+      let completo = false;
+      let stampErro: string | null = null;
+      if (linhasOk) {
+        // Achado Codex P2 / review: checar o update do marcador ANTES de
+        // contar sucesso. Ignorar `{ error }` reportava success /
+        // arquivos_restantes diminuído mesmo com o marcador ainda NULL —
+        // a próxima chamada reprocessava o arquivo inteiro.
+        const { error: stampErr } = await supabaseAdmin
           .from("getnet_arquivos")
           .update({ resumo_cobranca_backfilled_at: new Date().toISOString() })
           .eq("integracao_id", integracao.id)
           .eq("arquivo_nome", arq.arquivo_nome);
-        arquivosBackfilled++;
+        if (stampErr) {
+          stampErro = stampErr.message;
+        } else {
+          completo = true;
+          arquivosBackfilled++;
+        }
       }
 
+      const falhasLinha = resultado.erros.length > 0;
       detalhes.push({
         arquivo_nome: arq.arquivo_nome,
         status: completo
           ? "ok"
-          : resultado.erros.length > 0
+          : stampErro
             ? "parcial"
-            : "linhas_nao_encontradas",
+            : falhasLinha
+              ? "parcial"
+              : "linhas_nao_encontradas",
         atualizadas: resultado.atualizadas,
-        ...(resultado.erros.length > 0
-          ? { erro: `${resultado.erros.length} linha(s) falharam: ${resultado.erros[0]}` }
-          : {}),
+        puladas: resultado.puladas,
+        ...(stampErro
+          ? { erro: `marcador resumo_cobranca_backfilled_at: ${stampErro}` }
+          : falhasLinha
+            ? { erro: `${resultado.erros.length} linha(s) falharam: ${resultado.erros[0]}` }
+            : {}),
       });
-      if (resultado.erros.length > 0) arquivosComErro++;
+      if (falhasLinha || stampErro) arquivosComErro++;
     } catch (err) {
       arquivosComErro++;
       detalhes.push({
@@ -1742,11 +1804,12 @@ async function runBackfillResumoCobranca(args: {
     status,
     total_recebido: arquivosAlvo.length,
     total_inserido: linhasAtualizadas,
-    total_ignorado: linhasNaoEncontradas,
+    total_ignorado: linhasNaoEncontradas + linhasPuladas,
     metadata: {
       detalhes,
       arquivos_restantes: arquivosRestantes,
       arquivos_sem_storage_path: arquivosSemStoragePath ?? 0,
+      linhas_puladas: linhasPuladas,
     },
   });
 
@@ -1762,6 +1825,7 @@ async function runBackfillResumoCobranca(args: {
     arquivos_processados: arquivosProcessados,
     arquivos_com_erro: arquivosComErro,
     linhas_atualizadas: linhasAtualizadas,
+    linhas_puladas: linhasPuladas,
     linhas_nao_encontradas: linhasNaoEncontradas,
     detalhes,
   });

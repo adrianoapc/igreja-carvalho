@@ -1066,8 +1066,14 @@ flowchart TD
     ADMIN["action=backfill_resumo_cobranca\n(operador, fora do SFTP)"] --> SEL["getnet_arquivos\nWHERE resumo_cobranca_backfilled_at IS NULL\nAND storage_path IS NOT NULL\nORDER BY data_referencia LIMIT batchSize"]
     SEL --> BEP["baixarEParsearDoBucket"]
     BEP --> UPD["UPDATE getnet_resumo\npor rv+data_rv+indicador+arquivo_nome"]
-    UPD --> COMPLETO{"toda linha\nsem erro E encontrada?"}
-    COMPLETO -->|sim| STAMP
-    COMPLETO -->|não| RETRY["reselecionado na próxima chamada\n(arquivos_restantes > 0)"]
+    UPD --> OUT{"outcome por linha"}
+    OUT -->|atualizada| OK["conta pra completo"]
+    OUT -->|pulada\n(chave em outro arquivo)| OK
+    OUT -->|nao_encontrada / erro| RETRY["reselecionado na próxima chamada\n(arquivos_restantes > 0)"]
+    OK --> COMPLETO{"todas resolvidas\nsem lacuna real?"}
+    COMPLETO -->|sim| MARK["UPDATE marcador\n(checa error antes de contar)"]
+    MARK -->|ok| STAMP
+    MARK -->|erro| RETRY
+    COMPLETO -->|não| RETRY
 ```
 

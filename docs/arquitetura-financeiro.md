@@ -5917,6 +5917,18 @@ PR, harness completo, `/code-review` local antes do 1º `@codex review`"):
 - `batch_size:0`/não-numérico gerava `success` sem processar nada (mesma
   classe de bug corrigida de quebra também na `sync` pré-existente, achada
   de carona por já estar mexendo na área).
+- Arquivo "perdedor" do upsert (Getnet reenvia o mesmo RV/data/status sob
+  outro `arquivo_nome`; `getnet_resumo_unique` não inclui `arquivo_nome`)
+  nunca completava o backfill: UPDATE com `arquivo_nome` no WHERE devolvia
+  0 rows → contava como `naoEncontradas` → `completo` ficava falso pra
+  sempre → oldest-first reselecionava e podia esgotar o `batchSize`,
+  faminto o resto do histórico. Fix: 0 rows dispara SELECT pela chave
+  natural sem `arquivo_nome`; se a linha existir sob outro arquivo, conta
+  como `pulada` (resolvida, não sobrescreve) e libera o carimbo.
+- Update de `resumo_cobranca_backfilled_at` ignorava `{ error }` e ainda
+  incrementava `arquivosBackfilled` — resposta mentia success /
+  `arquivos_restantes` e a próxima chamada reprocessava o arquivo. Fix:
+  só conta backfilled depois do marcador gravar sem erro.
 
 **Limitação aceita e documentada** (não débito escondido): arquivo cujo
 download/parse falha por outro motivo (objeto removido do bucket, etc.)
