@@ -1128,4 +1128,27 @@ flowchart TD
     RPC -.->|reaproveitada quando destravar| C210["C2-10 (bloqueada — evento AC real)"]
 ```
 
+## Ciclo 2 (C2-6) — Separação extrato/cartão: nova estrutura, aditivo (§9.104)
+
+Primeira etapa da separação estrutural do espelho sintético em
+`extratos_bancarios` (causa raiz do `possivel_duplicata_de`, PR #55).
+`getnet_credito_disponivel` é uma VIEW (`security_invoker=true`, não
+tabela própria) sobre `getnet_resumo`/`getnet_financeiro_resumo`, mesmas
+tabelas já alimentadas pelo pipeline que hoje escreve o espelho — sem
+cópia derivada nova que possa divergir do dado bruto. Puramente aditivo: nenhum consumidor migra ainda
+(C2-7).
+
+```mermaid
+flowchart TD
+    ARQ["getnet_arquivos.espelho_origem\n(travado por arquivo, F6)"] --> LOCK{"origem?"}
+    LOCK -->|"NULL ou getnet_sftp_txt"| T1["getnet_resumo\nindicador_tipo_pagamento = 'LQ'"]
+    LOCK -->|"getnet_sftp_tipo5"| T5["getnet_financeiro_resumo\ntipo_operacao = 'PG'"]
+
+    T1 --> VIEW["getnet_credito_disponivel\n(view, security_invoker=true)"]
+    T5 --> VIEW
+    INT["integracoes_financeiras\nconfig->sftp->conta_id, filial_id"] --> VIEW
+
+    VIEW -.->|"comparado no harness\ncontra o espelho atual"| EB["extratos_bancarios\n(origem getnet_sftp_txt/tipo5)\nespelho legado, ainda em uso"]
+    VIEW -.->|"cutover dos consumidores"| C27["C2-7 (fin_venda_banco_getnet_hop1,\nfin_conferencia_totais_getnet_hop1,\ngetnet_antecipacao_lotes)"]
+```
 

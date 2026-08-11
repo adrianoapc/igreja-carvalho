@@ -6072,6 +6072,122 @@ busca por `numero_operacao` existente retorna resumo + detalhe;
 uma filial bloqueado (`FIN_TENANT`) numa integração de outra filial da
 mesma igreja.
 
+### 9.104 Ciclo 2 (C2-6) — Separação extrato/cartão: nova estrutura (aditivo)
+
+Primeira etapa da separação estrutural do espelho sintético em
+`extratos_bancarios` — causa raiz do mecanismo `possivel_duplicata_de`
+(PR #55/migration `20260717150000`). Constrói a estrutura nova que vai
+substituir o espelho, **sem desligar nada em produção ainda** (isso é a
+C2-7, que reavalia cada consumidor — `fin_venda_banco_getnet_hop1`,
+`fin_conferencia_totais_getnet_hop1`, `getnet_antecipacao_lotes.
+extrato_bancario_id` — e migra o dado histórico). Puramente aditivo:
+nenhum consumidor existente muda de fonte nesta fase.
+
+**Decisão: view, não tabela própria** (`20260812120000`). O espelho já é
+uma cópia derivada de `getnet_resumo`/`getnet_financeiro_resumo` — gravar
+uma SEGUNDA cópia (tabela própria) reintroduziria exatamente o problema
+estrutural que esta fase existe pra resolver (dado derivado podendo
+divergir do dado bruto). `getnet_credito_disponivel` expõe o dado direto
+das duas tabelas de origem, sempre em sincronia.
+
+**Replica os dois critérios do espelho atual** (`buildResumoRow`/
+`selecionarEspelhoTipo5`/`resolverUsoTipo5`,
+`getnet-sftp/getnetExtratoParser.ts` + `index.ts` ~1255-1300):
+- tipo 1/LQ (`getnet_resumo`): `indicador_tipo_pagamento = 'LQ'`; valor
+  vem de `valor_liquido`, que já é gravado com o sinal aplicado por
+  `buildResumoRow` — reaplicar o sinal na view seria idempotente, então
+  usa a coluna direto.
+- tipo 5/PG (`getnet_financeiro_resumo`): `tipo_operacao = 'PG'` (Regra
+  Geral #10 do manual — só PG é "valores livres creditado na conta do
+  estabelecimento"; os demais tipos são liquidação contábil de dinheiro
+  já adiantado, não crédito novo).
+- A escolha entre as duas fontes é **por arquivo**, travada em
+  `getnet_arquivos.espelho_origem` (F6, migration `20260713140000`) — a
+  view faz o mesmo JOIN condicional; nunca as duas fontes ao mesmo tempo
+  pro mesmo arquivo. `NULL` (arquivo pré-F6) conta como tipo 1, mesma
+  regra do código.
+
+**`conta_id`/`filial_id` não existem em `getnet_financeiro_resumo`** (só
+`igreja_id`) — vêm de `integracoes_financeiras` (`config->sftp->>
+conta_id` e `filial_id`), mesma fonte que `ingerirExtratos` usa na
+importação. Join único pras duas fontes.
+
+**Não reconstrói `external_id`** (o identificador de dedupe usado no
+`(conta_id, external_id)` de `extratos_bancarios`) — é um artefato
+interno da ingestão, e o componente de valor do tipo5 vem de um float JS
+formatado por `String()`, sem garantia de bater byte-a-byte com
+`numeric::text` do Postgres pra valores terminados em zero na casa dos
+centavos (`1234.50` → JS `"1234.5"` × Postgres `"1234.50"`). A view expõe
+o dado do domínio (`origem_tabela` + `origem_id` como identidade),
+não o identificador de dedupe de um consumidor específico.
+
+**`security_invoker = true`** (convenção já estabelecida no repo —
+migrations `20251203013244`/`20251204022222`/`20251208160649`, a segunda
+corrigindo um warning de "Security Definer View"): sem isso, RLS das
+tabelas base seria avaliada com o OWNER da view (role da migration,
+super-role), não com quem consulta — vazamento cross-tenant. Confirmado
+no harness (ver abaixo): sem `security_invoker`, um usuário sem
+`profiles`/`user_roles` veria os dados; com ele, 0 linhas.
+
+**Nota de segurança herdada, não nova**: a RLS de `getnet_resumo`/
+`getnet_financeiro_resumo`/`getnet_arquivos` hoje só filtra por
+`igreja_id` + papel, sem checar `filial_id` — mesmo gap já rastreado
+para outras tabelas Getnet (`RLS de getnet_ajustes/getnet_resumo` na
+lista de auditoria dedicada fora de escopo, ver
+`docs/guardrails-financeiro.md`). A view não piora nem corrige esse
+gap, só herda o que as tabelas base já expõem hoje — decisão deliberada
+de manter o escopo desta fase em "estrutura aditiva", não "auditoria de
+RLS". **Aviso explícito no comentário da migration pra quem escrever o
+consumidor da C2-7**: `filial_id` vem exposto na view mas não é
+filtrado por RLS nenhuma — a RPC/tela que ler esta view precisa aplicar
+`has_filial_access` (ou o padrão `filial_id.eq.X,filial_id.is.null` do
+guardrail A.1) explicitamente, senão repete a classe de bug do
+`project-financeiro-rpcs-sem-filial-access`.
+
+**3 achados do `/code-review` local, corrigidos antes do commit**:
+1. `JOIN` em `getnet_arquivos` virou `LEFT JOIN` + allow-list explícita
+   (`espelho_origem IS NULL OR = 'getnet_sftp_txt'`, em vez de
+   `IS DISTINCT FROM 'getnet_sftp_tipo5'`) — um `INNER JOIN` excluía
+   silenciosamente linhas de um arquivo cujo import falhasse ENTRE
+   gravar `getnet_resumo`/`getnet_financeiro_resumo` e gravar
+   `getnet_arquivos` (que só é escrito "only after all upserts succeed",
+   comentário do próprio `index.ts`) — nesse caso não existe linha
+   NENHUMA em `getnet_arquivos`, não é um `espelho_origem` `NULL`; o
+   fallback documentado ("NULL conta como tipo 1") cobria só o segundo
+   caso. A allow-list também falha seguro contra um 3º valor futuro de
+   `espelho_origem` (linha some da view em vez de cair no bucket errado).
+2. `conta_id` ganhou guarda de formato (regex UUID) antes do `::uuid` —
+   um valor malformado em `config->sftp->>conta_id` de QUALQUER
+   integração Getnet derrubava a query INTEIRA da view pra todo mundo
+   (erro de cast não é por linha). Confirmado no harness: 2ª integração
+   com `conta_id: "nao-e-um-uuid"` não quebra mais a view, só resolve
+   `conta_id: NULL` pra aquela linha.
+3. Índices novos `(integracao_id, arquivo_nome)` em `getnet_resumo`/
+   `getnet_financeiro_resumo` — nenhuma das duas tinha índice pela chave
+   real usada no JOIN novo desta view (só por `data_rv`/`rv` e
+   `data_operacao`/`chave_ur`).
+
+**Harness Docker** (postgres:15 puro, bootstrap Supabase mínimo +
+replay de todas as 443 migrations do repo, mesma técnica de sessões
+anteriores): 8 linhas semeadas cobrindo os 3 estados de
+`espelho_origem` (`NULL`/`getnet_sftp_txt`/`getnet_sftp_tipo5`) × os 2
+critérios de filtro (LQ/PG) × sinal negativo × datas ausentes — só as 3
+linhas esperadas (arquivo `NULL`-locked LQ, arquivo `txt`-locked LQ com
+sinal negativo, arquivo `tipo5`-locked PG) aparecem na view; as 5 linhas
+que deveriam ser excluídas (indicador≠LQ, LQ num arquivo travado em
+tipo5, tipo_operação≠PG, PG num arquivo travado em txt, PG sem nenhuma
+data) ficam de fora — confirmado linha a linha, não só contagem. RLS
+testada à parte (`BEGIN`/`SET LOCAL ROLE authenticated`/`SET LOCAL
+request.jwt.claim.sub`/`ROLLBACK` — fora de uma transação explícita,
+`SET LOCAL` é descartado antes do próximo statement, achado do processo
+de harness desta fase): tesoureiro da igreja certa vê as 3 linhas;
+usuário sem `profiles`/`user_roles` e sessão sem nenhum claim veem 0.
+Após os 3 fixes do code-review, harness re-rodado do zero com +2
+cenários: arquivo sem NENHUMA linha em `getnet_arquivos` (import órfão)
+agora aparece via fallback tipo1 (antes do fix, `INNER JOIN`
+descartava); 2ª integração com `conta_id` malformado não derruba mais a
+view — resolve `NULL` só naquela linha, as outras 3 continuam corretas.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
