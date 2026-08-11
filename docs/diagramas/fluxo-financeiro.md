@@ -1047,3 +1047,27 @@ flowchart TD
     FIX --> VINC["vinculada banco =\nextrato_bancario_id\nOU lote antecipação\n(contrato_registradora)"]
 ```
 
+## Ciclo 2 (C2-3) — `valor_liquido_cobranca`: coluna + INSERT + backfill histórico (§9.101)
+
+Parser já capturava `valorLiquidoCobranca`/`idBaixaCobrancaServico` (tipo
+1, seq 29/32) desde sempre — INSERT descartava os dois campos antes de
+chegar em `getnet_resumo`. `backfill_resumo_cobranca` reprocessa arquivo
+já importado direto do bucket (sem SFTP live), paginado por marcador
+persistente.
+
+```mermaid
+flowchart TD
+    IMPORT["import_extrato/sync\n(arquivo novo)"] --> BRR["buildResumoRow"]
+    BRR --> INS["INSERT getnet_resumo\nvalor_liquido_cobranca + id_baixa_cobranca_servico"]
+    INS --> IGN{"upsertChunks\nignorou linha\n(ON CONFLICT)?"}
+    IGN -->|não| STAMP["getnet_arquivos.\nresumo_cobranca_backfilled_at = now()"]
+    IGN -->|sim| SKIP["marcador NÃO carimbado\n(elegível pro backfill)"]
+
+    ADMIN["action=backfill_resumo_cobranca\n(operador, fora do SFTP)"] --> SEL["getnet_arquivos\nWHERE resumo_cobranca_backfilled_at IS NULL\nAND storage_path IS NOT NULL\nORDER BY data_referencia LIMIT batchSize"]
+    SEL --> BEP["baixarEParsearDoBucket"]
+    BEP --> UPD["UPDATE getnet_resumo\npor rv+data_rv+indicador+arquivo_nome"]
+    UPD --> COMPLETO{"toda linha\nsem erro E encontrada?"}
+    COMPLETO -->|sim| STAMP
+    COMPLETO -->|não| RETRY["reselecionado na próxima chamada\n(arquivos_restantes > 0)"]
+```
+
