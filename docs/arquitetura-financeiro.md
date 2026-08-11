@@ -5983,6 +5983,13 @@ integração NÃO-compartilhada. Mesma classe de achado que motivou a
 auditoria dedicada de `has_filial_access` nas RPCs core (§9.81) —
 registrado pra virar fase dedicada de RLS, não corrigido de carona aqui.
 
+**Data financeira do período** (filtro, `ORDER BY` e coluna "Data" do
+card): `COALESCE(data_pagamento_rv, data_rv)` — alinhado ao import
+Getnet (`getnet-sftp/index.ts`: `dataPagamentoRv || dataRv` como
+`data_transacao` do extrato bancário). Preferir `data_rv` fazia o ajuste/
+CI sumir do mês em que realmente afeta a conciliação quando o RV nasce
+num mês e o desconto/pagamento cai no seguinte.
+
 **Achados reais de `/code-review` neste PR** (já corrigidos):
 - `COALESCE(m.descricao, '...' || a.motivo_ajuste || ')')` colapsava pra
   NULL quando `motivo_ajuste` vinha em branco (não só código não
@@ -6003,6 +6010,10 @@ registrado pra virar fase dedicada de RLS, não corrigido de carona aqui.
   interface `{integracaoId, periodoInicio, periodoFim, filialId?}`
   idêntica no arquivo; as 4 anteriores retrofitadas pra reusar a base em
   vez de nascer uma 6ª cópia.
+- Filtro/ordenação/exibição usavam `data_rv` (ou `COALESCE(data_rv,
+  data_pagamento_rv)`) — desalinhado do critério financeiro do import.
+  Fix: `COALESCE(data_pagamento_rv, data_rv)` nas 2 RPCs e no card
+  (Codex P1 no PR #92).
 
 ## 11. Riscos
 

@@ -146,7 +146,7 @@ export function AjustesGetnetCard({
                   {ajustes.map((a) => (
                     <TableRow key={a.ajuste_id}>
                       <TableCell className="text-sm">
-                        {formatarData(a.data_rv ?? a.data_pagamento_rv)}
+                        {formatarData(a.data_pagamento_rv ?? a.data_rv)}
                       </TableCell>
                       <TableCell className="text-sm">{a.motivo_descricao}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
@@ -199,7 +199,9 @@ export function AjustesGetnetCard({
                 <TableBody>
                   {linhasCi.map((r) => (
                     <TableRow key={r.resumo_id}>
-                      <TableCell className="text-sm">{formatarData(r.data_rv)}</TableCell>
+                      <TableCell className="text-sm">
+                        {formatarData(r.data_pagamento_rv ?? r.data_rv)}
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{r.rv}</TableCell>
                       <TableCell className="text-right text-sm">
                         {formatValue(r.valor_liquido)}

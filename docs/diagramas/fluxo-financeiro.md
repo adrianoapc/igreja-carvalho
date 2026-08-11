@@ -1082,7 +1082,9 @@ flowchart TD
 `getnet_ajustes`/`getnet_resumo` (linhas CI) eram gravadas pelo import
 desde sempre e nunca lidas por nenhuma tela. `getnet_ajustes` não tem
 `filial_id` — `p_filial_id` na RPC de ajustes só valida acesso, não filtra
-linha; `getnet_resumo` tem, então a RPC de CI filtra de verdade.
+linha; `getnet_resumo` tem, então a RPC de CI filtra de verdade. Filtro/
+ordenação das 2 RPCs usam `COALESCE(data_pagamento_rv, data_rv)` (data
+financeira do extrato, não a origem do RV).
 
 ```mermaid
 flowchart TD
@@ -1096,6 +1098,9 @@ flowchart TD
 
     DEC --> UI["AjustesGetnetCard\n(aba Conciliação Cartão)"]
     CI --> UI
+
+    DT["COALESCE(data_pagamento_rv, data_rv)\nfiltro + ORDER BY"] -.-> RPC1
+    DT -.-> RPC2
 
     HFA["has_filial_access\n(filial EFETIVA da integração)"] -.->|valida acesso, não filtra ajustes| RPC1
     HFA -.->|valida + filtra via v_scope| RPC2

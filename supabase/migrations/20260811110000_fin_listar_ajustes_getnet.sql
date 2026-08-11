@@ -109,9 +109,15 @@ BEGIN
     RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial solicitada';
   END IF;
 
-  -- COALESCE(data_rv, data_pagamento_rv): ambas nullable no schema; uma
-  -- linha de ajuste sem data_rv (raro, mas o schema permite) não pode
-  -- desaparecer silenciosamente de todo filtro de período possível.
+  -- COALESCE(data_pagamento_rv, data_rv): data financeira efetiva do
+  -- ajuste no extrato Getnet (mesmo critério do import em
+  -- getnet-sftp/index.ts — `dataPagamentoRv || dataRv` pra
+  -- data_transacao do extrato bancário). Preferir data_rv fazia o ajuste
+  -- desaparecer do mês em que realmente afeta a conciliação bancária
+  -- quando o RV nasce num mês e o desconto/pagamento cai no seguinte
+  -- (achado Codex P1 no PR #92). Ambas nullable no schema — se as duas
+  -- forem NULL a linha some do filtro (aceito: sem data financeira não
+  -- há período onde encaixar).
   RETURN QUERY
   SELECT
     a.id,
@@ -137,8 +143,8 @@ BEGIN
   LEFT JOIN public.getnet_motivos_ajuste m ON m.codigo = a.motivo_ajuste
   WHERE a.igreja_id = v_igreja
     AND a.integracao_id = p_integracao_id
-    AND COALESCE(a.data_rv, a.data_pagamento_rv) BETWEEN p_periodo_inicio AND p_periodo_fim
-  ORDER BY COALESCE(a.data_rv, a.data_pagamento_rv) DESC, a.rv_ajustado;
+    AND COALESCE(a.data_pagamento_rv, a.data_rv) BETWEEN p_periodo_inicio AND p_periodo_fim
+  ORDER BY COALESCE(a.data_pagamento_rv, a.data_rv) DESC, a.rv_ajustado;
 END;
 $$;
 
@@ -221,6 +227,11 @@ BEGIN
   -- Sem filtro de valor_liquido_cobranca IS NOT NULL — linha CI some do
   -- resultado só se sair do período/integração, nunca por dedução vazia
   -- (achado do C2-3: seq 29 nem sempre vem preenchida mesmo em CI).
+  --
+  -- Mesmo critério de data financeira das linhas de ajuste (e do import
+  -- Getnet): data_pagamento_rv primeiro, fallback data_rv. Filtrar só por
+  -- data_rv desalinha o card do período de conciliação quando pagamento
+  -- e origem do RV caem em meses diferentes (Codex P1 no PR #92).
   RETURN QUERY
   SELECT
     r.id,
@@ -240,10 +251,10 @@ BEGIN
   WHERE r.igreja_id = v_igreja
     AND r.integracao_id = p_integracao_id
     AND r.indicador_tipo_pagamento = 'CI'
-    AND r.data_rv BETWEEN p_periodo_inicio AND p_periodo_fim
+    AND COALESCE(r.data_pagamento_rv, r.data_rv) BETWEEN p_periodo_inicio AND p_periodo_fim
     AND public.has_filial_access(v_igreja, r.filial_id)
     AND (v_scope IS NULL OR r.filial_id IS NULL OR r.filial_id = v_scope)
-  ORDER BY r.data_rv DESC, r.rv;
+  ORDER BY COALESCE(r.data_pagamento_rv, r.data_rv) DESC, r.rv;
 END;
 $$;
 
