@@ -201,7 +201,10 @@ export function useConciliacaoLote({
       
       toast.success(message);
       queryClient.invalidateQueries({ queryKey: ["extratos-lote"] });
-      queryClient.invalidateQueries({ queryKey: ["extratos-pendentes"] });
+      // C2-1: "Por Extrato" passou a viver em duas queries (derivada +
+      // bruta) — "extratos-pendentes" não existe mais desde então.
+      queryClient.invalidateQueries({ queryKey: ["extratos-sem-candidato"] });
+      queryClient.invalidateQueries({ queryKey: ["extratos-pendentes-brutos"] });
       queryClient.invalidateQueries({ queryKey: ["transacoes-conciliacao"] });
       queryClient.invalidateQueries({ queryKey: ["transacoes-pendentes-lote"] });
       queryClient.invalidateQueries({ queryKey: ["reconciliacao-cobertura"] });

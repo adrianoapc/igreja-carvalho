@@ -5797,6 +5797,35 @@ revisar juntos (antes dava pra navegar Sistema sozinho). Follow-up
 possível: expandir a janela de txs exibidas ou filtrar ML cuja trx não
 está no período.
 
+### 9.99 Ciclo 2 (C2-1) — Modo Clássico como estado derivado
+
+PR #88. `ConciliacaoManual` (aba "Por Extrato") deixa de listar **todo**
+extrato `reconciliado=false`/`transacao_vinculada_id IS NULL` e passa a
+ser **estado derivado**: só o que sobrou depois dos motores Cartão
+(Getnet) e Inteligente (F4), com campo `motivo` por item.
+
+**Nova RPC `fin_listar_extratos_sem_candidato`**
+(`20260810100000_fin_listar_extratos_sem_candidato.sql`) — reaproveita
+`fin_gerar_candidatos_conciliacao` como função de tabela (mesmo
+tenant/filial/corte de score). Exclui extrato em
+`getnet_antecipacao_lotes.extrato_bancario_id` (Hop lote **não** marca
+`reconciliado=true` — overlap real que motivou a fase). Filial
+compartilhada: `v_scope IS NULL OR e.filial_id = v_scope OR e.filial_id
+IS NULL`.
+
+**Escopo consciente:** candidatos Getnet Hop 1 ainda não confirmados
+não são excluídos (exigiria varredura conta×integração).
+
+**UI:** lista via `extratos-sem-candidato`; `extratos-pendentes-brutos`
+só para "Reconciliar Automático"/lookup. Empty state: residual vazio
+com brutos > 0 ≠ "tudo conciliado" (itens cobertos por Cartão/
+Inteligente). Busca: `contas?.nome?.toLowerCase()` (conta pode vir
+`null` enquanto o nome resolve).
+
+**Harness Docker** (5 cenários): sem candidato; com F4 (excluído);
+lote antecipação (excluído); origem Getnet sem vínculo; conta
+`filial_id NULL` visível com filial concreta.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
@@ -5941,3 +5970,4 @@ está no período.
   no banco de produção, ou foi setada com nome diferente do que os jobs
   esperam) — prioridade média, importação automática de PIX/Getnet está
   parada até isso ser corrigido.
+

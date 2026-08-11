@@ -43,6 +43,13 @@ const TIPO_OPTIONS_TRANSACAO = [
  * é sobretudo decomposição — 1037 l. num arquivo só viram orquestrador +
  * hook de dados + subcomponentes focados, com um pouco de polimento
  * responsivo nas listas/filtros/paginação.
+ *
+ * Ciclo 2 (C2-1): a aba "Por Extrato" virou estado DERIVADO — só mostra o que
+ * sobrou depois dos motores Cartão (Getnet) e Inteligente (F4) já terem
+ * tentado (`useConciliacaoManualData` → `fin_listar_extratos_sem_candidato`).
+ * A aba "Por Transação" (N:1) continua um fluxo separado de propósito — não
+ * tem chave de agrupamento natural (como o NSU do motor Cartão) que
+ * justifique reusar `BuscaManualDialog`; ver investigação da fase.
  */
 export function ConciliacaoManual() {
   const [activeTab, setActiveTab] = useState<string>("extrato");
@@ -60,6 +67,11 @@ export function ConciliacaoManual() {
   };
 
   const pendentes = data.extratosFiltrados.length;
+  const residualVazio =
+    !data.loadingExtratos && data.totalExtratosSemCandidato === 0;
+  const filtradoVazio =
+    !data.loadingExtratos && pendentes === 0 && !residualVazio;
+  const temPendentesBrutos = (data.extratosBrutos?.length ?? 0) > 0;
 
   return (
     <Card className="shadow-soft">
@@ -67,7 +79,11 @@ export function ConciliacaoManual() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <CardTitle className="text-lg">Conciliação Manual</CardTitle>
-            {pendentes > 0 && <Badge variant="secondary">{pendentes} pendente(s)</Badge>}
+            {data.totalExtratosSemCandidato > 0 && (
+              <Badge variant="secondary">
+                {data.totalExtratosSemCandidato} sem candidato(s)
+              </Badge>
+            )}
           </div>
           <Button
             onClick={handleReconciliarAutomatico}
@@ -97,6 +113,11 @@ export function ConciliacaoManual() {
 
           {/* Tab: Por Extrato */}
           <TabsContent value="extrato" className="space-y-4 mt-4">
+            <p className="text-xs text-muted-foreground">
+              Só aparece aqui o que nenhum motor conseguiu classificar
+              sozinho — cartão e sugestões automáticas ficam nas telas
+              Cartão/Inteligente até serem confirmados ou rejeitados lá.
+            </p>
             <ManualFiltrosBar
               selectedMonth={data.selectedMonth}
               onMonthChange={data.setSelectedMonth}
@@ -115,11 +136,31 @@ export function ConciliacaoManual() {
               onOrigemFiltroChange={data.setOrigemFiltro}
             />
 
-            {pendentes === 0 && !data.loadingExtratos && (
-              <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-start gap-2">
-                <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm font-medium text-green-900 dark:text-green-300">
-                  Todos os extratos estão conciliados
+            {residualVazio && (
+              <div
+                className={
+                  temPendentesBrutos
+                    ? "p-3 bg-sky-100 dark:bg-sky-900/20 rounded-lg flex items-start gap-2"
+                    : "p-3 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-start gap-2"
+                }
+              >
+                <CheckCircle2
+                  className={
+                    temPendentesBrutos
+                      ? "w-5 h-5 text-sky-600 flex-shrink-0 mt-0.5"
+                      : "w-5 h-5 text-green-600 flex-shrink-0 mt-0.5"
+                  }
+                />
+                <p
+                  className={
+                    temPendentesBrutos
+                      ? "text-sm font-medium text-sky-900 dark:text-sky-300"
+                      : "text-sm font-medium text-green-900 dark:text-green-300"
+                  }
+                >
+                  {temPendentesBrutos
+                    ? "Nada restou para o Modo Clássico neste período — os pendentes estão cobertos por Cartão ou Inteligente (confirme ou rejeite lá)."
+                    : "Todos os extratos do período estão conciliados"}
                 </p>
               </div>
             )}
@@ -142,14 +183,15 @@ export function ConciliacaoManual() {
                       />
                     ))}
 
-                    {data.extratosFiltrados.length === 0 && !data.loadingExtratos && (
+                    {filtradoVazio && (
                       <div className="flex flex-col items-center justify-center py-12 text-center">
                         <AlertCircle className="w-10 h-10 text-muted-foreground/40 mb-3" />
                         <p className="text-sm text-muted-foreground">
-                          Nenhum extrato pendente de conciliação
+                          Nenhum extrato corresponde aos filtros
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Importe extratos na página de Contas para iniciar a conciliação
+                          Ajuste busca, tipo ou origem — ainda há itens sem
+                          candidato neste período
                         </p>
                       </div>
                     )}

@@ -21,6 +21,12 @@ export interface ExtratoItem {
   origem?: string | null;
   possivel_duplicata_de?: string | null;
   contas?: { nome: string } | null;
+  /**
+   * Por que este extrato sobrou pro Modo Clássico (nenhum motor achou
+   * candidato) — vem de `fin_listar_extratos_sem_candidato` (Ciclo 2, C2-1).
+   * Ausente pra fontes antigas/outras telas que reaproveitam este tipo.
+   */
+  motivo?: string;
 }
 
 export interface TransacaoConciliacao {
