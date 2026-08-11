@@ -5937,6 +5937,73 @@ skip automático, mesmo modelo que `runSyncExtratoV10` já tem para arquivo
 com erro; o `erro` de cada arquivo aparece em `detalhes[]` a cada chamada,
 visível pro operador resolver isolando via `arquivo_nome` explícito.
 
+### 9.102 Ciclo 2 (C2-4) — RPCs de leitura de ajustes/CI Getnet + tela "Ajustes Getnet"
+
+`getnet_ajustes` (Tabela II do manual — 22 motivos: aluguel de POS,
+chargeback, cancelamento etc.) e as linhas `getnet_resumo.indicador_
+tipo_pagamento='CI'` (Cobrança Interna, com `valor_liquido_cobranca` desde
+a §9.101) eram gravadas pelo import Getnet desde sempre e nunca lidas por
+nenhuma tela/RPC (confirmado por grep no repo inteiro) — a dedução real
+que motivou o Ciclo 2 mora exatamente aqui.
+
+**Migration `20260811100000_getnet_motivos_ajuste.sql`**: tabela de
+referência `getnet_motivos_ajuste (codigo, descricao)`, seed a partir da
+Tabela II do manual — vira a única fonte de verdade. O dicionário TS
+`MOTIVO_AJUSTE` (`getnetExtratoParser.ts`, código morto, zero consumidor)
+foi removido no mesmo commit pra não virar segunda cópia divergente.
+`STATUS_PAGAMENTO` (mesmo perfil de dicionário morto, decodificava PF/LQ/
+PD/CI/PG) removido junto, mesma razão.
+
+**Migration `20260811110000_fin_listar_ajustes_getnet.sql`**: 2 RPCs
+read-only, mesmo padrão de tenant/filial de `fin_stats_cartao_getnet`
+(§9.100) — `fin_resolver_contexto` + `has_filial_access` contra a filial
+efetiva da integração. `fin_listar_ajustes_getnet` decodifica `motivo_
+ajuste` via `LEFT JOIN getnet_motivos_ajuste`; `fin_listar_resumo_ci_
+getnet` lê `getnet_resumo WHERE indicador_tipo_pagamento='CI'`, sem
+filtrar por `valor_liquido_cobranca` preenchido.
+
+**Assimetria de `p_filial_id` entre as 2 RPCs, documentada no código**:
+`getnet_ajustes` não tem coluna `filial_id` (schema `20260617000001`) —
+`p_filial_id` aí só valida acesso do chamador, não filtra linha nenhuma;
+`getnet_resumo` tem `filial_id`, então `fin_listar_resumo_ci_getnet` filtra
+de verdade via `v_scope` (mesmo padrão de §9.100). JSDoc de
+`listarAjustesGetnet` (`getnetRecebivel.api.ts`) avisa explicitamente
+sobre essa diferença — mesmo parâmetro, semântica diferente entre as duas
+funções irmãs.
+
+**Achado de segurança real, pré-existente, NÃO corrigido nesta fase**
+(fora de escopo — é RLS, não RPC): as policies `getnet_ajustes_select`/
+`getnet_resumo_select` (migrations `20260617000001`/`20260603221141`,
+meses antes deste ciclo) checam só `igreja_id = get_current_user_igreja_
+id() AND has_role(admin|admin_igreja|tesoureiro|super_admin)` — ZERO
+dimensão de filial na RLS em si. `has_filial_access` só existe dentro das
+RPCs novas; um tesoureiro acessando as tabelas DIRETO via PostgREST (fora
+da RPC) enxerga toda linha da igreja em qualquer filial, mesmo pra
+integração NÃO-compartilhada. Mesma classe de achado que motivou a
+auditoria dedicada de `has_filial_access` nas RPCs core (§9.81) —
+registrado pra virar fase dedicada de RLS, não corrigido de carona aqui.
+
+**Achados reais de `/code-review` neste PR** (já corrigidos):
+- `COALESCE(m.descricao, '...' || a.motivo_ajuste || ')')` colapsava pra
+  NULL quando `motivo_ajuste` vinha em branco (não só código não
+  documentado) — concatenação com NULL em Postgres devolve NULL antes do
+  COALESCE avaliar. Fix: `COALESCE(a.motivo_ajuste, '?')` dentro da
+  concatenação.
+- `sinal` nullable exibido como crédito verde (`negativo = sinal === "-"`
+  default `false` pra NULL) — o oposto do objetivo do card. Fix: sinal
+  desconhecido renderiza neutro, sem cor/prefixo.
+- Erro de RPC (`isError`) não tratado — `data` ficava `[]` e a tela
+  mostrava "nenhum ajuste no período", idêntico a sucesso vazio. Fix:
+  estado de erro distinto, mesmo padrão `rpcErrorMessage` de
+  `ConciliacaoCartaoLedger`.
+- `valor_liquido_cobranca` exibido como número neutro, sem sinalizar que é
+  sempre dedução (nunca crédito, por design da C2-3) — undercut o próprio
+  motivo do card. Fix: sempre destructive/"−", não condicional a sinal.
+- `GetnetPeriodoFilialParams` extraído em `getnetRecebivel.api.ts` — a 5ª
+  interface `{integracaoId, periodoInicio, periodoFim, filialId?}`
+  idêntica no arquivo; as 4 anteriores retrofitadas pra reusar a base em
+  vez de nascer uma 6ª cópia.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

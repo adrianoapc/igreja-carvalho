@@ -1077,3 +1077,28 @@ flowchart TD
     COMPLETO -->|não| RETRY
 ```
 
+## Ciclo 2 (C2-4) — RPCs de leitura de ajustes/CI Getnet + tela "Ajustes Getnet" (§9.102)
+
+`getnet_ajustes`/`getnet_resumo` (linhas CI) eram gravadas pelo import
+desde sempre e nunca lidas por nenhuma tela. `getnet_ajustes` não tem
+`filial_id` — `p_filial_id` na RPC de ajustes só valida acesso, não filtra
+linha; `getnet_resumo` tem, então a RPC de CI filtra de verdade.
+
+```mermaid
+flowchart TD
+    ADJ[(getnet_ajustes\nmotivo_ajuste bruto)] --> RPC1["fin_listar_ajustes_getnet"]
+    MOT[(getnet_motivos_ajuste\n22 códigos, seed)] -->|LEFT JOIN| RPC1
+    RPC1 --> DEC["motivo_descricao decodificado\nCOALESCE('?') se motivo_ajuste NULL"]
+
+    RES[(getnet_resumo\nindicador_tipo_pagamento)] --> RPC2["fin_listar_resumo_ci_getnet"]
+    RPC2 --> FILT{"indicador_tipo_pagamento\n= CI?"}
+    FILT -->|sim| CI["linha CI\n(valor_liquido_cobranca\nsem filtrar NULL)"]
+
+    DEC --> UI["AjustesGetnetCard\n(aba Conciliação Cartão)"]
+    CI --> UI
+
+    HFA["has_filial_access\n(filial EFETIVA da integração)"] -.->|valida acesso, não filtra ajustes| RPC1
+    HFA -.->|valida + filtra via v_scope| RPC2
+```
+
+
