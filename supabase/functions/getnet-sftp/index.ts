@@ -1187,6 +1187,11 @@ async function runExtratoEletronicoV10(args: {
           conta_corrente: f.contaCorrente || null,
           canal_operacao: f.canalOperacao || null,
           tipo_movimento: f.tipoMovimento || null,
+          participante_cnpj_cpf: f.participanteCnpjCpf || null,
+          participante_banco: f.participanteBanco || null,
+          participante_agencia: f.participanteAgencia || null,
+          participante_conta_corrente: f.participanteContaCorrente || null,
+          participante_razao_social: f.participanteRazaoSocial || null,
           codigo_arranjo: f.codigoArranjo || null,
           raw_line: f.rawLine,
         }));
@@ -1216,6 +1221,8 @@ async function runExtratoEletronicoV10(args: {
           valor_bruto_ur: f.valorBrutoUr,
           tipo_conta_estabelecimento: f.tipoContaEstabelecimento || null,
           tipo_movimento: f.tipoMovimento || null,
+          participante_cnpj_cpf: f.participanteCnpjCpf || null,
+          participante_razao_social: f.participanteRazaoSocial || null,
           raw_line: f.rawLine,
         }));
         finDetRes = await upsertChunks(

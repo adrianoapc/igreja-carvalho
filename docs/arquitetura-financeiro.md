@@ -6015,6 +6015,63 @@ num mês e o desconto/pagamento cai no seguinte.
   Fix: `COALESCE(data_pagamento_rv, data_rv)` nas 2 RPCs e no card
   (Codex P1 no PR #92).
 
+### 9.103 Ciclo 2 (C2-5) — Parser: campos de participante (tipo5/6)
+
+`LAYOUT_FIN_RESUMO` (tipo5) e `LAYOUT_FIN_DETALHE` (tipo6) tinham gaps de
+bytes nunca extraídos desde sempre — 149-255 (tipo5) e 155-261 (tipo6). O
+manual V10.1 (Tabela Resumo/Detalhe Financeiro, pág. 21-25) documenta esse
+range como CNPJ/CPF do participante, Razão Social do Participante e, só no
+tipo5 ("Exceto quando PG"), Banco/Agência/Conta do domicílio bancário —
+no tipo6 essas 3 últimas posições (seq 22-25, bytes 191-221) são
+documentadas como `ZEROS`/`ESPAÇO` (deprecadas).
+
+**Achado que mudou o escopo da fase, descoberto durante a implementação**:
+`getnet_financeiro_resumo`/`getnet_financeiro_detalhe` estão **vazias em
+produção** — nenhuma linha tipo5/tipo6 foi recebida por esta integração
+até hoje (confirmado por query direta do usuário, `total_linhas: 0` nas
+duas tabelas). Isso muda o plano original em 2 pontos, decisão explícita
+do usuário ("Prossiga confiando na DOC da Getnet e implemente"):
+
+- **Sem verificação empírica contra amostra real** — o plano original
+  exigia confirmar contra bytes reais antes de assumir o gap do tipo6
+  como deprecado (não só confiar no manual). Sem nenhuma linha real
+  disponível, a implementação segue o manual diretamente; uma auditoria
+  independente (agente separado, PDF→texto) re-conferiu todas as
+  posições linha a linha contra o manual e bateram exatamente — mas isso
+  confirma a doc, não o dado real em produção. Documentado nas migrations
+  e comentários do parser; validar contra `raw_line` real na primeira
+  linha tipo5/6 que chegar antes de tratar os campos como confiáveis.
+- **Sem shadow mode / reprocessamento de histórico** — o plano pedia
+  reaproveitar o mecanismo de backfill da C2-3 pra reprocessar arquivos
+  arquivados e comparar contagens antes/depois. Com zero linhas
+  históricas tipo5/6, esse reprocessamento sempre processaria 0 linhas —
+  não haveria nenhum sinal de validação real. Construir a infraestrutura
+  de backfill agora, sem nada pra rodar contra, foi julgado engenharia
+  prematura; fica pra quando (se) o volume real justificar.
+
+**Testes** (`getnetExtratoParser.test.ts`): 2 testes novos constroem uma
+linha posicional de 400 bytes de verdade (`montarLinha400`, primeiro
+teste do arquivo a de fato testar `parseExtrato` byte-a-byte — os testes
+anteriores só cobriam `selecionarEspelhoTipo5`/`resolverUsoTipo5` via
+objetos TS, nunca uma string posicional real) — confirma que os campos
+novos caem na posição certa E que campos vizinhos (`codigoArranjo`,
+`chaveUr`) não foram deslocados pela inserção.
+
+**RPC `fin_buscar_financeiro_participante_getnet`**
+(`20260812110000`): ponto de consulta mínimo por `numero_operacao`
+(resumo + detalhe), mesmo padrão de tenant/filial das RPCs anteriores —
+evita repetir o anti-padrão "capturado e nunca lido" da C2-4, sem
+justificar uma tela nova pra exibir uma tabela vazia. Pensada pra ser
+reaproveitada pela C2-10 (validação `numeroOperacao` ×
+`contrato_registradora`, bloqueada por evento AC real) quando destravar.
+
+**Harness Docker** (3 cenários, funções `has_filial_access`/
+`fin_resolver_contexto` copiadas das migrations reais, não mockadas):
+busca por `numero_operacao` existente retorna resumo + detalhe;
+`numero_operacao` inexistente retorna 0 linhas sem erro; tesoureiro de
+uma filial bloqueado (`FIN_TENANT`) numa integração de outra filial da
+mesma igreja.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
