@@ -462,23 +462,14 @@ export function checarSequencia(
   return { ok: faltando.length === 0 && atual === ultimaSequencia + 1, faltando };
 }
 
-export const STATUS_PAGAMENTO: Record<string, string> = {
-  PF: "Previsão de Pagamento Futuro",
-  LQ: "Baixa por Liquidação",
-  PD: "Pagamento Pendente",
-  CI: "Cobrança Interna",
-  PG: "Pagamento Realizado",
-};
+// STATUS_PAGAMENTO (dicionário PF/LQ/PD/CI/PG) removido junto — mesmo
+// perfil de código morto do MOTIVO_AJUSTE abaixo (exportado, zero
+// consumidor em todo o repo, achado do code-review). Nenhuma RPC decodifica
+// indicador_tipo_pagamento hoje; se isso virar necessário (ex. tela futura
+// mostrando o status de uma linha de getnet_resumo), recriar como tabela de
+// referência igual `getnet_motivos_ajuste`, não como dicionário TS solto.
 
-export const MOTIVO_AJUSTE: Record<string, string> = {
-  "01": "Ajuste a crédito ou a débito", "02": "Aluguel de POS",
-  "03": "Cancelamento", "04": "Chargeback", "05": "Recarga Telecom",
-  "06": "Bilhetagem", "07": "Consulta Serasa", "08": "Aluguel de Verticais",
-  "09": "Carga e Recarga Cartão Pré Pago", "10": "Manutenção de Cartão",
-  "11": "Venda de Cartão", "12": "Cancelamento com motivo de Estorno",
-  "13": "Recarga com cartão", "14": "Plataforma Digital", "15": "GetData",
-  "16": "Reversão de Chargeback", "17": "Liquidação de Gravame",
-  "18": "Débito de Cessão", "19": "Estorno de Cessão",
-  "20": "Débito de Antecipação", "21": "Estorno de Antecipação",
-  "22": "Cashback Conv Moedas (DCC)",
-};
+// Os 22 motivos de ajuste (Tabela II do manual) viraram a tabela
+// `getnet_motivos_ajuste` (C2-4, migration `20260811100000`) — dicionário
+// TS removido daqui pra não virar segunda fonte de verdade. Decodificação
+// acontece em `fin_listar_ajustes_getnet`, não no parser.
