@@ -5864,6 +5864,79 @@ na integração (sem `conta_id`); o ledger agrupa por oferta/conta. Smoke
 test deve bater a semântica de vínculo (oferta/banco), não o número de
 rows do ledger no mesmo período.
 
+### 9.101 Ciclo 2 (C2-3) — `valor_liquido_cobranca`: coluna + INSERT + backfill histórico
+
+O parser (`getnetExtratoParser.ts`) já capturava `valorLiquidoCobranca`
+(tipo 1, seq 29, bytes 255-266) e `idBaixaCobrancaServico` (seq 32, byte
+285) desde sempre — o gap era só no INSERT: `resumoRows.map()` em
+`index.ts` nunca incluía os dois campos. Sequência 29 é o "valor líquido
+do aluguel do POS ou ajuste de produtos verticais", só preenchido pelo
+adquirente quando `indicador_tipo_pagamento=CI` (manual V10.1, pág. 13) —
+a dedução que motivou a fase (histórico do usuário de dificuldade em
+rastrear aluguel de POS descontado do repasse sem visibilidade nenhuma).
+
+**Migration** (`20260810120000_getnet_resumo_valor_liquido_cobranca.sql`):
+2 colunas em `getnet_resumo`; `resumo_cobranca_backfilled_at` (marcador de
+progresso) em `getnet_arquivos`; `acao` nova (`backfill_resumo_cobranca`)
+no CHECK de `integracoes_execucoes_log`.
+
+**`buildResumoRow`/`baixarEParsearDoBucket`** extraídos como fonte única
+de verdade entre o INSERT normal (`import_extrato`/`sync`) e o novo action
+`backfill_resumo_cobranca`, que reprocessa arquivo(s) já importados direto
+do bucket `getnet-raw-files` (sem SFTP live) — pensado para a C2-5
+(shadow mode) reaproveitar o mesmo mecanismo.
+
+**Achados reais de 6+ rodadas de `/code-review` neste PR** (padrão já
+repetido nas fases anteriores do Ciclo 2 — reforça o processo "1 fase = 1
+PR, harness completo, `/code-review` local antes do 1º `@codex review`"):
+- Paginação por `.slice()` em memória nunca avançava entre chamadas —
+  faltava marcador persistente (`resumo_cobranca_backfilled_at`) e a query
+  virou `count:"exact"` + `.limit(batchSize)` direto no banco (cap de 1000
+  linhas do PostgREST truncava silenciosamente a contagem de restantes).
+- Reimportar (botão manual) um arquivo anterior à C2-3 carimbava o
+  marcador de "completo" mesmo com `upsertChunks`' `ON CONFLICT DO
+  NOTHING` deixando as colunas novas NULL nas linhas pré-existentes —
+  stamp condicionado a `resRes.ignored === 0`.
+- `valor_liquido_cobranca` com `|| null` puro apagava um R$0,00 legítimo
+  de CI junto com "não se aplica" — condicionado a
+  `indicador_tipo_pagamento === "CI"`.
+- Concorrência de 20 UPDATEs por chunk podia colidir em duas linhas do
+  mesmo arquivo com a mesma chave natural (constraint de unicidade de
+  `getnet_resumo` não inclui `num_parcela_rv`) — dedupe por chave mantendo
+  a 1ª ocorrência (mesmo critério do `ON CONFLICT DO NOTHING` original).
+- UPDATE por chave natural sem `arquivo_nome` no WHERE podia gravar o
+  valor de cobrança de um arquivo por cima de uma linha que fisicamente
+  veio de outro (Getnet reenviando o mesmo RV/data sob nome de arquivo
+  diferente) — `arquivo_nome` entrou no WHERE.
+- Arquivo com `storage_path IS NULL` (legado) reprocessava pra sempre,
+  comendo 1 vaga de lote em toda chamada — excluído da seleção, contado à
+  parte em `arquivos_sem_storage_path` pra não desaparecer da resposta.
+- `status` "success" mesmo com zero progresso real (todo arquivo com
+  `naoEncontradas > 0` sem erro de linha) — passou a exigir
+  `arquivosBackfilled === arquivosProcessados`.
+- `batch_size:0`/não-numérico gerava `success` sem processar nada (mesma
+  classe de bug corrigida de quebra também na `sync` pré-existente, achada
+  de carona por já estar mexendo na área).
+- Arquivo "perdedor" do upsert (Getnet reenvia o mesmo RV/data/status sob
+  outro `arquivo_nome`; `getnet_resumo_unique` não inclui `arquivo_nome`)
+  nunca completava o backfill: UPDATE com `arquivo_nome` no WHERE devolvia
+  0 rows → contava como `naoEncontradas` → `completo` ficava falso pra
+  sempre → oldest-first reselecionava e podia esgotar o `batchSize`,
+  faminto o resto do histórico. Fix: 0 rows dispara SELECT pela chave
+  natural sem `arquivo_nome`; se a linha existir sob outro arquivo, conta
+  como `pulada` (resolvida, não sobrescreve) e libera o carimbo.
+- Update de `resumo_cobranca_backfilled_at` ignorava `{ error }` e ainda
+  incrementava `arquivosBackfilled` — resposta mentia success /
+  `arquivos_restantes` e a próxima chamada reprocessava o arquivo. Fix:
+  só conta backfilled depois do marcador gravar sem erro.
+
+**Limitação aceita e documentada** (não débito escondido): arquivo cujo
+download/parse falha por outro motivo (objeto removido do bucket, etc.)
+continua sendo reselecionado em toda chamada — sem retry-cap nem
+skip automático, mesmo modelo que `runSyncExtratoV10` já tem para arquivo
+com erro; o `erro` de cada arquivo aparece em `detalhes[]` a cada chamada,
+visível pro operador resolver isolando via `arquivo_nome` explícito.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

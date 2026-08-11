@@ -314,6 +314,78 @@ function parseCSV(buf: Uint8Array): Record<string, unknown>[] {
 // ==================== PARSER POSICIONAL v10.1 ====================
 // Implementação completa importada de getnetExtratoParser.ts (parseExtrato)
 
+// Mapeia um ResumoRecord (tipo 1) já parseado pro shape de getnet_resumo.
+// Compartilhado entre o INSERT do fluxo normal (import_extrato/sync) e o
+// backfill de valor_liquido_cobranca (C2-3, action "backfill_resumo_cobranca")
+// — mesma fonte de verdade, sem duplicar a lista de campos.
+function buildResumoRow(
+  r: import("./getnetExtratoParser.ts").ResumoRecord & {
+    linhaNum: number;
+    rawLine: string;
+  },
+  integracao: { id: string; igreja_id: string; filial_id?: string | null },
+  arquivoNome: string,
+) {
+  return {
+    integracao_id: integracao.id,
+    igreja_id: integracao.igreja_id,
+    filial_id: integracao.filial_id ?? null,
+    arquivo_nome: arquivoNome,
+    codigo_produto: r.codigoProduto || null,
+    forma_captura: r.formaCaptura || null,
+    rv: r.rv,
+    data_rv: r.dataRv,
+    indicador_tipo_pagamento: r.indicadorTipoPagamento || "",
+    data_pagamento_rv: r.dataPagamentoRv || null,
+    chave_ur: r.chaveUr || null,
+    valor_bruto: r.valorBruto,
+    valor_liquido: r.sinal === "-" ? -Math.abs(r.valorLiquido) : r.valorLiquido,
+    valor_tarifa: r.valorTarifa || null,
+    valor_taxa_desconto: r.valorTaxaDesconto || null,
+    // C2-3: capturados pelo parser desde sempre, descartados antes do INSERT
+    // até aqui — manual pág. 14: o "sinal" geral só se refere a valor_liquido
+    // (seq 14), não a este campo (seq 29) — grava magnitude simples.
+    //
+    // Condicional ao CI (achado do code-review), não `|| null` puro: o
+    // campo só é preenchido pelo adquirente quando
+    // indicador_tipo_pagamento=CI (manual pág. 13); fora disso os bytes vêm
+    // sempre em branco e parseAmount devolve 0 igual a um "R$0,00" real de
+    // aluguel de POS numa linha CI de verdade — `|| null` sem essa condição
+    // apagaria um ajuste zero legítimo junto com o "não se aplica".
+    valor_liquido_cobranca: r.indicadorTipoPagamento === "CI" ? r.valorLiquidoCobranca : null,
+    id_baixa_cobranca_servico: r.idBaixaCobrancaServico || null,
+    sinal: r.sinal || null,
+    banco: r.banco || null,
+    agencia: r.agencia || null,
+    conta_corrente: r.contaCorrente || null,
+    tipo_conta: r.tipoConta || null,
+    num_parcela_rv: r.numParcelaRv || null,
+    qtd_parcelas_rv: r.qtdParcelasRv || null,
+    data_vencimento_original: r.dataVencimentoOriginal || null,
+    moeda: r.moeda || null,
+    raw_line: r.rawLine,
+  };
+}
+
+// Baixa um arquivo já armazenado no bucket (por storage_path) e roda o
+// parser posicional — sem tocar SFTP. Compartilhado entre
+// runExtratoEletronicoV10 (fase 2, arquivo recém-baixado do SFTP) e
+// runBackfillResumoCobranca (C2-3, arquivo já importado antes) — mesmo
+// mecanismo que a C2-5 (shadow mode) também vai reaproveitar (achado do
+// code-review: evita duplicar decode+parse numa terceira cópia).
+async function baixarEParsearDoBucket(
+  supabaseAdmin: any,
+  storagePath: string,
+): Promise<ReturnType<typeof parseExtrato>> {
+  const { data: blob, error: dlErr } = await supabaseAdmin.storage
+    .from(RAW_BUCKET)
+    .download(storagePath);
+  if (dlErr || !blob) throw new Error(dlErr?.message || "Falha ao baixar do bucket");
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  const text = new TextDecoder("latin1").decode(buf);
+  return parseExtrato(text);
+}
+
 async function upsertChunks<T>(
   supabaseAdmin: any,
   table: string,
@@ -338,11 +410,18 @@ async function upsertChunks<T>(
 // ==================== HANDLER ====================
 
 type Payload = {
-  action: "test_connection" | "list_files" | "import_extrato" | "sync";
+  action:
+    | "test_connection"
+    | "list_files"
+    | "import_extrato"
+    | "sync"
+    | "backfill_resumo_cobranca";
   integracao_id: string;
   arquivo_nome?: string;
   data_referencia?: string; // YYYY-MM-DD (override do "hoje")
   batch_size?: number;      // sync: máx de arquivos por execução (default 7)
+  data_referencia_inicio?: string; // backfill_resumo_cobranca: início do range (YYYY-MM-DD)
+  data_referencia_fim?: string;    // backfill_resumo_cobranca: fim do range (YYYY-MM-DD)
 };
 
 Deno.serve(async (req) => {
@@ -400,9 +479,13 @@ Deno.serve(async (req) => {
       return json(400, { error: "Invalid payload" });
     }
     if (
-      !["test_connection", "list_files", "import_extrato", "sync"].includes(
-        payload.action
-      )
+      ![
+        "test_connection",
+        "list_files",
+        "import_extrato",
+        "sync",
+        "backfill_resumo_cobranca",
+      ].includes(payload.action)
     ) {
       return json(400, { error: "Invalid action" });
     }
@@ -443,6 +526,44 @@ Deno.serve(async (req) => {
       provedor: integracao.provedor,
       created_by: userId === "cron" ? null : userId,
     };
+
+    // ===== backfill_resumo_cobranca (C2-3) =====
+    // Lê arquivos JÁ IMPORTADOS direto do bucket (sem SFTP live) e faz
+    // UPDATE só de valor_liquido_cobranca/id_baixa_cobranca_servico em
+    // getnet_resumo — não toca nenhuma outra tabela, não duplica linha.
+    if (payload.action === "backfill_resumo_cobranca") {
+      return await runBackfillResumoCobranca({
+        supabaseAdmin,
+        baseLogCtx,
+        startedAt,
+        integracao,
+        arquivoNome: payload.arquivo_nome ?? null,
+        dataInicio: payload.data_referencia_inicio ?? payload.data_referencia ?? null,
+        dataFim: payload.data_referencia_fim ?? payload.data_referencia ?? null,
+        // Mesmo teto de runSyncExtratoV10 (batchSize, linha ~651) — um
+        // range grande processado inteiro numa chamada só arrisca estourar
+        // o timeout da Edge Function (achado do code-review). Chamador
+        // reinvoca pra continuar; arquivos_restantes no retorno indica quanto falta.
+        // Piso de 1 (achado do code-review): batch_size=0 zerava
+        // arquivosAlvo, o loop nunca rodava e o status ainda saía "success"
+        // (arquivosComErro fica 0 por vacuidade) — resposta enganosa de
+        // "concluído" com trabalho pendente real. `payload.batch_size` não
+        // é validado em runtime (só tipado `number`) — um valor não
+        // numérico viraria NaN e `.limit(NaN)` na query (achado do
+        // code-review); `Number.isFinite` cai pro default 7 nesse caso.
+        // `Math.trunc` (achado Codex P2): um valor finito fracionário
+        // (ex.: 1.5) passava direto pro `.limit(batchSize)` — PostgREST
+        // exige limit inteiro, então um request válido virava erro de
+        // banco em vez de arredondar/truncar.
+        batchSize: Math.max(
+          1,
+          Math.min(
+            Number.isFinite(payload.batch_size) ? Math.trunc(payload.batch_size as number) : 7,
+            30,
+          ),
+        ),
+      });
+    }
 
     // ===== Credenciais =====
     const { data: secrets, error: secErr } = await supabaseAdmin
@@ -575,7 +696,23 @@ Deno.serve(async (req) => {
         filePatternRegex: sftpCfg.file_pattern_regex || null,
         contaId,
         integracao,
-        batchSize: Math.min(payload.batch_size ?? 7, 30),
+        // Mesma classe de bug corrigida em runBackfillResumoCobranca
+        // (achado do code-review, sinalizado aqui como inconsistência já
+        // que a correção nova ficou a poucas linhas desta): sem piso e sem
+        // `Number.isFinite`, `batch_size:0` zerava `missing.slice(0,0)` e o
+        // sync ainda reportava "success" sem processar nada; um valor não
+        // numérico virava NaN. `Math.trunc` (achado Codex P2 na
+        // backfill_resumo_cobranca, aplicado aqui por consistência): este
+        // batchSize só alimenta `.slice()` (JS trunca sozinho), mas manter
+        // os dois call sites idênticos evita o mesmo bug reaparecer se
+        // algum dia este valor passar a alimentar uma query `.limit()`.
+        batchSize: Math.max(
+          1,
+          Math.min(
+            Number.isFinite(payload.batch_size) ? Math.trunc(payload.batch_size as number) : 7,
+            30,
+          ),
+        ),
       });
     }
 
@@ -931,7 +1068,6 @@ async function runExtratoEletronicoV10(args: {
   let totalRecebido = 0;
   let totalInserido = 0;
   let totalIgnorado = 0;
-  const decoder = new TextDecoder("latin1");
 
   for (const arq of arquivos) {
     if (arq.status !== "baixado") continue;
@@ -953,47 +1089,11 @@ async function runExtratoEletronicoV10(args: {
     arq.log_id = childLogId;
 
     try {
-      // Baixa do bucket
-      const { data: blob, error: dlErr } = await supabaseAdmin.storage
-        .from(RAW_BUCKET)
-        .download(arq.storage_path);
-      if (dlErr || !blob) {
-        throw new Error(dlErr?.message || "Falha ao baixar do bucket");
-      }
-      const buf = new Uint8Array(await blob.arrayBuffer());
-      const text = decoder.decode(buf);
-
-      const parsed = parseExtrato(text);
+      const parsed = await baixarEParsearDoBucket(supabaseAdmin, arq.storage_path);
       const { resumos, analiticos, ajustes, financeirosResumo, financeirosDetalhe, validacao } = parsed;
 
       // ── getnet_resumo (tipo 1) — chave inclui indicador para ciclo PF→LQ ─
-      const resumoRows = resumos.map((r) => ({
-        integracao_id: integracao.id,
-        igreja_id: integracao.igreja_id,
-        filial_id: integracao.filial_id ?? null,
-        arquivo_nome: arq.nome,
-        codigo_produto: r.codigoProduto || null,
-        forma_captura: r.formaCaptura || null,
-        rv: r.rv,
-        data_rv: r.dataRv,
-        indicador_tipo_pagamento: r.indicadorTipoPagamento || "",
-        data_pagamento_rv: r.dataPagamentoRv || null,
-        chave_ur: r.chaveUr || null,
-        valor_bruto: r.valorBruto,
-        valor_liquido: r.sinal === "-" ? -Math.abs(r.valorLiquido) : r.valorLiquido,
-        valor_tarifa: r.valorTarifa || null,
-        valor_taxa_desconto: r.valorTaxaDesconto || null,
-        sinal: r.sinal || null,
-        banco: r.banco || null,
-        agencia: r.agencia || null,
-        conta_corrente: r.contaCorrente || null,
-        tipo_conta: r.tipoConta || null,
-        num_parcela_rv: r.numParcelaRv || null,
-        qtd_parcelas_rv: r.qtdParcelasRv || null,
-        data_vencimento_original: r.dataVencimentoOriginal || null,
-        moeda: r.moeda || null,
-        raw_line: r.rawLine,
-      }));
+      const resumoRows = resumos.map((r) => buildResumoRow(r, integracao, arq.nome));
       const resRes = await upsertChunks(
         supabaseAdmin, "getnet_resumo", resumoRows,
         "integracao_id,rv,data_rv,indicador_tipo_pagamento"
@@ -1201,6 +1301,23 @@ async function runExtratoEletronicoV10(args: {
           codigo_estabelecimento: parsed.header?.codigoEstabelecimento ?? null,
           cnpj_adquirente: parsed.header?.cnpjAdquirente ?? null,
           espelho_origem: usarTipo5ParaEsteArquivo ? "getnet_sftp_tipo5" : "getnet_sftp_txt",
+          // buildResumoRow (usado no resumoRows.map acima) já grava
+          // valor_liquido_cobranca/id_baixa_cobranca_servico no INSERT desde
+          // C2-3 — arquivo importado do zero a partir daqui nunca precisa do
+          // backfill_resumo_cobranca. MAS `resRes.ignored > 0` (achado do
+          // code-review) significa que pelo menos 1 linha já existia em
+          // getnet_resumo e o upsert (ON CONFLICT DO NOTHING, `upsertChunks`
+          // linha ~395) NÃO tocou nela — cenário real: reimportar pelo botão
+          // manual (GetnetListFilesDialog) um arquivo importado ANTES da
+          // C2-3 existir. Omitir o campo aqui (em vez de sempre carimbar)
+          // deixa o upsert por conflito não sobrescrever o valor já
+          // guardado — arquivo com linha órfã continua elegível pro
+          // backfill_resumo_cobranca de verdade, em vez de se esconder pra
+          // sempre atrás de um carimbo que mentia sobre o dado já estar
+          // completo.
+          ...(resRes.ignored === 0
+            ? { resumo_cobranca_backfilled_at: new Date().toISOString() }
+            : {}),
         }, { onConflict: "integracao_id,arquivo_nome" });
 
       const totalLinhas = validacao.qtdRegistrosLidos;
@@ -1311,6 +1428,417 @@ async function runExtratoEletronicoV10(args: {
       total_ignorado: totalIgnorado,
     },
     parent_log_id: parentLogId,
+  });
+}
+
+// ==================== runner: backfill_resumo_cobranca (C2-3) ====================
+// Reprocessa arquivo(s) JÁ IMPORTADOS lendo direto do bucket
+// (getnet-raw-files, storage_path já registrado em getnet_arquivos) — sem
+// SFTP live, sem exigir que o arquivo ainda exista no servidor remoto.
+// Escopo estreito de propósito: só UPDATE de valor_liquido_cobranca/
+// id_baixa_cobranca_servico em getnet_resumo, por linha já existente
+// (chave natural integracao_id+rv+data_rv+indicador_tipo_pagamento) — não
+// insere, não duplica, não toca extratos_bancarios/getnet_arquivos nem as
+// outras 5 tabelas. O par download-do-bucket+parseExtrato é o mesmo
+// mecanismo que a C2-5 (shadow mode dos campos novos de tipo5/6) vai
+// reaproveitar — por isso fica em runner próprio, não emaranhado no fluxo
+// de import_extrato.
+//
+// Limitação conhecida, documentada (não débito escondido): um arquivo que
+// falha SEMPRE (ex.: objeto removido/expirado no bucket, storage_path
+// legado nulo) nunca é marcado `resumo_cobranca_backfilled_at` e volta a
+// ser selecionado (oldest-first) em toda chamada futura sobre o mesmo
+// escopo — não há contador de tentativas nem "pular arquivo com problema".
+// Consome 1 de até `batchSize` vagas por chamada, não trava as demais; o
+// `erro` de cada arquivo aparece em `detalhes[]` a cada chamada, então o
+// problema é visível pro operador, que resolve isolando esse arquivo via
+// `arquivo_nome` explícito. Mesmo modelo de "sem retry automático além do
+// reinvoke manual" que `runSyncExtratoV10` já tem pra arquivo com erro.
+async function runBackfillResumoCobranca(args: {
+  supabaseAdmin: any;
+  baseLogCtx: {
+    integracao_id: string;
+    igreja_id: string;
+    filial_id: string | null;
+    provedor: string;
+    created_by: string | null;
+  };
+  startedAt: number;
+  integracao: { id: string; igreja_id: string; filial_id: string | null };
+  arquivoNome: string | null;
+  dataInicio: string | null;
+  dataFim: string | null;
+  batchSize: number;
+}): Promise<Response> {
+  const { supabaseAdmin, baseLogCtx, startedAt, integracao, arquivoNome, dataInicio, dataFim, batchSize } = args;
+
+  if (!arquivoNome && !dataInicio && !dataFim) {
+    return json(400, {
+      success: false,
+      error: "Informe arquivo_nome ou data_referencia_inicio/data_referencia_fim — reprocesso sem escopo não é permitido.",
+    });
+  }
+
+  const logId = await startLog(supabaseAdmin, {
+    ...baseLogCtx,
+    acao: "backfill_resumo_cobranca",
+    metadata: { arquivo_nome: arquivoNome, data_inicio: dataInicio, data_fim: dataFim },
+  });
+
+  // 1. Localiza os arquivos já importados que casam o escopo pedido — exclui
+  // quem já foi backfillado com sucesso (achado do code-review: sem esse
+  // filtro, reinvocar com o mesmo payload reprocessava sempre os mesmos
+  // `batchSize` primeiros arquivos e `arquivos_restantes` nunca chegava a 0).
+  //
+  // `count: "exact"` + `.limit(batchSize)` direto na query (em vez de
+  // buscar tudo e fatiar em memória) — achado do code-review: sem isso, o
+  // cap default de linhas do PostgREST (1000) truncaria silenciosamente
+  // `todosArquivos` num backlog grande, e `arquivos_restantes` (total -
+  // processados) saía menor que o real. `count` reflete o total que casa o
+  // filtro independente do `.limit()` aplicado à página retornada.
+  //
+  // `.is("resumo_cobranca_backfilled_at", null)` vale mesmo quando o
+  // chamador informa `arquivo_nome` explícito — decisão consciente, não
+  // esquecimento: não existe flag pra forçar reprocesso de um arquivo já
+  // marcado completo. Se um bug futuro no gate CI/offset de bytes exigir
+  // reabrir um arquivo específico, o remédio é `UPDATE getnet_arquivos SET
+  // resumo_cobranca_backfilled_at = NULL WHERE arquivo_nome = '...'` direto
+  // (ação admin-only, já tem acesso de banco) — evita um parâmetro novo na
+  // Payload só pra um cenário de recuperação raro.
+  // `.not("storage_path", "is", null)` (achado do code-review): arquivo
+  // legado sem storage_path (coluna nullable desde 20260617000001) NUNCA
+  // vai conseguir ser baixado do bucket — não é falha transitória pra
+  // tentar de novo, é impossibilidade estrutural. Sem excluir daqui, esse
+  // arquivo ficaria pra sempre na frente da fila (oldest-first), comendo 1
+  // de até `batchSize` vagas em toda chamada futura e travando o avanço
+  // dos arquivos saudáveis atrás dele. Contado à parte (`arquivos_sem_
+  // storage_path` abaixo) pra não desaparecer silenciosamente da resposta.
+  let query = supabaseAdmin
+    .from("getnet_arquivos")
+    .select("arquivo_nome, storage_path, data_referencia", { count: "exact" })
+    .eq("integracao_id", integracao.id)
+    .is("resumo_cobranca_backfilled_at", null)
+    .not("storage_path", "is", null);
+  if (arquivoNome) query = query.eq("arquivo_nome", arquivoNome);
+  if (dataInicio) query = query.gte("data_referencia", dataInicio);
+  if (dataFim) query = query.lte("data_referencia", dataFim);
+
+  let semStoragePathQuery = supabaseAdmin
+    .from("getnet_arquivos")
+    .select("id", { count: "exact", head: true })
+    .eq("integracao_id", integracao.id)
+    .is("resumo_cobranca_backfilled_at", null)
+    .is("storage_path", null);
+  if (arquivoNome) semStoragePathQuery = semStoragePathQuery.eq("arquivo_nome", arquivoNome);
+  if (dataInicio) semStoragePathQuery = semStoragePathQuery.gte("data_referencia", dataInicio);
+  if (dataFim) semStoragePathQuery = semStoragePathQuery.lte("data_referencia", dataFim);
+  const { count: arquivosSemStoragePath } = await semStoragePathQuery;
+
+  // Teto por chamada (mesmo padrão de runSyncExtratoV10) — evita estourar o
+  // timeout da Edge Function num range grande; oldest-first, chamador
+  // reinvoca (mesmo payload) até arquivos_restantes chegar a 0.
+  const { data: arquivosAlvo, error: listErr, count: totalPendente } = await query
+    .order("data_referencia", { ascending: true })
+    .limit(batchSize);
+  if (listErr) {
+    await finishLog(supabaseAdmin, logId, startedAt, { status: "error", erro_mensagem: listErr.message });
+    return json(200, { success: false, error: listErr.message });
+  }
+  if (!arquivosAlvo || arquivosAlvo.length === 0) {
+    // Distingue "escopo nunca existiu" (erro real) de "escopo existe mas já
+    // está 100% backfillado" (achado do code-review: sem essa distinção, um
+    // chamador que reinvoca até `arquivos_restantes=0` recebia
+    // `success:false`/status "error" bem na chamada que confirma
+    // conclusão — falso positivo pra qualquer alerta em cima do status).
+    let scopeQuery = supabaseAdmin
+      .from("getnet_arquivos")
+      .select("id", { count: "exact", head: true })
+      .eq("integracao_id", integracao.id);
+    if (arquivoNome) scopeQuery = scopeQuery.eq("arquivo_nome", arquivoNome);
+    if (dataInicio) scopeQuery = scopeQuery.gte("data_referencia", dataInicio);
+    if (dataFim) scopeQuery = scopeQuery.lte("data_referencia", dataFim);
+    const { count: totalNoEscopo } = await scopeQuery;
+
+    if (totalNoEscopo && totalNoEscopo > 0) {
+      await finishLog(supabaseAdmin, logId, startedAt, {
+        status: "success",
+        total_recebido: 0,
+        metadata: { detalhes: [], arquivos_restantes: 0, arquivos_sem_storage_path: arquivosSemStoragePath ?? 0 },
+      });
+      return json(200, {
+        success: true,
+        arquivos_encontrados: 0,
+        arquivos_restantes: 0,
+        // Achado do code-review: com o filtro `.not("storage_path", "is",
+        // null)` acima, chegar aqui com arquivos_sem_storage_path > 0
+        // significa "processável zerou, mas sobraram arquivos que este
+        // mecanismo nunca vai conseguir resolver" — não confundir com
+        // backfill 100% completo de verdade.
+        arquivos_sem_storage_path: arquivosSemStoragePath ?? 0,
+        arquivos_processados: 0,
+        arquivos_com_erro: 0,
+        linhas_atualizadas: 0,
+        linhas_puladas: 0,
+        linhas_nao_encontradas: 0,
+        detalhes: [],
+      });
+    }
+
+    await finishLog(supabaseAdmin, logId, startedAt, {
+      status: "error",
+      erro_mensagem: "Nenhum arquivo já importado casa o escopo informado.",
+    });
+    return json(200, { success: false, error: "Nenhum arquivo encontrado para o escopo informado." });
+  }
+
+  let arquivosProcessados = 0;
+  let arquivosComErro = 0;
+  let arquivosBackfilled = 0;
+  let linhasAtualizadas = 0;
+  let linhasPuladas = 0;
+  let linhasNaoEncontradas = 0;
+  const detalhes: Array<{
+    arquivo_nome: string;
+    status: string;
+    erro?: string;
+    atualizadas?: number;
+    puladas?: number;
+  }> = [];
+
+  // Atualiza 1 linha (chamada isolada — achado do code-review: o try/catch
+  // original envolvia o arquivo INTEIRO, então uma linha com erro descartava
+  // a contagem de tudo que já tinha sido atualizado com sucesso antes dela
+  // no mesmo arquivo, e abortava as linhas restantes sem tentar).
+  async function atualizarLinha(
+    r: Parameters<typeof buildResumoRow>[0],
+    arquivoNomeAtual: string,
+  ): Promise<
+    | { ok: true; outcome: "atualizada" | "pulada" | "nao_encontrada" }
+    | { ok: false; erro: string }
+  > {
+    // arquivo_nome ENTRA no WHERE (achado do code-review): a constraint de
+    // unicidade de getnet_resumo é só integracao_id+rv+data_rv+
+    // indicador_tipo_pagamento (não inclui arquivo_nome) — se a Getnet
+    // reenviar o mesmo RV/data sob um arquivo_nome diferente, a linha
+    // salva em getnet_resumo pertence a QUALQUER QUE SEJA o arquivo que
+    // ganhou a corrida do upsert original (`ON CONFLICT DO NOTHING`), não
+    // necessariamente o arquivo sendo reprocessado agora. Sem esse filtro,
+    // um backfill do arquivo "perdedor" gravaria o valor de cobrança dele
+    // por cima de uma linha que fisicamente veio de outro arquivo.
+    //
+    // 0 rows com arquivo_nome NÃO é automaticamente "não encontrada"
+    // (achado Codex P1 / review): a chave natural pode já pertencer a
+    // OUTRO arquivo. Tratar isso como permanente-pending nunca carimbava
+    // o perdedor, reselecionava oldest-first pra sempre e podia esgotar
+    // o batchSize faminto o resto do histórico. Distingue:
+    //   - atualizada: UPDATE bateu (linha deste arquivo)
+    //   - pulada: chave natural existe sob outro arquivo_nome → resolvida
+    //     (não sobrescreve; conta pra `completo`)
+    //   - nao_encontrada: chave natural ausente de verdade (import
+    //     incompleto) → NÃO carimba
+    const row = buildResumoRow(r, integracao, arquivoNomeAtual);
+    try {
+      const { data: updated, error: updErr } = await supabaseAdmin
+        .from("getnet_resumo")
+        .update({
+          valor_liquido_cobranca: row.valor_liquido_cobranca,
+          id_baixa_cobranca_servico: row.id_baixa_cobranca_servico,
+        })
+        .eq("integracao_id", row.integracao_id)
+        .eq("rv", row.rv)
+        .eq("data_rv", row.data_rv)
+        .eq("indicador_tipo_pagamento", row.indicador_tipo_pagamento)
+        .eq("arquivo_nome", row.arquivo_nome)
+        .select("id");
+      if (updErr) return { ok: false, erro: updErr.message };
+      if (updated && updated.length > 0) {
+        return { ok: true, outcome: "atualizada" };
+      }
+
+      const { data: existente, error: selErr } = await supabaseAdmin
+        .from("getnet_resumo")
+        .select("id, arquivo_nome")
+        .eq("integracao_id", row.integracao_id)
+        .eq("rv", row.rv)
+        .eq("data_rv", row.data_rv)
+        .eq("indicador_tipo_pagamento", row.indicador_tipo_pagamento)
+        .maybeSingle();
+      if (selErr) return { ok: false, erro: selErr.message };
+      if (existente && existente.arquivo_nome !== row.arquivo_nome) {
+        return { ok: true, outcome: "pulada" };
+      }
+      return { ok: true, outcome: "nao_encontrada" };
+    } catch (err) {
+      return { ok: false, erro: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  // Concorrência limitada por chunk (não sequencial 1 a 1, não Promise.all
+  // do arquivo inteiro de uma vez) — reduz wall-clock num arquivo com
+  // centenas de linhas sem abrir mão de isolamento de erro por linha
+  // (achado do code-review sobre risco de timeout da Edge Function).
+  const CHUNK_CONCORRENCIA = 20;
+  async function atualizarLinhasEmChunks(
+    resumos: Array<Parameters<typeof buildResumoRow>[0]>,
+    arquivoNomeAtual: string,
+  ): Promise<{
+    atualizadas: number;
+    puladas: number;
+    naoEncontradas: number;
+    erros: string[];
+  }> {
+    // Dedupe pela chave natural (integracao_id+rv+data_rv+
+    // indicador_tipo_pagamento) antes de disparar chunks concorrentes —
+    // achado do code-review: duas linhas do MESMO arquivo com essa chave
+    // igual (num_parcela_rv não entra na chave) gerariam 2 UPDATEs
+    // concorrentes na mesma linha física, resultado não-determinístico por
+    // corrida. Mantém a PRIMEIRA ocorrência — mesmo critério do INSERT
+    // original (`upsertChunks` usa `ignoreDuplicates: true`, que descarta
+    // silenciosamente as ocorrências seguintes no conflito), pra não gravar
+    // um valor de cobrança que não corresponde à linha que ficou salva.
+    const porChave = new Map<string, Parameters<typeof buildResumoRow>[0]>();
+    for (const r of resumos) {
+      const chave = `${r.rv}|${r.dataRv}|${r.indicadorTipoPagamento}`;
+      if (!porChave.has(chave)) porChave.set(chave, r);
+    }
+    const resumosSemDuplicata = Array.from(porChave.values());
+
+    let atualizadas = 0;
+    let puladas = 0;
+    let naoEncontradas = 0;
+    const erros: string[] = [];
+    for (let i = 0; i < resumosSemDuplicata.length; i += CHUNK_CONCORRENCIA) {
+      const chunk = resumosSemDuplicata.slice(i, i + CHUNK_CONCORRENCIA);
+      const resultados = await Promise.all(chunk.map((r) => atualizarLinha(r, arquivoNomeAtual)));
+      for (const res of resultados) {
+        if (!res.ok) erros.push(res.erro);
+        else if (res.outcome === "atualizada") atualizadas++;
+        else if (res.outcome === "pulada") puladas++;
+        else naoEncontradas++;
+      }
+    }
+    return { atualizadas, puladas, naoEncontradas, erros };
+  }
+
+  for (const arq of arquivosAlvo) {
+    try {
+      const { resumos } = await baixarEParsearDoBucket(supabaseAdmin, arq.storage_path);
+
+      const resultado = await atualizarLinhasEmChunks(resumos, arq.arquivo_nome);
+      linhasAtualizadas += resultado.atualizadas;
+      linhasPuladas += resultado.puladas;
+      linhasNaoEncontradas += resultado.naoEncontradas;
+      arquivosProcessados++;
+
+      // Só marca backfilled quando TODA linha do arquivo foi resolvida sem
+      // erro E sem lacuna real em getnet_resumo (achado do code-review):
+      // "não encontrada" pode ser sintoma de um import original incompleto
+      // (upsertChunks retorna cedo se um chunk falha — ver linha ~397), não
+      // "nada a fazer aqui". Linhas `puladas` (chave natural já pertencente
+      // a outro arquivo) contam como resolvidas — não bloqueiam o carimbo.
+      // Marcar como concluído com naoEncontradas>0 esconderia o gap pra
+      // sempre, já que o filtro `.is("resumo_cobranca_backfilled_at", null)`
+      // nunca mais revisitaria o arquivo.
+      const linhasOk = resultado.erros.length === 0 && resultado.naoEncontradas === 0;
+      let completo = false;
+      let stampErro: string | null = null;
+      if (linhasOk) {
+        // Achado Codex P2 / review: checar o update do marcador ANTES de
+        // contar sucesso. Ignorar `{ error }` reportava success /
+        // arquivos_restantes diminuído mesmo com o marcador ainda NULL —
+        // a próxima chamada reprocessava o arquivo inteiro.
+        const { error: stampErr } = await supabaseAdmin
+          .from("getnet_arquivos")
+          .update({ resumo_cobranca_backfilled_at: new Date().toISOString() })
+          .eq("integracao_id", integracao.id)
+          .eq("arquivo_nome", arq.arquivo_nome);
+        if (stampErr) {
+          stampErro = stampErr.message;
+        } else {
+          completo = true;
+          arquivosBackfilled++;
+        }
+      }
+
+      const falhasLinha = resultado.erros.length > 0;
+      detalhes.push({
+        arquivo_nome: arq.arquivo_nome,
+        status: completo
+          ? "ok"
+          : stampErro
+            ? "parcial"
+            : falhasLinha
+              ? "parcial"
+              : "linhas_nao_encontradas",
+        atualizadas: resultado.atualizadas,
+        puladas: resultado.puladas,
+        ...(stampErro
+          ? { erro: `marcador resumo_cobranca_backfilled_at: ${stampErro}` }
+          : falhasLinha
+            ? { erro: `${resultado.erros.length} linha(s) falharam: ${resultado.erros[0]}` }
+            : {}),
+      });
+      if (falhasLinha || stampErro) arquivosComErro++;
+    } catch (err) {
+      arquivosComErro++;
+      detalhes.push({
+        arquivo_nome: arq.arquivo_nome,
+        status: "erro",
+        erro: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  // Recalculado com o resultado real do processamento deste batch (achado
+  // do code-review): `totalPendente - arquivosAlvo.length`, antes do loop,
+  // não refletia falhas ocorridas dentro do próprio batch — um arquivo com
+  // erro no meio da execução ficava fora da contagem de "restantes" nesta
+  // resposta (a próxima chamada corrige sozinha, mas a resposta desta
+  // ficava otimista demais pra quem só olha 1 chamada). `totalPendente` vem
+  // do `count: "exact"` da query — reflete o total real, não a página
+  // truncada pelo `.limit(batchSize)`.
+  const arquivosRestantes = (totalPendente ?? arquivosAlvo.length) - arquivosBackfilled;
+
+  // Não basta `arquivosComErro === 0` pra "success" (achado do code-review):
+  // um arquivo com `naoEncontradas > 0` mas sem erro de linha (ex.: chave
+  // natural nunca casa por alguma mudança futura no parser/gate CI) nunca
+  // conta pra `arquivosComErro`, então um batch inteiro sem progresso real
+  // (`arquivosBackfilled === 0`) ainda reportava "success" — falso
+  // positivo pra quem monitora `status` esperando convergência.
+  const status =
+    arquivosComErro === 0 && arquivosBackfilled === arquivosProcessados
+      ? "success"
+      : arquivosBackfilled > 0
+        ? "partial"
+        : "error";
+  await finishLog(supabaseAdmin, logId, startedAt, {
+    status,
+    total_recebido: arquivosAlvo.length,
+    total_inserido: linhasAtualizadas,
+    total_ignorado: linhasNaoEncontradas + linhasPuladas,
+    metadata: {
+      detalhes,
+      arquivos_restantes: arquivosRestantes,
+      arquivos_sem_storage_path: arquivosSemStoragePath ?? 0,
+      linhas_puladas: linhasPuladas,
+    },
+  });
+
+  return json(200, {
+    success: status !== "error",
+    arquivos_encontrados: arquivosAlvo.length,
+    arquivos_restantes: arquivosRestantes,
+    // Arquivo sem storage_path é excluído da seleção acima (nunca
+    // conseguiria baixar do bucket) — contado à parte pra não sumir da
+    // resposta; não decresce reinvocando, exige intervenção manual
+    // (achado do code-review).
+    arquivos_sem_storage_path: arquivosSemStoragePath ?? 0,
+    arquivos_processados: arquivosProcessados,
+    arquivos_com_erro: arquivosComErro,
+    linhas_atualizadas: linhasAtualizadas,
+    linhas_puladas: linhasPuladas,
+    linhas_nao_encontradas: linhasNaoEncontradas,
+    detalhes,
   });
 }
 
