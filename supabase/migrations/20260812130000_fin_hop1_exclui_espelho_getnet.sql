@@ -856,12 +856,19 @@ BEGIN
  WHERE l.igreja_id = v_igreja
    AND public.fin_e_espelho_getnet(e.origem)
    AND (p_integracao_id IS NULL OR l.integracao_id = p_integracao_id)
-   -- Achado Codex P1 + Bugbot: extrato compartilhado (filial_id NULL)
-   -- passa pra qualquer chamador, mas o LOTE pode ter filial própria —
-   -- filial EFETIVA (lote se definida, senão a do extrato), mesmo padrão
-   -- já usado em fin_vincular_lote_antecipacao/fin_desfazer_vinculo_
-   -- lote_antecipacao (COALESCE(v_lote.filial_id, v_extrato.filial_id)).
-   AND public.has_filial_access(v_igreja, COALESCE(l.filial_id, e.filial_id))
+   -- Achado Codex P1 (2ª rodada) — o COALESCE original só validava UMA
+   -- filial concreta quando as duas eram definidas: um lote legado com
+   -- filial A cujo extrato espelho tem filial B (a migration original
+   -- que criava esse vínculo, `20260729170000_fin_lote_antecipacao_
+   -- vinculo_desagio.sql`, nunca comparava as duas — histórico real
+   -- pode ter esse descompasso, mesmo com escritas atuais já validando)
+   -- vazava os dados do extrato (valor/data/origem/id) pra quem só tem
+   -- acesso à filial A. Checa as duas filiais INDEPENDENTEMENTE — cada
+   -- has_filial_access já trata NULL como "sem restrição" sozinho, então
+   -- isso não regride o caso comum (uma das duas NULL), só fecha o caso
+   -- em que as duas são concretas e diferentes.
+   AND public.has_filial_access(v_igreja, l.filial_id)
+   AND public.has_filial_access(v_igreja, e.filial_id)
 
   -- Achado do code-review: `ORDER BY 5` era posicional e caía na 5ª
   -- coluna (valor_extrato), não na intenção (mais recente primeiro) —

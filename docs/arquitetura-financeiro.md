@@ -6415,6 +6415,22 @@ linhas pros 2 vínculos plantados (Hop1 + antecipação); mesma consulta sem
 o claim de filial (ramo "backwards compatibility" de `has_filial_access`)
 vê as 2.
 
+**PR #95 — 3ª rodada, Codex P1**: o `COALESCE(l.filial_id, e.filial_id)`
+da correção acima só valida UMA filial concreta quando as duas são
+definidas — um lote com filial A e extrato espelho com filial B
+(diferente) só checava A. Achado real, não hipotético: a migration que
+originalmente criava esses vínculos
+(`20260729170000_fin_lote_antecipacao_vinculo_desagio.sql`) nunca
+comparava as duas filiais — histórico pode ter esse descompasso mesmo
+com escritas atuais já validando. Fix: troca o `COALESCE` por duas
+checagens independentes (`has_filial_access` na filial do lote E na do
+extrato) — cada uma já trata `NULL` como "sem restrição" sozinha, então
+não regride o caso comum (uma das duas `NULL`), só fecha o caso raro
+(as duas concretas e diferentes). Confirmado no harness: tesoureiro com
+acesso só à filial do lote não vê o vínculo (extrato é de outra filial);
+com grant explícito em `user_filial_access` pra filial do extrato
+também, o vínculo aparece.
+
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
   inegociável; revisão de segurança dedicada (checklist de
   `docs/01-Arquitetura/04-rls-e-seguranca.MD`).
