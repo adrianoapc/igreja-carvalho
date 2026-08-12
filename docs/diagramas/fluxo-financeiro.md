@@ -1253,3 +1253,30 @@ depois de apertar o `USING` do `_modify` também, o mesmo tesoureiro
 passou a ver só a própria filial — `admin_igreja` (sem filial no JWT)
 continuou vendo as 2, confirmando que só o caminho restrito mudou.
 
+## Ciclo 2 (C2-8) — Corta o espelho Getnet em `extratos_bancarios` (§9.108)
+
+Só o layout `extrato_eletronico_v10` é tocado — `settlement_v1`
+(`getnet_sftp`) escreve exclusivamente em `extratos_bancarios`, sem
+nenhuma tabela `getnet_resumo`-equivalente por trás; não é um espelho
+redundante, é a única cópia do dado dessa integração.
+
+```mermaid
+flowchart TD
+    subgraph V10["extrato_eletronico_v10 (tocado)"]
+        Arq["arquivo importado"] --> Real["getnet_resumo /\ngetnet_financeiro_resumo\n(dado real, sem mudança)"]
+        Arq -.->|"ATÉ C2-8: também escrevia"| Espelho["extratos_bancarios\norigem getnet_sftp_txt/tipo5\n(CORTADO)"]
+        Real --> View["getnet_credito_disponivel\n(C2-6, ainda sem consumidor)"]
+    end
+    subgraph SV1["settlement_v1 (NÃO tocado)"]
+        Arq2["arquivo importado"] --> Unico["extratos_bancarios\norigem getnet_sftp\n(ÚNICA cópia do dado —\nnão é espelho de nada)"]
+    end
+```
+
+Achado adicional (mesma pesquisa): `useDashboardConciliacaoData.ts`
+tinha sua própria query de stats/pendentes sem filtro de origem —
+mesmo bug que `view_reconciliacao_cobertura` (§9.106) já tinha
+corrigido, só que numa query paralela que passou batido. Corrigido com
+o mesmo `FILTRO_EXCLUI_ESPELHO_GETNET`. `possivel_duplicata_de`
+mantido — continua útil pra duplicatas reais entre outros bancos, só
+deixa de ser acionado pelo caso Getnet específico.
+

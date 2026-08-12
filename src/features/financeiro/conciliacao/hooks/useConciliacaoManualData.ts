@@ -4,7 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { useFilialId } from "@/hooks/useFilialId";
 import { formatLocalDate } from "@/utils/dateUtils";
-import { marcarExtratoIgnorado } from "@/features/financeiro/core/api/extratos.api";
+import {
+  marcarExtratoIgnorado,
+  FILTRO_EXCLUI_ESPELHO_GETNET,
+} from "@/features/financeiro/core/api/extratos.api";
 import {
   gerarCandidatosConciliacao,
   listarExtratosSemCandidato,
@@ -174,6 +177,10 @@ export function useConciliacaoManualData() {
         .is("transacao_vinculada_id", null)
         .gte("data_transacao", dataInicio)
         .lte("data_transacao", dataFim)
+        // C2-8: espelho sintético do próprio Getnet nunca terá candidato
+        // real (C2-7/motor F4 já rejeitam ele) — mesmo filtro já aplicado
+        // em HistoricoExtratos.tsx/useConciliacaoInteligente.ts.
+        .or(FILTRO_EXCLUI_ESPELHO_GETNET)
         .order("data_transacao", { ascending: false });
       // Sem .limit() de propósito (achado do code-review C2-1): esta lista
       // alimenta a contagem "pendentes" do dialog de resultado e a varredura

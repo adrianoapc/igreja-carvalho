@@ -6704,6 +6704,99 @@ rodada (não sobre o design original da C2-6):
    de segurança prioritário, candidato a fase dedicada própria — não
    pendência escondida.
 
+### 9.108 Ciclo 2 (C2-8) — Corta o espelho Getnet em `extratos_bancarios`
+
+**Decisão do usuário**: depois de confirmar que nada mais casa contra o
+espelho (C2-7 §9.105, motor central F4 §9.106) e que nenhum saldo de
+conta depende dele, cortar a escrita de vez — a visibilidade que a
+`getnet_credito_disponivel` (C2-6, §9.104) daria como substituto continua
+sem consumidor, mas não é mais pré-condição: a única coisa que a
+visibilidade do espelho ainda "oferecia" era um sinal de matching que
+já era estruturalmente errado (uma venda podia casar contra o próprio
+espelho) — não uma feature legítima perdida.
+
+**Pesquisa pré-implementação** (grounded no código atual, não em
+memória/documentação antiga): mapeou exaustivamente (1) quem ainda
+escreve o espelho, (2) quem ainda lê `extratos_bancarios` por origem
+Getnet sem excluir, (3) o mecanismo `possivel_duplicata_de`, (4) se
+algum saldo de conta depende do espelho.
+
+**Achado que mudou o escopo do corte**: o plano original citava só
+`index.ts:1152-1165` genericamente, mas existem DOIS layouts de
+integração completamente distintos, e só UM deles é de fato um
+"espelho" (dado redundante com uma fonte real em outra tabela):
+
+- **`extrato_eletronico_v10`** (`getnet_sftp_txt`/`getnet_sftp_tipo5`):
+  além de escrever o espelho, também grava `getnet_resumo`/`getnet_
+  financeiro_resumo` — a linha em `extratos_bancarios` era mesmo uma
+  CÓPIA redundante de dado já armazenado em outro lugar. **Este é o
+  único layout tocado por este corte.**
+- **`settlement_v1`** (`getnet_sftp`) — layout "legado", mas ainda o
+  DEFAULT em `IntegracoesCriarDialog.tsx` pra integração nova
+  (`sftpLayout` inicial = `"settlement_v1"`). `runSettlementV1`
+  (`index.ts`) escreve EXCLUSIVAMENTE em `extratos_bancarios` — não
+  existe nenhuma tabela `getnet_resumo`-equivalente pra este layout. A
+  origem `getnet_sftp` FOI corretamente incluída em `fin_e_espelho_
+  getnet` (C2-7, §9.105) pra fins de EXCLUSÃO DE MATCHING (evita casar
+  uma venda contra o próprio import settlement, mesma classe de bug),
+  mas ela NÃO é um "espelho que pode ser cortado" no sentido de "dado
+  redundante" — é a única cópia existente do dado dessa integração.
+  **Cortar a escrita do `settlement_v1` destruiria a única fonte de
+  dado que essas integrações têm.** Não tocado nesta fase.
+
+**Backend** (`supabase/functions/getnet-sftp/index.ts`,
+`getnetExtratoParser.ts`): removido o bloco "Espelha em
+extratos_bancarios" de `runExtratoEletronicoV10` (construção de
+`itensExtrato` + chamada `ingerirExtratos` com origem `getnet_sftp_txt`/
+`getnet_sftp_tipo5`). `getnet_arquivos.espelho_origem` continua sendo
+travado por arquivo (`resolverUsoTipo5`, não removida) — não alimenta
+mais o espelho, mas `getnet_credito_disponivel_view.sql` (C2-6) ainda
+usa essa coluna pra decidir, por arquivo, entre a fonte tipo1/LQ e
+tipo5/PG. `selecionarEspelhoTipo5` (função pura que só existia pra
+montar as linhas do espelho tipo5) foi removida por não ter mais
+chamador nenhum — junto com seus 9 testes dedicados em
+`getnetExtratoParser.test.ts` (os testes de `resolverUsoTipo5`/
+`parseExtrato`, que continuam relevantes, ficaram).
+
+**`possivel_duplicata_de`** (mecanismo que sinaliza colisão cross-canal
+Getnet×Santander pra mesma movimentação, `20260717150000`) — **decisão
+explícita: MANTIDO, sem mudança de código**. A causa raiz dele (o
+espelho colidir com o import Santander real) desaparece pra casos
+NOVOS depois deste corte, mas o mecanismo continua genuinamente útil
+pra duplicatas reais entre quaisquer outros 2 bancos/canais — não é um
+mecanismo morto, só deixa de ser acionado especificamente pelo caso
+Getnet.
+
+**Frontend — gap adicional achado na mesma pesquisa, fora do que C2-7/
+motor F4 já tinham cobrido**: `useDashboardConciliacaoData.ts` (queries
+`reconciliacao-stats` e `extratos-pendentes-dashboard`, painel Dashboard)
+tinha sua PRÓPRIA leitura de `extratos_bancarios` sem nenhum filtro de
+origem — mesmo bug que `view_reconciliacao_cobertura` tinha antes do
+fix da §9.106, só que numa query paralela no cliente que passou batido
+naquela rodada. Sem o filtro, os cards "Pendentes"/"Cobertura%" do
+Dashboard contavam/exibiam linhas espelho que NUNCA teriam candidato
+real (e, com o corte da escrita, o estoque histórico não-reconciliável
+ficaria congelado pra sempre nesses números, sem nem ser mascarado por
+entrada diária nova). Corrigido com o mesmo `FILTRO_EXCLUI_ESPELHO_
+GETNET` já usado em `HistoricoExtratos.tsx`/`useConciliacaoInteligente.
+ts`. `useConciliacaoManualData.ts` (`extratosBrutos`) tinha o mesmo gap,
+impacto menor (só alimentava mensagem de dialog/gate de empty-state, o
+badge principal da aba já vinha de `fin_listar_extratos_sem_candidato`,
+que já excluía) — corrigido pela mesma consistência.
+
+**Verificação**: `deno check`/`deno test` confirmam que a remoção não
+introduziu erro de tipo novo (os 11 erros pré-existentes do arquivo são
+todos de incompatibilidade de tipos do pacote `ssh2-sftp-client`, não
+relacionados) e que os 7 testes remanescentes de `getnetExtratoParser.
+test.ts` passam. Não foi possível testar o corte fim-a-fim contra um
+servidor SFTP real (fora do alcance deste ambiente) — a verificação
+funcional se apoiou em grep exaustivo confirmando zero chamador
+remanescente de `ingerirExtratos` com as 2 origens cortadas, e no fato
+de a lógica removida ser um bloco bem isolado (não compartilha estado
+com o resto de `runExtratoEletronicoV10`, que continua gravando
+`getnet_resumo`/`getnet_analitico`/`getnet_ajustes`/`getnet_financeiro_
+resumo`/`getnet_financeiro_detalhe`/`getnet_arquivos` exatamente igual).
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

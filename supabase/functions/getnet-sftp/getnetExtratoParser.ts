@@ -300,13 +300,22 @@ export interface FinResumoRecord {
 }
 
 /**
- * Trava a origem do espelho por arquivo (fix P1, review PR #52): a origem
- * usada na 1a importação de um arquivo NUNCA pode mudar em reprocessamentos
+ * Trava a origem por arquivo (fix P1, review PR #52): a origem usada na 1a
+ * importação de um arquivo NUNCA pode mudar em reprocessamentos
  * posteriores, mesmo que `espelho_tipo5_desde` seja setado/alterado depois
- * cobrindo retroativamente a data desse arquivo — senão o external_id muda
- * (`getnet_rv:...` -> `getnet_fin5:...`), o dedupe `(conta_id, external_id)`
- * não reconhece as duas linhas como o mesmo crédito, e o valor é duplicado
- * em `extratos_bancarios`.
+ * cobrindo retroativamente a data desse arquivo.
+ *
+ * Motivo original (até C2-8): o external_id do espelho em
+ * `extratos_bancarios` mudava de forma (`getnet_rv:...` ->
+ * `getnet_fin5:...`) e o dedupe `(conta_id, external_id)` duplicava o
+ * valor. C2-8 cortou a escrita do espelho, mas a trava continua
+ * necessária por um motivo diferente agora: `getnet_credito_disponivel_
+ * view` (C2-6) decide, por arquivo, entre a fonte tipo1/LQ e tipo5/PG via
+ * `getnet_arquivos.espelho_origem` (coluna única, sobrescrita a cada
+ * reprocessamento). Sem a trava, reprocessar o mesmo arquivo depois de
+ * mudar `espelho_tipo5_desde` mudaria essa coluna, e a view passaria a
+ * classificar o MESMO crédito histórico pela fonte oposta — instável
+ * entre reprocessamentos, mesmo sem nenhuma mudança real no dado.
  *
  * `arquivoAnterior` vem de `getnet_arquivos` (SELECT espelho_origem WHERE
  * integracao_id/arquivo_nome). Três estados, não dois — a distinção entre
@@ -327,63 +336,6 @@ export function resolverUsoTipo5(
     return usarTipo5PorConfig;
   }
   return arquivoAnterior.espelho_origem === "getnet_sftp_tipo5";
-}
-
-export interface ItemEspelhoGetnet {
-  data_transacao: string;
-  valor: number;
-  tipo: "credito" | "debito";
-  descricao: string;
-  numero_documento: string | null;
-  external_id: string;
-}
-
-/**
- * Seleciona, dentre as linhas do registro tipo 5 (`getnet_financeiro_resumo`),
- * as que representam dinheiro NOVO creditado na conta do lojista — Regra
- * Geral #10 do Manual Extrato Eletrônico V10.1/V6.2024 (pg. 56): só
- * `tipo_operacao === "PG"` (Pagamento de Agenda Livre) é "valores livres
- * creditado na conta do estabelecimento". Os demais tipos (CS/CF/AC/CL/GL/
- * GF/AL) são liquidação contábil de dinheiro já adiantado em data anterior
- * (contrato de cessão/antecipação/gravame), não crédito novo — confirmado
- * pelo exemplo numérico do manual (pg. 44-45).
- *
- * `external_id` é construído SÓ com campos do conteúdo/provedor da linha
- * (chave UR + data + arranjo + valor) — nunca com `arquivoNome`/`linhaNum`
- * (fix P2, review PR #52) nem com `integracao_id` (fix P2, mesma rodada de
- * review): se a Getnet reenviar/reprocessar o mesmo dia sob um nome de
- * arquivo diferente, `getnet_arquivos` (chave `arquivo_nome`) trata isso
- * como arquivo novo; se a integração SFTP for excluída/recriada para a
- * MESMA conta bancária (`conta_id` não muda, `integracao.id` muda), um
- * histórico reimportado geraria uma chave diferente. Em ambos os casos, o
- * dedupe `(conta_id, external_id)` de `fin_ingerir_extratos` não reconhece
- * as duas linhas como o mesmo crédito e duplica o valor — o path tipo 1
- * legado (`getnet_rv:${rv}:${dataRv}:LQ`) nunca teve esse problema porque só
- * usa campos do provedor/conteúdo, nunca do transporte (arquivo) ou do
- * cadastro (integração). `chaveUr` é preenchida para PG (o manual, pg. 38,
- * só confirma que `numeroOperacao` não é) e já é ela mesma um composto
- * determinístico (data de liquidação + código de arranjo + CNPJ/CPF — Regra
- * Geral #11); ainda assim inclui `codigoArranjo`/data/valor como reforço,
- * com fallback pra `numeroOperacao` se `chaveUr` vier vazia num caso
- * inesperado.
- */
-export function selecionarEspelhoTipo5(
-  financeirosResumo: Array<FinResumoRecord & { linhaNum: number; rawLine: string }>,
-): ItemEspelhoGetnet[] {
-  return financeirosResumo
-    .filter((f) => f.tipoOperacao === "PG" && (f.dataCreditoOperacao || f.dataOperacao))
-    .map((f) => {
-      const data = (f.dataCreditoOperacao || f.dataOperacao) as string;
-      const chave = f.chaveUr || f.numeroOperacao || "sem-chave";
-      return {
-        data_transacao: data,
-        valor: f.valorLiquidoOperacao,
-        tipo: "credito" as const,
-        descricao: `Getnet PG ${chave}`,
-        numero_documento: f.numeroOperacao || null,
-        external_id: `getnet_fin5:${data}:${f.codigoArranjo || "na"}:${chave}:${f.valorLiquidoOperacao}`,
-      };
-    });
 }
 
 export interface FinDetalheRecord {
