@@ -1229,3 +1229,27 @@ Validado no harness com fixtures reais (não só metadado de constraint):
 `DELETE` de integração com linha em `getnet_resumo` → `23503`; `DELETE`
 de integração sem nenhum dado Getnet → sucesso.
 
+### Codex P1 (PR #97, 1ª rodada) — revogar só a view não bastava
+
+`getnet_resumo`/`getnet_financeiro_resumo` continuavam legíveis direto,
+expondo o mesmo crédito entre filiais que a view expunha — a policy
+`_select` nova por si só não filtrou nada, porque a policy `_modify`
+(`FOR ALL`, sem filial) já cobria `SELECT` e as duas se combinam por OR.
+
+```mermaid
+flowchart TD
+    T["tesoureiro restrito\nà Filial A"] -->|"SELECT direto\n(PostgREST)"| TAB["getnet_resumo /\ngetnet_financeiro_resumo"]
+    TAB --> SEL{"policy _select\n(FOR SELECT,\ncom has_filial_access)"}
+    TAB --> MOD{"policy _modify\n(FOR ALL,\nSEM has_filial_access)"}
+    SEL -->|"nega Filial B"| OR{"Postgres: OR entre\ntodas as policies\npermissivas do comando"}
+    MOD -->|"permite Filial A e B\n(só checa igreja_id)"| OR
+    OR -->|"1ª versão: vazava\n(MOD permissivo venceu)"| LEAK["vê as 2 filiais"]
+    OR -->|"fix: has_filial_access\ntambém no USING do _modify"| OK2["vê só Filial A"]
+```
+
+Confirmado no harness com fixture de 2 filiais/1 tesoureiro restrito:
+1ª versão do fix retornava as 2 filiais (vazamento real, não teórico);
+depois de apertar o `USING` do `_modify` também, o mesmo tesoureiro
+passou a ver só a própria filial — `admin_igreja` (sem filial no JWT)
+continuou vendo as 2, confirmando que só o caminho restrito mudou.
+

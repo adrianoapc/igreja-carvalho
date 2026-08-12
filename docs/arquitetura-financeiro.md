@@ -6618,6 +6618,55 @@ existe em produção) — não afeta a correção do fix, já que a view não é
 gravável (sem `INSTEAD OF` triggers) e o único grant real revogado
 (`SELECT`) foi confirmado funcionalmente bloqueado.
 
+**PR #97 — 1ª rodada, Codex P1: revogar só a view não bastava.**
+Revogar `SELECT` da view não fecha o gap se o MESMO dado (crédito por
+RV/operação, `filial_id`) continua legível direto em `getnet_resumo`/
+`getnet_financeiro_resumo` — e continua: as policies `getnet_resumo_
+select`/`getnet_fin_resumo_select` (`20260603221141`/`20260617000001`)
+checam só `igreja_id` + role, zero dimensão de filial, apesar de
+`getnet_resumo.filial_id` ser preenchido de verdade no import
+(congelado de `integracao.filial_id`, `getnet-sftp/index.ts:340`) —
+gap já documentado como pré-existente (`20260811110000`,
+`20260812120000`) mas nunca fechado nas tabelas base, só citado como
+"fora de escopo" repetidamente. Fix: mesmo padrão já usado em dezenas
+de outras tabelas do repo — `has_filial_access(igreja_id, filial_id)`
+direto na policy de `SELECT`. `getnet_resumo` tem `filial_id` própria;
+`getnet_financeiro_resumo` não tem — deriva via `EXISTS` contra
+`integracoes_financeiras.filial_id` (mesmo caminho que `fin_buscar_
+financeiro_participante_getnet`/`fin_listar_ajustes_getnet` já usam
+internamente).
+
+**Achado do próprio harness, testando a 1ª versão deste fix**: recriar
+só a policy `_select` (`FOR SELECT`) não bastou — ambas as tabelas já
+tinham uma policy `_modify` (`FOR ALL`) sem checagem de filial nenhuma,
+e o Postgres faz OR entre todas as policies permissivas aplicáveis ao
+mesmo comando. Como `FOR ALL` cobre `SELECT` também, a policy `_modify`
+(sem filial) deixava o `SELECT` passar mesmo com a `_select` (com
+filial) negando — fixture com 2 filiais/1 tesoureiro restrito a uma
+mostrou as 2 filiais retornando igual, sem nenhuma mudança visível.
+Corrigido adicionando `has_filial_access` também no `USING` do
+`_modify` (mantendo o `WITH CHECK` como estava — só `service_role`
+escreve nestas tabelas, que ignora RLS de qualquer forma, então isso
+não tem efeito colateral em escrita real). Re-testado no harness: o
+mesmo tesoureiro passou a ver só a linha da própria filial em ambas as
+tabelas; `admin_igreja` (sem filial no JWT) continuou vendo as 2 —
+confirma que o vazamento estava especificamente na combinação `FOR
+ALL` + ausência de filial, não em nenhum outro ponto.
+
+**Lição**: uma policy `FOR SELECT` nova, adicionada a uma tabela que já
+tem uma policy `FOR ALL` mais permissiva, não estreita nada por si só —
+as duas se combinam por OR. Sempre que uma tabela já tiver uma policy
+`FOR ALL`/`FOR UPDATE`/`FOR DELETE` mais ampla, uma correção de
+`SELECT` isolada precisa necessariamente revisar (e, se for o caso,
+apertar) essa outra policy também — só testar a policy nova em
+isolamento (sem fixture cobrindo a interação real) teria deixado este
+fix inofensivo por completo, apesar de sintaticamente correto.
+
+**Escopo consciente**: não estende pra `getnet_arquivos`/`getnet_
+analitico`/`getnet_ajustes` (mesmo gap, mas fora do que o @codex
+apontou nesta rodada) — auditoria dedicada de todas as tabelas Getnet
+já está registrada como follow-up separado, não pendência escondida.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
