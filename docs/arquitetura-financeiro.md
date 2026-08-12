@@ -6702,7 +6702,94 @@ rodada (não sobre o design original da C2-6):
    qualquer tabela que já usa `has_filial_access`, sem harness dedicado
    pra validar todos os consumidores afetados. Registrado como achado
    de segurança prioritário, candidato a fase dedicada própria — não
-   pendência escondida.
+   pendência escondida. **Corrigido em §9.109.**
+
+### 9.109 Fase dedicada — `has_filial_access` para de ignorar `user_filial_access` quando o JWT não tem filial primária
+
+Fase dedicada pro achado do Codex na PR #97 (§9.107, item 2), como
+combinado: nova branch, migration isolada, harness Postgres real, sem
+misturar com nenhuma outra mudança.
+
+**Fix**: o shortcut `get_jwt_filial_id() IS NULL` (usuário sem filial
+primária no perfil/JWT = acesso total) deixa de ser avaliado antes do
+`EXISTS` contra `user_filial_access`. Nova ordem: `_filial_id IS NULL`
+(recurso compartilhado) ou igual à filial primária do JWT libera; senão,
+uma row explícita em `user_filial_access` (`igreja_id` + `filial_id` +
+`can_view=true`) decide sozinha — allow OU deny; o shortcut legado só
+entra em jogo quando o usuário não tem NENHUMA row em `user_filial_access`
+**para a igreja sendo checada** (ver achados 2 e 3 abaixo).
+`has_role('admin'/'admin_igreja'/'super_admin')` continuam com bypass
+total, sem mudança.
+
+**3 achados do próprio harness / review, ao testar o fix** (nenhum no
+código original — nasceram do jeito como o fix foi escrito):
+
+1. **NULL em vez de `false`, e o efeito em `IF NOT has_filial_access(...)`
+   de dezenas de RPCs.** A 1ª versão do fix removeu o `OR get_jwt_filial_id()
+   IS NULL` incondicional e só manteve `_filial_id = get_jwt_filial_id()`
+   — mas essa comparação retorna SQL `NULL` (não `false`) quando
+   `get_jwt_filial_id()` é `NULL`, e nenhum outro braço do `OR` resolvia pra
+   `true` no caso "sem filial primária + grant só pra OUTRA filial" —
+   `false OR NULL OR false OR false` fica `NULL`, não `false`. A função
+   original nunca expunha isso porque o `IS NULL` incondicional resolvia o
+   `OR` pra `true` antes de qualquer NULL entrar em jogo. O risco real: em
+   PL/pgSQL, `IF <condição NULL> THEN` é tratado como `false` (mesma regra
+   de `WHERE`) — e o grep do repo mostra dezenas de `IF NOT public.
+   has_filial_access(...) THEN RAISE EXCEPTION` nas RPCs `fin_*`. Se a
+   função tivesse ido pra produção retornando `NULL` nesse caso, `NOT NULL`
+   também é `NULL`, o `IF` nunca entra, o `RAISE EXCEPTION` nunca dispara —
+   a RPC deixaria passar exatamente o acesso que o fix pretendia bloquear,
+   um bypass NOVO, pior que o original (que ao menos era consistente:
+   sempre `true`, nunca um `NULL` imprevisível dependendo do call site).
+   Fix: `SELECT COALESCE(<expressão toda>, false)` — garante que a função
+   NUNCA retorna `NULL`, só `true`/`false`, como todo helper booleano usado
+   dentro de `USING`/`WITH CHECK`/`IF NOT ... THEN` deveria.
+2. **Shortcut legado sem escopo de igreja.** A 1ª versão do fix checava
+   `NOT EXISTS (SELECT 1 FROM user_filial_access WHERE user_id = auth.uid())`
+   sem filtrar por `igreja_id` — um usuário sem filial primária, sem
+   nenhuma row de acesso NA IGREJA ATUAL mas com uma row antiga de OUTRA
+   igreja (ex.: ex-membro de outro tenant), perderia o acesso legado total
+   na igreja atual só por ter uma row irrelevante em outro tenant. Falha
+   seguro (nega em vez de vazar), mas ainda uma regressão funcional
+   desnecessária. Fix: `AND igreja_id = _igreja_id` no `NOT EXISTS` — como
+   `user_filial_access` já tem coluna `igreja_id` própria, o escopo correto
+   sai de graça.
+3. **EXISTS do grant explícito sem escopo de igreja (Codex, 1ª review
+   desta PR — o follow-up `852698c` foi anunciado mas nunca chegou na
+   branch).** O `NOT EXISTS` do shortcut legado ganhou `igreja_id =
+   _igreja_id` no achado 2, mas o `EXISTS` que autoriza (`can_view=true`)
+   continuava só com `filial_id = _filial_id`. Os dois lookups são irmãos
+   na mesma tabela: um decide allow, o outro decide se o legado ainda
+   vale — precisam do mesmo predicado de tenant. Sem o `igreja_id` no
+   EXISTS, uma row inconsistente (grant com `filial_id` da igreja A e
+   `igreja_id` da igreja B — a tabela não tem CHECK cruzando as duas FKs,
+   e o upsert da UI grava o `igreja_id` do admin, não o da filial) OU um
+   JWT sem `igreja_id` (o mesmo ramo de backwards-compatibility do
+   helper) faria o grant de outro tenant autorizar a filial pedida.
+   `UNIQUE(user_id, filial_id)` não substitui o predicado: impede duas
+   rows pro mesmo par usuário+filial, mas não impede a coluna
+   `igreja_id` denormalizada de divergir. Fix: `AND igreja_id =
+   _igreja_id` também no EXISTS. Falha seguro (nega em vez de vazar).
+
+**Harness**: réplica mínima do schema real (tipos/tabelas/funções copiados
+literalmente das migrations — `app_role`, `has_role`, `get_jwt_igreja_id`/
+`get_jwt_filial_id`, `user_filial_access`) num Postgres 17 via Docker, não
+o `supabase start` completo (bloqueado por conflito de porta com outro
+projeto local rodando ao mesmo tempo — trade-off consciente, documentado
+no PR). Cenários confirmados: (1) usuário sem filial primária + grant só
+pra filial A pedindo filial B → `false` (bug original reproduzido ANTES do
+fix, confirmado `true`); (2) mesmo usuário pedindo filial A (grant
+explícito) → `true`; (3) `_filial_id IS NULL` (recurso compartilhado) →
+`true`, sempre; (4) usuário sem filial primária e SEM nenhuma row em
+`user_filial_access` (legado de verdade) → `true`, comportamento
+preservado; (5) usuário COM filial primária no JWT pedindo outra filial
+sem grant → `false` (não regrediu o caso normal, já era `false` antes);
+(6) admin global → `true` incondicional (bypass preservado); (7) usuário
+com row de acesso só noutra igreja, sem nenhuma na igreja atual → `true`
+(legado preservado, valida o fix do 2º achado acima); (8) grant
+explícito com `filial_id` da igreja atual mas `igreja_id` de OUTRO tenant
+→ `false` (valida o fix do 3º achado; sem o `igreja_id` no EXISTS era
+`true`).
 
 ### 9.108 Ciclo 2 (C2-8) — Corta o espelho Getnet em `extratos_bancarios`
 
