@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { confirmarConciliacao } from "@/features/financeiro/core";
+import { FILTRO_EXCLUI_ESPELHO_GETNET } from "@/features/financeiro/core/api/extratos.api";
 import { useIgrejaId } from "@/hooks/useIgrejaId";
 import { useFilialId } from "@/hooks/useFilialId";
 import { toast } from "sonner";
@@ -88,6 +89,11 @@ export function useConciliacaoLote({
         .eq("igreja_id", igrejaId)
         .eq("reconciliado", false)
         .is("transacao_vinculada_id", null)
+        // Achado pré-C2-8 (mesma razão da C2-7): o espelho sintético do
+        // próprio Getnet não é um crédito/débito bancário real — sem este
+        // filtro, um tesoureiro podia selecionar essa linha como uma das
+        // pernas de um lote N:1 manual.
+        .or(FILTRO_EXCLUI_ESPELHO_GETNET)
         .gte("data_transacao", effectiveDataInicio)
         .lte("data_transacao", effectiveDataFim)
         .order("data_transacao", { ascending: true });

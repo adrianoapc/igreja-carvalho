@@ -1,7 +1,10 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { marcarExtratoIgnorado } from "@/features/financeiro/core/api/extratos.api";
+import {
+  marcarExtratoIgnorado,
+  FILTRO_EXCLUI_ESPELHO_GETNET,
+} from "@/features/financeiro/core/api/extratos.api";
 import { desconciliar } from "@/features/financeiro/core/api/conciliacao.api";
 import { useAuthContext } from "@/contexts/AuthContextProvider";
 import { useHideValues } from "@/hooks/useHideValues";
@@ -184,6 +187,11 @@ export function HistoricoExtratos() {
         `,
         )
         .eq("igreja_id", igrejaId)
+        // Achado pré-C2-8 (mesma razão da C2-7): o espelho sintético do
+        // próprio Getnet não é um movimento bancário real — sem este
+        // filtro, os cards "Total/Pendentes/Conciliados/Ignorados" contam
+        // essas linhas como se fossem crédito/débito de banco de verdade.
+        .or(FILTRO_EXCLUI_ESPELHO_GETNET)
         .order("data_transacao", { ascending: false });
 
       if (filialId) {

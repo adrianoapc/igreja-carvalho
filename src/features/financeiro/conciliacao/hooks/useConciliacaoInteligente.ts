@@ -11,6 +11,7 @@ import {
   type VinculoConciliacao,
 } from "@/features/financeiro/core";
 import { gerarCandidatosConciliacao } from "@/features/financeiro/core/api/conciliacao.api";
+import { FILTRO_EXCLUI_ESPELHO_GETNET } from "@/features/financeiro/core/api/extratos.api";
 import { isWithinInterval } from "date-fns";
 import {
   parseLocalDate,
@@ -194,6 +195,12 @@ export function useConciliacaoInteligente() {
         .eq("reconciliado", false)
         .is("transacao_vinculada_id", null)
         .not("descricao", "ilike", "%contamax%")
+        // Achado pré-C2-8 (Codex P1, mesma razão da C2-7): sem este
+        // filtro, o painel "Banco" oferecia o espelho sintético Getnet
+        // pra seleção manual — fin_confirmar_conciliacao agora rejeita
+        // na escrita, mas deixar a UI sugerir uma opção que sempre falha
+        // é má UX; camada de defesa em profundidade, não a boundary real.
+        .or(FILTRO_EXCLUI_ESPELHO_GETNET)
         .gte("data_transacao", formatLocalDate(inicio))
         .lte("data_transacao", formatLocalDate(fim))
         .order("data_transacao", { ascending: false });
