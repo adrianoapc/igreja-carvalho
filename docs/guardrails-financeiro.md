@@ -363,6 +363,19 @@ DEFINER`:**
     que o fix deveria bloquear — um bypass NOVO, pior que o original,
     só pego porque o harness comparava o VALOR (`t`/`f`/vazio), não só
     "não deu erro" (regra F.1) (§9.109).
+16. **Lookups irmãos na mesma tabela de autorização precisam do mesmo
+    predicado de tenant.** Se um `EXISTS` (allow) e um `NOT EXISTS`
+    (atalho legado / "sem restrição configurada") leem
+    `user_filial_access` (ou equivalente), os dois filtram por
+    `igreja_id` — não só por `user_id`/`filial_id`. `UNIQUE(user_id,
+    filial_id)` não substitui: impede duplicata do par, mas a coluna
+    `igreja_id` é denormalizada e pode divergir da filial (não há CHECK
+    cruzando as duas FKs; o upsert da UI grava o tenant do admin).
+    Achado real: o `NOT EXISTS` do shortcut legado de `has_filial_access`
+    ganhou `igreja_id = _igreja_id`, mas o `EXISTS` que autoriza
+    (`can_view=true`) ficou só com `filial_id` — um grant de outro
+    tenant autorizava a filial pedida. Codex apontou na 1ª review desta
+    PR; o follow-up anunciado nunca chegou na branch (§9.109, achado 3).
 
 Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.65, §9.67,
 §9.73, §9.74, §9.80, §9.81, §9.82, §9.86, §9.96, §9.109, checklist completo na memória de sessão.

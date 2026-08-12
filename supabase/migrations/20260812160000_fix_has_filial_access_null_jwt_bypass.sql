@@ -8,9 +8,11 @@
 -- UserFilialAccessManager.tsx. Achado em revisão da PR #97 (2026-08-12).
 --
 -- Fix: o shortcut "sem filial primária = acesso total" só vale quando o
--- usuário NÃO tem NENHUMA row em user_filial_access (comportamento legado,
--- sem restrição granular configurada). Se existe qualquer row, ela decide
--- (allow/deny) por conta própria para a filial pedida.
+-- usuário NÃO tem NENHUMA row em user_filial_access NESTA igreja
+-- (comportamento legado, sem restrição granular configurada). Se existe
+-- qualquer row nesta igreja, a allowlist decide (allow/deny) por conta
+-- própria para a filial pedida. EXISTS (grant) e NOT EXISTS (legado)
+-- são ambos escopados por igreja_id — lookups irmãos na mesma tabela.
 CREATE OR REPLACE FUNCTION public.has_filial_access(_igreja_id UUID, _filial_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -40,10 +42,17 @@ AS $$
           -- Filial compartilhada (sem dono) ou é a filial primária do JWT
           _filial_id IS NULL
           OR _filial_id = public.get_jwt_filial_id()
-          -- Permissão explícita na tabela user_filial_access decide por conta própria
+          -- Permissão explícita na tabela user_filial_access decide por
+          -- conta própria. Escopada por igreja_id E filial_id: um grant
+          -- de OUTRO tenant (row inconsistente, ou JWT sem igreja_id)
+          -- não autoriza a filial pedida nesta igreja. UNIQUE(user_id,
+          -- filial_id) não substitui esse predicado — a coluna igreja_id
+          -- é denormalizada e o upsert da UI pode gravar o tenant do
+          -- admin, não o da filial.
           OR EXISTS (
             SELECT 1 FROM public.user_filial_access
             WHERE user_id = auth.uid()
+            AND igreja_id = _igreja_id
             AND filial_id = _filial_id
             AND can_view = true
           )
@@ -73,8 +82,10 @@ COMMENT ON FUNCTION public.has_filial_access(UUID, UUID) IS
   'Verifica acesso de um usuário a uma filial. Admin global/de igreja têm
    acesso total. Caso contrário: filial_id NULL (compartilhada) ou igual à
    filial primária do JWT libera; senão, uma row explícita em
-   user_filial_access (can_view=true) decide; o shortcut de "sem filial
-   primária = acesso total" só vale quando o usuário não tem NENHUMA row
-   em user_filial_access (comportamento legado, sem restrição granular
-   configurada) — corrige bypass onde a allowlist granular era ignorada
-   (achado PR #97, 2026-08-12).';
+   user_filial_access (igreja_id + filial_id + can_view=true) decide; o
+   shortcut de "sem filial primária = acesso total" só vale quando o
+   usuário não tem NENHUMA row em user_filial_access NESTA igreja
+   (comportamento legado, sem restrição granular configurada) — corrige
+   bypass onde a allowlist granular era ignorada (achado PR #97,
+   2026-08-12). Lookups irmãos (EXISTS grant e NOT EXISTS legado) são
+   ambos escopados por igreja_id.';

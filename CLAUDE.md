@@ -17,7 +17,9 @@ próprio arquivo):
   EFETIVA, e repassar o contexto (não `NULL`) pra RPCs aninhadas.
   Arrays JSON irmãos (ex.: `transacao_ids` + `divisoes`) precisam da
   mesma validação; `filial_id` de audit/relatório ≠ filial de junção
-  (ator vs recurso).
+  (ator vs recurso). Lookups irmãos em `user_filial_access` (`EXISTS`
+  grant vs `NOT EXISTS` legado) precisam do mesmo `igreja_id` — unique
+  em `(user_id, filial_id)` não substitui o predicado de tenant.
 - **Trigger de saldo de conta**: sempre recalcula do zero a partir de
   `transacoes_financeiras` — nunca soma/subtrai incrementalmente. Dispara em
   INSERT/UPDATE/DELETE (sem `OF <colunas>`, statement-level com transition

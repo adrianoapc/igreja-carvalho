@@ -6714,15 +6714,15 @@ misturar com nenhuma outra mudança.
 primária no perfil/JWT = acesso total) deixa de ser avaliado antes do
 `EXISTS` contra `user_filial_access`. Nova ordem: `_filial_id IS NULL`
 (recurso compartilhado) ou igual à filial primária do JWT libera; senão,
-uma row explícita em `user_filial_access` (`can_view=true`) decide sozinha
-— allow OU deny; o shortcut legado só entra em jogo quando o usuário não
-tem NENHUMA row em `user_filial_access` **para a igreja sendo checada**
-(ver 3º achado abaixo). `has_role('admin'/'admin_igreja'/'super_admin')`
-continuam com bypass total, sem mudança.
+uma row explícita em `user_filial_access` (`igreja_id` + `filial_id` +
+`can_view=true`) decide sozinha — allow OU deny; o shortcut legado só
+entra em jogo quando o usuário não tem NENHUMA row em `user_filial_access`
+**para a igreja sendo checada** (ver achados 2 e 3 abaixo).
+`has_role('admin'/'admin_igreja'/'super_admin')` continuam com bypass
+total, sem mudança.
 
-**2 achados do próprio harness, ao testar a 1ª versão do fix** (nenhum dos
-dois no código original — os dois nasceram do jeito como o fix inicial foi
-escrito):
+**3 achados do próprio harness / review, ao testar o fix** (nenhum no
+código original — nasceram do jeito como o fix foi escrito):
 
 1. **NULL em vez de `false`, e o efeito em `IF NOT has_filial_access(...)`
    de dezenas de RPCs.** A 1ª versão do fix removeu o `OR get_jwt_filial_id()
@@ -6754,6 +6754,22 @@ escrito):
    desnecessária. Fix: `AND igreja_id = _igreja_id` no `NOT EXISTS` — como
    `user_filial_access` já tem coluna `igreja_id` própria, o escopo correto
    sai de graça.
+3. **EXISTS do grant explícito sem escopo de igreja (Codex, 1ª review
+   desta PR — o follow-up `852698c` foi anunciado mas nunca chegou na
+   branch).** O `NOT EXISTS` do shortcut legado ganhou `igreja_id =
+   _igreja_id` no achado 2, mas o `EXISTS` que autoriza (`can_view=true`)
+   continuava só com `filial_id = _filial_id`. Os dois lookups são irmãos
+   na mesma tabela: um decide allow, o outro decide se o legado ainda
+   vale — precisam do mesmo predicado de tenant. Sem o `igreja_id` no
+   EXISTS, uma row inconsistente (grant com `filial_id` da igreja A e
+   `igreja_id` da igreja B — a tabela não tem CHECK cruzando as duas FKs,
+   e o upsert da UI grava o `igreja_id` do admin, não o da filial) OU um
+   JWT sem `igreja_id` (o mesmo ramo de backwards-compatibility do
+   helper) faria o grant de outro tenant autorizar a filial pedida.
+   `UNIQUE(user_id, filial_id)` não substitui o predicado: impede duas
+   rows pro mesmo par usuário+filial, mas não impede a coluna
+   `igreja_id` denormalizada de divergir. Fix: `AND igreja_id =
+   _igreja_id` também no EXISTS. Falha seguro (nega em vez de vazar).
 
 **Harness**: réplica mínima do schema real (tipos/tabelas/funções copiados
 literalmente das migrations — `app_role`, `has_role`, `get_jwt_igreja_id`/
@@ -6770,7 +6786,10 @@ preservado; (5) usuário COM filial primária no JWT pedindo outra filial
 sem grant → `false` (não regrediu o caso normal, já era `false` antes);
 (6) admin global → `true` incondicional (bypass preservado); (7) usuário
 com row de acesso só noutra igreja, sem nenhuma na igreja atual → `true`
-(legado preservado, valida o fix do 2º achado acima).
+(legado preservado, valida o fix do 2º achado acima); (8) grant
+explícito com `filial_id` da igreja atual mas `igreja_id` de OUTRO tenant
+→ `false` (valida o fix do 3º achado; sem o `igreja_id` no EXISTS era
+`true`).
 
 ### 9.108 Ciclo 2 (C2-8) — Corta o espelho Getnet em `extratos_bancarios`
 
