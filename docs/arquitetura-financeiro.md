@@ -6548,6 +6548,162 @@ Confirmado no harness: `fin_confirmar_conciliacao` rejeita o espelho
 (`FIN_VALIDACAO`) mesmo passando o id direto, sem gerar candidato antes;
 extrato real confirma normalmente.
 
+### 9.107 Ciclo 2 — Resolve os 2 bloqueios da C2-6 (`has_filial_access` + `ON DELETE CASCADE`) mesmo sem consumidor ainda
+
+**Decisão explícita do usuário**: depois de confirmar (§9.106) que
+Hop1/antecipação e o motor central já não precisam ler o espelho pra
+casar corretamente, nada mais depende de migrar consumidores pra
+`getnet_credito_disponivel` — mas os 2 bloqueios documentados desde a
+C2-6 (§9.104) continuavam abertos. Usuário escolheu resolvê-los mesmo
+assim, como hardening standalone, não como pré-condição de um cutover
+que deixou de ser necessário.
+
+**Achado durante a pesquisa, antes mesmo de tocar em código**:
+`getnet_credito_disponivel` já tinha `GRANT SELECT ... TO authenticated`
+desde a C2-6. PostgREST expõe automaticamente qualquer view/tabela com
+esse grant via API REST — "sem consumidor no frontend" não significava
+"sem exposição real": qualquer tesoureiro/admin já podia
+`supabase.from('getnet_credito_disponivel').select()` direto e ver
+`filial_id` sem nenhuma checagem de `has_filial_access` (a view herda
+RLS por `igreja_id` das tabelas base via `security_invoker=true`, mas
+não filtra por filial). O gap já era live, não teórico — não dependia
+de nenhuma tela nova consumir a view.
+
+**Fix — bloqueio 1 (`has_filial_access`)**: `REVOKE SELECT ON
+getnet_credito_disponivel FROM authenticated`. Em vez de construir uma
+RPC wrapper sem consumidor real (abstração prematura), fecha o acesso
+direto — só `service_role`/superuser consulta a partir daqui. Qualquer
+consumidor futuro precisa de RPC `SECURITY DEFINER` nova com
+`has_filial_access`, o que evita reintroduzir o mesmo gap por
+esquecimento.
+
+**Fix — bloqueio 2 (`ON DELETE CASCADE`)**: as 8 tabelas Getnet que
+carregam dado (`getnet_resumo`, `getnet_analitico`, `getnet_arquivos`,
+`getnet_ajustes`, `getnet_financeiro_resumo`, `getnet_financeiro_
+detalhe`, `getnet_recebivel_lancamentos`, `getnet_antecipacao_lotes`)
+tinham `integracao_id ON DELETE CASCADE` — excluir uma integração
+apagava todo o histórico de import e os vínculos de reconciliação já
+confirmados sobre ele, silenciosamente (o espelho legado em
+`extratos_bancarios` não tem essa FK e sobrevivia, criando uma
+assimetria: apagar a integração deixava o espelho órfão mas destruía o
+dado "real"). Trocado pra `ON DELETE RESTRICT` (guardrail J — dado com
+valor duradouro por si só, `NOT NULL` descarta `SET NULL`).
+`integracoes_financeiras_secrets` (credenciais, sem valor de dado) e
+`integracoes_execucoes_log` (log de execução) continuam `CASCADE` —
+não têm o mesmo motivo de proteção.
+
+**Confirmado antes da migration**: `getnet-sync-automatico` (cron
+diário) já filtra `WHERE status = 'ativo'` — "Inativar" (toggle já
+existente em `IntegracoesCriarDialog.tsx`) já é alternativa real e
+funcional ao hard delete, só não estava oferecida no momento da
+exclusão. Frontend (`Integracoes.tsx`): catch trata `error.code ===
+"23503"` (FK violation do PostgREST) com toast específico apontando
+pra "Editar" → desligar "Ativo"; `AlertDialogDescription` da
+confirmação de exclusão avisa proativamente do mesmo bloqueio antes do
+usuário tentar.
+
+**Validado no harness** (fixtures dedicados, não só metadado de
+constraint): tesoureiro autenticado tentando `SELECT` direto na view →
+`permission denied for view`; `DELETE` de integração com linha em
+`getnet_resumo` → `foreign_key_violation` (23503); `DELETE` de
+integração sem nenhum dado Getnet → sucesso normal, sem falso bloqueio.
+
+**Nota sobre o harness**: a listagem de grants do container de teste
+mostrava `authenticated` com INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/
+TRIGGER na view mesmo após o REVOKE — checado contra a migration
+original da C2-6 (`20260812120000`) e confirmado que ela SÓ concedeu
+`GRANT SELECT`. Os extras vêm de um `ALTER DEFAULT PRIVILEGES ... GRANT
+ALL ON TABLES` do bootstrap do harness (conveniência de teste, não
+existe em produção) — não afeta a correção do fix, já que a view não é
+gravável (sem `INSTEAD OF` triggers) e o único grant real revogado
+(`SELECT`) foi confirmado funcionalmente bloqueado.
+
+**PR #97 — 1ª rodada, Codex P1: revogar só a view não bastava.**
+Revogar `SELECT` da view não fecha o gap se o MESMO dado (crédito por
+RV/operação, `filial_id`) continua legível direto em `getnet_resumo`/
+`getnet_financeiro_resumo` — e continua: as policies `getnet_resumo_
+select`/`getnet_fin_resumo_select` (`20260603221141`/`20260617000001`)
+checam só `igreja_id` + role, zero dimensão de filial, apesar de
+`getnet_resumo.filial_id` ser preenchido de verdade no import
+(congelado de `integracao.filial_id`, `getnet-sftp/index.ts:340`) —
+gap já documentado como pré-existente (`20260811110000`,
+`20260812120000`) mas nunca fechado nas tabelas base, só citado como
+"fora de escopo" repetidamente. Fix: mesmo padrão já usado em dezenas
+de outras tabelas do repo — `has_filial_access(igreja_id, filial_id)`
+direto na policy de `SELECT`. `getnet_resumo` tem `filial_id` própria;
+`getnet_financeiro_resumo` não tem — deriva via `EXISTS` contra
+`integracoes_financeiras.filial_id` (mesmo caminho que `fin_buscar_
+financeiro_participante_getnet`/`fin_listar_ajustes_getnet` já usam
+internamente).
+
+**Achado do próprio harness, testando a 1ª versão deste fix**: recriar
+só a policy `_select` (`FOR SELECT`) não bastou — ambas as tabelas já
+tinham uma policy `_modify` (`FOR ALL`) sem checagem de filial nenhuma,
+e o Postgres faz OR entre todas as policies permissivas aplicáveis ao
+mesmo comando. Como `FOR ALL` cobre `SELECT` também, a policy `_modify`
+(sem filial) deixava o `SELECT` passar mesmo com a `_select` (com
+filial) negando — fixture com 2 filiais/1 tesoureiro restrito a uma
+mostrou as 2 filiais retornando igual, sem nenhuma mudança visível.
+Corrigido adicionando `has_filial_access` também no `USING` do
+`_modify` (mantendo o `WITH CHECK` como estava — só `service_role`
+escreve nestas tabelas, que ignora RLS de qualquer forma, então isso
+não tem efeito colateral em escrita real). Re-testado no harness: o
+mesmo tesoureiro passou a ver só a linha da própria filial em ambas as
+tabelas; `admin_igreja` (sem filial no JWT) continuou vendo as 2 —
+confirma que o vazamento estava especificamente na combinação `FOR
+ALL` + ausência de filial, não em nenhum outro ponto.
+
+**Lição**: uma policy `FOR SELECT` nova, adicionada a uma tabela que já
+tem uma policy `FOR ALL` mais permissiva, não estreita nada por si só —
+as duas se combinam por OR. Sempre que uma tabela já tiver uma policy
+`FOR ALL`/`FOR UPDATE`/`FOR DELETE` mais ampla, uma correção de
+`SELECT` isolada precisa necessariamente revisar (e, se for o caso,
+apertar) essa outra policy também — só testar a policy nova em
+isolamento (sem fixture cobrindo a interação real) teria deixado este
+fix inofensivo por completo, apesar de sintaticamente correto.
+
+**Escopo consciente**: não estende pra `getnet_arquivos`/`getnet_
+analitico`/`getnet_ajustes` (mesmo gap, mas fora do que o @codex
+apontou nesta rodada) — auditoria dedicada de todas as tabelas Getnet
+já está registrada como follow-up separado, não pendência escondida.
+
+**PR #97 — 2ª rodada.** Dois achados novos, sobre o próprio fix da 1ª
+rodada (não sobre o design original da C2-6):
+
+1. **Cursor Bugbot (Medium), corrigido**: `WITH CHECK` do `_modify`
+   continuava só com `igreja_id` — `authenticated` ainda tem GRANT de
+   INSERT/UPDATE/DELETE nas 2 tabelas (pré-existente), então a
+   suposição "só `service_role` escreve" não era garantida pelo GRANT
+   em si, só pela ausência de qualquer caminho de escrita no código
+   hoje. Adicionado `has_filial_access` também no `WITH CHECK` — sem
+   efeito no único escritor real (`service_role`, ignora RLS via
+   `rolbypassrls`), só fecha a porta pra um hipotético INSERT/UPDATE
+   cross-filial via `authenticated`. Validado no harness: tesoureiro
+   restrito à Filial A tentando `INSERT` com `filial_id`/integração da
+   Filial B → `new row violates row-level security policy`;
+   `service_role` inserindo normalmente → sucesso.
+
+2. **Codex (P1), NÃO corrigido nesta PR — achado de segurança maior,
+   fora de escopo, registrado separadamente**: `has_filial_access`
+   (`20260105153404`) tem um shortcut de "backwards compatibility" — se
+   `get_jwt_filial_id() IS NULL` (usuário sem filial primária no
+   perfil/JWT), a função retorna `true` pra QUALQUER `_filial_id`,
+   ANTES de consultar `user_filial_access`. Um tesoureiro sem filial
+   primária mas com restrição EXPLÍCITA em `user_filial_access` (só
+   filial A) ainda vê filial B, porque o shortcut nunca deixa o
+   `EXISTS` decidir. **Confirmado explorável de verdade**: existe UI
+   dedicada (`UserFilialAccessManager.tsx`) que permite conceder
+   `user_filial_access` a qualquer usuário da igreja sem exigir
+   `filial_id` preenchido no perfil — não depende de nenhum estado raro
+   pra acontecer. Não corrigido aqui porque não é um bug desta PR: é
+   pré-existente numa função compartilhada usada em DEZENAS de outras
+   policies RLS no repo (não só Getnet) — corrigi-la dentro de "resolver
+   2 bloqueios pontuais da C2-6" expandiria o raio de impacto pra
+   qualquer tabela que já usa `has_filial_access`, sem harness dedicado
+   pra validar todos os consumidores afetados. Registrado como achado
+   de segurança prioritário, candidato a fase dedicada própria — não
+   pendência escondida.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é

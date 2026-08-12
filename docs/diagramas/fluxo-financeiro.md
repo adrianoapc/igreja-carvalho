@@ -1201,3 +1201,55 @@ flowchart TD
     LOTE -.->|"FILTRO_EXCLUI_ESPELHO_GETNET\n(extratos.api.ts, mesma lista SQL)"| CHECK2
 ```
 
+## Resolve os 2 bloqueios da C2-6 — `has_filial_access` + `ON DELETE CASCADE` (§9.107)
+
+Decisão do usuário: fechar os 2 bloqueios documentados na C2-6 mesmo sem
+nenhum consumidor real de `getnet_credito_disponivel` ainda (§9.106 já
+tinha confirmado que o cutover deixou de ser necessário). Achado durante
+a pesquisa: a view já era acessível via PostgREST por qualquer
+`authenticated` — gap live, não teórico.
+
+```mermaid
+flowchart TD
+    subgraph Bloqueio1["Bloqueio 1 — has_filial_access"]
+        V["getnet_credito_disponivel\n(security_invoker=true,\nsó RLS igreja_id)"] -->|"GRANT SELECT\n(C2-6, já expunha via PostgREST)"| AUTH["authenticated\n(qualquer tesoureiro/admin)"]
+        AUTH -->|"REVOKE SELECT\n(esta migration)"| BLOQ["acesso direto\nbloqueado"]
+        V -->|"SELECT ainda permitido"| SVC["service_role"]
+    end
+
+    subgraph Bloqueio2["Bloqueio 2 — ON DELETE CASCADE"]
+        INT["integracoes_financeiras"] -->|"DELETE"| FK{"integracao_id\nreferenciado em\ngetnet_resumo/analitico/\narquivos/ajustes/...\n(8 tabelas)"}
+        FK -->|"tem histórico\n(ON DELETE RESTRICT)"| ERRO["23503 foreign_key_violation\n→ toast: use \"Editar\" → Inativar"]
+        FK -->|"sem histórico"| OK["DELETE ok"]
+    end
+```
+
+Validado no harness com fixtures reais (não só metadado de constraint):
+`SELECT` direto na view por `authenticated` → `permission denied`;
+`DELETE` de integração com linha em `getnet_resumo` → `23503`; `DELETE`
+de integração sem nenhum dado Getnet → sucesso.
+
+### Codex P1 (PR #97, 1ª rodada) — revogar só a view não bastava
+
+`getnet_resumo`/`getnet_financeiro_resumo` continuavam legíveis direto,
+expondo o mesmo crédito entre filiais que a view expunha — a policy
+`_select` nova por si só não filtrou nada, porque a policy `_modify`
+(`FOR ALL`, sem filial) já cobria `SELECT` e as duas se combinam por OR.
+
+```mermaid
+flowchart TD
+    T["tesoureiro restrito\nà Filial A"] -->|"SELECT direto\n(PostgREST)"| TAB["getnet_resumo /\ngetnet_financeiro_resumo"]
+    TAB --> SEL{"policy _select\n(FOR SELECT,\ncom has_filial_access)"}
+    TAB --> MOD{"policy _modify\n(FOR ALL,\nSEM has_filial_access)"}
+    SEL -->|"nega Filial B"| OR{"Postgres: OR entre\ntodas as policies\npermissivas do comando"}
+    MOD -->|"permite Filial A e B\n(só checa igreja_id)"| OR
+    OR -->|"1ª versão: vazava\n(MOD permissivo venceu)"| LEAK["vê as 2 filiais"]
+    OR -->|"fix: has_filial_access\ntambém no USING do _modify"| OK2["vê só Filial A"]
+```
+
+Confirmado no harness com fixture de 2 filiais/1 tesoureiro restrito:
+1ª versão do fix retornava as 2 filiais (vazamento real, não teórico);
+depois de apertar o `USING` do `_modify` também, o mesmo tesoureiro
+passou a ver só a própria filial — `admin_igreja` (sem filial no JWT)
+continuou vendo as 2, confirmando que só o caminho restrito mudou.
+

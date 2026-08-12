@@ -111,7 +111,28 @@ export default function Integracoes() {
       });
     } catch (error) {
       console.error("Error deleting integration:", error);
-      toast.error("Erro ao deletar integração");
+      // Postgres 23503 = foreign_key_violation — as tabelas Getnet com
+      // histórico real (getnet_resumo/getnet_recebivel_lancamentos/etc.)
+      // agora usam ON DELETE RESTRICT em vez de CASCADE (resolve o
+      // bloqueio de durabilidade documentado na C2-6): excluir uma
+      // integração que já importou algo é bloqueado de propósito, pra
+      // não apagar histórico/vínculos de reconciliação confirmados em
+      // silêncio. "Inativar" (editar a integração, desligar "Ativo") é a
+      // alternativa real — já para as sincronizações automáticas
+      // (getnet-sync-automatico filtra status='ativo'), sem perder dado.
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        error.code === "23503"
+      ) {
+        toast.error("Não é possível excluir — esta integração tem histórico de importação", {
+          description:
+            "Use \"Editar\" e desligue \"Ativo\" em vez de excluir — isso para as sincronizações sem apagar o histórico já importado.",
+        });
+      } else {
+        toast.error("Erro ao deletar integração");
+      }
     } finally {
       setIsDeleting(false);
     }
@@ -551,7 +572,9 @@ export default function Integracoes() {
             <AlertDialogTitle>Deletar Integração?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta ação não pode ser desfeita. A integração e todos os seus
-              dados criptografados serão permanentemente removidos.
+              dados criptografados serão permanentemente removidos. Se esta
+              integração já importou algum dado (Getnet), a exclusão será
+              bloqueada — use "Editar" e desligue "Ativo" nesse caso.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex gap-2 justify-end">
