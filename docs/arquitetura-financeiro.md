@@ -6396,6 +6396,25 @@ com usuário sem role nenhuma) + 2 cenários novos pós-review (filial por
 recebível rejeitada; origem `getnet_sftp`/settlement_v1 excluída e
 rejeitada, mesmo tratamento das outras duas).
 
+**PR #95 — 2ª rodada, Codex P1 + Bugbot Medium (mesmo achado dos dois)**:
+`fin_diagnosticar_vinculos_getnet_espelho` tinha o MESMO gap que o item 2
+da 1ª rodada já tinha corrigido em `fin_desfazer_vinculo_venda_banco_
+getnet` — só validava a filial do EXTRATO, não a de cada recurso
+vinculado. Extrato compartilhado (`filial_id NULL`) passa no check pra
+qualquer chamador; no ramo Hop1, os recebíveis vinculados podem ser de
+uma filial específica; no ramo antecipação, o LOTE pode ter filial
+própria. Como é uma função `SECURITY DEFINER` (bypassa RLS de propósito),
+o vazamento expunha `recebivel_ids`/valores (Hop1) ou
+`contrato_registradora`/valor/status (antecipação) de filiais sem
+acesso. Fix: Hop1 ganhou `AND has_filial_access(v_igreja, g.filial_id)`
+além do check do extrato; antecipação passou a checar a filial EFETIVA
+(`COALESCE(l.filial_id, e.filial_id)`, mesmo padrão já usado em
+`fin_vincular_lote_antecipacao`/`fin_desfazer_vinculo_lote_antecipacao`).
+Confirmado no harness: tesoureiro sem acesso à filial restrita vê 0
+linhas pros 2 vínculos plantados (Hop1 + antecipação); mesma consulta sem
+o claim de filial (ramo "backwards compatibility" de `has_filial_access`)
+vê as 2.
+
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
   inegociável; revisão de segurança dedicada (checklist de
   `docs/01-Arquitetura/04-rls-e-seguranca.MD`).

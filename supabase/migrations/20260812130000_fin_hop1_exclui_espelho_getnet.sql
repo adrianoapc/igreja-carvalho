@@ -825,7 +825,13 @@ BEGIN
  WHERE g.igreja_id = v_igreja
    AND public.fin_e_espelho_getnet(e.origem)
    AND (p_integracao_id IS NULL OR g.integracao_id = p_integracao_id)
+   -- Achado Codex P1 + Bugbot (mesmo padrão do fix em
+   -- fin_desfazer_vinculo_venda_banco_getnet): extrato compartilhado
+   -- (filial_id NULL) passa no check de filial pra qualquer chamador,
+   -- mas os recebíveis vinculados podem ser de uma filial específica —
+   -- checa a do extrato E a de CADA recebível, não só a do extrato.
    AND public.has_filial_access(v_igreja, e.filial_id)
+   AND public.has_filial_access(v_igreja, g.filial_id)
  GROUP BY e.id, e.origem, e.valor, e.data_transacao, e.filial_id
 
   UNION ALL
@@ -850,7 +856,12 @@ BEGIN
  WHERE l.igreja_id = v_igreja
    AND public.fin_e_espelho_getnet(e.origem)
    AND (p_integracao_id IS NULL OR l.integracao_id = p_integracao_id)
-   AND public.has_filial_access(v_igreja, e.filial_id)
+   -- Achado Codex P1 + Bugbot: extrato compartilhado (filial_id NULL)
+   -- passa pra qualquer chamador, mas o LOTE pode ter filial própria —
+   -- filial EFETIVA (lote se definida, senão a do extrato), mesmo padrão
+   -- já usado em fin_vincular_lote_antecipacao/fin_desfazer_vinculo_
+   -- lote_antecipacao (COALESCE(v_lote.filial_id, v_extrato.filial_id)).
+   AND public.has_filial_access(v_igreja, COALESCE(l.filial_id, e.filial_id))
 
   -- Achado do code-review: `ORDER BY 5` era posicional e caía na 5ª
   -- coluna (valor_extrato), não na intenção (mais recente primeiro) —
