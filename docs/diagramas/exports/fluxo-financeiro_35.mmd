@@ -10,4 +10,4 @@ flowchart TD
     INT["integracoes_financeiras\n(só filial_id)"] --> VIEW
 
     VIEW -.->|"comparado no harness\ncontra o espelho atual"| EB["extratos_bancarios\n(origem getnet_sftp_txt/tipo5)\nespelho legado, ainda em uso"]
-    VIEW -.->|"cutover dos consumidores"| C27["C2-7 (fin_venda_banco_getnet_hop1,\nfin_conferencia_totais_getnet_hop1,\ngetnet_antecipacao_lotes)"]
+    VIEW -.->|"SEM consumidor ainda\n(decisão C2-7: fix cirúrgico)"| C27["C2-7"]
