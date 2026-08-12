@@ -1201,3 +1201,31 @@ flowchart TD
     LOTE -.->|"FILTRO_EXCLUI_ESPELHO_GETNET\n(extratos.api.ts, mesma lista SQL)"| CHECK2
 ```
 
+## Resolve os 2 bloqueios da C2-6 — `has_filial_access` + `ON DELETE CASCADE` (§9.107)
+
+Decisão do usuário: fechar os 2 bloqueios documentados na C2-6 mesmo sem
+nenhum consumidor real de `getnet_credito_disponivel` ainda (§9.106 já
+tinha confirmado que o cutover deixou de ser necessário). Achado durante
+a pesquisa: a view já era acessível via PostgREST por qualquer
+`authenticated` — gap live, não teórico.
+
+```mermaid
+flowchart TD
+    subgraph Bloqueio1["Bloqueio 1 — has_filial_access"]
+        V["getnet_credito_disponivel\n(security_invoker=true,\nsó RLS igreja_id)"] -->|"GRANT SELECT\n(C2-6, já expunha via PostgREST)"| AUTH["authenticated\n(qualquer tesoureiro/admin)"]
+        AUTH -->|"REVOKE SELECT\n(esta migration)"| BLOQ["acesso direto\nbloqueado"]
+        V -->|"SELECT ainda permitido"| SVC["service_role"]
+    end
+
+    subgraph Bloqueio2["Bloqueio 2 — ON DELETE CASCADE"]
+        INT["integracoes_financeiras"] -->|"DELETE"| FK{"integracao_id\nreferenciado em\ngetnet_resumo/analitico/\narquivos/ajustes/...\n(8 tabelas)"}
+        FK -->|"tem histórico\n(ON DELETE RESTRICT)"| ERRO["23503 foreign_key_violation\n→ toast: use \"Editar\" → Inativar"]
+        FK -->|"sem histórico"| OK["DELETE ok"]
+    end
+```
+
+Validado no harness com fixtures reais (não só metadado de constraint):
+`SELECT` direto na view por `authenticated` → `permission denied`;
+`DELETE` de integração com linha em `getnet_resumo` → `23503`; `DELETE`
+de integração sem nenhum dado Getnet → sucesso.
+

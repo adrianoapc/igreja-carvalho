@@ -6548,6 +6548,76 @@ Confirmado no harness: `fin_confirmar_conciliacao` rejeita o espelho
 (`FIN_VALIDACAO`) mesmo passando o id direto, sem gerar candidato antes;
 extrato real confirma normalmente.
 
+### 9.107 Ciclo 2 — Resolve os 2 bloqueios da C2-6 (`has_filial_access` + `ON DELETE CASCADE`) mesmo sem consumidor ainda
+
+**Decisão explícita do usuário**: depois de confirmar (§9.106) que
+Hop1/antecipação e o motor central já não precisam ler o espelho pra
+casar corretamente, nada mais depende de migrar consumidores pra
+`getnet_credito_disponivel` — mas os 2 bloqueios documentados desde a
+C2-6 (§9.104) continuavam abertos. Usuário escolheu resolvê-los mesmo
+assim, como hardening standalone, não como pré-condição de um cutover
+que deixou de ser necessário.
+
+**Achado durante a pesquisa, antes mesmo de tocar em código**:
+`getnet_credito_disponivel` já tinha `GRANT SELECT ... TO authenticated`
+desde a C2-6. PostgREST expõe automaticamente qualquer view/tabela com
+esse grant via API REST — "sem consumidor no frontend" não significava
+"sem exposição real": qualquer tesoureiro/admin já podia
+`supabase.from('getnet_credito_disponivel').select()` direto e ver
+`filial_id` sem nenhuma checagem de `has_filial_access` (a view herda
+RLS por `igreja_id` das tabelas base via `security_invoker=true`, mas
+não filtra por filial). O gap já era live, não teórico — não dependia
+de nenhuma tela nova consumir a view.
+
+**Fix — bloqueio 1 (`has_filial_access`)**: `REVOKE SELECT ON
+getnet_credito_disponivel FROM authenticated`. Em vez de construir uma
+RPC wrapper sem consumidor real (abstração prematura), fecha o acesso
+direto — só `service_role`/superuser consulta a partir daqui. Qualquer
+consumidor futuro precisa de RPC `SECURITY DEFINER` nova com
+`has_filial_access`, o que evita reintroduzir o mesmo gap por
+esquecimento.
+
+**Fix — bloqueio 2 (`ON DELETE CASCADE`)**: as 8 tabelas Getnet que
+carregam dado (`getnet_resumo`, `getnet_analitico`, `getnet_arquivos`,
+`getnet_ajustes`, `getnet_financeiro_resumo`, `getnet_financeiro_
+detalhe`, `getnet_recebivel_lancamentos`, `getnet_antecipacao_lotes`)
+tinham `integracao_id ON DELETE CASCADE` — excluir uma integração
+apagava todo o histórico de import e os vínculos de reconciliação já
+confirmados sobre ele, silenciosamente (o espelho legado em
+`extratos_bancarios` não tem essa FK e sobrevivia, criando uma
+assimetria: apagar a integração deixava o espelho órfão mas destruía o
+dado "real"). Trocado pra `ON DELETE RESTRICT` (guardrail J — dado com
+valor duradouro por si só, `NOT NULL` descarta `SET NULL`).
+`integracoes_financeiras_secrets` (credenciais, sem valor de dado) e
+`integracoes_execucoes_log` (log de execução) continuam `CASCADE` —
+não têm o mesmo motivo de proteção.
+
+**Confirmado antes da migration**: `getnet-sync-automatico` (cron
+diário) já filtra `WHERE status = 'ativo'` — "Inativar" (toggle já
+existente em `IntegracoesCriarDialog.tsx`) já é alternativa real e
+funcional ao hard delete, só não estava oferecida no momento da
+exclusão. Frontend (`Integracoes.tsx`): catch trata `error.code ===
+"23503"` (FK violation do PostgREST) com toast específico apontando
+pra "Editar" → desligar "Ativo"; `AlertDialogDescription` da
+confirmação de exclusão avisa proativamente do mesmo bloqueio antes do
+usuário tentar.
+
+**Validado no harness** (fixtures dedicados, não só metadado de
+constraint): tesoureiro autenticado tentando `SELECT` direto na view →
+`permission denied for view`; `DELETE` de integração com linha em
+`getnet_resumo` → `foreign_key_violation` (23503); `DELETE` de
+integração sem nenhum dado Getnet → sucesso normal, sem falso bloqueio.
+
+**Nota sobre o harness**: a listagem de grants do container de teste
+mostrava `authenticated` com INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/
+TRIGGER na view mesmo após o REVOKE — checado contra a migration
+original da C2-6 (`20260812120000`) e confirmado que ela SÓ concedeu
+`GRANT SELECT`. Os extras vêm de um `ALTER DEFAULT PRIVILEGES ... GRANT
+ALL ON TABLES` do bootstrap do harness (conveniência de teste, não
+existe em produção) — não afeta a correção do fix, já que a view não é
+gravável (sem `INSTEAD OF` triggers) e o único grant real revogado
+(`SELECT`) foi confirmado funcionalmente bloqueado.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
