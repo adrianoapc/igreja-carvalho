@@ -1679,29 +1679,30 @@ O tipo 1 pode aparecer duas vezes para o mesmo RV:
 
 O campo `indicador_tipo_pagamento` faz parte da chave única `(integracao_id, rv, data_rv, indicador_tipo_pagamento)`, permitindo armazenar PF e LQ como linhas distintas e suportando reimportações idempotentes.
 
-### Espelho em `extratos_bancarios`: tipo 1 (LQ) vs tipo 5 (PG) {#getnet-espelho-tipo5}
+### Espelho em `extratos_bancarios`: tipo 1 (LQ) vs tipo 5 (PG) — CORTADO na C2-8 {#getnet-espelho-tipo5}
 
-Além de gravar nas tabelas cruas acima, o sync espelha o valor efetivamente
-movimentado em `extratos_bancarios` (usado pela conciliação). Duas fontes
-possíveis para esse espelho, configuráveis por integração:
+**Até 2026-08-12 (C2-8)**, além de gravar nas tabelas cruas acima, o sync
+também espelhava o valor efetivamente movimentado em `extratos_bancarios`
+(usado pela conciliação). A C2-7 (PR #95) e o fix do motor central F4
+(PR #96) acharam que essa premissa estava errada — uma venda Getnet podia
+casar contra o PRÓPRIO espelho sintético em vez do crédito bancário real
+(Santander) — e passaram a rejeitar o espelho como alvo em todo caminho de
+matching/confirmação. A C2-8 foi além: **parou de escrever a linha**, já
+que nada mais casa contra ela e nenhum saldo de conta depende dela.
+`selecionarEspelhoTipo5` (a função que selecionava as linhas tipo 5/PG pro
+espelho) foi removida por não ter mais chamador.
 
-- **Tipo 1 / LQ** (comportamento padrão, sem configuração adicional): usa os
-  registros do tipo 1 com `indicador_tipo_pagamento = 'LQ'`.
-- **Tipo 5 / PG** (opt-in): usa só as linhas do tipo 5
-  (`getnet_financeiro_resumo`) com `tipo_operacao = 'PG'` (Pagamento de
-  Agenda Livre) — o único tipo de operação que representa dinheiro
-  efetivamente creditado na conta naquele dia (os demais tipos — CS, CF, AC,
-  CL, GL, GF, AL — são liquidação contábil de valores já adiantados em uma
-  data anterior). É a fonte mais precisa, pois isola o dinheiro real dos
-  ajustes contratuais que aparecem misturados no tipo 1.
-
-Para ativar o tipo 5 numa integração, preencha o campo **"Espelhar extrato a
-partir do tipo 5 (dinheiro real) desde"** no diálogo de edição da integração
-(visível só quando o layout é "Extrato Eletrônico v10.1"). A partir da data
-escolhida, arquivos processados usam o tipo 5; arquivos anteriores continuam
-usando o tipo 1 — não há reprocessamento automático do histórico já
-importado. Sem essa data preenchida, a integração continua no comportamento
-padrão (tipo 1).
+O campo **"Espelhar extrato a partir do tipo 5 (dinheiro real) desde"**
+(diálogo de edição da integração, visível só quando o layout é "Extrato
+Eletrônico v10.1") **continua existindo e continua relevante** — não pra
+escolher a fonte do espelho (que não existe mais), mas pra decidir, por
+arquivo (`getnet_arquivos.espelho_origem`, travado na 1ª importação, função
+pura `resolverUsoTipo5`), entre a fonte tipo 1/LQ e tipo 5/PG que alimenta
+`getnet_credito_disponivel_view` (C2-6). Regra geral #10 do manual técnico
+da Getnet segue valendo pra essa escolha: só `tipo_operacao='PG'` no
+registro tipo 5 é dinheiro NOVO creditado na conta — os demais tipos (CS,
+CF, AC, CL, GL, GF, AL) são liquidação contábil de valores já adiantados
+numa data anterior.
 
 ### Componentes de UI
 

@@ -1,7 +1,8 @@
 # Fluxo Getnet SFTP — Importação de Extrato Eletrônico V10.1
 
 > **Atualizado em 2026-06-19**: adicionado fluxo de `sync` automático (action: sync) disparado por cron e pelo botão "Sincronizar" na UI.
-> **Atualizado em 2026-07 (F6/D5)**: o espelho em `extratos_bancarios` agora pode nascer do tipo 5 (`PG`, dinheiro real) em vez do tipo 1 (`LQ`), por integração, via `config.espelho_tipo5_desde` — ver seção "Espelho: tipo 1 (LQ) vs tipo 5 (PG)" abaixo.
+> **Atualizado em 2026-07 (F6/D5)**: o espelho em `extratos_bancarios` agora pode nascer do tipo 5 (`PG`, dinheiro real) em vez do tipo 1 (`LQ`), por integração, via `config.espelho_tipo5_desde` — ver seção "Espelho" abaixo.
+> **Atualizado em 2026-08-12 (C2-8)**: o espelho em `extratos_bancarios` foi CORTADO — nenhuma linha sintética Getnet é mais escrita. Ver seção "Espelho em `extratos_bancarios` — CORTADO na C2-8" abaixo.
 
 ## Objetivo
 
@@ -97,7 +98,7 @@ sequenceDiagram
 
     loop Para cada arquivo pendente
         Fn->>Fn: Chama runExtratoEletronicoV10(arquivo_nome)
-        Note over Fn: Upserta getnet_resumo, getnet_analitico,<br/>getnet_ajustes, getnet_fin_resumo,<br/>getnet_fin_detalhe, extratos_bancarios<br/>(espelho: tipo 1/LQ ou tipo 5/PG, conforme corte)
+        Note over Fn: Upserta getnet_resumo, getnet_analitico,<br/>getnet_ajustes, getnet_fin_resumo,<br/>getnet_fin_detalhe (C2-8: NÃO espelha mais<br/>em extratos_bancarios — ver seção "Espelho")
         alt Todos os upserts OK
             Fn->>DB: Upsert getnet_arquivos (marca como importado)
         else Qualquer upsert falhou
@@ -117,50 +118,43 @@ O mesmo RV pode aparecer duas vezes no tipo 1, diferenciado pelo campo `indicado
 
 O constraint `UNIQUE(integracao_id, rv, data_rv, indicador_tipo_pagamento)` garante que cada linha seja única e permite reimportações idempotentes.
 
-## Espelho: tipo 1 (LQ) vs tipo 5 (PG) — F6/D5
+## Espelho em `extratos_bancarios` — CORTADO na C2-8 (2026-08-12)
 
-O espelho em `extratos_bancarios` (usado pela conciliação) pode nascer de
-duas fontes distintas, escolhida por integração:
+**Histórico (F6/D5, até a C2-8)**: cada arquivo importado também escrevia
+uma linha sintética em `extratos_bancarios` (origem `getnet_sftp_txt`
+pro tipo 1/LQ legado, ou `getnet_sftp_tipo5` pro tipo 5/PG mais preciso,
+conforme `config.espelho_tipo5_desde`) — pensada pra servir de "lado
+bancário" pro motor de conciliação casar contra vendas Getnet.
 
-```mermaid
-flowchart LR
-    Config{"config.espelho_tipo5_desde\nsetado E data_referencia\n>= corte?"}
-    T1[Tipo 1: RV com\nindicador_tipo_pagamento='LQ']
-    T5[Tipo 5: PG\ntipo_operacao='PG']
-    Extrato[(extratos_bancarios\norigem='getnet_sftp_txt'\nou 'getnet_sftp_tipo5')]
+**C2-7 (PR #95) e o fix do motor central F4 (PR #96) acharam que essa
+premissa estava ERRADA**: uma venda Getnet podia casar contra o PRÓPRIO
+espelho sintético em vez do crédito bancário REAL (Santander), um bug de
+matching self-referencial. O fix rejeitou o espelho como alvo em todo
+caminho de candidatos/confirmação — mas a linha continuava sendo
+escrita, só deixou de ser útil pra qualquer matching.
 
-    Config -->|não| T1
-    Config -->|sim| T5
-    T1 --> Extrato
-    T5 --> Extrato
-```
+**C2-8 (esta fase) parou de escrever a linha** (`index.ts`, bloco
+"Espelha em extratos_bancarios" removido — a função pura
+`selecionarEspelhoTipo5`, que selecionava as linhas tipo 5/PG pro
+espelho, foi removida junto por não ter mais nenhum chamador). Seguro
+porque: (1) nada mais casa contra o espelho desde C2-7/F4; (2) nenhum
+saldo de conta depende dele — `extratos_bancarios` não tem trigger de
+saldo, que só se move via `transacoes_financeiras` quando algo é
+conciliado com o crédito bancário real. `possivel_duplicata_de`
+(mecanismo que existia por causa do espelho colidir com o import
+Santander da mesma movimentação) fica mantido — continua útil pra
+duplicatas reais entre outros bancos, só deixa de ser acionado pelo
+caso Getnet especificamente.
 
-Regra geral #10 do manual técnico da Getnet (V10.1/V6.2024): só
-`tipo_operacao='PG'` no registro tipo 5 é dinheiro NOVO creditado na conta —
-os demais tipos (CS/CF/AC/CL/GL/GF/AL) são liquidação contábil de valores já
-adiantados em contrato numa data anterior. Por isso o tipo 5/PG é a fonte
-mais precisa: o tipo 1/LQ mistura esse dinheiro real com os ajustes
-contratuais (`AJUSTE 18`, `AJUSTE 20` etc. nos registros 1/3).
-
-Sem `config.espelho_tipo5_desde` setado na integração, o comportamento é o
-legado (tipo 1). Função pura `selecionarEspelhoTipo5` em
-`getnetExtratoParser.ts` filtra as linhas PG e constrói o `external_id` de
-dedupe **só com campos de conteúdo/provedor da linha** — `chave_ur` (ou
-`numero_operacao` como fallback) + data + código de arranjo + valor — nunca
-com o nome do arquivo nem com `integracao_id` (2 rodadas de fix P2, review
-PR #52): se a Getnet reenviar o mesmo dia sob outro nome de arquivo,
-`getnet_arquivos` trata como arquivo novo; se a integração SFTP for
-excluída/recriada pra mesma conta bancária, `integracao.id` muda mas
-`conta_id` (o que o dedupe realmente escopa) não. Em ambos os casos, um
-`external_id` amarrado a esses IDs deixaria o mesmo crédito passar 2x pelo
-dedupe — igual ao path tipo 1 legado, que nunca dependeu de nenhum dos dois.
-
-**A origem trava por arquivo** (`getnet_arquivos.espelho_origem`, migration
-`20260713140000`): reprocessar manualmente um arquivo já importado não pode
-trocar de origem, mesmo que o corte mude depois cobrindo retroativamente
-aquela data — senão o `external_id` muda de forma e o dedupe
-`(conta_id, external_id)` não reconhece as duas linhas como o mesmo crédito,
-duplicando o valor. Função pura `resolverUsoTipo5`.
+**`getnet_arquivos.espelho_origem` continua sendo travado por arquivo**
+(migration `20260713140000`, função pura `resolverUsoTipo5` — não
+removida) — não alimenta mais o espelho, mas `getnet_credito_
+disponivel_view.sql` (C2-6) ainda usa essa coluna pra decidir, por
+arquivo, entre a fonte tipo 1/LQ e tipo 5/PG. Regra geral #10 do manual
+técnico da Getnet (V10.1/V6.2024) continua valendo pra essa decisão: só
+`tipo_operacao='PG'` no registro tipo 5 é dinheiro NOVO creditado na
+conta — os demais tipos (CS/CF/AC/CL/GL/GF/AL) são liquidação contábil
+de valores já adiantados em contrato numa data anterior.
 
 ## Diagrama de Sequência — Importação de Arquivo
 

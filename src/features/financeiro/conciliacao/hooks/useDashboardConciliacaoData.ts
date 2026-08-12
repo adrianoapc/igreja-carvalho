@@ -7,7 +7,10 @@ import { toast } from "sonner";
 import { format, parseISO, subDays, addDays } from "date-fns";
 import { gerarCandidatosConciliacao } from "@/features/financeiro/core/api/conciliacao.api";
 import { confirmarConciliacao } from "@/features/financeiro/core/api/conciliacao.api";
-import { marcarExtratoIgnorado } from "@/features/financeiro/core/api/extratos.api";
+import {
+  marcarExtratoIgnorado,
+  FILTRO_EXCLUI_ESPELHO_GETNET,
+} from "@/features/financeiro/core/api/extratos.api";
 import type { ExtratoItem, TransacaoConciliacao, ContaConciliacao } from "../model/types";
 import type { AutoReconciliarCandidato } from "./useAutoReconciliar";
 
@@ -127,7 +130,12 @@ export function useDashboardConciliacaoData() {
       let extratoQuery = supabase
         .from("extratos_bancarios")
         .select("id, reconciliado", { count: "exact" })
-        .eq("igreja_id", igrejaId);
+        .eq("igreja_id", igrejaId)
+        // C2-8: espelho sintético do próprio Getnet não é crédito/débito
+        // bancário real — sem este filtro, os cards de cobertura contam
+        // linhas que nunca poderão ter candidato (C2-7/motor F4 já
+        // rejeitam o espelho como alvo de match).
+        .or(FILTRO_EXCLUI_ESPELHO_GETNET);
 
       if (!isAllFiliais && filialId) {
         extratoQuery = extratoQuery.eq("filial_id", filialId);
@@ -175,6 +183,9 @@ export function useDashboardConciliacaoData() {
         .eq("igreja_id", igrejaId)
         .eq("reconciliado", false)
         .is("transacao_vinculada_id", null)
+        // C2-8: mesmo motivo do card de cobertura acima — o espelho nunca
+        // terá candidato real, então listá-lo como "pendente" é ruído.
+        .or(FILTRO_EXCLUI_ESPELHO_GETNET)
         .order("data_transacao", { ascending: false })
         .limit(50);
 

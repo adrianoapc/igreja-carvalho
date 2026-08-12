@@ -23,7 +23,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import nacl from "npm:tweetnacl@1.0.3";
 import SftpClient from "npm:ssh2-sftp-client@10.0.3";
 import Papa from "npm:papaparse@5.4.1";
-import { parseExtrato, selecionarEspelhoTipo5, resolverUsoTipo5 } from "./getnetExtratoParser.ts";
+import { parseExtrato, resolverUsoTipo5 } from "./getnetExtratoParser.ts";
 import { ingerirExtratos, type ExtratoItemInput } from "../_shared/financeiro-core.ts";
 
 const corsHeaders = {
@@ -1244,20 +1244,16 @@ async function runExtratoEletronicoV10(args: {
         if (finDetRes.error) throw new Error(`getnet_financeiro_detalhe: ${finDetRes.error}`);
       }
 
-      // ── Espelha em extratos_bancarios ───────────────────────────────────
-      // Porta única de ingestão (F5): canal 'integracao' sem ator humano (D-F5.2).
-      // F6/D5: fonte do espelho é tipo 5 (PG, dinheiro real) para arquivos
-      // pós-corte (`usarTipo5`); tipo 1 (RV liquidado/LQ) permanece o
-      // comportamento legado para integrações sem `espelho_tipo5_desde`.
-      //
-      // P1 (review PR #52): a origem escolhida na 1a importação de um
-      // arquivo TRAVA — reprocessar o mesmo arquivo depois de mudar/setar
-      // `espelho_tipo5_desde` retroativamente não pode trocar de origem, ou
-      // o external_id muda (getnet_rv:... -> getnet_fin5:...) e o dedupe
-      // (conta_id, external_id) não vê os dois como o mesmo crédito,
-      // duplicando o valor em extratos_bancarios. NULL (arquivo importado
-      // antes desta coluna existir) conta como tipo 1, já que a origem tipo5
-      // não existia antes da F6.
+      // ── espelho_origem (getnet_arquivos) ────────────────────────────────
+      // C2-8: parou de espelhar em extratos_bancarios — nada mais casa
+      // contra o espelho (C2-7/motor F4 já rejeitam essas 3 origens) e
+      // nenhum saldo de conta depende dele (extratos_bancarios não tem
+      // trigger de saldo). `espelho_origem` continua sendo travado por
+      // arquivo (mesma lógica de sempre, P1 review PR #52 — a origem
+      // escolhida na 1a importação não pode trocar depois que
+      // `espelho_tipo5_desde` muda retroativamente) porque
+      // `getnet_credito_disponivel_view.sql` (C2-6) ainda usa esta coluna
+      // pra decidir entre tipo1/LQ e tipo5/PG por arquivo.
       const { data: arquivoJaProcessado } = await supabaseAdmin
         .from("getnet_arquivos")
         .select("espelho_origem")
@@ -1265,42 +1261,6 @@ async function runExtratoEletronicoV10(args: {
         .eq("arquivo_nome", arq.nome)
         .maybeSingle();
       const usarTipo5ParaEsteArquivo = resolverUsoTipo5(arquivoJaProcessado, usarTipo5);
-
-      let extratosInseridos = 0;
-      let extratosIgnorados = 0;
-      const itensExtrato: ExtratoItemInput[] = usarTipo5ParaEsteArquivo
-        ? selecionarEspelhoTipo5(financeirosResumo)
-        : resumos
-            .filter((r) => r.indicadorTipoPagamento === "LQ" && r.dataRv)
-            .map((r) => ({
-              // r.dataRv truthy é garantido pelo filter acima; o TS não
-              // propaga essa narrowing através do .map() seguinte.
-              data_transacao: (r.dataPagamentoRv || r.dataRv) as string,
-              valor: r.sinal === "-" ? -Math.abs(r.valorLiquido) : r.valorLiquido,
-              tipo: r.sinal === "-" ? "debito" : "credito",
-              descricao: `Getnet RV ${r.rv}`,
-              numero_documento: r.rv,
-              external_id: `getnet_rv:${r.rv}:${r.dataRv}:LQ`,
-            }));
-      if (itensExtrato.length > 0) {
-        try {
-          const exRes = await ingerirExtratos(
-            supabaseAdmin,
-            contaId,
-            usarTipo5ParaEsteArquivo ? "getnet_sftp_tipo5" : "getnet_sftp_txt",
-            itensExtrato,
-            {
-              igreja_id: integracao.igreja_id,
-              filial_id: integracao.filial_id ?? null,
-              canal: "integracao",
-            },
-          );
-          extratosInseridos = Number(exRes.inseridos ?? 0);
-          extratosIgnorados = Number(exRes.duplicados ?? 0);
-        } catch (err) {
-          throw new Error(`extratos_bancarios: ${err instanceof Error ? err.message : String(err)}`);
-        }
-      }
 
       // ── getnet_arquivos (controle por arquivo) — written only after all upserts succeed
       // so failed imports are not silently skipped on the next sync run.
@@ -1376,8 +1336,6 @@ async function runExtratoEletronicoV10(args: {
             financeiros_detalhe: financeirosDetalhe.length,
             validacao_ok: validacao.ok,
             erros_validacao: validacao.erros,
-            extratos_inseridos: extratosInseridos,
-            extratos_ignorados: extratosIgnorados,
           },
         })
         .eq("id", childLogId);
