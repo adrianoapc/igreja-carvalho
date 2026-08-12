@@ -1,0 +1,9 @@
+flowchart TD
+    subgraph V10["extrato_eletronico_v10 (tocado)"]
+        Arq["arquivo importado"] --> Real["getnet_resumo /\ngetnet_financeiro_resumo\n(dado real, sem mudança)"]
+        Arq -.->|"ATÉ C2-8: também escrevia"| Espelho["extratos_bancarios\norigem getnet_sftp_txt/tipo5\n(CORTADO)"]
+        Real --> View["getnet_credito_disponivel\n(C2-6, ainda sem consumidor)"]
+    end
+    subgraph SV1["settlement_v1 (NÃO tocado)"]
+        Arq2["arquivo importado"] --> Unico["extratos_bancarios\norigem getnet_sftp\n(ÚNICA cópia do dado —\nnão é espelho de nada)"]
+    end
