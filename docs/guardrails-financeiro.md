@@ -631,11 +631,12 @@ Referências: §9.35, §9.39, §9.51, §9.53, §9.73, §9.77.
    'getnet_sftp_txt', 'getnet_sftp_tipo5')`) — use
    `FILTRO_EXCLUI_ESPELHO_GETNET`/`ORIGENS_ESPELHO_GETNET`
    (`src/features/financeiro/core/api/extratos.api.ts`), nunca reescreva
-   a lista de origens à mão. Padrão achado e corrigido em pelo menos 3
-   rodadas diferentes (§9.106 e §9.108 — `HistoricoExtratos.tsx`/
-   `useConciliacaoInteligente.ts`/`useConciliacaoLote.ts` na 1ª rodada;
-   `useDashboardConciliacaoData.ts`/`useConciliacaoManualData.ts` na
-   2ª) porque cada query nova de `extratos_bancarios` precisa lembrar
+   a lista de origens à mão. Padrão achado e corrigido em 2 rodadas
+   diferentes, 5 call sites no total (§9.106 e §9.108 —
+   `HistoricoExtratos.tsx`/`useConciliacaoInteligente.ts`/
+   `useConciliacaoLote.ts` na 1ª rodada; `useDashboardConciliacaoData.ts`/
+   `useConciliacaoManualData.ts` na 2ª) porque cada query nova de
+   `extratos_bancarios` precisa lembrar
    de aplicar o filtro por conta própria — não existe checagem de tipo
    nem lint que force isso. Ao escrever QUALQUER query nova (client-side
    ou RPC) que leia `extratos_bancarios` sem passar por uma RPC que já
