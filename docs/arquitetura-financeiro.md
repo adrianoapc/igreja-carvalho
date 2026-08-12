@@ -6107,10 +6107,15 @@ das duas tabelas de origem, sempre em sincronia.
   pro mesmo arquivo. `NULL` (arquivo pré-F6) conta como tipo 1, mesma
   regra do código.
 
-**`conta_id`/`filial_id` não existem em `getnet_financeiro_resumo`** (só
-`igreja_id`) — vêm de `integracoes_financeiras` (`config->sftp->>
-conta_id` e `filial_id`), mesma fonte que `ingerirExtratos` usa na
-importação. Join único pras duas fontes.
+**`conta_id` vem do snapshot congelado no import** (coluna própria em
+`getnet_resumo`/`getnet_financeiro_resumo`, populada por
+`buildResumoRow`/`finResRows` com o mesmo valor já resolvido pra
+`ingerirExtratos`, com FK composta pra `contas` — ver achados do
+`@codex review`/Bugbot abaixo) — a view lê a coluna direto, **nunca**
+`integracoes_financeiras.config` em tempo de consulta. **`filial_id`**
+continua vindo de `integracoes_financeiras` (não existe coluna própria
+pra ele nas tabelas de origem) — esse join com `integracoes_financeiras`
+serve só pra `filial_id` agora, não mais pra `conta_id`.
 
 **Não reconstrói `external_id`** (o identificador de dedupe usado no
 `(conta_id, external_id)` de `extratos_bancarios`) — é um artefato
@@ -6259,6 +6264,23 @@ correto, não regressão**: a FK nova (achado 2 acima) É a validação
 pretendida, mesma garantia que `fin_ingerir_extratos` já dava pro espelho,
 agora também pro dado cru, falhando alto e cedo em vez de aceitar um
 valor ruim silenciosamente.
+
+**3ª rodada — Codex e Bugbot acharam o MESMO gap na FK do item 2**: ela
+só checa `contas.id`, não `igreja_id` — uma conta de OUTRA igreja (UUID
+sintaticamente válido, existe em `contas`, `igreja_id` diferente) ainda
+passava pelo INSERT. Corrigido, mas **não** com FK composta
+`(conta_id, igreja_id) REFERENCES contas(id, igreja_id)`: `ON DELETE SET
+NULL` numa FK composta zera TODAS as colunas da FK, incluindo
+`igreja_id` — que é `NOT NULL` nas duas tabelas, então excluir uma conta
+quebraria a constraint `NOT NULL` em vez de só desatribuir. Fix: trigger
+`getnet_valida_conta_id_tenant()` (`BEFORE INSERT OR UPDATE OF conta_id`,
+não reage a `DELETE` em `contas` — a FK simples continua cuidando do
+`SET NULL` nesse caso) valida o par `(conta_id, igreja_id)` contra
+`contas` e recusa com `FIN_TENANT` se não bater. Confirmado no harness
+com o cenário específico que faltava nas rodadas anteriores: `conta_id`
+de uma conta que EXISTE mas é de outra igreja é rejeitado (as rodadas
+anteriores só tinham testado "não existe de jeito nenhum", que a FK
+sozinha já cobria).
 
 ## 11. Riscos
 

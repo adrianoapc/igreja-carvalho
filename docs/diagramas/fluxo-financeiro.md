@@ -1146,7 +1146,9 @@ flowchart TD
 
     T1 --> VIEW["getnet_credito_disponivel\n(view, security_invoker=true)"]
     T5 --> VIEW
-    INT["integracoes_financeiras\nconfig->sftp->conta_id, filial_id"] --> VIEW
+    CONTA["conta_id: coluna própria,\ncongelada no import,\nFK composta (conta_id,igreja_id)->contas"] -.->|"gravada por buildResumoRow/\nfinResRows, NUNCA relida"| T1
+    CONTA -.-> T5
+    INT["integracoes_financeiras\n(só filial_id)"] --> VIEW
 
     VIEW -.->|"comparado no harness\ncontra o espelho atual"| EB["extratos_bancarios\n(origem getnet_sftp_txt/tipo5)\nespelho legado, ainda em uso"]
     VIEW -.->|"cutover dos consumidores"| C27["C2-7 (fin_venda_banco_getnet_hop1,\nfin_conferencia_totais_getnet_hop1,\ngetnet_antecipacao_lotes)"]

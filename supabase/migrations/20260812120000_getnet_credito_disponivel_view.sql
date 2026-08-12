@@ -144,25 +144,29 @@
 -- **P1 — nada validava o conta_id antes de gravá-lo nas tabelas novas.**
 -- `contaId` (texto solto de `config.sftp.conta_id`, sem checagem de
 -- formato nem de existência) ia direto pras colunas `conta_id` novas,
--- sem FK. Um UUID sintaticamente válido mas de uma conta inexistente/de
--- outra igreja passava pelo INSERT de `getnet_resumo`/
--- `getnet_financeiro_resumo` (que roda ANTES do espelho) e só o
--- `fin_ingerir_extratos` (que TEM validação de tenant) rejeitava depois —
--- deixando a linha crua já commitada com uma conta errada, presa lá pra
--- sempre (reprocessamento usa upsert com `ON CONFLICT DO NOTHING`,
--- nunca corrige um valor já gravado). Fix: FK de verdade —
--- `conta_id REFERENCES public.contas(id) ON DELETE SET NULL` nas duas
--- tabelas. Postgres passa a rejeitar o INSERT/UPDATE na origem (mesma
--- garantia que `fin_ingerir_extratos` já dava pro espelho, agora
--- também pro dado cru) em vez de aceitar um valor ruim silenciosamente;
--- `ON DELETE SET NULL` (não CASCADE) porque excluir uma conta bancária
--- não deveria apagar o histórico de crédito Getnet, só sua atribuição —
--- mesmo princípio do achado P1 anterior (atribuição desconhecida = NULL
+-- sem FK. Um UUID sintaticamente válido mas de uma conta inexistente
+-- passava pelo INSERT de `getnet_resumo`/`getnet_financeiro_resumo`
+-- (que roda ANTES do espelho) e só o `fin_ingerir_extratos` (que TEM
+-- validação de tenant) rejeitava depois — deixando a linha crua já
+-- commitada com uma conta errada, presa lá pra sempre (reprocessamento
+-- usa upsert com `ON CONFLICT DO NOTHING`, nunca corrige um valor já
+-- gravado). Fix: FK de verdade — `conta_id REFERENCES public.contas(id)
+-- ON DELETE SET NULL` nas duas tabelas. Postgres passa a rejeitar o
+-- INSERT/UPDATE na origem pra conta INEXISTENTE (mesma garantia que
+-- `fin_ingerir_extratos` já dava pro espelho, agora também pro dado
+-- cru) em vez de aceitar um valor ruim silenciosamente; `ON DELETE SET
+-- NULL` (não CASCADE) porque excluir uma conta bancária não deveria
+-- apagar o histórico de crédito Getnet, só sua atribuição — mesmo
+-- princípio do achado P1 anterior (atribuição desconhecida = NULL
 -- honesto, não motivo pra apagar dado). Backfill best-effort ajustado
 -- pra só preencher quando a conta realmente existe NESTA igreja (join
 -- direto contra `contas`, não só formato) — senão a própria migration
 -- quebraria ao tentar adicionar a FK sobre um valor que não referencia
--- nada.
+-- nada. **Gap residual desta FK simples (conta de OUTRA igreja, UUID
+-- válido) corrigido na 3ª rodada, mais abaixo** (trigger de tenant —
+-- `ON DELETE SET NULL` numa FK COMPOSTA zeraria `igreja_id`, que é
+-- `NOT NULL`, então a validação de tenant não podia ir pra dentro da
+-- mesma FK).
 -- ============================================================================
 
 -- Cast seguro de uuid — evita repetir a guarda de formato em 3 lugares
@@ -226,16 +230,56 @@ UPDATE public.getnet_financeiro_resumo f
    AND f.conta_id IS NULL;
 
 -- FK de verdade (achado Codex P1, 2ª rodada) — Postgres rejeita conta_id
--- inexistente/de outra igreja NA ORIGEM, mesma garantia que
--- fin_ingerir_extratos já dava só pro espelho. ON DELETE SET NULL, não
--- CASCADE: excluir uma conta bancária não apaga histórico de crédito,
--- só sua atribuição (mesmo princípio do NULL honesto acima).
+-- inexistente NA ORIGEM, mesma garantia que fin_ingerir_extratos já dava
+-- só pro espelho. ON DELETE SET NULL, não CASCADE: excluir uma conta
+-- bancária não apaga histórico de crédito, só sua atribuição (mesmo
+-- princípio do NULL honesto acima).
 ALTER TABLE public.getnet_resumo
   ADD CONSTRAINT getnet_resumo_conta_id_fkey
   FOREIGN KEY (conta_id) REFERENCES public.contas(id) ON DELETE SET NULL;
 ALTER TABLE public.getnet_financeiro_resumo
   ADD CONSTRAINT getnet_financeiro_resumo_conta_id_fkey
   FOREIGN KEY (conta_id) REFERENCES public.contas(id) ON DELETE SET NULL;
+
+-- (3ª rodada do `@codex review` + Bugbot, mesmo achado dos dois) A FK
+-- acima só checa `contas.id` — uma conta de OUTRA igreja (UUID
+-- sintaticamente válido, existe em `contas`, mas `igreja_id` diferente)
+-- ainda passava. Uma FK composta `(conta_id, igreja_id) REFERENCES
+-- contas(id, igreja_id)` resolveria isso, mas `ON DELETE SET NULL` numa
+-- FK composta zera TODAS as colunas da FK — incluindo `igreja_id`, que é
+-- `NOT NULL` nas duas tabelas; excluir uma conta quebraria a constraint
+-- NOT NULL em vez de só desatribuir a conta. Trigger em vez de FK
+-- composta: valida o mesmo par (conta_id, igreja_id) só em INSERT/UPDATE
+-- de conta_id (não reage a DELETE em contas — a FK acima já cuida do
+-- SET NULL nesse caso, sem tocar igreja_id).
+CREATE OR REPLACE FUNCTION public.getnet_valida_conta_id_tenant()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.conta_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.contas c
+     WHERE c.id = NEW.conta_id AND c.igreja_id = NEW.igreja_id
+  ) THEN
+    RAISE EXCEPTION 'FIN_TENANT: conta_id % não pertence à igreja % (linha de %)',
+      NEW.conta_id, NEW.igreja_id, TG_TABLE_NAME;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.getnet_valida_conta_id_tenant() IS
+  'Trigger de tenant pra conta_id de getnet_resumo/getnet_financeiro_resumo (C2-6): a FK sozinha só garante que a conta existe, não que é da mesma igreja. Achado Codex/Bugbot, 3ª rodada de review.';
+
+DROP TRIGGER IF EXISTS trg_getnet_resumo_valida_conta_tenant ON public.getnet_resumo;
+CREATE TRIGGER trg_getnet_resumo_valida_conta_tenant
+  BEFORE INSERT OR UPDATE OF conta_id ON public.getnet_resumo
+  FOR EACH ROW EXECUTE FUNCTION public.getnet_valida_conta_id_tenant();
+
+DROP TRIGGER IF EXISTS trg_getnet_financeiro_resumo_valida_conta_tenant ON public.getnet_financeiro_resumo;
+CREATE TRIGGER trg_getnet_financeiro_resumo_valida_conta_tenant
+  BEFORE INSERT OR UPDATE OF conta_id ON public.getnet_financeiro_resumo
+  FOR EACH ROW EXECUTE FUNCTION public.getnet_valida_conta_id_tenant();
 
 CREATE OR REPLACE VIEW public.getnet_credito_disponivel
 WITH (security_invoker = true) AS
