@@ -252,24 +252,33 @@ ALTER TABLE public.getnet_financeiro_resumo
 -- composta: valida o mesmo par (conta_id, igreja_id) só em INSERT/UPDATE
 -- de conta_id (não reage a DELETE em contas — a FK acima já cuida do
 -- SET NULL nesse caso, sem tocar igreja_id).
+--
+-- (4ª rodada, achado Bugbot Medium) A 1ª versão deste trigger fazia o
+-- `SELECT ... FROM contas` direto, SEM `SECURITY DEFINER` — rodava com
+-- as permissões/RLS de quem estivesse fazendo o INSERT/UPDATE em
+-- getnet_resumo/getnet_financeiro_resumo. A policy de SELECT de
+-- `contas` é mais restrita (`admin`/`tesoureiro` + `has_filial_access`)
+-- que a de escrita de `getnet_resumo`/`getnet_financeiro_resumo`
+-- (`admin_igreja`/`super_admin` também, sem checar filial) — um writer
+-- legítimo (mesma igreja, conta_id correto) podia disparar `FIN_TENANT`
+-- por FALSO NEGATIVO: não é que a conta fosse de outra igreja, é que
+-- o papel dele não tinha `SELECT` liberado nela. Fix: reusa
+-- `fin_validar_fk_tenant` (helper já `SECURITY DEFINER` do repo, usado
+-- em dezenas de RPCs `fin_*` pra exatamente este propósito — validar FK
+-- de tenant sem depender da visibilidade RLS de quem chama) em vez de
+-- reimplementar a checagem.
 CREATE OR REPLACE FUNCTION public.getnet_valida_conta_id_tenant()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  IF NEW.conta_id IS NOT NULL AND NOT EXISTS (
-    SELECT 1 FROM public.contas c
-     WHERE c.id = NEW.conta_id AND c.igreja_id = NEW.igreja_id
-  ) THEN
-    RAISE EXCEPTION 'FIN_TENANT: conta_id % não pertence à igreja % (linha de %)',
-      NEW.conta_id, NEW.igreja_id, TG_TABLE_NAME;
-  END IF;
+  PERFORM public.fin_validar_fk_tenant('contas', NEW.conta_id, NEW.igreja_id);
   RETURN NEW;
 END;
 $$;
 
 COMMENT ON FUNCTION public.getnet_valida_conta_id_tenant() IS
-  'Trigger de tenant pra conta_id de getnet_resumo/getnet_financeiro_resumo (C2-6): a FK sozinha só garante que a conta existe, não que é da mesma igreja. Achado Codex/Bugbot, 3ª rodada de review.';
+  'Trigger de tenant pra conta_id de getnet_resumo/getnet_financeiro_resumo (C2-6): a FK sozinha só garante que a conta existe, não que é da mesma igreja. Delega pra fin_validar_fk_tenant (SECURITY DEFINER) em vez de checar direto — um SELECT direto sob RLS do invoker falso-rejeitaria writers legítimos sem SELECT em contas (achado Bugbot, 4ª rodada).';
 
 DROP TRIGGER IF EXISTS trg_getnet_resumo_valida_conta_tenant ON public.getnet_resumo;
 CREATE TRIGGER trg_getnet_resumo_valida_conta_tenant

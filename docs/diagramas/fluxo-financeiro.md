@@ -1146,7 +1146,7 @@ flowchart TD
 
     T1 --> VIEW["getnet_credito_disponivel\n(view, security_invoker=true)"]
     T5 --> VIEW
-    CONTA["conta_id: coluna própria,\ncongelada no import,\nFK composta (conta_id,igreja_id)->contas"] -.->|"gravada por buildResumoRow/\nfinResRows, NUNCA relida"| T1
+    CONTA["conta_id: coluna própria,\ncongelada no import,\nFK simples->contas.id +\ntrigger de tenant (SECURITY DEFINER)"] -.->|"gravada por buildResumoRow/\nfinResRows, NUNCA relida"| T1
     CONTA -.-> T5
     INT["integracoes_financeiras\n(só filial_id)"] --> VIEW
 

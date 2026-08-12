@@ -6110,8 +6110,10 @@ das duas tabelas de origem, sempre em sincronia.
 **`conta_id` vem do snapshot congelado no import** (coluna própria em
 `getnet_resumo`/`getnet_financeiro_resumo`, populada por
 `buildResumoRow`/`finResRows` com o mesmo valor já resolvido pra
-`ingerirExtratos`, com FK composta pra `contas` — ver achados do
-`@codex review`/Bugbot abaixo) — a view lê a coluna direto, **nunca**
+`ingerirExtratos`, com FK simples pra `contas(id)` + trigger de tenant
+(`getnet_valida_conta_id_tenant`, `SECURITY DEFINER` via
+`fin_validar_fk_tenant`) — ver achados do `@codex review`/Bugbot abaixo)
+— a view lê a coluna direto, **nunca**
 `integracoes_financeiras.config` em tempo de consulta. **`filial_id`**
 continua vindo de `integracoes_financeiras` (não existe coluna própria
 pra ele nas tabelas de origem) — esse join com `integracoes_financeiras`
@@ -6281,6 +6283,32 @@ com o cenário específico que faltava nas rodadas anteriores: `conta_id`
 de uma conta que EXISTE mas é de outra igreja é rejeitado (as rodadas
 anteriores só tinham testado "não existe de jeito nenhum", que a FK
 sozinha já cobria).
+
+**4ª rodada — Bugbot achou que o trigger acima tinha o MESMO tipo de
+bug que ele existia pra evitar**: a 1ª versão fazia `SELECT ... FROM
+contas` direto, SEM `SECURITY DEFINER` — rodava sob a RLS de quem
+estivesse escrevendo em `getnet_resumo`/`getnet_financeiro_resumo`. A
+policy de `SELECT` de `contas` é mais restrita (`admin`/`tesoureiro` +
+`has_filial_access`) que a de ESCRITA de `getnet_resumo`/
+`getnet_financeiro_resumo` (`admin_igreja`/`super_admin` também, sem
+checar filial) — um `super_admin` gravando um `conta_id` **correto** da
+**mesma** igreja podia disparar `FIN_TENANT` por falso negativo: não é
+que a conta fosse de outra igreja, é que o papel dele não tinha
+`SELECT` liberado nela sob RLS. Fix: em vez de reimplementar a
+checagem, o trigger passou a delegar pra `fin_validar_fk_tenant`
+(helper `SECURITY DEFINER` já usado em dezenas de RPCs `fin_*` do repo
+pra exatamente este propósito) — `PERFORM public.fin_validar_fk_tenant
+('contas', NEW.conta_id, NEW.igreja_id)`. Erro passou de `FIN_TENANT`
+pra `FIN_FK` (convenção já estabelecida do helper reusado, mais
+consistente que inventar um código novo). Confirmado no harness com o
+cenário exato do achado: `super_admin` sem `SELECT` em `contas` (0
+linhas visíveis sob a própria RLS, confirmado antes do teste) consegue
+inserir `getnet_resumo` com `conta_id` válido da mesma igreja sem cair
+no falso `FIN_FK`; conta de outra igreja continua rejeitada.
+Aproveitado pra corrigir também 2 menções erradas a "FK composta" que
+sobraram de rascunho em outro parágrafo deste arquivo e no diagrama
+Mermaid (achado P2 do Codex, mesma rodada) — a solução final é FK
+simples + trigger, nunca foi FK composta.
 
 ## 11. Riscos
 
