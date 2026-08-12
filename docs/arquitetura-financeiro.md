@@ -6310,7 +6310,144 @@ sobraram de rascunho em outro parágrafo deste arquivo e no diagrama
 Mermaid (achado P2 do Codex, mesma rodada) — a solução final é FK
 simples + trigger, nunca foi FK composta.
 
-## 11. Riscos
+### 9.105 Ciclo 2 (C2-7) — Hop 1/Antecipação param de casar contra o próprio espelho Getnet
+
+**Decisão de escopo, explícita do usuário**: entre um fix cirúrgico (só
+corrigir o matching, sem consumidor novo pra `getnet_credito_disponivel`
+da C2-6) e o cutover completo do plano original (view como 3º sinal em
+`fin_conferencia_totais_getnet` + telas novas), escolheu o fix cirúrgico.
+`getnet_credito_disponivel` continua sem nenhum consumidor — fica pronta
+pra quando a C2-8 cortar o espelho de vez.
+
+**Achado real, descoberto ANTES de escrever qualquer migration** (pesquisa
+de mapeamento dos consumidores): `fin_gerar_candidatos_venda_banco_getnet`
+e `fin_gerar_candidatos_lote_antecipacao_getnet` casavam contra QUALQUER
+`extratos_bancarios` não reconciliado — sem filtrar `origem`. Isso inclui
+as próprias linhas sintéticas que o pipeline Getnet escreve. Uma venda
+Getnet podia (e o scoring de texto do lote — `%getnet%` vale +40 pontos —
+provavelmente favorecia) casar com o PRÓPRIO espelho em vez do crédito
+bancário real do Santander: silencioso, sem erro, aparência de match
+legítimo. Não é hipotético — é o "crédito não reconciliado da conta"
+citado no próprio plano original da C2-7 como o problema a corrigir.
+
+**Fix em 2 camadas** (mesmo padrão de `fin_vincular_lote_bloqueia_hop1`,
+que já fecha o double-booking Hop1×antecipação):
+1. Candidatos (leitura) — exclui origem espelho do pool, não sugere mais
+   a própria linha.
+2. Vincular (escrita) — rejeita explicitamente, fecha a brecha pra
+   qualquer chamada direta da RPC (não só via UI).
+
+**3 achados do `/code-review` local, corrigidos antes do push**:
+1. **Terceira origem espelho faltando** (mais grave — achado do agente
+   "cross-file tracer"): a lista original só tinha
+   `getnet_sftp_txt`/`getnet_sftp_tipo5` (layout `extrato_eletronico_v10`,
+   tipo1/tipo5). Faltava `getnet_sftp` — origem do layout `settlement_v1`,
+   que é o **DEFAULT** em `IntegracoesCriarDialog.tsx` pra integração
+   nova e grava direto em `extratos_bancarios` sem passar por
+   `getnet_resumo`/`getnet_financeiro_resumo`. Sem essa 3ª origem, o fix
+   inteiro seria um no-op pra qualquer integração no layout antigo —
+   exatamente o bug que a fase existe pra fechar. Fix: extraído um helper
+   `fin_e_espelho_getnet(origem text) RETURNS boolean` (a lista aparecia
+   6× no arquivo — 2 candidatos, 2 vincular, 2 diagnóstico — achado
+   paralelo de duplicação de 3 agentes de review diferentes), agora com
+   as 3 origens.
+2. **`fin_desfazer_vinculo_venda_banco_getnet` só validava a filial do
+   extrato, não de cada recebível vinculado**: um extrato COMPARTILHADO
+   (`filial_id NULL`) passa no check de filial pra qualquer chamador —
+   mas os recebíveis vinculados podem ser de uma filial específica.
+   `fin_vincular_venda_banco_getnet` já validava isso (loop por
+   recebível); o desfazer, novo, não tinha o mesmo loop — um usuário
+   restrito a uma filial conseguia desvincular (e reverter `reconciliado`)
+   de recebíveis de outra filial via um extrato compartilhado. Fix: mesmo
+   loop de `has_filial_access` por recebível, fundido com o próprio lock
+   (`FOR v_rec IN SELECT ... FOR NO KEY UPDATE LOOP` — sem agregado
+   nenhum aqui, diferente do padrão de 2 statements que
+   `fin_vincular_venda_banco_getnet` precisa por causa do `count(*)`;
+   achado de eficiência do mesmo review, o comentário original copiava a
+   justificativa errada). Confirmado no harness com o cenário exato:
+   extrato compartilhado + recebível de filial sem acesso → `FIN_TENANT`,
+   nada alterado.
+3. **`fin_desfazer_vinculo_lote_antecipacao` usava `FOR UPDATE`, não `FOR
+   NO KEY UPDATE`**: o UPDATE só toca `extrato_bancario_id`/`status`/
+   `updated_at`, nunca a PK — lock mais fraco resolve (guardrail D.2),
+   evita conflito desnecessário com um INSERT concorrente de filho
+   referenciando o lote.
+
+**Migração de dado histórico**: `fin_diagnosticar_vinculos_getnet_espelho`
+(read-only) lista vínculos Hop1/antecipação JÁ confirmados que apontam
+pro espelho — não corrige nada sozinho, decisão de reapontar é do
+tesoureiro (plano original: "decidir se são reapontadas... e o que
+acontece com casos sem correspondência ainda"). `fin_desfazer_vinculo_
+venda_banco_getnet`/`fin_desfazer_vinculo_lote_antecipacao` (novos — não
+existia NENHUM mecanismo de desfazer pra estes 2 vínculos até agora)
+permitem desfazer o vínculo errado pra depois re-vincular pelo fluxo
+normal (candidatos já corrigidos acham o crédito real). **Sem tela nova
+nesta fase** (decisão explícita do usuário) — uso via RPC direto até uma
+fase de UI.
+
+**Harness Docker** (postgres:15, replay das 444 migrations): 9 cenários
+(candidatos excluem espelho nos dois hops; vincular rejeita espelho nos
+dois hops; diagnóstico acha os 2 vínculos históricos plantados; desfazer
+funciona nos dois, com efeito confirmado via `RESET ROLE` dentro da
+transação — `extratos_bancarios` usa `get_jwt_igreja_id()`/RLS baseada em
+claim, não em `profiles`, então checar o resultado como o mesmo usuário
+autenticado sem o claim setado dava falso "0 rows"; isolamento de tenant
+com usuário sem role nenhuma) + 2 cenários novos pós-review (filial por
+recebível rejeitada; origem `getnet_sftp`/settlement_v1 excluída e
+rejeitada, mesmo tratamento das outras duas).
+
+**PR #95 — 2ª rodada, Codex P1 + Bugbot Medium (mesmo achado dos dois)**:
+`fin_diagnosticar_vinculos_getnet_espelho` tinha o MESMO gap que o item 2
+da 1ª rodada já tinha corrigido em `fin_desfazer_vinculo_venda_banco_
+getnet` — só validava a filial do EXTRATO, não a de cada recurso
+vinculado. Extrato compartilhado (`filial_id NULL`) passa no check pra
+qualquer chamador; no ramo Hop1, os recebíveis vinculados podem ser de
+uma filial específica; no ramo antecipação, o LOTE pode ter filial
+própria. Como é uma função `SECURITY DEFINER` (bypassa RLS de propósito),
+o vazamento expunha `recebivel_ids`/valores (Hop1) ou
+`contrato_registradora`/valor/status (antecipação) de filiais sem
+acesso. Fix: Hop1 ganhou `AND has_filial_access(v_igreja, g.filial_id)`
+além do check do extrato; antecipação passou a checar a filial EFETIVA
+(`COALESCE(l.filial_id, e.filial_id)`, mesmo padrão já usado em
+`fin_vincular_lote_antecipacao`/`fin_desfazer_vinculo_lote_antecipacao`).
+Confirmado no harness: tesoureiro sem acesso à filial restrita vê 0
+linhas pros 2 vínculos plantados (Hop1 + antecipação); mesma consulta sem
+o claim de filial (ramo "backwards compatibility" de `has_filial_access`)
+vê as 2.
+
+**PR #95 — 3ª rodada, Codex P1**: o `COALESCE(l.filial_id, e.filial_id)`
+da correção acima só valida UMA filial concreta quando as duas são
+definidas — um lote com filial A e extrato espelho com filial B
+(diferente) só checava A. Achado real, não hipotético: a migration que
+originalmente criava esses vínculos
+(`20260729170000_fin_lote_antecipacao_vinculo_desagio.sql`) nunca
+comparava as duas filiais — histórico pode ter esse descompasso mesmo
+com escritas atuais já validando. Fix: troca o `COALESCE` por duas
+checagens independentes (`has_filial_access` na filial do lote E na do
+extrato) — cada uma já trata `NULL` como "sem restrição" sozinha, então
+não regride o caso comum (uma das duas `NULL`), só fecha o caso raro
+(as duas concretas e diferentes). Confirmado no harness: tesoureiro com
+acesso só à filial do lote não vê o vínculo (extrato é de outra filial);
+com grant explícito em `user_filial_access` pra filial do extrato
+também, o vínculo aparece.
+
+**PR #95 — 4ª rodada, Codex P1**: mesma classe de bug, agora achada em
+`fin_desfazer_vinculo_lote_antecipacao` (o próprio COALESCE corrigido no
+diagnóstico tinha um gêmeo aqui) — um caller restrito à filial do lote
+conseguia desfazer o vínculo (e receber o `extrato_bancario_id` de volta
+na resposta) de um extrato de outra filial sem nunca provar acesso a
+ela. Mesmo fix: 2 checagens independentes. **Proativo, guardrail B.9**:
+como `fin_vincular_lote_antecipacao` (pré-existente) já estava sendo
+reescrita nesta mesma migration (achado da origem espelho, fase inicial),
+aproveitei pra corrigir os 2 `COALESCE` dela também — o de "vínculo novo"
+(linha ~707, risco baixo, o guard de mesma-filial 15 linhas depois já
+rejeitava um descompasso genuíno de qualquer forma) e o de "revincular"
+(linha ~717, risco real: o vínculo ATUAL pode ser um descompasso
+histórico, e revincular removeria o link com uma filial nunca provada).
+Confirmado no harness: cenário idêntico rejeitado no desfazer
+(`FIN_TENANT`) e permitido com o grant explícito; caso comum
+(`filial_id NULL` dos dois lados) continua funcionando em
+`fin_vincular_lote_antecipacao` sem regressão.
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
   inegociável; revisão de segurança dedicada (checklist de

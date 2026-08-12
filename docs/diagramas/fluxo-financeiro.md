@@ -1151,6 +1151,27 @@ flowchart TD
     INT["integracoes_financeiras\n(só filial_id)"] --> VIEW
 
     VIEW -.->|"comparado no harness\ncontra o espelho atual"| EB["extratos_bancarios\n(origem getnet_sftp_txt/tipo5)\nespelho legado, ainda em uso"]
-    VIEW -.->|"cutover dos consumidores"| C27["C2-7 (fin_venda_banco_getnet_hop1,\nfin_conferencia_totais_getnet_hop1,\ngetnet_antecipacao_lotes)"]
+    VIEW -.->|"SEM consumidor ainda\n(decisão C2-7: fix cirúrgico)"| C27["C2-7"]
+```
+
+## Ciclo 2 (C2-7) — Hop 1/Antecipação param de casar contra o próprio espelho (§9.105)
+
+Fix cirúrgico (decisão do usuário): `fin_gerar_candidatos_venda_banco_getnet`/
+`fin_gerar_candidatos_lote_antecipacao_getnet` casavam contra QUALQUER
+crédito não reconciliado, sem filtrar `origem` — uma venda Getnet podia
+casar com o próprio espelho sintético em vez do crédito bancário real.
+`getnet_credito_disponivel` (C2-6) segue sem consumidor nesta fase.
+
+```mermaid
+flowchart TD
+    VENDA["venda Getnet\n(getnet_recebivel_lancamentos)"] --> CAND["fin_gerar_candidatos_venda_banco_getnet\n/_lote_antecipacao_getnet"]
+    EB2["extratos_bancarios\n(créditos não reconciliados)"] --> CAND
+    CAND --> CHECK{"fin_e_espelho_getnet(origem)?\ngetnet_sftp | _txt | _tipo5"}
+    CHECK -->|"sim — é o próprio espelho"| EXCLUI["excluído do pool\n(candidatos) / rejeitado\n(vincular, FIN_VALIDACAO)"]
+    CHECK -->|"não — crédito bancário real"| OK["candidato válido /\nvínculo aceito"]
+
+    HIST["vínculos históricos\n(antes deste fix)"] --> DIAG["fin_diagnosticar_vinculos_getnet_espelho\n(só leitura)"]
+    DIAG --> DESFAZ["fin_desfazer_vinculo_venda_banco_getnet\n/_lote_antecipacao\n(sem tela — RPC direto)"]
+    DESFAZ -.->|"tesoureiro decide,\nrevincula pelo fluxo normal"| CAND
 ```
 
