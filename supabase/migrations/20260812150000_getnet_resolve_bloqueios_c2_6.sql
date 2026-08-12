@@ -66,9 +66,38 @@ COMMENT ON VIEW public.getnet_credito_disponivel IS
 -- "errada" que decidia. Confirmado com fixture real (2 filiais, tesoureiro
 -- restrito a uma via `request.jwt.claim.filial_id`): a 1ª versão retornava
 -- as 2 filiais; só depois de adicionar `has_filial_access` também no
--- `USING` do `_modify` (mantendo o `WITH CHECK` como estava — só
--- `service_role` escreve, que ignora RLS de qualquer forma, então isso não
--- tem efeito colateral em escrita real) o isolamento passou a valer.
+-- `USING` do `_modify` o isolamento passou a valer pra leitura.
+--
+-- **Achado do Cursor Bugbot (PR #97, 2ª rodada, Medium)**: `WITH CHECK`
+-- do `_modify` continuava só com `igreja_id` — como `authenticated`
+-- ainda tem GRANT de INSERT/UPDATE/DELETE nas 2 tabelas (pré-existente,
+-- não introduzido aqui), a suposição "só service_role escreve" não é
+-- garantida pelo GRANT em si, só pela ausência de qualquer caminho no
+-- código hoje. `WITH CHECK` agora também exige `has_filial_access` —
+-- sem efeito no único escritor real (`service_role`, que ignora RLS via
+-- `rolbypassrls`), só fecha a porta pra um hipotético INSERT/UPDATE
+-- cross-filial via `authenticated` que os GRANTs já permitiam.
+--
+-- **Achado do @codex (PR #97, 2ª rodada, P1) — NÃO corrigido nesta PR,
+-- registrado como follow-up separado**: `has_filial_access` (definição
+-- em `20260105153404`) tem um shortcut de "backwards compatibility" —
+-- se `get_jwt_filial_id() IS NULL` (usuário sem filial primária no
+-- perfil/JWT), a função retorna `true` pra QUALQUER `_filial_id`, ANTES
+-- de consultar `user_filial_access` — um tesoureiro sem filial primária
+-- mas com restrição EXPLÍCITA em `user_filial_access` (só filial A)
+-- ainda vê filial B também, porque o shortcut nunca deixa o `EXISTS`
+-- decidir. Confirmado que é explorável de verdade, não só teórico:
+-- existe UI dedicada pra isso (`UserFilialAccessManager.tsx`), que
+-- permite conceder `user_filial_access` a qualquer usuário da igreja
+-- sem exigir `filial_id` preenchido no perfil. **NÃO é um bug
+-- introduzido por esta PR** — é pré-existente na função compartilhada,
+-- usada em DEZENAS de outras policies RLS no repo; corrigi-la aqui
+-- expandiria o raio de impacto muito além do escopo desta PR (2
+-- bloqueios pontuais da C2-6) pra qualquer tabela que já usa
+-- `has_filial_access`, sem harness dedicado pra validar todos os
+-- consumidores. Registrado como achado de segurança prioritário,
+-- separado, pra auditoria dedicada — não pendência escondida (resposta
+-- deixada na própria thread do @codex).
 -- Escopo consciente: NÃO estende pra `getnet_arquivos`/`getnet_analitico`/
 -- `getnet_ajustes` (mesmo gap, mas fora do que o @codex apontou nesta
 -- rodada) — auditoria dedicada de todas as tabelas Getnet já está
@@ -102,6 +131,7 @@ CREATE POLICY "getnet_resumo_modify" ON public.getnet_resumo
   )
   WITH CHECK (
     igreja_id = public.get_current_user_igreja_id()
+    AND public.has_filial_access(igreja_id, filial_id)
   );
 
 DROP POLICY IF EXISTS "getnet_fin_resumo_select" ON public.getnet_financeiro_resumo;
@@ -139,7 +169,14 @@ CREATE POLICY "getnet_fin_resumo_modify" ON public.getnet_financeiro_resumo
       OR public.has_role(auth.uid(), 'super_admin'::app_role)
     )
   )
-  WITH CHECK (igreja_id = public.get_current_user_igreja_id());
+  WITH CHECK (
+    igreja_id = public.get_current_user_igreja_id()
+    AND EXISTS (
+      SELECT 1 FROM public.integracoes_financeiras i
+      WHERE i.id = integracao_id
+        AND public.has_filial_access(i.igreja_id, i.filial_id)
+    )
+  );
 
 -- ─── 2. Bloqueio ON DELETE CASCADE — vira RESTRICT nas tabelas de dado ─────
 -- Escopo: só as 8 tabelas que carregam DADO (histórico de import +

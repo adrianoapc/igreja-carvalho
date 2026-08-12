@@ -6667,6 +6667,43 @@ analitico`/`getnet_ajustes` (mesmo gap, mas fora do que o @codex
 apontou nesta rodada) — auditoria dedicada de todas as tabelas Getnet
 já está registrada como follow-up separado, não pendência escondida.
 
+**PR #97 — 2ª rodada.** Dois achados novos, sobre o próprio fix da 1ª
+rodada (não sobre o design original da C2-6):
+
+1. **Cursor Bugbot (Medium), corrigido**: `WITH CHECK` do `_modify`
+   continuava só com `igreja_id` — `authenticated` ainda tem GRANT de
+   INSERT/UPDATE/DELETE nas 2 tabelas (pré-existente), então a
+   suposição "só `service_role` escreve" não era garantida pelo GRANT
+   em si, só pela ausência de qualquer caminho de escrita no código
+   hoje. Adicionado `has_filial_access` também no `WITH CHECK` — sem
+   efeito no único escritor real (`service_role`, ignora RLS via
+   `rolbypassrls`), só fecha a porta pra um hipotético INSERT/UPDATE
+   cross-filial via `authenticated`. Validado no harness: tesoureiro
+   restrito à Filial A tentando `INSERT` com `filial_id`/integração da
+   Filial B → `new row violates row-level security policy`;
+   `service_role` inserindo normalmente → sucesso.
+
+2. **Codex (P1), NÃO corrigido nesta PR — achado de segurança maior,
+   fora de escopo, registrado separadamente**: `has_filial_access`
+   (`20260105153404`) tem um shortcut de "backwards compatibility" — se
+   `get_jwt_filial_id() IS NULL` (usuário sem filial primária no
+   perfil/JWT), a função retorna `true` pra QUALQUER `_filial_id`,
+   ANTES de consultar `user_filial_access`. Um tesoureiro sem filial
+   primária mas com restrição EXPLÍCITA em `user_filial_access` (só
+   filial A) ainda vê filial B, porque o shortcut nunca deixa o
+   `EXISTS` decidir. **Confirmado explorável de verdade**: existe UI
+   dedicada (`UserFilialAccessManager.tsx`) que permite conceder
+   `user_filial_access` a qualquer usuário da igreja sem exigir
+   `filial_id` preenchido no perfil — não depende de nenhum estado raro
+   pra acontecer. Não corrigido aqui porque não é um bug desta PR: é
+   pré-existente numa função compartilhada usada em DEZENAS de outras
+   policies RLS no repo (não só Getnet) — corrigi-la dentro de "resolver
+   2 bloqueios pontuais da C2-6" expandiria o raio de impacto pra
+   qualquer tabela que já usa `has_filial_access`, sem harness dedicado
+   pra validar todos os consumidores afetados. Registrado como achado
+   de segurança prioritário, candidato a fase dedicada própria — não
+   pendência escondida.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
