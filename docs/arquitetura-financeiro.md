@@ -6431,6 +6431,24 @@ acesso só à filial do lote não vê o vínculo (extrato é de outra filial);
 com grant explícito em `user_filial_access` pra filial do extrato
 também, o vínculo aparece.
 
+**PR #95 — 4ª rodada, Codex P1**: mesma classe de bug, agora achada em
+`fin_desfazer_vinculo_lote_antecipacao` (o próprio COALESCE corrigido no
+diagnóstico tinha um gêmeo aqui) — um caller restrito à filial do lote
+conseguia desfazer o vínculo (e receber o `extrato_bancario_id` de volta
+na resposta) de um extrato de outra filial sem nunca provar acesso a
+ela. Mesmo fix: 2 checagens independentes. **Proativo, guardrail B.9**:
+como `fin_vincular_lote_antecipacao` (pré-existente) já estava sendo
+reescrita nesta mesma migration (achado da origem espelho, fase inicial),
+aproveitei pra corrigir os 2 `COALESCE` dela também — o de "vínculo novo"
+(linha ~707, risco baixo, o guard de mesma-filial 15 linhas depois já
+rejeitava um descompasso genuíno de qualquer forma) e o de "revincular"
+(linha ~717, risco real: o vínculo ATUAL pode ser um descompasso
+histórico, e revincular removeria o link com uma filial nunca provada).
+Confirmado no harness: cenário idêntico rejeitado no desfazer
+(`FIN_TENANT`) e permitido com o grant explícito; caso comum
+(`filial_id NULL` dos dois lados) continua funcionando em
+`fin_vincular_lote_antecipacao` sem regressão.
+
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
   inegociável; revisão de segurança dedicada (checklist de
   `docs/01-Arquitetura/04-rls-e-seguranca.MD`).

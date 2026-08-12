@@ -704,17 +704,30 @@ BEGIN
     RAISE EXCEPTION 'FIN_VALIDACAO: extrato já vinculado a vendas Getnet (Hop 1)';
   END IF;
 
-  IF NOT public.has_filial_access(v_igreja, COALESCE(v_lote.filial_id, v_extrato.filial_id)) THEN
+  -- Achado Codex P1 (mesma classe já corrigida no diagnóstico/desfazer
+  -- desta migration — proativo aqui porque esta função já está sendo
+  -- reescrita nesta migration por outro motivo, guardrail B.9): COALESCE
+  -- só valida UMA filial concreta quando lote e extrato NOVO têm filiais
+  -- diferentes. O guard de linha ~724 abaixo já rejeita esse caso pro
+  -- link NOVO (então o risco aqui é baixo — não vaza dado, só rejeita
+  -- tarde), mas troca por 2 checagens independentes por consistência.
+  IF NOT public.has_filial_access(v_igreja, v_lote.filial_id)
+     OR NOT public.has_filial_access(v_igreja, v_extrato.filial_id) THEN
     RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial deste vínculo';
   END IF;
 
   -- §9.68: revincular (trocar um extrato JÁ vinculado por outro) exige
-  -- acesso à filial do vínculo ATUAL também, não só do novo.
+  -- acesso à filial do vínculo ATUAL também, não só do novo. Este É o
+  -- caso de risco real: o vínculo ATUAL pode ser um descompasso
+  -- histórico (lote filial A, extrato atual filial B — criado antes do
+  -- guard de linha ~724 existir), e o COALESCE só validava A, permitindo
+  -- revincular (removendo o vínculo com B) sem nunca provar acesso a B.
   IF v_lote.extrato_bancario_id IS NOT NULL
      AND v_lote.extrato_bancario_id IS DISTINCT FROM p_extrato_bancario_id THEN
     SELECT filial_id INTO v_extrato_atual_filial
       FROM public.extratos_bancarios WHERE id = v_lote.extrato_bancario_id;
-    IF NOT public.has_filial_access(v_igreja, COALESCE(v_lote.filial_id, v_extrato_atual_filial)) THEN
+    IF NOT public.has_filial_access(v_igreja, v_lote.filial_id)
+       OR NOT public.has_filial_access(v_igreja, v_extrato_atual_filial) THEN
       RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial do vínculo atual deste lote';
     END IF;
   END IF;
@@ -1023,9 +1036,18 @@ BEGIN
   IF v_lote.extrato_bancario_id IS NULL THEN
     RAISE EXCEPTION 'FIN_VALIDACAO: lote não tem vínculo pra desfazer';
   END IF;
-  IF NOT public.has_filial_access(v_igreja, COALESCE(v_lote.filial_id, (
-    SELECT filial_id FROM public.extratos_bancarios WHERE id = v_lote.extrato_bancario_id
-  ))) THEN
+  -- Achado Codex P1 (mesma classe do fix no diagnóstico, 3ª rodada): o
+  -- COALESCE só validava UMA filial concreta quando lote e extrato têm
+  -- filiais diferentes (vínculo histórico criado antes de qualquer
+  -- validação de match — 20260729170000_fin_lote_antecipacao_vinculo_
+  -- desagio.sql nunca comparava as duas). Um caller restrito à filial do
+  -- lote conseguia desfazer o vínculo (e receber o extrato_bancario_id
+  -- de volta) de um extrato de OUTRA filial sem acesso a ela. Duas
+  -- checagens independentes, não COALESCE.
+  IF NOT public.has_filial_access(v_igreja, v_lote.filial_id)
+     OR NOT public.has_filial_access(v_igreja, (
+       SELECT filial_id FROM public.extratos_bancarios WHERE id = v_lote.extrato_bancario_id
+     )) THEN
     RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial deste vínculo';
   END IF;
 
