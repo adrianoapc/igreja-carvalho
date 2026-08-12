@@ -6523,6 +6523,31 @@ o frontend a acompanhar. Fix: `ORIGENS_ESPELHO_GETNET`/
 tipo `OrigemExtrato`), os 2 call sites importam em vez de copiar a
 string à mão.
 
+**PR #96 — 2ª rodada, Codex P1**: o fix original só protegia quem passa
+pelo motor F4 (candidatos gerados) — `useConciliacaoInteligente.ts`
+(painel "Banco") carrega TODO extrato não reconciliado direto de
+`extratos_bancarios`, sem filtrar origem, e deixa o usuário selecionar
+manualmente + chamar `fin_confirmar_conciliacao`, que também nunca
+validava origem. Um usuário podia confirmar manualmente o espelho
+Getnet como o lado bancário de qualquer transação real, contornando o
+filtro de candidatos por inteiro — a escrita real não tinha boundary
+nenhuma. Mesmo padrão da C2-7 (fecha geração E escrita, não só uma):
+`fin_confirmar_conciliacao` ganhou o mesmo `IF fin_e_espelho_getnet
+(v_ext.origem) THEN RAISE EXCEPTION` no loop que já trava/valida cada
+extrato — a boundary real agora é aqui, não só no motor de candidatos.
+Aproveitado pra também filtrar a query raw do painel "Banco"
+(`useConciliacaoInteligente.ts`, mesmo `FILTRO_EXCLUI_ESPELHO_GETNET`) —
+UX (não oferecer uma opção que sempre falha), não a proteção real.
+**Escopo consciente, não pendência esquecida**: as outras queries raw
+achadas na pesquisa original (`useConciliacaoManualData.ts`
+`extratosBrutos`, `useDashboardConciliacaoData.ts` aba legada) não
+foram filtradas nesta rodada — a RPC de escrita já bloqueia o caso real
+(confirmação incorreta), essas são só polimento de UX em telas
+secundárias/legadas, registrado como possível follow-up, não escondido.
+Confirmado no harness: `fin_confirmar_conciliacao` rejeita o espelho
+(`FIN_VALIDACAO`) mesmo passando o id direto, sem gerar candidato antes;
+extrato real confirma normalmente.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
