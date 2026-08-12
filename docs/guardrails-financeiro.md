@@ -346,8 +346,26 @@ DEFINER`:**
     `FIN_JA_LANCADO` — fix é `IN ('nao_conciliado', 'conciliado_manual')`
     (§9.96).
 
+15. **`has_filial_access`/qualquer helper booleano usado em `IF NOT
+    fn(...) THEN RAISE EXCEPTION` precisa NUNCA retornar SQL `NULL`,
+    só `true`/`false`.** Em PL/pgSQL, `IF <condição NULL> THEN` é tratado
+    como `false` (mesma regra do `WHERE`) — então `NOT NULL` também é
+    `NULL`, o `IF NOT fn(...) THEN` nunca entra, e o `RAISE EXCEPTION`
+    de bloqueio simplesmente não dispara: um `NULL` inesperado libera
+    acesso, não nega. Qualquer `OR` dentro da função que combine uma
+    comparação `x = y` (retorna `NULL`, não `false`, quando um lado é
+    `NULL`) com outros termos precisa terminar em `COALESCE(<expressão
+    toda>, false)`. Achado real: reescrever o shortcut de "sem filial
+    primária no JWT = acesso total" de `has_filial_access` (removendo o
+    `OR get_jwt_filial_id() IS NULL` incondicional que mascarava o
+    problema) expôs que `_filial_id = get_jwt_filial_id()` sozinho no
+    `OR` faz a função retornar `NULL` (não `false`) exatamente no caso
+    que o fix deveria bloquear — um bypass NOVO, pior que o original,
+    só pego porque o harness comparava o VALOR (`t`/`f`/vazio), não só
+    "não deu erro" (regra F.1) (§9.109).
+
 Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.65, §9.67,
-§9.73, §9.74, §9.80, §9.81, §9.82, §9.86, §9.96, checklist completo na memória de sessão.
+§9.73, §9.74, §9.80, §9.81, §9.82, §9.86, §9.96, §9.109, checklist completo na memória de sessão.
 
 ---
 
