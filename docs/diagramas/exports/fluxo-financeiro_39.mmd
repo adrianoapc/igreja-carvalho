@@ -1,0 +1,8 @@
+flowchart TD
+    T["tesoureiro restrito\nà Filial A"] -->|"SELECT direto\n(PostgREST)"| TAB["getnet_resumo /\ngetnet_financeiro_resumo"]
+    TAB --> SEL{"policy _select\n(FOR SELECT,\ncom has_filial_access)"}
+    TAB --> MOD{"policy _modify\n(FOR ALL,\nSEM has_filial_access)"}
+    SEL -->|"nega Filial B"| OR{"Postgres: OR entre\ntodas as policies\npermissivas do comando"}
+    MOD -->|"permite Filial A e B\n(só checa igreja_id)"| OR
+    OR -->|"1ª versão: vazava\n(MOD permissivo venceu)"| LEAK["vê as 2 filiais"]
+    OR -->|"fix: has_filial_access\ntambém no USING do _modify"| OK2["vê só Filial A"]

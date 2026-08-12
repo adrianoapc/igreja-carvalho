@@ -1,0 +1,12 @@
+flowchart TD
+    subgraph Bloqueio1["Bloqueio 1 — has_filial_access"]
+        V["getnet_credito_disponivel\n(security_invoker=true,\nsó RLS igreja_id)"] -->|"GRANT SELECT\n(C2-6, já expunha via PostgREST)"| AUTH["authenticated\n(qualquer tesoureiro/admin)"]
+        AUTH -->|"REVOKE SELECT\n(esta migration)"| BLOQ["acesso direto\nbloqueado"]
+        V -->|"SELECT ainda permitido"| SVC["service_role"]
+    end
+
+    subgraph Bloqueio2["Bloqueio 2 — ON DELETE CASCADE"]
+        INT["integracoes_financeiras"] -->|"DELETE"| FK{"integracao_id\nreferenciado em\ngetnet_resumo/analitico/\narquivos/ajustes/...\n(8 tabelas)"}
+        FK -->|"tem histórico\n(ON DELETE RESTRICT)"| ERRO["23503 foreign_key_violation\n→ toast: use \"Editar\" → Inativar"]
+        FK -->|"sem histórico"| OK["DELETE ok"]
+    end
