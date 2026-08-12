@@ -6072,6 +6072,244 @@ busca por `numero_operacao` existente retorna resumo + detalhe;
 uma filial bloqueado (`FIN_TENANT`) numa integração de outra filial da
 mesma igreja.
 
+### 9.104 Ciclo 2 (C2-6) — Separação extrato/cartão: nova estrutura (aditivo)
+
+Primeira etapa da separação estrutural do espelho sintético em
+`extratos_bancarios` — causa raiz do mecanismo `possivel_duplicata_de`
+(PR #55/migration `20260717150000`). Constrói a estrutura nova que vai
+substituir o espelho, **sem desligar nada em produção ainda** (isso é a
+C2-7, que reavalia cada consumidor — `fin_venda_banco_getnet_hop1`,
+`fin_conferencia_totais_getnet_hop1`, `getnet_antecipacao_lotes.
+extrato_bancario_id` — e migra o dado histórico). Puramente aditivo:
+nenhum consumidor existente muda de fonte nesta fase.
+
+**Decisão: view, não tabela própria** (`20260812120000`). O espelho já é
+uma cópia derivada de `getnet_resumo`/`getnet_financeiro_resumo` — gravar
+uma SEGUNDA cópia (tabela própria) reintroduziria exatamente o problema
+estrutural que esta fase existe pra resolver (dado derivado podendo
+divergir do dado bruto). `getnet_credito_disponivel` expõe o dado direto
+das duas tabelas de origem, sempre em sincronia.
+
+**Replica os dois critérios do espelho atual** (`buildResumoRow`/
+`selecionarEspelhoTipo5`/`resolverUsoTipo5`,
+`getnet-sftp/getnetExtratoParser.ts` + `index.ts` ~1255-1300):
+- tipo 1/LQ (`getnet_resumo`): `indicador_tipo_pagamento = 'LQ'`; valor
+  vem de `valor_liquido`, que já é gravado com o sinal aplicado por
+  `buildResumoRow` — reaplicar o sinal na view seria idempotente, então
+  usa a coluna direto.
+- tipo 5/PG (`getnet_financeiro_resumo`): `tipo_operacao = 'PG'` (Regra
+  Geral #10 do manual — só PG é "valores livres creditado na conta do
+  estabelecimento"; os demais tipos são liquidação contábil de dinheiro
+  já adiantado, não crédito novo).
+- A escolha entre as duas fontes é **por arquivo**, travada em
+  `getnet_arquivos.espelho_origem` (F6, migration `20260713140000`) — a
+  view faz o mesmo JOIN condicional; nunca as duas fontes ao mesmo tempo
+  pro mesmo arquivo. `NULL` (arquivo pré-F6) conta como tipo 1, mesma
+  regra do código.
+
+**`conta_id` vem do snapshot congelado no import** (coluna própria em
+`getnet_resumo`/`getnet_financeiro_resumo`, populada por
+`buildResumoRow`/`finResRows` com o mesmo valor já resolvido pra
+`ingerirExtratos`, com FK simples pra `contas(id)` + trigger de tenant
+(`getnet_valida_conta_id_tenant`, `SECURITY DEFINER` via
+`fin_validar_fk_tenant`) — ver achados do `@codex review`/Bugbot abaixo)
+— a view lê a coluna direto, **nunca**
+`integracoes_financeiras.config` em tempo de consulta. **`filial_id`**
+continua vindo de `integracoes_financeiras` (não existe coluna própria
+pra ele nas tabelas de origem) — esse join com `integracoes_financeiras`
+serve só pra `filial_id` agora, não mais pra `conta_id`.
+
+**Não reconstrói `external_id`** (o identificador de dedupe usado no
+`(conta_id, external_id)` de `extratos_bancarios`) — é um artefato
+interno da ingestão, e o componente de valor do tipo5 vem de um float JS
+formatado por `String()`, sem garantia de bater byte-a-byte com
+`numeric::text` do Postgres pra valores terminados em zero na casa dos
+centavos (`1234.50` → JS `"1234.5"` × Postgres `"1234.50"`). A view expõe
+o dado do domínio (`origem_tabela` + `origem_id` como identidade),
+não o identificador de dedupe de um consumidor específico.
+
+**`security_invoker = true`** (convenção já estabelecida no repo —
+migrations `20251203013244`/`20251204022222`/`20251208160649`, a segunda
+corrigindo um warning de "Security Definer View"): sem isso, RLS das
+tabelas base seria avaliada com o OWNER da view (role da migration,
+super-role), não com quem consulta — vazamento cross-tenant. Confirmado
+no harness (ver abaixo): sem `security_invoker`, um usuário sem
+`profiles`/`user_roles` veria os dados; com ele, 0 linhas.
+
+**Nota de segurança herdada, não nova**: a RLS de `getnet_resumo`/
+`getnet_financeiro_resumo`/`getnet_arquivos` hoje só filtra por
+`igreja_id` + papel, sem checar `filial_id` — mesmo gap já rastreado
+para outras tabelas Getnet (`RLS de getnet_ajustes/getnet_resumo` na
+lista de auditoria dedicada fora de escopo, ver
+`docs/guardrails-financeiro.md`). A view não piora nem corrige esse
+gap, só herda o que as tabelas base já expõem hoje — decisão deliberada
+de manter o escopo desta fase em "estrutura aditiva", não "auditoria de
+RLS". **Aviso explícito no comentário da migration pra quem escrever o
+consumidor da C2-7**: `filial_id` vem exposto na view mas não é
+filtrado por RLS nenhuma — a RPC/tela que ler esta view precisa aplicar
+`has_filial_access` (ou o padrão `filial_id.eq.X,filial_id.is.null` do
+guardrail A.1) explicitamente, senão repete a classe de bug do
+`project-financeiro-rpcs-sem-filial-access`.
+
+**3 achados do `/code-review` local, corrigidos antes do commit**:
+1. `JOIN` em `getnet_arquivos` virou `LEFT JOIN` + allow-list explícita
+   (`espelho_origem IS NULL OR = 'getnet_sftp_txt'`, em vez de
+   `IS DISTINCT FROM 'getnet_sftp_tipo5'`) — um `INNER JOIN` excluía
+   silenciosamente linhas de um arquivo cujo import falhasse ENTRE
+   gravar `getnet_resumo`/`getnet_financeiro_resumo` e gravar
+   `getnet_arquivos` (que só é escrito "only after all upserts succeed",
+   comentário do próprio `index.ts`) — nesse caso não existe linha
+   NENHUMA em `getnet_arquivos`, não é um `espelho_origem` `NULL`; o
+   fallback documentado ("NULL conta como tipo 1") cobria só o segundo
+   caso. A allow-list também falha seguro contra um 3º valor futuro de
+   `espelho_origem` (linha some da view em vez de cair no bucket errado).
+2. `conta_id` ganhou guarda de formato (regex UUID) antes do `::uuid` —
+   um valor malformado em `config->sftp->>conta_id` de QUALQUER
+   integração Getnet derrubava a query INTEIRA da view pra todo mundo
+   (erro de cast não é por linha). Confirmado no harness: 2ª integração
+   com `conta_id: "nao-e-um-uuid"` não quebra mais a view, só resolve
+   `conta_id: NULL` pra aquela linha.
+3. Índices novos `(integracao_id, arquivo_nome)` em `getnet_resumo`/
+   `getnet_financeiro_resumo` — nenhuma das duas tinha índice pela chave
+   real usada no JOIN novo desta view (só por `data_rv`/`rv` e
+   `data_operacao`/`chave_ur`).
+
+**Harness Docker** (postgres:15 puro, bootstrap Supabase mínimo +
+replay de todas as 443 migrations do repo, mesma técnica de sessões
+anteriores): 8 linhas semeadas cobrindo os 3 estados de
+`espelho_origem` (`NULL`/`getnet_sftp_txt`/`getnet_sftp_tipo5`) × os 2
+critérios de filtro (LQ/PG) × sinal negativo × datas ausentes — só as 3
+linhas esperadas (arquivo `NULL`-locked LQ, arquivo `txt`-locked LQ com
+sinal negativo, arquivo `tipo5`-locked PG) aparecem na view; as 5 linhas
+que deveriam ser excluídas (indicador≠LQ, LQ num arquivo travado em
+tipo5, tipo_operação≠PG, PG num arquivo travado em txt, PG sem nenhuma
+data) ficam de fora — confirmado linha a linha, não só contagem. RLS
+testada à parte (`BEGIN`/`SET LOCAL ROLE authenticated`/`SET LOCAL
+request.jwt.claim.sub`/`ROLLBACK` — fora de uma transação explícita,
+`SET LOCAL` é descartado antes do próximo statement, achado do processo
+de harness desta fase): tesoureiro da igreja certa vê as 3 linhas;
+usuário sem `profiles`/`user_roles` e sessão sem nenhum claim veem 0.
+Após os 3 fixes do code-review, harness re-rodado do zero com +2
+cenários: arquivo sem NENHUMA linha em `getnet_arquivos` (import órfão)
+agora aparece via fallback tipo1 (antes do fix, `INNER JOIN`
+descartava); 2ª integração com `conta_id` malformado não derruba mais a
+view — resolve `NULL` só naquela linha, as outras 3 continuam corretas.
+
+**2 achados P1 do `@codex review` no PR #94 + 1 do Cursor Bugbot,
+corrigidos antes do merge**:
+1. **`conta_id` congelado no momento do import** (Codex P1): a 1ª versão
+   da view resolvia `conta_id` de `integracoes_financeiras.config` em
+   TEMPO DE CONSULTA — editar a "Conta destino" da integração depois
+   reatribuiria retroativamente TODO o histórico já importado (o espelho
+   legado não tem esse problema porque `ingerirExtratos` grava o
+   `conta_id` resolvido no momento do import, congelado pra sempre). Fix:
+   coluna própria `conta_id` em `getnet_resumo`/`getnet_financeiro_resumo`,
+   populada por `buildResumoRow`/`finResRows` (`getnet-sftp/index.ts`) com
+   o mesmo `contaId` já resolvido pra `ingerirExtratos`; view passa a ler
+   a coluna (com fallback pra config atual só quando a coluna é NULL —
+   linhas históricas, backfilled best-effort na mesma migration, mesma
+   limitação de "não dá pra recuperar o passado" já documentada na C2-3).
+   Confirmado no harness: linha com `conta_id` gravado sobrevive
+   inalterada a uma mudança posterior na config da integração.
+2. **`ON DELETE CASCADE` de `integracao_id`** (Codex P1): excluir uma
+   integração hoje já apaga `getnet_resumo`/`getnet_financeiro_resumo`/
+   `getnet_arquivos` inteiros (comportamento pré-existente, não
+   introduzido por esta PR) — mas o espelho `extratos_bancarios` não tem
+   FK pra integração e sobrevive. Se a C2-7 fizer desta view a fonte
+   durável, excluir uma integração passa a apagar todo o histórico de
+   reconciliação. Decisão: **não corrigido nesta PR** (mudar `ON DELETE`
+   de FK já existente pede tratamento dedicado, guardrail J) — documentado
+   como pré-condição bloqueante da C2-7, não como "resolve depois" solto.
+3. **`COALESCE` do SQL não trata `''` como o `||` do JS** (Bugbot, low):
+   `chave_ur`/`numero_operacao` vazios (não `NULL`) escapavam do fallback
+   pretendido. Fix: `NULLIF(campo, '')` antes de cada `COALESCE`, nos dois
+   lugares (`descricao` e `numero_documento`). Confirmado no harness com
+   3 combinações (preenchido / vazio+fallback / ambos vazios→'sem-chave').
+
+Novo helper `getnet_safe_uuid(text)` (`IMMUTABLE`, cast tolerante a
+`NULL`) centraliza a guarda de formato usada no backfill das duas
+tabelas + validação da FK abaixo.
+
+**2ª rodada do `@codex review` (contra o commit que corrigiu os 2 P1
+acima) achou mais 2 P1 reais, ambos corrigidos**:
+1. **Fallback pra config atual ainda sobrevivia pra linhas com
+   `conta_id IS NULL`**: o 1º fix parou de RE-LER a config só pra linhas
+   que JÁ tinham `conta_id` congelado — uma linha com `conta_id NULL`
+   (backfill sem match) reabria o mesmo bug SÓ pra ela. Fix: removeu o
+   `COALESCE` da view inteiramente — `conta_id IS NULL` fica `NULL` de
+   verdade, sem recálculo a cada consulta. Atribuição desconhecida agora
+   é um estado final honesto, não algo "resolvido" via config atual.
+2. **Nada validava `conta_id` antes de gravar nas colunas novas**: um
+   UUID sintaticamente válido mas de conta inexistente/de outra igreja
+   passava pelo INSERT de `getnet_resumo`/`getnet_financeiro_resumo`
+   (que roda ANTES do espelho) e só `fin_ingerir_extratos` (que TEM
+   validação de tenant) rejeitava depois — deixando a linha crua já
+   commitada com conta errada, presa pra sempre (`upsertChunks` usa
+   `ON CONFLICT DO NOTHING`, nunca corrige valor já gravado). Fix: FK de
+   verdade — `conta_id REFERENCES contas(id) ON DELETE SET NULL` nas
+   duas tabelas (não `CASCADE`: excluir uma conta bancária não deveria
+   apagar histórico de crédito Getnet, só sua atribuição — mesmo
+   princípio do NULL honesto do item 1). Backfill ajustado pra só
+   preencher via JOIN direto contra `contas` (existência + mesma
+   igreja), não só formato — senão a própria migration quebraria ao
+   adicionar a FK sobre um valor que não referencia nada. Confirmado no
+   harness: INSERT com `conta_id` de conta inexistente é rejeitado na
+   hora (`getnet_resumo_conta_id_fkey`), e a linha com `conta_id`
+   congelado sobrevive inalterada a uma mudança posterior na config —
+   agora sem exceção nenhuma.
+
+Cursor Bugbot, mesma rodada, achado Medium: gravar `contaId` bruto (sem
+guarda de formato) nas colunas novas podia quebrar o upsert de
+`getnet_resumo`/`getnet_financeiro_resumo` pra um `config.sftp.conta_id`
+malformado que hoje só quebra o passo do espelho — julgado **comportamento
+correto, não regressão**: a FK nova (achado 2 acima) É a validação
+pretendida, mesma garantia que `fin_ingerir_extratos` já dava pro espelho,
+agora também pro dado cru, falhando alto e cedo em vez de aceitar um
+valor ruim silenciosamente.
+
+**3ª rodada — Codex e Bugbot acharam o MESMO gap na FK do item 2**: ela
+só checa `contas.id`, não `igreja_id` — uma conta de OUTRA igreja (UUID
+sintaticamente válido, existe em `contas`, `igreja_id` diferente) ainda
+passava pelo INSERT. Corrigido, mas **não** com FK composta
+`(conta_id, igreja_id) REFERENCES contas(id, igreja_id)`: `ON DELETE SET
+NULL` numa FK composta zera TODAS as colunas da FK, incluindo
+`igreja_id` — que é `NOT NULL` nas duas tabelas, então excluir uma conta
+quebraria a constraint `NOT NULL` em vez de só desatribuir. Fix: trigger
+`getnet_valida_conta_id_tenant()` (`BEFORE INSERT OR UPDATE OF conta_id`,
+não reage a `DELETE` em `contas` — a FK simples continua cuidando do
+`SET NULL` nesse caso) valida o par `(conta_id, igreja_id)` contra
+`contas` e recusa com `FIN_TENANT` se não bater. Confirmado no harness
+com o cenário específico que faltava nas rodadas anteriores: `conta_id`
+de uma conta que EXISTE mas é de outra igreja é rejeitado (as rodadas
+anteriores só tinham testado "não existe de jeito nenhum", que a FK
+sozinha já cobria).
+
+**4ª rodada — Bugbot achou que o trigger acima tinha o MESMO tipo de
+bug que ele existia pra evitar**: a 1ª versão fazia `SELECT ... FROM
+contas` direto, SEM `SECURITY DEFINER` — rodava sob a RLS de quem
+estivesse escrevendo em `getnet_resumo`/`getnet_financeiro_resumo`. A
+policy de `SELECT` de `contas` é mais restrita (`admin`/`tesoureiro` +
+`has_filial_access`) que a de ESCRITA de `getnet_resumo`/
+`getnet_financeiro_resumo` (`admin_igreja`/`super_admin` também, sem
+checar filial) — um `super_admin` gravando um `conta_id` **correto** da
+**mesma** igreja podia disparar `FIN_TENANT` por falso negativo: não é
+que a conta fosse de outra igreja, é que o papel dele não tinha
+`SELECT` liberado nela sob RLS. Fix: em vez de reimplementar a
+checagem, o trigger passou a delegar pra `fin_validar_fk_tenant`
+(helper `SECURITY DEFINER` já usado em dezenas de RPCs `fin_*` do repo
+pra exatamente este propósito) — `PERFORM public.fin_validar_fk_tenant
+('contas', NEW.conta_id, NEW.igreja_id)`. Erro passou de `FIN_TENANT`
+pra `FIN_FK` (convenção já estabelecida do helper reusado, mais
+consistente que inventar um código novo). Confirmado no harness com o
+cenário exato do achado: `super_admin` sem `SELECT` em `contas` (0
+linhas visíveis sob a própria RLS, confirmado antes do teste) consegue
+inserir `getnet_resumo` com `conta_id` válido da mesma igreja sem cair
+no falso `FIN_FK`; conta de outra igreja continua rejeitada.
+Aproveitado pra corrigir também 2 menções erradas a "FK composta" que
+sobraram de rascunho em outro parágrafo deste arquivo e no diagrama
+Mermaid (achado P2 do Codex, mesma rodada) — a solução final é FK
+simples + trigger, nunca foi FK composta.
+
 ## 11. Riscos
 
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
