@@ -938,8 +938,9 @@ async function runExtratoEletronicoV10(args: {
     dataReferencia, requestedFile,
   } = args;
 
-  // F6/D5: espelho em extratos_bancarios nasce do tipo 5 (PG, dinheiro real)
-  // em vez do tipo 1 (LQ) para arquivos com data_referencia >= corte
+  // F6/D5 (C2-8: não alimenta mais espelho em extratos_bancarios, só a
+  // fonte de getnet_credito_disponivel_view, C2-6): tipo 5 (PG, dinheiro
+  // real) em vez do tipo 1 (LQ) para arquivos com data_referencia >= corte
   // configurado por integração. Opt-in: sem `espelho_tipo5_desde`, mantém o
   // comportamento legado (tipo 1). Fica no nível raiz de `config` (não em
   // `config.sftp`) para sobreviver ao merge raso da edge integracoes-config.

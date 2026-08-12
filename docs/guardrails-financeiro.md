@@ -626,7 +626,23 @@ Referências: §9.35, §9.39, §9.51, §9.53, §9.73, §9.77.
    `mutate`/toast use só os IDs (e a contagem) efetivamente enviados
    (§9.98 — Modo Inteligente C2-0).
 
-Referências: §9.40, §9.41, §9.56, §9.57, §9.58, §9.59, §9.98.
+6. **Toda listagem/stats client-side de `extratos_bancarios` precisa
+   excluir o espelho sintético Getnet** (`origem IN ('getnet_sftp',
+   'getnet_sftp_txt', 'getnet_sftp_tipo5')`) — use
+   `FILTRO_EXCLUI_ESPELHO_GETNET`/`ORIGENS_ESPELHO_GETNET`
+   (`src/features/financeiro/core/api/extratos.api.ts`), nunca reescreva
+   a lista de origens à mão. Padrão achado e corrigido em pelo menos 3
+   rodadas diferentes (§9.106 e §9.108 — `HistoricoExtratos.tsx`/
+   `useConciliacaoInteligente.ts`/`useConciliacaoLote.ts` na 1ª rodada;
+   `useDashboardConciliacaoData.ts`/`useConciliacaoManualData.ts` na
+   2ª) porque cada query nova de `extratos_bancarios` precisa lembrar
+   de aplicar o filtro por conta própria — não existe checagem de tipo
+   nem lint que force isso. Ao escrever QUALQUER query nova (client-side
+   ou RPC) que leia `extratos_bancarios` sem passar por uma RPC que já
+   filtre (`fin_listar_extratos_sem_candidato`, `fin_gerar_candidatos_
+   conciliacao`), aplicar o filtro é obrigatório, não opcional.
+
+Referências: §9.40, §9.41, §9.56, §9.57, §9.58, §9.59, §9.98, §9.106, §9.108.
 
 ---
 
