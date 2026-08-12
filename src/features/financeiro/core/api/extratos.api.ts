@@ -18,6 +18,30 @@ export type OrigemExtrato =
   | "getnet_sftp_tipo5"
   | "pix";
 
+/**
+ * Origens que são o espelho sintético do próprio pipeline Getnet (settlement_v1,
+ * extrato_eletronico_v10 tipo1/tipo5) — não são um crédito/débito bancário
+ * real. Mesma lista de `public.fin_e_espelho_getnet` no banco
+ * (`supabase/migrations/20260812130000_fin_hop1_exclui_espelho_getnet.sql`) —
+ * centralizada aqui pra qualquer query client-side em `extratos_bancarios`
+ * que precise excluir essas linhas (achado do code-review: sem isso, cada
+ * call site copiava a lista à mão, e uma origem nova adicionada no banco
+ * facilmente ficava fora de sync no frontend).
+ */
+export const ORIGENS_ESPELHO_GETNET: readonly OrigemExtrato[] = [
+  "getnet_sftp",
+  "getnet_sftp_txt",
+  "getnet_sftp_tipo5",
+];
+
+/**
+ * Filtro PostgREST (`.or(...)`) NULL-safe pra excluir o espelho Getnet de
+ * uma query em `extratos_bancarios` — `origem IS NULL` nunca é descartado
+ * (mesmo motivo do guard SQL: `NOT (origem IN (...))` é NULL, não TRUE,
+ * pra `origem` nulo, e o PostgREST/SQL filtram NULL fora do WHERE).
+ */
+export const FILTRO_EXCLUI_ESPELHO_GETNET = `origem.is.null,origem.not.in.(${ORIGENS_ESPELHO_GETNET.join(",")})`;
+
 export interface ExtratoItem {
   /** Data da transação em ISO (yyyy-mm-dd). */
   data_transacao: string;

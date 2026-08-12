@@ -6449,6 +6449,82 @@ Confirmado no harness: cenário idêntico rejeitado no desfazer
 (`filial_id NULL` dos dois lados) continua funcionando em
 `fin_vincular_lote_antecipacao` sem regressão.
 
+### 9.106 Motor central de conciliação (F4) para de casar contra o espelho Getnet
+
+**Fora do plano Ciclo 2 numerado — achado durante a pesquisa pré-cutover
+da C2-8, decisão explícita do usuário: corrigir isto ANTES do cutover
+pra `getnet_credito_disponivel`.**
+
+Depois da C2-7 mergeada, o usuário pediu pra retomar o cutover completo
+(Opção B): resolver os 2 bloqueios da C2-6 (`has_filial_access`,
+`ON DELETE CASCADE`) e migrar Hop1/antecipação pra ler de
+`getnet_credito_disponivel`. Antes de implementar, uma pesquisa ampla
+mapeou TODOS os consumidores de `extratos_bancarios` (não só a família
+Hop1/antecipação já corrigida) e achou um bug mais grave e mais urgente
+que o cutover em si.
+
+**Achado**: `fin_gerar_candidatos_conciliacao` — o motor ÚNICO de
+candidatos de conciliação (ADR-030 F4), usado por Modo Inteligente, Modo
+Clássico (via `fin_listar_extratos_sem_candidato`), a aba Dashboard
+legada e a edge `gerar-sugestoes-ml` — **nunca filtrava
+`extratos_bancarios.origem`**. Exatamente o mesmo bug que a C2-7 corrigiu
+em `fin_gerar_candidatos_venda_banco_getnet`/`fin_gerar_candidatos_lote_
+antecipacao_getnet`, só que aqui é o motor que atende TODOS os bancos,
+não só Getnet, e o caminho de escrita (`fin_confirmar_conciliacao`) é
+transacional — uma venda Getnet podia ser confirmada como o lado
+bancário de uma transação real qualquer, silenciosamente, por qualquer
+um dos 4 caminhos que chamam este motor. Mais grave que o achado da
+C2-7 porque é um bug de ESCRITA (confirmação errada), não só de
+sugestão/exibição.
+
+**Outros 3 consumidores achados na mesma pesquisa, mesmo bug**:
+`fin_listar_extratos_sem_candidato` (própria query, além de herdar via
+F4 — sem o fix, o espelho SEMPRE apareceria como "sem candidato" já que
+nunca teria candidato F4 de verdade, confundindo o tesoureiro com uma
+tarefa que não existe); `view_reconciliacao_cobertura` (infla Total/
+Reconciliados/Pendentes/% Cobertura/Valor do relatório com dado
+sintético); `HistoricoExtratos.tsx` "Banco" stats card e
+`useConciliacaoLote.ts` (lote manual N:1) no frontend.
+
+**Fix**: mesmo padrão cirúrgico da C2-7, reusa `public.fin_e_espelho_getnet`
+(já existe desde `20260812130000`) — `supabase/migrations/
+20260812140000_fin_motor_conciliacao_exclui_espelho_getnet.sql`.
+
+**Achado do `/code-review` local, corrigido antes do push**: a 1ª versão
+usava `AND NOT public.fin_e_espelho_getnet(e.origem)` sem guarda de
+NULL — o comentário original desta linha afirmava (ERRADO) que não
+precisava de guarda. Na real, `fin_e_espelho_getnet(NULL)` é
+`NULL IN (...)` = `NULL`, `NOT NULL` = `NULL`, e `WHERE` descarta `NULL`
+igual a `FALSE` — um extrato REAL com `origem` `NULL` (coluna nullable,
+sem `NOT NULL`) sumiria silenciosamente do pool de candidatos, da lista
+"sem candidato" e das estatísticas de cobertura. Exatamente a armadilha
+do guardrail §9.62 item 3 que a própria C2-7 já tinha evitado
+corretamente nesta função-irmã — a 2ª versão usa `(e.origem IS NULL OR
+NOT public.fin_e_espelho_getnet(e.origem))` nos 4 lugares SQL e
+`.or("origem.is.null,origem.not.in.(...)")` nos 2 lugares frontend
+(equivalente PostgREST — `.not("origem","in",...)` sozinho tem a mesma
+propagação de NULL). Confirmado no harness: extrato com `origem NULL`
+continua aparecendo como candidato, fora da lista "sem candidato" (por
+ter candidato real) e contado em `view_reconciliacao_cobertura`, junto
+com o cenário original (extrato REAL e espelho Getnet com mesmo
+valor/data — só o real vira candidato).
+
+**Achado do 2º code-review (reuse), corrigido antes do push**: a lista
+de 3 origens espelho estava hardcoded, duplicada, nos 2 filtros
+PostgREST client-side (`HistoricoExtratos.tsx`/`useConciliacaoLote.ts`)
+— sem link nenhum com `fin_e_espelho_getnet` do banco nem com o tipo TS
+`OrigemExtrato` já existente. Risco real e específico: foi exatamente
+assim que o achado da própria C2-7 aconteceu (`getnet_sftp` do layout
+`settlement_v1` ficou fora da 1ª versão da lista) — uma origem nova
+adicionada no helper SQL não teria NENHUM link de compilação forçando
+o frontend a acompanhar. Fix: `ORIGENS_ESPELHO_GETNET`/
+`FILTRO_EXCLUI_ESPELHO_GETNET` centralizados em
+`src/features/financeiro/core/api/extratos.api.ts` (mesmo arquivo do
+tipo `OrigemExtrato`), os 2 call sites importam em vez de copiar a
+string à mão.
+
+## 11. Riscos
+
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
   inegociável; revisão de segurança dedicada (checklist de
   `docs/01-Arquitetura/04-rls-e-seguranca.MD`).

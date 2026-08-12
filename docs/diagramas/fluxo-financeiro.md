@@ -1175,3 +1175,29 @@ flowchart TD
     DESFAZ -.->|"tesoureiro decide,\nrevincula pelo fluxo normal"| CAND
 ```
 
+## Motor central de conciliação (F4) para de casar contra o espelho Getnet (§9.106)
+
+Fora do plano Ciclo 2 numerado — achado na pesquisa pré-cutover da C2-8:
+`fin_gerar_candidatos_conciliacao` (motor ÚNICO, atende Modo Inteligente,
+Modo Clássico, Dashboard legado e ML), sem filtro de `origem`, podia
+confirmar uma venda Getnet como o lado bancário de QUALQUER transação
+real via `fin_confirmar_conciliacao` — bug de escrita, mais grave que o
+achado da C2-7 (só sugestão/exibição).
+
+```mermaid
+flowchart TD
+    T["transacao_financeira\n(pendente/pago)"] --> F4["fin_gerar_candidatos_conciliacao\n(motor único F4)"]
+    EB3["extratos_bancarios\n(créditos/débitos não reconciliados,\nqualquer banco)"] --> F4
+    F4 --> CHECK2{"origem IS NULL OR\nNOT fin_e_espelho_getnet(origem)?"}
+    CHECK2 -->|"não — é o espelho"| FORA["excluído do pool\n(Modo Inteligente, auto-reconciliar,\nDashboard, sugestões ML)"]
+    CHECK2 -->|"sim — real ou origem NULL"| CAND2["candidato válido"]
+    CAND2 --> CONF["fin_confirmar_conciliacao"]
+
+    F4 -.-> SEMCAND["fin_listar_extratos_sem_candidato\n(Modo Clássico)"]
+    SEMCAND -.->|"mesmo filtro, own query"| CHECK2
+    EB3 -.-> COBERTURA["view_reconciliacao_cobertura\n(Relatório)"]
+    COBERTURA -.->|"mesmo filtro"| CHECK2
+    EB3 -.-> LOTE["useConciliacaoLote.ts\n(lote manual N:1, frontend)"]
+    LOTE -.->|"FILTRO_EXCLUI_ESPELHO_GETNET\n(extratos.api.ts, mesma lista SQL)"| CHECK2
+```
+
