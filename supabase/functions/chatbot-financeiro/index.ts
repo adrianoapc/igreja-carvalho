@@ -2397,13 +2397,27 @@ serve(async (req) => {
           );
         }
 
-        // Buscar categoria "Transferência entre Contas"
-        const { data: categoriaTransferencia } = await supabase
+        // Buscar categoria "Transferência entre Contas" — filial-aware
+        // (achado junto do fix de fin_criar_transferencia: sem filtro de
+        // filial, uma categoria filial-específica de OUTRA filial passava
+        // batido aqui e a nova validação fin_validar_fk_filial do backend
+        // rejeitaria a transferência via WhatsApp). Mesma regra de
+        // TransferenciaDialog.tsx/useDadosApoio.ts: filial específica →
+        // própria ou global; sem filial (filialIdFromWhatsApp null) → só
+        // global.
+        let categoriaQuery = supabase
           .from("categorias_financeiras")
-          .select("id")
+          .select("id, filial_id")
           .eq("nome", "Transferência entre Contas")
-          .eq("igreja_id", igrejaId)
-          .maybeSingle();
+          .eq("igreja_id", igrejaId);
+        categoriaQuery = filialIdFromWhatsApp
+          ? categoriaQuery.or(`filial_id.eq.${filialIdFromWhatsApp},filial_id.is.null`)
+          : categoriaQuery.is("filial_id", null);
+        const { data: categoriasTransferencia } = await categoriaQuery.limit(5);
+        const categoriaTransferencia = filialIdFromWhatsApp
+          ? categoriasTransferencia?.find((c) => c.filial_id === filialIdFromWhatsApp) ??
+            categoriasTransferencia?.[0]
+          : categoriasTransferencia?.[0];
 
         const categoriaId = categoriaTransferencia?.id || null;
         const dataHoje = new Date().toISOString().split("T")[0];

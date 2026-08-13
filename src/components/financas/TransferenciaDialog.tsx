@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { criarTransferencia } from "@/features/financeiro/core";
+import { primeiroCatalogoPorFilial } from "@/features/financeiro/core/filialCatalogo";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
@@ -76,31 +77,39 @@ export function TransferenciaDialog({
     enabled: open && !!igrejaId,
   });
 
-  // Buscar categoria "Transferência entre Contas"
+  // Buscar categoria "Transferência entre Contas" — filial-aware (achado:
+  // sem isso, uma filial com categoria "Transferência" própria podia
+  // silenciosamente pegar a de outra filial/global por engano).
   const { data: categoriaTransferencia } = useQuery({
-    queryKey: ["categoria-transferencia", igrejaId],
+    queryKey: ["categoria-transferencia", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return null;
 
-      // Buscar categoria de SAÍDA
-      const { data: catSaida } = await supabase
-        .from("categorias_financeiras")
-        .select("id, nome")
-        .eq("igreja_id", igrejaId)
-        .eq("tipo", "saida")
-        .ilike("nome", "%transferência%")
-        .limit(1)
-        .single();
-
-      // Buscar categoria de ENTRADA
-      const { data: catEntrada } = await supabase
-        .from("categorias_financeiras")
-        .select("id, nome")
-        .eq("igreja_id", igrejaId)
-        .eq("tipo", "entrada")
-        .ilike("nome", "%transferência%")
-        .limit(1)
-        .single();
+      type Categoria = { id: string; nome: string; filial_id: string | null };
+      const [catSaida, catEntrada] = await Promise.all([
+        primeiroCatalogoPorFilial<Categoria>(
+          () =>
+            supabase
+              .from("categorias_financeiras")
+              .select("id, nome, filial_id")
+              .eq("igreja_id", igrejaId)
+              .eq("tipo", "saida")
+              .ilike("nome", "%transferência%"),
+          filialId,
+          isAllFiliais,
+        ),
+        primeiroCatalogoPorFilial<Categoria>(
+          () =>
+            supabase
+              .from("categorias_financeiras")
+              .select("id, nome, filial_id")
+              .eq("igreja_id", igrejaId)
+              .eq("tipo", "entrada")
+              .ilike("nome", "%transferência%"),
+          filialId,
+          isAllFiliais,
+        ),
+      ]);
 
       return {
         saida: catSaida,
@@ -115,58 +124,63 @@ export function TransferenciaDialog({
     queryKey: [
       "subcategoria-deposito-saida",
       igrejaId,
+      filialId,
+      isAllFiliais,
       categoriaTransferencia?.saida?.id,
     ],
     queryFn: async () => {
       if (!igrejaId || !categoriaTransferencia?.saida?.id) return null;
 
-      const { data } = await supabase
-        .from("subcategorias_financeiras")
-        .select("id")
-        .eq("categoria_id", categoriaTransferencia.saida.id)
-        .ilike("nome", "%depósito%caixa%")
-        .limit(1)
-        .single();
-
-      return data;
+      return primeiroCatalogoPorFilial<{ id: string; filial_id: string | null }>(
+        () =>
+          supabase
+            .from("subcategorias_financeiras")
+            .select("id, filial_id")
+            .eq("categoria_id", categoriaTransferencia.saida!.id)
+            .ilike("nome", "%depósito%caixa%"),
+        filialId,
+        isAllFiliais,
+      );
     },
     enabled: open && !!igrejaId && !!categoriaTransferencia?.saida?.id,
   });
 
   // Buscar Base Ministerial "Administração Geral"
   const { data: baseMinisterial } = useQuery({
-    queryKey: ["base-ministerial-admin", igrejaId],
+    queryKey: ["base-ministerial-admin", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return null;
 
-      const { data } = await supabase
-        .from("bases_ministeriais")
-        .select("id")
-        .eq("igreja_id", igrejaId)
-        .ilike("titulo", "%administração%geral%")
-        .limit(1)
-        .single();
-
-      return data;
+      return primeiroCatalogoPorFilial<{ id: string; filial_id: string | null }>(
+        () =>
+          supabase
+            .from("bases_ministeriais")
+            .select("id, filial_id")
+            .eq("igreja_id", igrejaId)
+            .ilike("titulo", "%administração%geral%"),
+        filialId,
+        isAllFiliais,
+      );
     },
     enabled: open && !!igrejaId,
   });
 
   // Buscar Centro de Custo "Administração"
   const { data: centroCusto } = useQuery({
-    queryKey: ["centro-custo-admin", igrejaId],
+    queryKey: ["centro-custo-admin", igrejaId, filialId, isAllFiliais],
     queryFn: async () => {
       if (!igrejaId) return null;
 
-      const { data } = await supabase
-        .from("centros_custo")
-        .select("id")
-        .eq("igreja_id", igrejaId)
-        .ilike("nome", "%administração%")
-        .limit(1)
-        .single();
-
-      return data;
+      return primeiroCatalogoPorFilial<{ id: string; filial_id: string | null }>(
+        () =>
+          supabase
+            .from("centros_custo")
+            .select("id, filial_id")
+            .eq("igreja_id", igrejaId)
+            .ilike("nome", "%administração%"),
+        filialId,
+        isAllFiliais,
+      );
     },
     enabled: open && !!igrejaId,
   });
