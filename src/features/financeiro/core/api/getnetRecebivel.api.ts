@@ -360,6 +360,8 @@ export interface LedgerCartaoLote {
   desagio: number | null;
   credito_banco: number | null;
   data_liquidacao: string | null;
+  /** Transação da saída "Deságio de antecipação Getnet" — null se ainda não lançada. Usado pra reverter direto nesta tela (fin_alterar_status_lancamento). */
+  lancamento_desagio_id: string | null;
   vendas_origem: LedgerCartaoVendaOrigem[];
 }
 

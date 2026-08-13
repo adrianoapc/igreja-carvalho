@@ -12,6 +12,7 @@ import {
   Loader2,
   Search,
   TrendingDown,
+  Undo2,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -32,6 +33,7 @@ import {
   type LedgerCartaoLancamento,
   type LedgerCartaoLote,
 } from "@/features/financeiro/core/api/getnetRecebivel.api";
+import { alterarStatusLancamento } from "@/features/financeiro/core/api/lancamentos.api";
 import { ScoreBadge, rpcErrorMessage } from "@/components/financas/ScoreBadge";
 import { BuscaManualDialog } from "@/components/financas/BuscaManualDialog";
 import { VincularExtratoLoteDialog } from "@/components/financas/VincularExtratoLoteDialog";
@@ -430,6 +432,25 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
     },
   });
 
+  // Reverte a saída "Deságio de antecipação Getnet" direto desta tela —
+  // antes só dava pra fazer pelo menu de transações (TransacaoActionsMenu),
+  // fora daqui. O trigger sincronizar_lote_antecipacao_ao_reverter_desagio
+  // (20260731180000) volta o lote pra 'vinculado' e limpa lancamento_
+  // desagio_id automaticamente ao detectar pago -> não-pago; o vínculo com
+  // o extrato bancário (extrato_bancario_id) não é tocado.
+  const reverterDesagio = useMutation({
+    mutationFn: (lancamentoDesagioId: string) => alterarStatusLancamento(lancamentoDesagioId, "pendente"),
+    onSuccess: () => {
+      toast.success("Deságio revertido — lote voltou pra 'Vinculado'");
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["getnet-antecipacao-lotes"] });
+      queryClient.invalidateQueries({ queryKey: ["conferencia-totais-getnet"] });
+    },
+    onError: (err) => {
+      toast.error(rpcErrorMessage(err) ?? "Erro ao reverter deságio");
+    },
+  });
+
   const gruposPorData = useMemo(() => {
     const ordem: string[] = [];
     const map = new Map<string, LedgerCartaoLancamento[]>();
@@ -569,6 +590,12 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
                           formatValue={formatValue}
                           onVincularExtrato={() => setLoteVinculando(lote)}
                           onLancarSaida={() => setLoteLancando(lote)}
+                          onReverterDesagio={() =>
+                            lote.lancamento_desagio_id && reverterDesagio.mutate(lote.lancamento_desagio_id)
+                          }
+                          revertendo={
+                            reverterDesagio.isPending && reverterDesagio.variables === lote.lancamento_desagio_id
+                          }
                           dadosStatus={dadosStatus}
                         />
                       );
@@ -922,6 +949,8 @@ function LoteRow({
   formatValue,
   onVincularExtrato,
   onLancarSaida,
+  onReverterDesagio,
+  revertendo,
   dadosStatus,
 }: {
   lote: LedgerCartaoLote;
@@ -930,6 +959,8 @@ function LoteRow({
   formatValue: (v: number) => string;
   onVincularExtrato: () => void;
   onLancarSaida: () => void;
+  onReverterDesagio: () => void;
+  revertendo: boolean;
   dadosStatus: LoteDadosStatus;
 }) {
   const meta = LOTE_STATUS_META[lote.status];
@@ -938,6 +969,12 @@ function LoteRow({
       ? lote.valor_contrato - lote.credito_banco
       : null;
   const temDadosCompletos = dadosStatus === "ready";
+  // Hop 2 (venda↔oferta) é um conceito independente do status do lote —
+  // "Concluído" aqui só reflete vínculo bancário + deságio lançado, não se
+  // a venda dentro do lote já foi casada com uma oferta. Agregado calculado
+  // no cliente (vendas_origem já traz oferta_lancamento_id por venda) pra
+  // não precisar de outro campo na RPC.
+  const vendasSemHop2 = lote.vendas_origem.filter((v) => !v.oferta_lancamento_id).length;
 
   return (
     <Collapsible open={open} onOpenChange={onToggle} className="border rounded-lg bg-card shadow-sm overflow-hidden">
@@ -956,6 +993,11 @@ function LoteRow({
               {formatValue(lote.valor_contrato ?? 0)}
             </span>
             <StatusPillBadge tone={meta.tone} label={meta.label} />
+            {vendasSemHop2 > 0 && (
+              <Badge variant="outline" className="text-xs whitespace-nowrap">
+                Hop 2: {vendasSemHop2}/{lote.vendas_origem.length} sem oferta
+              </Badge>
+            )}
             <span className={`text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`}>▸</span>
           </button>
         </CollapsibleTrigger>
@@ -1028,9 +1070,24 @@ function LoteRow({
               </>
             )}
             {lote.status === "lancamento_criado" && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Landmark className="w-3.5 h-3.5" /> Concluído
-              </span>
+              <>
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Landmark className="w-3.5 h-3.5" /> Lote concluído
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onReverterDesagio}
+                  disabled={!lote.lancamento_desagio_id || revertendo}
+                >
+                  {revertendo ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                  ) : (
+                    <Undo2 className="w-3.5 h-3.5 mr-1" />
+                  )}
+                  Reverter deságio
+                </Button>
+              </>
             )}
             {!temDadosCompletos && lote.status !== "lancamento_criado" && (
               <span className="text-xs text-muted-foreground flex items-center gap-1">
