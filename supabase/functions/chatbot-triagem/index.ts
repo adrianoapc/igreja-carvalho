@@ -247,10 +247,8 @@ async function atualizarMetaSessao(
 function respostaJson(
   message: string,
   extras: Record<string, unknown> = {},
-  status = 200,
 ): Response {
   return new Response(JSON.stringify({ reply_message: message, ...extras }), {
-    status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
@@ -1193,15 +1191,6 @@ serve(async (req: Request) => {
     const FALLBACK_ERRO_IA =
       "Desculpe, tivemos um problema técnico ao processar sua mensagem. Por favor, tente novamente em instantes.";
 
-    const logFalhaProvider = (provider: string, res: Response, data: unknown) => {
-      if (!res.ok) {
-        console.error(
-          `[Triagem] ${provider} falhou (status ${res.status}):`,
-          JSON.stringify(data),
-        );
-      }
-    };
-
     // Cobre os dois jeitos de a IA falhar: exceção na chamada (timeout,
     // conexão resetada, corpo não-JSON de um 502/503 — mais comuns que um
     // 200 vazio) e resposta bem-formada sem conteúdo utilizável. Sem
@@ -1243,23 +1232,26 @@ serve(async (req: Request) => {
 
       // notificar_admin: true — falha de IA sem visibilidade nenhuma pra
       // equipe pastoral (só log de edge function) é pior que um alerta
-      // ocasional de mais. Status 502 (não 200): antes, uma exceção na
-      // chamada de IA caía no catch genérico e voltava 500 — qualquer
-      // automação a montante (Make) que alerte em cima de status não-2xx
-      // pra detectar instabilidade precisa continuar vendo isso aqui.
-      return respostaJson(
-        FALLBACK_ERRO_IA,
-        {
-          notificar_admin: true,
-          telefone_admin_destino: TELEFONE_PASTOR_PLANTAO,
-          dados_contato: {
-            telefone_usuario: telefone,
-            nome_usuario: nome_perfil,
-            motivo: `Falha técnica: ${motivo}`,
-          },
+      // ocasional de mais. Status 200, não 5xx (achado do review, PR #100):
+      // reply_message/notificar_admin só chegam no WhatsApp do usuário/
+      // pastor se o módulo HTTP do Make não tratar a resposta como erro —
+      // o comportamento padrão do Make (e de qualquer cenário com
+      // "Evaluate all states as errors" ligado) para no 5xx, nunca lê o
+      // body, e pode reprocessar depois da janela de idempotência de 5s,
+      // reanexando a mesma mensagem em historico_conversa. `erro_ia: true`
+      // no body sinaliza a falha pra quem quiser distinguir, sem quebrar
+      // a entrega. A falha técnica em si já fica registrada em
+      // logs_auditoria_chat/log_edge_function_with_metrics acima.
+      return respostaJson(FALLBACK_ERRO_IA, {
+        erro_ia: true,
+        notificar_admin: true,
+        telefone_admin_destino: TELEFONE_PASTOR_PLANTAO,
+        dados_contato: {
+          telefone_usuario: telefone,
+          nome_usuario: nome_perfil,
+          motivo: `Falha técnica: ${motivo}`,
         },
-        502,
-      );
+      });
     };
 
     // 30s: sem isso, um provedor que trava (não retorna erro nenhum, só não
@@ -1282,7 +1274,13 @@ serve(async (req: Request) => {
           },
         );
         const data = await res.json();
-        logFalhaProvider("Lovable AI gateway", res, data);
+        if (!res.ok) {
+          console.error(
+            `[Triagem] Lovable AI gateway falhou (status ${res.status}):`,
+            JSON.stringify(data),
+          );
+          return await responderComFalhaIA(`Lovable AI gateway HTTP ${res.status}`);
+        }
         aiContent = data.choices?.[0]?.message?.content || "";
       } else {
         const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -1299,7 +1297,13 @@ serve(async (req: Request) => {
           signal: AbortSignal.timeout(AI_TIMEOUT_MS),
         });
         const data = await res.json();
-        logFalhaProvider("OpenAI", res, data);
+        if (!res.ok) {
+          console.error(
+            `[Triagem] OpenAI falhou (status ${res.status}):`,
+            JSON.stringify(data),
+          );
+          return await responderComFalhaIA(`OpenAI HTTP ${res.status}`);
+        }
         aiContent = data.choices?.[0]?.message?.content || "";
       }
     } catch (aiErr) {
