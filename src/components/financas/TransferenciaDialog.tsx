@@ -67,7 +67,10 @@ export function TransferenciaDialog({
         .order("nome");
 
       if (!isAllFiliais && filialId) {
-        query = query.eq("filial_id", filialId);
+        // Conta compartilhada (filial_id NULL) é visível de qualquer
+        // filial (RLS via has_filial_access) — eq() sozinho a excluiria
+        // (mesmo padrão de useDadosApoio.ts).
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
       }
 
       const { data, error } = await query;

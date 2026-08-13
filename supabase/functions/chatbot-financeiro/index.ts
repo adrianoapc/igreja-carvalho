@@ -2405,21 +2405,41 @@ serve(async (req) => {
         // TransferenciaDialog.tsx/useDadosApoio.ts: filial específica →
         // própria ou global; sem filial (filialIdFromWhatsApp null) → só
         // global.
-        let categoriaQuery = supabase
-          .from("categorias_financeiras")
-          .select("id, filial_id")
-          .eq("nome", "Transferência entre Contas")
-          .eq("igreja_id", igrejaId);
-        categoriaQuery = filialIdFromWhatsApp
-          ? categoriaQuery.or(`filial_id.eq.${filialIdFromWhatsApp},filial_id.is.null`)
-          : categoriaQuery.is("filial_id", null);
-        const { data: categoriasTransferencia } = await categoriaQuery.limit(5);
-        const categoriaTransferencia = filialIdFromWhatsApp
-          ? categoriasTransferencia?.find((c) => c.filial_id === filialIdFromWhatsApp) ??
-            categoriasTransferencia?.[0]
-          : categoriasTransferencia?.[0];
+        //
+        // Achado de review (#103): a versão anterior buscava só por nome,
+        // sem `tipo` nem ORDER BY, e usava o 1º resultado (não-
+        // determinístico) pros dois lados da transferência — podia gravar
+        // a categoria de SAÍDA em `categoria_entrada_id` (ou vice-versa)
+        // quando saída/entrada têm o mesmo nome "Transferência entre
+        // Contas" (padrão, ver TransferenciaDialog.tsx). Agora busca cada
+        // tipo separado, com ORDER BY determinístico (mesmo padrão de
+        // `primeiroCatalogoPorFilial`).
+        const buscarCategoriaTransferencia = async (tipo: "saida" | "entrada") => {
+          let query = supabase
+            .from("categorias_financeiras")
+            .select("id, filial_id")
+            .eq("nome", "Transferência entre Contas")
+            .eq("igreja_id", igrejaId)
+            .eq("tipo", tipo);
+          query = filialIdFromWhatsApp
+            ? query.or(`filial_id.eq.${filialIdFromWhatsApp},filial_id.is.null`)
+            : query.is("filial_id", null);
+          const { data } = await query
+            .order("filial_id", { ascending: false, nullsFirst: false })
+            .order("id")
+            .limit(5);
+          const linhas = data ?? [];
+          if (linhas.length === 0) return null;
+          if (filialIdFromWhatsApp) {
+            return linhas.find((c) => c.filial_id === filialIdFromWhatsApp) ?? linhas[0];
+          }
+          return linhas[0];
+        };
 
-        const categoriaId = categoriaTransferencia?.id || null;
+        const [categoriaSaida, categoriaEntrada] = await Promise.all([
+          buscarCategoriaTransferencia("saida"),
+          buscarCategoriaTransferencia("entrada"),
+        ]);
         const dataHoje = new Date().toISOString().split("T")[0];
 
         // Criar transferência + par de transações + saldos numa transação
@@ -2434,8 +2454,8 @@ serve(async (req) => {
               valor: valorFinal,
               data: dataHoje,
               extras: {
-                categoria_saida_id: categoriaId,
-                categoria_entrada_id: categoriaId,
+                categoria_saida_id: categoriaSaida?.id || null,
+                categoria_entrada_id: categoriaEntrada?.id || null,
                 descricao_saida: "Transferência para conta destino",
                 descricao_entrada: "Transferência de conta origem",
                 observacoes: `Via WhatsApp por ${metaDados.nome_perfil}`,
