@@ -9,6 +9,7 @@ import { normalizarTelefone, formatarParaWhatsApp } from "../_shared/telefone-ut
 import {
   criarLancamento,
   criarTransferencia,
+  resolverIgrejaEFilialWhatsApp,
   type FinContexto,
 } from "../_shared/financeiro-core.ts";
 
@@ -557,39 +558,22 @@ serve(async (req) => {
       (tel || "").replace(/\D/g, "");
     const whatsappNumeroNormalizado = normalizeDisplayPhone(whatsappNumber);
 
-    // Tentar pegar igreja_id diretamente ou buscar via whatsapp_number
-    let igrejaId =
-      body?.igreja_id ?? new URL(req.url).searchParams.get("igreja_id");
-    let filialIdFromWhatsApp: string | null = null;
-
-    // Se não veio igreja_id mas veio whatsapp_number, buscar na tabela whatsapp_numeros
-    if (!igrejaId && whatsappNumeroNormalizado) {
-      console.log(
-        `[Financeiro] Buscando igreja pelo whatsapp_number: ${whatsappNumeroNormalizado}`
+    // Tentar pegar igreja_id diretamente ou buscar via whatsapp_number.
+    // resolverIgrejaEFilialWhatsApp roda o lookup em whatsapp_numeros mesmo
+    // quando igreja_id já veio no body — filial_id nunca vem do Make, só
+    // dessa tabela (ver JSDoc da função em financeiro-core.ts pro histórico
+    // do bug que isso corrige).
+    const igrejaIdExplicito: string | null =
+      body?.igreja_id ?? new URL(req.url).searchParams.get("igreja_id") ?? null;
+    const { igrejaId, filialId: filialIdFromWhatsApp } =
+      await resolverIgrejaEFilialWhatsApp(
+        supabase,
+        igrejaIdExplicito,
+        whatsappNumeroNormalizado
       );
-
-      const { data: rota, error: rotaError } = await supabase
-        .from("whatsapp_numeros")
-        .select("igreja_id, filial_id")
-        .eq("display_phone_number", whatsappNumeroNormalizado)
-        .eq("enabled", true)
-        .maybeSingle();
-
-      if (rotaError) {
-        console.error(
-          `[Financeiro] Erro ao buscar whatsapp_numeros:`,
-          rotaError
-        );
-      }
-
-      if (rota) {
-        igrejaId = rota.igreja_id;
-        filialIdFromWhatsApp = rota.filial_id;
-        console.log(
-          `[Financeiro] Igreja encontrada via whatsapp_number: ${igrejaId}, filial: ${filialIdFromWhatsApp}`
-        );
-      }
-    }
+    console.log(
+      `[Financeiro] igreja_id resolvido: ${igrejaId}, filial: ${filialIdFromWhatsApp}`
+    );
 
     if (!igrejaId) {
       console.error(

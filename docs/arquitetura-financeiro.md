@@ -6976,21 +6976,10 @@ transferência legítima na mesma filial passa.
 
 ## 11. Riscos
 
-- **`chatbot-financeiro`: `filialIdFromWhatsApp` fica `null` quando o payload
-  do Make já traz `igreja_id` direto** (achado de review, PR #103,
-  não corrigido) — o lookup em `whatsapp_numeros` (que resolve
-  `filial_id`) só roda em `if (!igrejaId && whatsappNumeroNormalizado)`;
-  se o Make manda `igreja_id` (body ou querystring) junto com
-  `display_phone_number`, o lookup é pulado inteiro e `filialIdFromWhatsApp`
-  nunca é preenchido. Afeta todo write-path do bot que depende dessa
-  variável (lançamento/reembolso/transferência), não só o caminho de
-  transferência que a §9.110 tocou. Não é regressão de segurança — os
-  campos de catálogo filial-scoped são opcionais nas RPCs (`NULLIF`), o
-  sintoma é dado incompleto (ex.: transferência sem categoria), não
-  vínculo com filial errada. Fix real exige decidir precedência entre
-  `igreja_id`/`filial_id` explícitos no payload vs. o lookup em
-  `whatsapp_numeros` — mudança no roteamento do bot inteiro, fase
-  dedicada com harness próprio, fora do escopo de uma PR pontual.
+- ~~`chatbot-financeiro`: `filialIdFromWhatsApp` fica `null` quando o
+  payload do Make já traz `igreja_id` direto~~ **RESOLVIDO (§9.111)** —
+  `resolverIgrejaEFilialWhatsApp` roda o lookup em `whatsapp_numeros`
+  mesmo com `igreja_id` explícito no payload.
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
   inegociável; revisão de segurança dedicada (checklist de
   `docs/01-Arquitetura/04-rls-e-seguranca.MD`).
@@ -7171,4 +7160,30 @@ achou 3 furos nessa superfície, fechados em `20260813150000` +
 
 A mutation do revert invalida `["saidas"]` além do ledger (Codex: a
 saída deixa de ser paga; listas/totais de caixa ficavam stale).
+
+### 9.111 `chatbot-financeiro` resolve filial mesmo com `igreja_id` explícito no payload
+
+Fecha o risco registrado em §11 (achado da PR #103, não corrigido
+naquela PR por escopo). `filialIdFromWhatsApp` só era preenchido dentro
+de `if (!igrejaId && whatsappNumeroNormalizado)` — como `filial_id`
+nunca vem no payload do Make (só `igreja_id` + `display_phone_number`),
+todo request com os dois campos (o formato documentado) pulava o
+lookup em `whatsapp_numeros` inteiro, e a filial ficava `null` em
+qualquer lançamento/reembolso/transferência via bot.
+
+Extraída `resolverIgrejaEFilialWhatsApp` pra `_shared/financeiro-core.ts`
+(mesmo padrão de `resolverContaPix`, testável sem mock de rede — 6
+cenários em `financeiro-core.test.ts`, incluindo o caso que reproduzia
+o bug antigo). Precedência decidida: o lookup em `whatsapp_numeros`
+roda SEMPRE que há telefone normalizado, mesmo com `igreja_id`
+explícito; se o número mapear pra uma igreja DIFERENTE da explícita no
+payload, a filial do lookup é descartada (tenant já veio decidido, não
+é o mesmo número). `igreja_id` explícito nunca é sobrescrito pelo
+lookup — só a filial passa a ser preenchida no caso que faltava.
+
+Mesmo pacote de fixes: `TELEFONE_PASTOR_PLANTAO` (hardcoded,
+`chatbot-triagem/index.ts`, achado da PR #100) passou a ler
+`configuracoes_igreja.telefone_plantao_pastoral` por `igreja_id`
+resolvido no fluxo, com o valor fixo antigo como fallback quando a
+config não existe pra uma igreja (`resolverTelefonePlantaoPastoral`).
 
