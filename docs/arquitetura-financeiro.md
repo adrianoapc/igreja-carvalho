@@ -5629,6 +5629,10 @@ p_periodo_inicio, p_periodo_fim, p_contexto, p_filial_id)`** → jsonb
   `extratos_bancarios.valor`, tol. R$0,01 — sem HFA por recebível na
   soma (âncora #13: soma parcial gerava `divergencia` falsa).
 - Lotes `pendente_vinculo` aparecem sem filtro de conta (ação Vincular).
+- `lotes.lancamento_desagio_id` só sai com `has_filial_access` na
+  transação (lote global + deságio de outra filial → `NULL`, §9.110).
+- `vendas_origem.hop2_pendente` = oferta inexistente (`ot.id IS NULL`),
+  distinto de metadados anulados por falta de HFA.
 
 **`fin_buscar_recebiveis_getnet_oferta(p_transacao_id, p_integracao_id,
 p_contexto, p_busca, p_limite)`**: busca manual de recebíveis livres do
@@ -5640,10 +5644,11 @@ EC; score 0..100 (40 direção + data/valor); direção da oferta via
 
 Substitui as 3 seções empilhadas da Fase 6 (`Hop2OfertaVendaSection`,
 `Hop1VendaBancoSection`, tabela de lotes em `LotesAntecipacaoTab`) por
-`ConciliacaoCartaoLedger`, consumindo as RPCs de §9.94. Writers
-inalterados (`fin_vincular_venda_getnet_oferta`,
+`ConciliacaoCartaoLedger`, consumindo as RPCs de §9.94. Writers:
+`fin_vincular_venda_getnet_oferta`,
 `fin_vincular_venda_banco_getnet`, `fin_vincular_lote_antecipacao`,
-`fin_lancar_desagio_antecipacao`).
+`fin_lancar_desagio_antecipacao`, `fin_reverter_desagio_antecipacao`
+(§9.110).
 
 **Componentes**
 
@@ -7028,4 +7033,54 @@ resumo`/`getnet_financeiro_detalhe`/`getnet_arquivos` exatamente igual).
   no banco de produção, ou foi setada com nome diferente do que os jobs
   esperam) — prioridade média, importação automática de PIX/Getnet está
   parada até isso ser corrigido.
+
+### 9.110 Ciclo 2 C2-9/C2-10 — spike EDI×CSV + reverter deságio no ledger (review #102)
+
+Spikes C2-9 (Hop1/Hop2 EDI `nsu_cv` vs CSV) e C2-10 (`numeroOperacao` vs
+`contrato_registradora`) documentados em `docs/getnet-edi-vs-csv-hop2-spike.md`
+e `docs/getnet-edi-vs-csv-antecipacao-c2-10.md` — vereditos com ressalva
+de amostra pequena; nenhuma RPC de matching automático nesta fase.
+
+**Produção, 1º uso real do caminho de deságio:**
+`fin_lancar_desagio_antecipacao` gravava `origem_registro=
+'getnet_antecipacao_desagio'` desde `20260729170000`, mas a CHECK de
+`transacoes_financeiras` só permitia `manual`/`api`. Migration
+`20260813130000` alarga a CHECK. Guardrail B.17.
+
+**UX no ledger (Conciliação Cartão):** `fin_listar_ledger_conciliacao_cartao`
+passa a expor `lancamento_desagio_id` por lote (`20260813140000`) pra
+botão "Reverter deságio" no card. Review #102 (cursoragent + Codex)
+achou 3 furos nessa superfície, fechados em `20260813150000` +
+`20260813160000`:
+
+1. **Permissão.** O botão chamava `fin_alterar_status_lancamento`
+   (`p_flag_bot` NULL). `fin_lancar_desagio_antecipacao` exige
+   `autorizado_lancar_despesas` (canal bot). Porta nova
+   `fin_reverter_desagio_antecipacao(p_lote_id)`: HFA no lote + filial
+   efetiva do extrato + transação, aninha
+   `fin_alterar_status_lancamento(..., v_ctx)`. Não trava o lote antes
+   da transação (ordem igual ao menu — o trigger AFTER UPDATE trava o
+   lote; inverter abriria deadlock). O trigger
+   `sincronizar_lote_antecipacao_ao_reverter_desagio` continua sendo
+   quem volta o lote pra `vinculado`.
+   **Codex P1 ainda aberto depois de `150000`:** o 2º arg de
+   `fin_resolver_contexto` só vale no bot (ADR-029). Tesoureiro JWT sem
+   o flag ainda revertia; `fin_alterar_status_lancamento` (menu /
+   rpc direto) continuava com `p_flag` NULL. `20260813160000` adiciona
+   `_fin_exigir_autorizado_lancar_despesas` (resolver + check do flag
+   no JWT; admin/super_admin bypass), a porta dedicada e a porta
+   genérica ao sair de `pago` em `getnet_antecipacao_desagio` usam o
+   helper, e o botão só renderiza com a mesma permissão. Guardrail B.19.
+2. **Filial efetiva.** `lancamento_desagio_id` saía incondicional; o
+   botão não pedia `temDadosCompletos` (Vincular/Lançar neste card já
+   pedem). Lote global + deságio de filial B, filtro em A: botão
+   clicável. SQL agora anula o id sem HFA na transação; UI
+   `disabled` sem `temDadosCompletos` e o aviso de "filtro de filial"
+   vale também pra `lancamento_criado`. Guardrail B.18.
+3. **Badge Hop 2.** Contar `!oferta_lancamento_id` mentia "sem oferta"
+   quando a RPC já anula o id sem HFA. `hop2_pendente = (ot.id IS NULL)`;
+   metadados inacessíveis renderizam "—" no detalhe, sem badge.
+
+A mutation do revert invalida `["saidas"]` além do ledger (Codex: a
+saída deixa de ser paga; listas/totais de caixa ficavam stale).
 

@@ -20,6 +20,15 @@ próprio arquivo):
   (ator vs recurso). Lookups irmãos em `user_filial_access` (`EXISTS`
   grant vs `NOT EXISTS` legado) precisam do mesmo `igreja_id` — unique
   em `(user_id, filial_id)` não substitui o predicado de tenant.
+  O 2º argumento de `fin_resolver_contexto` (`p_flag_bot`) **só vale no
+  canal bot** — no JWT, tesoureiro sem o flag de `profiles` ainda passa.
+  Escrita que exige o flag no web precisa checar `autorizado_lancar_*`
+  no JWT (ou não expor a ação).
+- **`origem_registro`**: literal novo numa RPC precisa da CHECK
+  constraint na mesma PR (`manual`/`api`/`getnet_antecipacao_desagio`).
+- **Ação de escrita nova** num card que já gateia irmãs por filial
+  efetiva usa o mesmo gate; ID exposto por RPC de leitura só sai com
+  `has_filial_access` no recurso alvo.
 - **Trigger de saldo de conta**: sempre recalcula do zero a partir de
   `transacoes_financeiras` — nunca soma/subtrai incrementalmente. Dispara em
   INSERT/UPDATE/DELETE (sem `OF <colunas>`, statement-level com transition

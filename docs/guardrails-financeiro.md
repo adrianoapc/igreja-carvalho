@@ -377,8 +377,44 @@ DEFINER`:**
     tenant autorizava a filial pedida. Codex apontou na 1ª review desta
     PR; o follow-up anunciado nunca chegou na branch (§9.109, achado 3).
 
+17. **RPC que grava um literal novo em `origem_registro` precisa da CHECK
+    constraint na mesma PR.** `transacoes_financeiras.origem_registro`
+    tem CHECK (`manual`/`api`/`getnet_antecipacao_desagio`).
+    `fin_lancar_desagio_antecipacao` gravava `'getnet_antecipacao_desagio'`
+    desde `20260729170000` e a constraint só aceitava `manual`/`api` —
+    o INSERT falhava no 1º uso real em produção. Antes de commitar um
+    `origem_registro = '<valor>'` novo, grep a CHECK vigente e alargue
+    na **mesma** leva. Não é "a RPC compilou" — é o INSERT que a CHECK
+    recusa (§9.110).
+
+18. **Ação de escrita nova num card/lista que já tem irmãs gated por
+    filial efetiva usa o mesmo gate, e o ID que dispara a escrita só
+    sai da RPC de leitura com `has_filial_access` no recurso alvo.**
+    Achado real: "Reverter deságio" no ledger usava
+    `lancamento_desagio_id` incondicional e **não** pedia
+    `temDadosCompletos` (que Vincular/Lançar neste mesmo card já
+    exigem via `useLotesAntecipacao`, §9.78/§9.79). Lote global +
+    deságio de filial B, filtro em A: botão clicável; com HFA a RPC
+    passava e revertia a outra filial. Fix: anular o id sem HFA na
+    transação **e** `disabled` sem `temDadosCompletos`. Não silenciar
+    o aviso "indisponível neste filtro de filial" só porque o status
+    é `lancamento_criado` (§9.110).
+
+19. **Passar `p_flag_bot` em `fin_resolver_contexto` não autoriza o canal
+    JWT.** O 2º argumento só vale no bot (ADR-029 convenção 4). Uma RPC
+    dedicada que só faz `fin_resolver_contexto(..., 'autorizado_lancar_
+    despesas')` ainda deixa tesoureiro web **sem o flag** escrever —
+    `has_role(tesoureiro)` basta no JWT. Achado real: "Reverter deságio"
+    no ledger (#102 / Codex P1) depois de `20260813150000`. Fix: helper
+    `_fin_exigir_autorizado_lancar_despesas` (resolver + check do flag
+    no JWT; admin/super_admin bypass) usado pela porta dedicada **e**
+    por `fin_alterar_status_lancamento` ao sair de `pago` em
+    `getnet_antecipacao_desagio` (senão o menu / rpc direto bypassa).
+    Não expor o botão sem essa permissão; a rota `AuthGate` não substitui
+    (§9.110).
+
 Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.65, §9.67,
-§9.73, §9.74, §9.80, §9.81, §9.82, §9.86, §9.96, §9.109, checklist completo na memória de sessão.
+§9.73, §9.74, §9.80, §9.81, §9.82, §9.86, §9.96, §9.109, §9.110, checklist completo na memória de sessão.
 
 ---
 

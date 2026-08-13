@@ -22,3 +22,4 @@ export * from "./api/reembolsos.api";
 export * from "./api/conciliacao.api";
 export * from "./hooks/useLancamentos";
 export * from "./hooks/useDadosApoio";
+export * from "./hooks/usePodeReverterDesagioAntecipacao";

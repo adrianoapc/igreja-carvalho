@@ -46,6 +46,7 @@ export interface LancamentoCardTransacao extends TransacaoResumo {
   forma_pagamento_id?: string | null;
   forma_pagamento?: string | null;
   solicitacao_reembolso_id?: string | null;
+  origem_registro?: string | null;
   categoria?: { nome: string; cor?: string | null } | null;
   conta?: { nome: string } | null;
   fornecedor?: { nome: string } | null;
@@ -266,6 +267,7 @@ export function LancamentoCard({
           isDinheiro={isDinheiro}
           conferidoManual={!!transacao.conferido_manual}
           conciliacaoStatus={conciliacaoStatus}
+          origemRegistro={transacao.origem_registro}
           onEdit={() => onEdit(transacao)}
           onVerExtrato={onVerExtrato}
         />

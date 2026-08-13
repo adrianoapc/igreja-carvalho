@@ -12,6 +12,7 @@ import {
   Loader2,
   Search,
   TrendingDown,
+  Undo2,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -21,12 +22,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useHideValues } from "@/hooks/useHideValues";
 import { useLotesAntecipacao } from "@/features/financeiro/core/hooks/useLotesAntecipacao";
+import { usePodeReverterDesagioAntecipacao } from "@/features/financeiro/core/hooks/usePodeReverterDesagioAntecipacao";
 import {
   listarLedgerConciliacaoCartao,
   buscarRecebiveisGetnetOferta,
   vincularVendaGetnetOferta,
   gerarCandidatosVendaBancoGetnet,
   vincularVendaBancoGetnet,
+  reverterDesagioAntecipacao,
   type CandidatoBuscaRecebivelOferta,
   type CandidatoVendaBancoGetnet,
   type LedgerCartaoLancamento,
@@ -430,6 +433,29 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
     },
   });
 
+  // Reverte a saída "Deságio de antecipação Getnet" direto desta tela —
+  // porta fin_reverter_desagio_antecipacao (autorizado_lancar_despesas
+  // no bot e no JWT; HFA na filial efetiva). O trigger sincronizar_
+  // lote_antecipacao_ao_reverter_desagio (20260731180000) volta o lote
+  // pra 'vinculado' e limpa lancamento_desagio_id ao detectar pago ->
+  // não-pago; o vínculo com o extrato bancário não é tocado.
+  const podeReverterDesagio = usePodeReverterDesagioAntecipacao();
+  const reverterDesagio = useMutation({
+    mutationFn: (loteId: string) => reverterDesagioAntecipacao(loteId),
+    onSuccess: () => {
+      toast.success("Deságio revertido — lote voltou pra 'Vinculado'");
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["getnet-antecipacao-lotes"] });
+      queryClient.invalidateQueries({ queryKey: ["conferencia-totais-getnet"] });
+      // Codex #102: a saída deixa de ser paga — listas/totais de caixa
+      // em Saídas ficam stale sem isto (TransacaoActionsMenu já invalidava).
+      queryClient.invalidateQueries({ queryKey: ["saidas"] });
+    },
+    onError: (err) => {
+      toast.error(rpcErrorMessage(err) ?? "Erro ao reverter deságio");
+    },
+  });
+
   const gruposPorData = useMemo(() => {
     const ordem: string[] = [];
     const map = new Map<string, LedgerCartaoLancamento[]>();
@@ -461,7 +487,7 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
   // snapshot antigo — trava confirmações pra não reenviar o mesmo vínculo
   // (Bugbot #84, stale duplicate confirms).
   const actionsLocked =
-    isFetching || confirmarSugestoes.isPending || confirmarHop1.isPending;
+    isFetching || confirmarSugestoes.isPending || confirmarHop1.isPending || reverterDesagio.isPending;
 
   return (
     <div className="space-y-4 pb-16">
@@ -569,6 +595,11 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
                           formatValue={formatValue}
                           onVincularExtrato={() => setLoteVinculando(lote)}
                           onLancarSaida={() => setLoteLancando(lote)}
+                          onReverterDesagio={() => reverterDesagio.mutate(lote.lote_id)}
+                          revertendo={
+                            reverterDesagio.isPending && reverterDesagio.variables === lote.lote_id
+                          }
+                          podeReverterDesagio={podeReverterDesagio}
                           dadosStatus={dadosStatus}
                         />
                       );
@@ -922,6 +953,9 @@ function LoteRow({
   formatValue,
   onVincularExtrato,
   onLancarSaida,
+  onReverterDesagio,
+  revertendo,
+  podeReverterDesagio,
   dadosStatus,
 }: {
   lote: LedgerCartaoLote;
@@ -930,6 +964,9 @@ function LoteRow({
   formatValue: (v: number) => string;
   onVincularExtrato: () => void;
   onLancarSaida: () => void;
+  onReverterDesagio: () => void;
+  revertendo: boolean;
+  podeReverterDesagio: boolean;
   dadosStatus: LoteDadosStatus;
 }) {
   const meta = LOTE_STATUS_META[lote.status];
@@ -938,6 +975,11 @@ function LoteRow({
       ? lote.valor_contrato - lote.credito_banco
       : null;
   const temDadosCompletos = dadosStatus === "ready";
+  // Hop 2 (venda↔oferta) é um conceito independente do status do lote —
+  // "Concluído" aqui só reflete vínculo bancário + deságio lançado, não se
+  // a venda dentro do lote já foi casada com uma oferta. hop2_pendente
+  // (RPC) é oferta inexistente — não conta metadados anulados por HFA.
+  const vendasSemHop2 = lote.vendas_origem.filter((v) => v.hop2_pendente).length;
 
   return (
     <Collapsible open={open} onOpenChange={onToggle} className="border rounded-lg bg-card shadow-sm overflow-hidden">
@@ -956,6 +998,11 @@ function LoteRow({
               {formatValue(lote.valor_contrato ?? 0)}
             </span>
             <StatusPillBadge tone={meta.tone} label={meta.label} />
+            {vendasSemHop2 > 0 && (
+              <Badge variant="outline" className="text-xs whitespace-nowrap">
+                Hop 2: {vendasSemHop2}/{lote.vendas_origem.length} sem oferta
+              </Badge>
+            )}
             <span className={`text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`}>▸</span>
           </button>
         </CollapsibleTrigger>
@@ -996,10 +1043,12 @@ function LoteRow({
                             {v.oferta_data_vencimento ? ` · ${formatDateSafe(v.oferta_data_vencimento, "dd/MM")}` : ""}
                           </span>
                         </span>
-                      ) : (
+                      ) : v.hop2_pendente ? (
                         <span className="italic text-muted-foreground">
                           venda ainda sem oferta vinculada — Hop 2 pendente
                         </span>
+                      ) : (
+                        <span className="italic text-muted-foreground">—</span>
                       )}
                     </span>
                   </div>
@@ -1028,11 +1077,28 @@ function LoteRow({
               </>
             )}
             {lote.status === "lancamento_criado" && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Landmark className="w-3.5 h-3.5" /> Concluído
-              </span>
+              <>
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Landmark className="w-3.5 h-3.5" /> Lote concluído
+                </span>
+                {podeReverterDesagio && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onReverterDesagio}
+                    disabled={!lote.lancamento_desagio_id || revertendo || !temDadosCompletos}
+                  >
+                    {revertendo ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                    ) : (
+                      <Undo2 className="w-3.5 h-3.5 mr-1" />
+                    )}
+                    Reverter deságio
+                  </Button>
+                )}
+              </>
             )}
-            {!temDadosCompletos && lote.status !== "lancamento_criado" && (
+            {!temDadosCompletos && (
               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 <AlertCircle className="w-3.5 h-3.5" />
                 {dadosStatus === "loading"
