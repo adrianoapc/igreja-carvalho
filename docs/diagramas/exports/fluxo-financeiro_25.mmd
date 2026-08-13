@@ -11,6 +11,10 @@ flowchart TD
     BTN1 --> W1["fin_vincular_venda_banco_getnet"]
     LEDGER --> LOTES["lotes do período"]
     LOTES --> W3["fin_vincular_lote_antecipacao\n+ fin_lancar_desagio_antecipacao"]
+    LOTES -->|"lancamento_criado\n+ HFA + temDadosCompletos\n+ autorizado_lancar_despesas"| W4["fin_reverter_desagio_antecipacao"]
+    W4 --> TRG["trigger: lote volta pra vinculado"]
     W2 -.-> INV["invalidate:\nledger · Hop1 · conferência · lotes"]
     W1 -.-> INV
     W3 -.-> INV
+    W4 -.-> INV
+    W4 -.-> SAIDAS["invalidate: saidas"]

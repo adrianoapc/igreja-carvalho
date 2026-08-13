@@ -1,0 +1,6 @@
+flowchart TD
+    CARD["LoteRow status=lancamento_criado"] --> GATE{"temDadosCompletos\nAND lancamento_desagio_id\nAND autorizado_lancar_despesas?"}
+    GATE -->|não| AVISO["aviso: filtro de filial / carregando\nou botão oculto sem permissão"]
+    GATE -->|sim| RPC["fin_reverter_desagio_antecipacao\n_fin_exigir_autorizado_lancar_despesas\nHFA lote + extrato + transação"]
+    RPC --> ST["fin_alterar_status_lancamento\npendente, v_ctx\n(mesmo check se rpc/menu direto)"]
+    ST --> TRG["trigger: lote → vinculado"]
