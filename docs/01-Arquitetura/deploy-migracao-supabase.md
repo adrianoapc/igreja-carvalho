@@ -104,7 +104,7 @@ Obter a key: `supabase projects api-keys --project-ref ugnrumtngcskbfpwynsr`.
 **Não precisam de secret custom (~33)** — deployam e funcionam só com os secrets
 automáticos do Supabase. Inclui as do financeiro: `gerar-sugestoes-ml`,
 `reclass-transacoes`, `undo-import`, `undo-reclass`, `finance-sync`,
-`buscar-pix-cron`, `sync-transferencias-conciliacao`, entre outras.
+`buscar-pix-cron`, entre outras.
 
 **Precisam de secret (24)** — o mapa abaixo é dos env vars usados no diretório da
 própria function; funções que importam `_shared/internal-auth.ts` também exigem
