@@ -1,0 +1,599 @@
+-- Review #102 (cursoragent + Codex) sobre 20260813130000/20260813140000:
+--
+-- P1: "Reverter deságio" no ledger chamava fin_alterar_status_lancamento,
+--     que resolve contexto com p_flag_bot NULL. fin_lancar_desagio_
+--     antecipacao exige autorizado_lancar_despesas (canal bot). A tela
+--     nova ficava mais permissiva que o lançamento da mesma saída.
+--     Porta dedicada fin_reverter_desagio_antecipacao, mesma permissão
+--     do lançamento, valida lote + HFA na filial efetiva, e aninha
+--     fin_alterar_status_lancamento com v_ctx (não NULL). O trigger
+--     sincronizar_lote_antecipacao_ao_reverter_desagio continua sendo
+--     quem volta o lote pra 'vinculado' — esta RPC não mexe no lote.
+--
+-- P2: lancamento_desagio_id saía incondicional no JSON do ledger. Lote
+--     global + deságio de outra filial habilitava o botão; com HFA a
+--     escrita passava (filtro de UI A revertia B); sem HFA, FIN_TENANT.
+--     Agora o campo só sai com has_filial_access na transação.
+--
+-- P4: badge "Hop 2: N/M sem oferta" contava !oferta_lancamento_id, mas
+--     esse id já era anulado sem HFA na oferta — falso "sem Hop 2".
+--     vendas_origem.hop2_pendente = (ot.id IS NULL).
+--
+-- Guardrail 6b: CREATE OR REPLACE numa migration NOVA — 20260813140000
+-- já aplicada em produção.
+
+-- ─── 1. fin_reverter_desagio_antecipacao ────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.fin_reverter_desagio_antecipacao(
+  p_lote_id uuid,
+  p_contexto jsonb DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_ctx jsonb;
+  v_igreja uuid;
+  v_lote public.getnet_antecipacao_lotes%ROWTYPE;
+  v_extrato_filial uuid;
+  v_trx public.transacoes_financeiras%ROWTYPE;
+  v_res jsonb;
+BEGIN
+  IF p_lote_id IS NULL THEN
+    RAISE EXCEPTION 'FIN_VALIDACAO: p_lote_id é obrigatório';
+  END IF;
+
+  -- Mesma permissão de fin_lancar_desagio_antecipacao (simetria lançar/
+  -- desfazer). No canal JWT o flag é ignorado (só admin|tesoureiro|
+  -- super_admin); no canal bot é o que impede membro autorizado no bot
+  -- sem autorizado_lancar_despesas de reverter a saída.
+  v_ctx := public.fin_resolver_contexto(p_contexto, 'autorizado_lancar_despesas');
+  v_igreja := (v_ctx ->> 'igreja_id')::uuid;
+
+  -- Sem FOR UPDATE no lote: fin_alterar_status_lancamento trava a
+  -- transação e o trigger AFTER UPDATE trava o lote. Travar lote ANTES
+  -- da transação inverteria a ordem do caminho do menu (transação →
+  -- lote) e abriria deadlock entre as duas superfícies.
+  SELECT * INTO v_lote
+    FROM public.getnet_antecipacao_lotes
+   WHERE id = p_lote_id AND igreja_id = v_igreja;
+  IF v_lote.id IS NULL THEN
+    RAISE EXCEPTION 'FIN_NAO_ENCONTRADO: lote % fora do tenant ou inexistente', p_lote_id;
+  END IF;
+
+  IF NOT public.has_filial_access(v_igreja, v_lote.filial_id) THEN
+    RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial deste lote';
+  END IF;
+
+  IF v_lote.status IS DISTINCT FROM 'lancamento_criado'
+     OR v_lote.lancamento_desagio_id IS NULL THEN
+    RAISE EXCEPTION 'FIN_VALIDACAO: lote % não tem deságio lançado para reverter', p_lote_id;
+  END IF;
+
+  -- Filial efetiva = extrato vinculado (lote global + extrato de filial
+  -- B não é mais "de qualquer filial", §9.78).
+  IF v_lote.extrato_bancario_id IS NOT NULL THEN
+    SELECT filial_id INTO v_extrato_filial
+      FROM public.extratos_bancarios
+     WHERE id = v_lote.extrato_bancario_id
+       AND igreja_id = v_igreja;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'FIN_FK: extrato vinculado ao lote % não encontrado', p_lote_id;
+    END IF;
+    IF NOT public.has_filial_access(v_igreja, v_extrato_filial) THEN
+      RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial efetiva deste lote';
+    END IF;
+  END IF;
+
+  SELECT * INTO v_trx
+    FROM public.transacoes_financeiras
+   WHERE id = v_lote.lancamento_desagio_id
+     AND igreja_id = v_igreja;
+  IF v_trx.id IS NULL THEN
+    RAISE EXCEPTION 'FIN_FK: lançamento de deságio % inexistente ou fora do tenant', v_lote.lancamento_desagio_id;
+  END IF;
+  IF NOT public.has_filial_access(v_igreja, v_trx.filial_id) THEN
+    RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial do lançamento de deságio';
+  END IF;
+  IF v_trx.origem_registro IS DISTINCT FROM 'getnet_antecipacao_desagio' THEN
+    RAISE EXCEPTION 'FIN_VALIDACAO: lançamento % não é deságio de antecipação Getnet', v_trx.id;
+  END IF;
+
+  -- Porta única de status (ADR-029). v_ctx já resolvido, nunca NULL.
+  -- Trigger sincronizar_lote_antecipacao_ao_reverter_desagio (pago →
+  -- não-pago) volta o lote pra 'vinculado' e limpa lancamento_desagio_id.
+  v_res := public.fin_alterar_status_lancamento(
+    v_lote.lancamento_desagio_id,
+    'pendente',
+    '{}'::jsonb,
+    v_ctx
+  );
+
+  PERFORM public.fin_registrar_auditoria(
+    v_ctx, 'fin_reverter_desagio_antecipacao', 'getnet_antecipacao_lotes', p_lote_id,
+    jsonb_build_object('lancamento_desagio_id', v_lote.lancamento_desagio_id),
+    v_res);
+
+  RETURN jsonb_build_object(
+    'ok', true,
+    'id', p_lote_id,
+    'lancamento_id', v_lote.lancamento_desagio_id,
+    'warnings', COALESCE(v_res -> 'warnings', '[]'::jsonb)
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.fin_reverter_desagio_antecipacao(uuid, jsonb) IS
+  'Reverte a saída de deságio de um lote Getnet em lancamento_criado. Mesma permissão de fin_lancar_desagio_antecipacao (autorizado_lancar_despesas no canal bot). Valida has_filial_access no lote, na filial efetiva do extrato e na transação. Aninha fin_alterar_status_lancamento(..., v_ctx) — o trigger sincronizar_lote_antecipacao_ao_reverter_desagio volta o lote pra vinculado. Não trava o lote antes da transação (ordem igual ao menu, evita deadlock).';
+
+GRANT EXECUTE ON FUNCTION public.fin_reverter_desagio_antecipacao(uuid, jsonb)
+  TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.fin_reverter_desagio_antecipacao(uuid, jsonb)
+  FROM anon;
+
+-- ─── 2. ledger: HFA em lancamento_desagio_id + hop2_pendente ─────────────────
+
+CREATE OR REPLACE FUNCTION public.fin_listar_ledger_conciliacao_cartao(
+  p_integracao_id uuid,
+  p_conta_id uuid,
+  p_periodo_inicio date,
+  p_periodo_fim date,
+  p_contexto jsonb DEFAULT NULL,
+  p_filial_id uuid DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_ctx jsonb;
+  v_igreja uuid;
+  v_integracao record;
+  v_conta record;
+  v_scope uuid;
+  v_resultado jsonb;
+BEGIN
+  IF p_integracao_id IS NULL THEN
+    RAISE EXCEPTION 'FIN_VALIDACAO: p_integracao_id é obrigatório';
+  END IF;
+  IF p_conta_id IS NULL THEN
+    RAISE EXCEPTION 'FIN_VALIDACAO: p_conta_id é obrigatório';
+  END IF;
+  IF p_periodo_inicio IS NULL OR p_periodo_fim IS NULL THEN
+    RAISE EXCEPTION 'FIN_VALIDACAO: p_periodo_inicio e p_periodo_fim são obrigatórios';
+  END IF;
+  IF p_periodo_fim < p_periodo_inicio THEN
+    RAISE EXCEPTION 'FIN_VALIDACAO: p_periodo_fim anterior a p_periodo_inicio';
+  END IF;
+
+  v_ctx := public.fin_resolver_contexto(p_contexto, NULL);
+  v_igreja := (v_ctx ->> 'igreja_id')::uuid;
+
+  SELECT i.id, i.igreja_id, i.filial_id, i.provedor
+    INTO v_integracao
+    FROM public.integracoes_financeiras i
+   WHERE i.id = p_integracao_id;
+
+  IF v_integracao.id IS NULL OR v_integracao.igreja_id IS DISTINCT FROM v_igreja THEN
+    RAISE EXCEPTION 'FIN_FK: integração inexistente ou fora do tenant';
+  END IF;
+  IF v_integracao.provedor IS DISTINCT FROM 'getnet' THEN
+    RAISE EXCEPTION 'FIN_VALIDACAO: integração % não é do provedor getnet', p_integracao_id;
+  END IF;
+  IF NOT public.has_filial_access(v_igreja, v_integracao.filial_id) THEN
+    RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial da integração';
+  END IF;
+
+  SELECT c.id, c.igreja_id, c.filial_id
+    INTO v_conta
+    FROM public.contas c
+   WHERE c.id = p_conta_id;
+
+  IF v_conta.id IS NULL OR v_conta.igreja_id IS DISTINCT FROM v_igreja THEN
+    RAISE EXCEPTION 'FIN_FK: conta inexistente ou fora do tenant';
+  END IF;
+  IF NOT public.has_filial_access(v_igreja, v_conta.filial_id) THEN
+    RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial da conta';
+  END IF;
+
+  IF p_filial_id IS NOT NULL THEN
+    IF NOT public.has_filial_access(v_igreja, p_filial_id) THEN
+      RAISE EXCEPTION 'FIN_TENANT: sem acesso à filial solicitada';
+    END IF;
+    v_scope := p_filial_id;
+  ELSE
+    v_scope := NULL;
+  END IF;
+
+  WITH
+  -- ─── Raízes de grupo (não-dividido ou parcela 1/N pós Fase 2b) ───────────
+  raizes AS (
+    SELECT
+      t.id,
+      t.descricao AS trx_descricao,
+      t.data_vencimento,
+      t.filial_id,
+      t.valor,
+      t.numero_parcela,
+      t.total_parcelas,
+      COALESCE(fp.nome, t.forma_pagamento) AS forma_desc
+    FROM public.transacoes_financeiras t
+    LEFT JOIN public.formas_pagamento fp ON fp.id = t.forma_pagamento_id
+   WHERE t.igreja_id = v_igreja
+     AND t.conta_id = p_conta_id
+     AND t.tipo = 'entrada'
+     AND t.status <> 'cancelado'
+     AND t.lancamento_pai_id IS NULL
+     AND t.data_vencimento BETWEEN p_periodo_inicio AND p_periodo_fim
+     AND COALESCE(fp.nome, t.forma_pagamento, '') ILIKE '%cart%'
+     AND public.has_filial_access(v_igreja, t.filial_id)
+     AND (v_scope IS NULL OR t.filial_id IS NULL OR t.filial_id = v_scope)
+     -- Exclui 'conciliado_extrato' E 'conciliado_bot' (fechados por um canal
+     -- que não é este ledger — nunca vão ganhar recebível Getnet vinculado;
+     -- ficariam presos em sem_hop2 pra sempre, e a ação "Buscar
+     -- manualmente"/"Confirmar sugestão" rejeita com FIN_JA_LANCADO porque o
+     -- lançamento já não está 'nao_conciliado'). 'conciliado_manual' PRECISA
+     -- continuar aparecendo — é o status setado por fin_vincular_venda_
+     -- getnet_oferta quando o Hop 2 via Getnet É confirmado; excluí-lo
+     -- quebraria fechado/aguardando_banco/divergencia. Allow-list explícito
+     -- sobre o que É permitido (não `<> 'conciliado_extrato'`) — enum real
+     -- já tem 4 valores (não 3), e o codebase já trata conciliado_bot como
+     -- sinônimo de conciliado_extrato em ~15 RPCs (idioma `IN
+     -- ('conciliado_extrato','conciliado_bot')`); um deny-list só do
+     -- primeiro deixaria o segundo vazar pela mesma classe de bug.
+     AND t.conciliacao_status IN ('nao_conciliado', 'conciliado_manual')
+  ),
+  -- ─── Todo membro do grupo (raiz + filhas), 1 linha por lançamento ────────
+  membros AS (
+    SELECT r.id AS trans_id, r.id AS grupo_id, r.numero_parcela, r.total_parcelas, r.valor
+      FROM raizes r
+    UNION ALL
+    SELECT f.id, f.lancamento_pai_id, f.numero_parcela, f.total_parcelas, f.valor
+      FROM public.transacoes_financeiras f
+     WHERE f.lancamento_pai_id IN (SELECT id FROM raizes)
+       AND f.igreja_id = v_igreja
+       AND f.status <> 'cancelado'
+  ),
+  grupo_agg AS (
+    SELECT
+      grupo_id,
+      SUM(valor) AS valor_bruto,
+      COUNT(*) AS n_membros,
+      COUNT(*) FILTER (WHERE trans_id <> grupo_id) AS n_filhas
+    FROM membros
+    GROUP BY grupo_id
+  ),
+  -- ─── Recebíveis Getnet já casados (Hop 2 feito) com cada membro ──────────
+  recebiveis_grupo AS (
+    SELECT
+      m.grupo_id,
+      g.id AS recebivel_id,
+      g.nsu,
+      COALESCE(
+        g.valor_liquido_parcela,
+        g.valor_liquido,
+        COALESCE(g.valor_parcela, g.valor_venda) - abs(COALESCE(g.descontos, 0))
+      ) AS valor_liquido,
+      g.data_vencimento AS data_vencimento_real,
+      g.extrato_bancario_id,
+      g.contrato_registradora,
+      COALESCE(m.numero_parcela, 1) AS numero_parcela,
+      COALESCE(m.total_parcelas, 1) AS total_parcelas
+    FROM membros m
+    JOIN public.getnet_recebivel_lancamentos g
+      ON g.transacao_financeira_id = m.trans_id
+     AND g.igreja_id = v_igreja
+     AND g.integracao_id = p_integracao_id
+     AND public.has_filial_access(v_igreja, g.filial_id)
+  ),
+  recebiveis_status AS (
+    SELECT
+      rg.*,
+      CASE
+        WHEN rg.extrato_bancario_id IS NOT NULL THEN 'fechado'
+        WHEN rg.contrato_registradora IS NOT NULL
+         AND EXISTS (
+               SELECT 1 FROM public.getnet_antecipacao_lotes l
+                WHERE l.igreja_id = v_igreja
+                  AND l.integracao_id = p_integracao_id
+                  AND l.contrato_registradora = rg.contrato_registradora
+                  AND l.status IN ('vinculado', 'lancamento_criado')
+                  AND public.has_filial_access(v_igreja, l.filial_id)
+             ) THEN 'antecipada'
+        ELSE 'aguardando'
+      END AS hop1_status,
+      (
+        SELECT l.id FROM public.getnet_antecipacao_lotes l
+         WHERE l.igreja_id = v_igreja
+           AND l.integracao_id = p_integracao_id
+           AND l.contrato_registradora = rg.contrato_registradora
+           AND public.has_filial_access(v_igreja, l.filial_id)
+      ) AS lote_id
+    FROM recebiveis_grupo rg
+  ),
+  grupo_stats AS (
+    SELECT
+      grupo_id,
+      COUNT(*) AS n_recebiveis,
+      COUNT(*) FILTER (WHERE hop1_status IN ('fechado', 'antecipada')) AS n_batidas
+    FROM recebiveis_status
+    GROUP BY grupo_id
+  ),
+  -- ─── Divergência: soma completa do EC por extrato (Hop 1 agrupa por dia,
+  -- não por lançamento — um crédito pode cobrir parcelas de mais de uma
+  -- oferta). Gate = HFA no extrato (eb). Soma g2 NÃO filtra HFA: com âncora
+  -- compartilhada (#13) a conta vs eb.valor tem que ser completa — HFA em
+  -- g2 gerava divergencia falsa (Bugbot review #83). Escopo integracao_id
+  -- no g2 pela mesma razão do resto do arquivo.
+  divergencia_grupo AS (
+    SELECT DISTINCT rs.grupo_id
+    FROM recebiveis_status rs
+    JOIN public.extratos_bancarios eb
+      ON eb.id = rs.extrato_bancario_id
+     AND public.has_filial_access(v_igreja, eb.filial_id)
+   WHERE rs.extrato_bancario_id IS NOT NULL
+     AND abs(
+           (
+             SELECT COALESCE(SUM(
+                      COALESCE(
+                        g2.valor_liquido_parcela,
+                        g2.valor_liquido,
+                        COALESCE(g2.valor_parcela, g2.valor_venda) - abs(COALESCE(g2.descontos, 0))
+                      )
+                    ), 0)
+               FROM public.getnet_recebivel_lancamentos g2
+              WHERE g2.extrato_bancario_id = rs.extrato_bancario_id
+                AND g2.igreja_id = v_igreja
+                AND g2.integracao_id = p_integracao_id
+           ) - eb.valor
+         ) > 0.01
+  ),
+  parcelas_agg AS (
+    SELECT
+      grupo_id,
+      jsonb_agg(
+        jsonb_build_object(
+          'numero_parcela', numero_parcela,
+          'total_parcelas', total_parcelas,
+          'nsu', nsu,
+          'valor_liquido', valor_liquido,
+          'data_vencimento_real', data_vencimento_real,
+          'hop1_status', hop1_status,
+          'extrato_bancario_id', extrato_bancario_id,
+          'lote_id', lote_id
+        )
+        ORDER BY numero_parcela, recebivel_id
+      ) AS parcelas
+    FROM recebiveis_status
+    GROUP BY grupo_id
+  ),
+  -- ─── Sugestão Hop 2: 1 chamada pro período inteiro, join por transacao_id ─
+  sugestoes AS (
+    SELECT DISTINCT ON (c.transacao_id)
+      c.transacao_id,
+      c.recebivel_ids,
+      c.score,
+      c.features
+    FROM public.fin_gerar_candidatos_oferta_venda_getnet(
+           p_integracao_id, p_periodo_inicio, p_periodo_fim, v_ctx, v_scope
+         ) c
+   WHERE c.transacao_id IS NOT NULL
+   ORDER BY c.transacao_id, c.score DESC
+  ),
+  lancamentos_montados AS (
+    SELECT
+      r.id AS grupo_id,
+      r.forma_desc AS descricao,
+      r.data_vencimento,
+      r.filial_id,
+      ga.valor_bruto,
+      (COALESCE(ga.n_filhas, 0) > 0) AS parcelado,
+      (COALESCE(ga.n_filhas, 0) + 1) AS total_parcelas,
+      CASE
+        WHEN COALESCE(gs.n_recebiveis, 0) = 0 THEN 'sem_hop2'
+        WHEN r.id IN (SELECT grupo_id FROM divergencia_grupo) THEN 'divergencia'
+        -- Exige cobrir todos os membros do grupo (raiz+filhas), não só os
+        -- recebíveis já linkados — Hop 2 incompleto não vira "fechado".
+        WHEN gs.n_batidas = gs.n_recebiveis
+         AND gs.n_recebiveis >= ga.n_membros THEN 'fechado'
+        ELSE 'aguardando_banco'
+      END AS status,
+      COALESCE(pa.parcelas, '[]'::jsonb) AS parcelas,
+      CASE
+        WHEN COALESCE(gs.n_recebiveis, 0) = 0 AND s.transacao_id IS NOT NULL THEN
+          jsonb_build_object(
+            'recebivel_ids', to_jsonb(s.recebivel_ids),
+            'score', s.score,
+            'features', s.features
+          )
+        ELSE NULL
+      END AS sugestao
+    FROM raizes r
+    JOIN grupo_agg ga ON ga.grupo_id = r.id
+    LEFT JOIN grupo_stats gs ON gs.grupo_id = r.id
+    LEFT JOIN parcelas_agg pa ON pa.grupo_id = r.id
+    LEFT JOIN sugestoes s ON s.transacao_id = r.id
+  ),
+  lancamentos_final AS (
+    SELECT jsonb_agg(
+             jsonb_build_object(
+               'grupo_id', grupo_id,
+               'descricao', descricao,
+               'data_vencimento', data_vencimento,
+               'filial_id', filial_id,
+               'valor_bruto', valor_bruto,
+               'parcelado', parcelado,
+               'total_parcelas', total_parcelas,
+               'status', status,
+               'parcelas', parcelas,
+               'sugestao', sugestao
+             )
+             ORDER BY data_vencimento, grupo_id
+           ) AS arr,
+           COUNT(*) FILTER (WHERE status = 'fechado') AS n_fechados,
+           COUNT(*) FILTER (WHERE status = 'aguardando_banco') AS n_aguardando,
+           COUNT(*) FILTER (WHERE status = 'sem_hop2') AS n_sem_hop2,
+           COUNT(*) FILTER (WHERE status = 'divergencia') AS n_divergencia
+      FROM lancamentos_montados
+  ),
+  -- ─── Lotes de antecipação do período (ou já tocados por vendas do período) ─
+  lotes_candidatos AS (
+    SELECT l.*
+      FROM public.getnet_antecipacao_lotes l
+     WHERE l.igreja_id = v_igreja
+       AND l.integracao_id = p_integracao_id
+       AND public.has_filial_access(v_igreja, l.filial_id)
+       AND (v_scope IS NULL OR l.filial_id IS NULL OR l.filial_id = v_scope)
+       AND (
+             (l.data_contratacao_contrato BETWEEN p_periodo_inicio AND p_periodo_fim)
+             OR EXISTS (
+                  SELECT 1 FROM public.getnet_recebivel_lancamentos g
+                   WHERE g.igreja_id = v_igreja
+                     AND g.integracao_id = p_integracao_id
+                     AND g.contrato_registradora = l.contrato_registradora
+                     AND g.data_venda BETWEEN p_periodo_inicio AND p_periodo_fim
+                )
+           )
+       -- Conta: lote já vinculado só entra se o extrato é desta conta; lote
+       -- ainda pendente_vinculo (sem extrato) não tem conta própria — segue
+       -- aparecendo pra permitir a ação "Vincular extrato" (mesmo
+       -- comportamento sem escopo de conta que LotesAntecipacaoTab já tem
+       -- hoje pra esse caso).
+       AND (
+             l.extrato_bancario_id IS NULL
+             OR EXISTS (
+                  SELECT 1 FROM public.extratos_bancarios eb
+                   WHERE eb.id = l.extrato_bancario_id
+                     AND eb.conta_id = p_conta_id
+                )
+           )
+  ),
+  vendas_origem_agg AS (
+    SELECT
+      lc.id AS lote_id,
+      jsonb_agg(
+        jsonb_build_object(
+          'nsu', g.nsu,
+          'valor_parcela_liquido', COALESCE(
+            g.valor_liquido_parcela,
+            g.valor_liquido,
+            COALESCE(g.valor_parcela, g.valor_venda) - abs(COALESCE(g.descontos, 0))
+          ),
+          -- g.parcelas é `integer` (drift de schema fechado em
+          -- 20260807100000; produção nunca teve o rótulo texto "N de M" —
+          -- coluna 100% NULL nas linhas reais). Um integer isolado não
+          -- permite reconstruir "parcela atual DE total" sem uma 2ª coluna
+          -- que não existe — não tenta mais extrair via regex; cai direto
+          -- no fallback 1, que é o comportamento real hoje (ot.numero_
+          -- parcela/ot.total_parcelas de transacoes_financeiras seguem
+          -- confiáveis quando a venda já tem oferta vinculada).
+          'numero_parcela', COALESCE(ot.numero_parcela, 1),
+          'total_parcelas', COALESCE(ot.total_parcelas, 1),
+          -- hop2_pendente = oferta realmente inexistente (ot.id IS NULL).
+          -- Distinto de "existe mas o chamador não tem HFA": nesse caso
+          -- anulamos metadados (não vazar descrição/data) mas NÃO
+          -- marcamos Hop 2 pendente — senão o badge do header mente
+          -- "sem oferta" pra vínculo de outra filial (review #102).
+          'hop2_pendente', (ot.id IS NULL),
+          -- Sem HFA na oferta: nullar metadados (não vazar descrição/data
+          -- de filial inacessível via recebível global).
+          'oferta_lancamento_id', CASE
+            WHEN ot.id IS NULL THEN NULL
+            WHEN public.has_filial_access(v_igreja, ot.filial_id) THEN ot.id
+            ELSE NULL
+          END,
+          'oferta_descricao', CASE
+            WHEN ot.id IS NOT NULL AND public.has_filial_access(v_igreja, ot.filial_id)
+              THEN ot.descricao
+            ELSE NULL
+          END,
+          'oferta_data_vencimento', CASE
+            WHEN ot.id IS NOT NULL AND public.has_filial_access(v_igreja, ot.filial_id)
+              THEN ot.data_vencimento
+            ELSE NULL
+          END
+        )
+        ORDER BY g.data_venda, g.id
+      ) AS vendas_origem
+    FROM lotes_candidatos lc
+    JOIN public.getnet_recebivel_lancamentos g
+      ON g.igreja_id = v_igreja
+     AND g.integracao_id = p_integracao_id
+     AND g.contrato_registradora = lc.contrato_registradora
+     AND public.has_filial_access(v_igreja, g.filial_id)
+    LEFT JOIN public.transacoes_financeiras ot ON ot.id = g.transacao_financeira_id
+    GROUP BY lc.id
+  ),
+  lotes_final AS (
+    SELECT jsonb_agg(
+             jsonb_build_object(
+               'lote_id', lc.id,
+               'contrato_registradora', lc.contrato_registradora,
+               'status', lc.status,
+               'filial_id', lc.filial_id,
+               'valor_contrato', lc.valor_atual_contrato,
+               'desagio', CASE WHEN eb.id IS NOT NULL THEN lc.valor_atual_contrato - eb.valor ELSE NULL END,
+               'credito_banco', eb.valor,
+               'data_liquidacao', eb.data_transacao,
+               -- Expõe o lançamento de deságio só quando o chamador tem
+               -- HFA na transação (filial efetiva). Lote global + deságio
+               -- de outra filial não pode habilitar "Reverter" (§9.78,
+               -- review #102). Sem HFA devolve NULL — o botão some.
+               'lancamento_desagio_id', CASE
+                 WHEN lc.lancamento_desagio_id IS NULL THEN NULL
+                 WHEN EXISTS (
+                       SELECT 1 FROM public.transacoes_financeiras tf
+                        WHERE tf.id = lc.lancamento_desagio_id
+                          AND tf.igreja_id = v_igreja
+                          AND public.has_filial_access(v_igreja, tf.filial_id)
+                     ) THEN lc.lancamento_desagio_id
+                 ELSE NULL
+               END,
+               'vendas_origem', COALESCE(voa.vendas_origem, '[]'::jsonb)
+             )
+             ORDER BY lc.data_contratacao_contrato NULLS LAST, lc.id
+           ) AS arr
+      FROM lotes_candidatos lc
+      -- HFA no extrato: lote global + extrato de outra filial não vaza
+      -- credito_banco/data_liquidacao (review #83 / §9.78).
+      LEFT JOIN public.extratos_bancarios eb
+        ON eb.id = lc.extrato_bancario_id
+       AND public.has_filial_access(v_igreja, eb.filial_id)
+      LEFT JOIN vendas_origem_agg voa ON voa.lote_id = lc.id
+  )
+  SELECT jsonb_build_object(
+           'resumo', jsonb_build_object(
+             'fechados', COALESCE(lf.n_fechados, 0),
+             'aguardando_banco', COALESCE(lf.n_aguardando, 0),
+             'sem_hop2', COALESCE(lf.n_sem_hop2, 0),
+             'divergencia', COALESCE(lf.n_divergencia, 0)
+           ),
+           'lancamentos', COALESCE(lf.arr, '[]'::jsonb),
+           'lotes', COALESCE(lotf.arr, '[]'::jsonb)
+         )
+    INTO v_resultado
+    FROM lancamentos_final lf
+    FULL OUTER JOIN lotes_final lotf ON true;
+
+  RETURN COALESCE(
+    v_resultado,
+    jsonb_build_object(
+      'resumo', jsonb_build_object('fechados', 0, 'aguardando_banco', 0, 'sem_hop2', 0, 'divergencia', 0),
+      'lancamentos', '[]'::jsonb,
+      'lotes', '[]'::jsonb
+    )
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.fin_listar_ledger_conciliacao_cartao(uuid, uuid, date, date, jsonb, uuid) IS
+  'Fase 7a/7b Conciliação Cartão Getnet (só leitura): monta o ledger unificado Oferta→Venda→Banco + lotes de antecipação por período. Status de linha (sem_hop2/aguardando_banco/fechado/divergencia) deliberadamente distinto do enum getnet_antecipacao_lotes.status. raizes usa allow-list conciliacao_status IN (nao_conciliado, conciliado_manual) — exclui conciliado_extrato E conciliado_bot (fechados por outro canal — nunca ganham recebível Getnet, ficariam presos em sem_hop2 com ações que sempre falham com FIN_JA_LANCADO; fix 20260807120000); conciliado_manual continua aparecendo (setado por fin_vincular_venda_getnet_oferta no Hop 2 confirmado). Sugestão Hop 2 via 1 chamada de fin_gerar_candidatos_oferta_venda_getnet por período (join único por transacao_id, DISTINCT ON score DESC). Divergência = Σ valor_liquido do EC por extrato vs extratos_bancarios.valor, tol. R$0,01; gate has_filial_access só no extrato (eb) — soma g2 completa (igreja+integracao, sem HFA por recebível) pra não gerar divergencia falsa com âncora compartilhada #13 (review #83); lancamentos escopados por transacoes_financeiras.conta_id = p_conta_id; recebíveis/lotes/vendas_origem por integracao_id = p_integracao_id; lotes vinculados só entram se o extrato é da mesma conta, lotes pendente_vinculo aparecem sem escopo de conta. Extrato do lote e metadados de oferta em vendas_origem exigem has_filial_access. fechado exige n_batidas = n_recebiveis >= n_membros. lotes.lancamento_desagio_id exposto só com HFA na transação (20260813150000 — lote global + deságio de outra filial devolve NULL). vendas_origem.hop2_pendente = (oferta inexistente), distinto de metadados anulados por falta de HFA.';
+
+GRANT EXECUTE ON FUNCTION public.fin_listar_ledger_conciliacao_cartao(uuid, uuid, date, date, jsonb, uuid)
+  TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.fin_listar_ledger_conciliacao_cartao(uuid, uuid, date, date, jsonb, uuid)
+  FROM anon;

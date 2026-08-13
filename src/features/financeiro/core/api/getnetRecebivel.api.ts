@@ -109,6 +109,18 @@ export function lancarDesagioAntecipacao(
   });
 }
 
+/**
+ * → fin_reverter_desagio_antecipacao. Mesma permissão do lançamento
+ * (`autorizado_lancar_despesas` no canal bot). Recusa lote que não está
+ * `lancamento_criado` ou sem HFA na filial efetiva. O trigger de
+ * reversão volta o lote pra `vinculado`.
+ */
+export function reverterDesagioAntecipacao(loteId: string): Promise<FinResultado> {
+  return callFinRpc("fin_reverter_desagio_antecipacao", {
+    p_lote_id: loteId,
+  });
+}
+
 export interface ConferenciaTotaisGetnet {
   oferta_bruto: number;
   taxa_mdr: number;
@@ -343,6 +355,8 @@ export interface LedgerCartaoVendaOrigem {
   valor_parcela_liquido: number | null;
   numero_parcela: number;
   total_parcelas: number;
+  /** True só quando a venda não tem oferta — distinto de metadados anulados por falta de HFA. */
+  hop2_pendente: boolean;
   oferta_lancamento_id: string | null;
   oferta_descricao: string | null;
   oferta_data_vencimento: string | null;
@@ -360,7 +374,7 @@ export interface LedgerCartaoLote {
   desagio: number | null;
   credito_banco: number | null;
   data_liquidacao: string | null;
-  /** Transação da saída "Deságio de antecipação Getnet" — null se ainda não lançada. Usado pra reverter direto nesta tela (fin_alterar_status_lancamento). */
+  /** Transação da saída de deságio — null se ainda não lançada OU se o chamador não tem HFA nela. Reverter vai via fin_reverter_desagio_antecipacao(lote_id). */
   lancamento_desagio_id: string | null;
   vendas_origem: LedgerCartaoVendaOrigem[];
 }

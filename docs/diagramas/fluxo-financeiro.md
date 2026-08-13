@@ -858,7 +858,7 @@ flowchart TD
 
 ## Fase 7a — Ledger unificado (RPCs de leitura) (§9.94)
 
-Só leitura. UI do ledger = Fase 7b. Writers inalterados.
+Só leitura. UI do ledger = Fase 7b.
 
 ```mermaid
 flowchart TD
@@ -881,7 +881,7 @@ flowchart TD
 ## Fase 7b — UI do ledger unificado (§9.95)
 
 Substitui Hop 2 / Hop 1 / tabela de lotes empilhados por uma linha
-expansível por lançamento. Writers inalterados.
+expansível por lançamento.
 
 ```mermaid
 flowchart TD
@@ -897,9 +897,12 @@ flowchart TD
     BTN1 --> W1["fin_vincular_venda_banco_getnet"]
     LEDGER --> LOTES["lotes do período"]
     LOTES --> W3["fin_vincular_lote_antecipacao\n+ fin_lancar_desagio_antecipacao"]
+    LOTES -->|"lancamento_criado\n+ HFA + temDadosCompletos"| W4["fin_reverter_desagio_antecipacao"]
+    W4 --> TRG["trigger: lote volta pra vinculado"]
     W2 -.-> INV["invalidate:\nledger · Hop1 · conferência · lotes"]
     W1 -.-> INV
     W3 -.-> INV
+    W4 -.-> INV
 ```
 
 ## Hotfix — drift `parcelas` text→integer (§9.96)
@@ -1279,4 +1282,23 @@ corrigido, só que numa query paralela que passou batido. Corrigido com
 o mesmo `FILTRO_EXCLUI_ESPELHO_GETNET`. `possivel_duplicata_de`
 mantido — continua útil pra duplicatas reais entre outros bancos, só
 deixa de ser acionado pelo caso Getnet específico.
+
+## Ciclo 2 (C2-9/C2-10) — reverter deságio no ledger (§9.110)
+
+Spikes EDI×CSV em `docs/getnet-edi-vs-csv-hop2-spike.md` e
+`docs/getnet-edi-vs-csv-antecipacao-c2-10.md` (sem RPC de matching).
+Produção: CHECK de `origem_registro` alargada. Ledger ganha
+"Reverter deságio" via `fin_reverter_desagio_antecipacao` (não
+`fin_alterar_status_lancamento` direto). `lancamento_desagio_id` só
+sai com HFA na transação; botão também exige `temDadosCompletos`.
+
+```mermaid
+flowchart TD
+    CARD["LoteRow status=lancamento_criado"] --> GATE{"temDadosCompletos\nAND lancamento_desagio_id?"}
+    GATE -->|não| AVISO["aviso: filtro de filial / carregando"]
+    GATE -->|sim| RPC["fin_reverter_desagio_antecipacao\nautorizado_lancar_despesas\nHFA lote + extrato + transação"]
+    RPC --> ST["fin_alterar_status_lancamento\npendente, v_ctx"]
+    ST --> TRG["trigger: lote → vinculado"]
+```
+
 

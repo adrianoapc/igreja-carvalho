@@ -1766,6 +1766,14 @@ Parser posicional sem dependências externas. Destaques:
 - `supabase/migrations/20260617000001_getnet_schema_expand.sql` (novo)
 - `src/App.tsx` (rota `/financas/integracoes`)
 
+### Conciliação Cartão — reverter deságio no ledger
+
+Na tela **Conciliação Cartão**, um lote de antecipação Getnet já
+concluído oferece **Reverter deságio** no próprio card. A ação chama
+`fin_reverter_desagio_antecipacao` (mesma permissão de lançar a saída);
+o lote volta para "vinculado" e o crédito bancário permanece. O botão
+só habilita quando o lote pertence ao filtro de filial atual.
+
 ### Referências
 
 - Fluxo: [`docs/diagramas/fluxo-getnet-sftp.md`](diagramas/fluxo-getnet-sftp.md)
