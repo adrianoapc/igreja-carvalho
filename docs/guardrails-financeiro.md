@@ -400,6 +400,19 @@ DEFINER`:**
     o aviso "indisponível neste filtro de filial" só porque o status
     é `lancamento_criado` (§9.110).
 
+19. **Passar `p_flag_bot` em `fin_resolver_contexto` não autoriza o canal
+    JWT.** O 2º argumento só vale no bot (ADR-029 convenção 4). Uma RPC
+    dedicada que só faz `fin_resolver_contexto(..., 'autorizado_lancar_
+    despesas')` ainda deixa tesoureiro web **sem o flag** escrever —
+    `has_role(tesoureiro)` basta no JWT. Achado real: "Reverter deságio"
+    no ledger (#102 / Codex P1) depois de `20260813150000`. Fix: helper
+    `_fin_exigir_autorizado_lancar_despesas` (resolver + check do flag
+    no JWT; admin/super_admin bypass) usado pela porta dedicada **e**
+    por `fin_alterar_status_lancamento` ao sair de `pago` em
+    `getnet_antecipacao_desagio` (senão o menu / rpc direto bypassa).
+    Não expor o botão sem essa permissão; a rota `AuthGate` não substitui
+    (§9.110).
+
 Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.65, §9.67,
 §9.73, §9.74, §9.80, §9.81, §9.82, §9.86, §9.96, §9.109, §9.110, checklist completo na memória de sessão.
 

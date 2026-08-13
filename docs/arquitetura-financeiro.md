@@ -7050,18 +7050,27 @@ de amostra pequena; nenhuma RPC de matching automático nesta fase.
 **UX no ledger (Conciliação Cartão):** `fin_listar_ledger_conciliacao_cartao`
 passa a expor `lancamento_desagio_id` por lote (`20260813140000`) pra
 botão "Reverter deságio" no card. Review #102 (cursoragent + Codex)
-achou 3 furos nessa superfície, fechados em `20260813150000`:
+achou 3 furos nessa superfície, fechados em `20260813150000` +
+`20260813160000`:
 
 1. **Permissão.** O botão chamava `fin_alterar_status_lancamento`
    (`p_flag_bot` NULL). `fin_lancar_desagio_antecipacao` exige
    `autorizado_lancar_despesas` (canal bot). Porta nova
-   `fin_reverter_desagio_antecipacao(p_lote_id)`: mesma permissão,
-   valida HFA no lote + filial efetiva do extrato + transação, aninha
+   `fin_reverter_desagio_antecipacao(p_lote_id)`: HFA no lote + filial
+   efetiva do extrato + transação, aninha
    `fin_alterar_status_lancamento(..., v_ctx)`. Não trava o lote antes
    da transação (ordem igual ao menu — o trigger AFTER UPDATE trava o
    lote; inverter abriria deadlock). O trigger
    `sincronizar_lote_antecipacao_ao_reverter_desagio` continua sendo
    quem volta o lote pra `vinculado`.
+   **Codex P1 ainda aberto depois de `150000`:** o 2º arg de
+   `fin_resolver_contexto` só vale no bot (ADR-029). Tesoureiro JWT sem
+   o flag ainda revertia; `fin_alterar_status_lancamento` (menu /
+   rpc direto) continuava com `p_flag` NULL. `20260813160000` adiciona
+   `_fin_exigir_autorizado_lancar_despesas` (resolver + check do flag
+   no JWT; admin/super_admin bypass), a porta dedicada e a porta
+   genérica ao sair de `pago` em `getnet_antecipacao_desagio` usam o
+   helper, e o botão só renderiza com a mesma permissão. Guardrail B.19.
 2. **Filial efetiva.** `lancamento_desagio_id` saía incondicional; o
    botão não pedia `temDadosCompletos` (Vincular/Lançar neste card já
    pedem). Lote global + deságio de filial B, filtro em A: botão
@@ -7071,4 +7080,7 @@ achou 3 furos nessa superfície, fechados em `20260813150000`:
 3. **Badge Hop 2.** Contar `!oferta_lancamento_id` mentia "sem oferta"
    quando a RPC já anula o id sem HFA. `hop2_pendente = (ot.id IS NULL)`;
    metadados inacessíveis renderizam "—" no detalhe, sem badge.
+
+A mutation do revert invalida `["saidas"]` além do ledger (Codex: a
+saída deixa de ser paga; listas/totais de caixa ficavam stale).
 

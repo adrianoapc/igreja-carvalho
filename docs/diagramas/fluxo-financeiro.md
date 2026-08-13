@@ -897,12 +897,13 @@ flowchart TD
     BTN1 --> W1["fin_vincular_venda_banco_getnet"]
     LEDGER --> LOTES["lotes do período"]
     LOTES --> W3["fin_vincular_lote_antecipacao\n+ fin_lancar_desagio_antecipacao"]
-    LOTES -->|"lancamento_criado\n+ HFA + temDadosCompletos"| W4["fin_reverter_desagio_antecipacao"]
+    LOTES -->|"lancamento_criado\n+ HFA + temDadosCompletos\n+ autorizado_lancar_despesas"| W4["fin_reverter_desagio_antecipacao"]
     W4 --> TRG["trigger: lote volta pra vinculado"]
     W2 -.-> INV["invalidate:\nledger · Hop1 · conferência · lotes"]
     W1 -.-> INV
     W3 -.-> INV
     W4 -.-> INV
+    W4 -.-> SAIDAS["invalidate: saidas"]
 ```
 
 ## Hotfix — drift `parcelas` text→integer (§9.96)
@@ -1290,14 +1291,18 @@ Spikes EDI×CSV em `docs/getnet-edi-vs-csv-hop2-spike.md` e
 Produção: CHECK de `origem_registro` alargada. Ledger ganha
 "Reverter deságio" via `fin_reverter_desagio_antecipacao` (não
 `fin_alterar_status_lancamento` direto). `lancamento_desagio_id` só
-sai com HFA na transação; botão também exige `temDadosCompletos`.
+sai com HFA na transação; botão também exige `temDadosCompletos` e
+`autorizado_lancar_despesas` (JWT tesoureiro precisa do flag — o 2º
+arg de `fin_resolver_contexto` só vale no bot; admin/super_admin
+bypass). `fin_alterar_status_lancamento` recusa sair de `pago` em
+deságio sem o mesmo check.
 
 ```mermaid
 flowchart TD
-    CARD["LoteRow status=lancamento_criado"] --> GATE{"temDadosCompletos\nAND lancamento_desagio_id?"}
-    GATE -->|não| AVISO["aviso: filtro de filial / carregando"]
-    GATE -->|sim| RPC["fin_reverter_desagio_antecipacao\nautorizado_lancar_despesas\nHFA lote + extrato + transação"]
-    RPC --> ST["fin_alterar_status_lancamento\npendente, v_ctx"]
+    CARD["LoteRow status=lancamento_criado"] --> GATE{"temDadosCompletos\nAND lancamento_desagio_id\nAND autorizado_lancar_despesas?"}
+    GATE -->|não| AVISO["aviso: filtro de filial / carregando\nou botão oculto sem permissão"]
+    GATE -->|sim| RPC["fin_reverter_desagio_antecipacao\n_fin_exigir_autorizado_lancar_despesas\nHFA lote + extrato + transação"]
+    RPC --> ST["fin_alterar_status_lancamento\npendente, v_ctx\n(mesmo check se rpc/menu direto)"]
     ST --> TRG["trigger: lote → vinculado"]
 ```
 

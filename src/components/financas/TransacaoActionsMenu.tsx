@@ -46,6 +46,7 @@ import {
   alterarStatusLancamento,
   alternarConferenciaManual,
   excluirLancamento,
+  usePodeReverterDesagioAntecipacao,
 } from "@/features/financeiro/core";
 
 interface TransacaoActionsMenuProps {
@@ -66,6 +67,7 @@ interface TransacaoActionsMenuProps {
       data_pagamento: string;
     },
   ) => void;
+  origemRegistro?: string | null;
 }
 
 export function TransacaoActionsMenu({
@@ -78,6 +80,7 @@ export function TransacaoActionsMenu({
   conciliacaoStatus = null,
   onEdit,
   onVerExtrato,
+  origemRegistro = null,
 }: TransacaoActionsMenuProps) {
   const [showVinculadaDrawer, setShowVinculadaDrawer] = useState(false);
   const [movVinculada, setMovVinculada] = useState<{
@@ -120,6 +123,14 @@ export function TransacaoActionsMenu({
     }
   };
   const queryClient = useQueryClient();
+  const podeReverterDesagio = usePodeReverterDesagioAntecipacao();
+  // Codex #102 P1: "Marcar como Pendente" nesta porta genérica revertia
+  // deságio pago sem autorizado_lancar_despesas. O SQL agora recusa; a
+  // ação some daqui se o usuário não tem a permissão.
+  const ocultarReverterDesagio =
+    origemRegistro === "getnet_antecipacao_desagio" &&
+    status === "pago" &&
+    !podeReverterDesagio;
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditWarningDialog, setShowEditWarningDialog] = useState(false);
   const [showConfirmarPagamentoDialog, setShowConfirmarPagamentoDialog] =
@@ -306,7 +317,7 @@ export function TransacaoActionsMenu({
               Marcar como Pago
             </DropdownMenuItem>
           )}
-          {status !== "pendente" && (
+          {status !== "pendente" && !ocultarReverterDesagio && (
             <DropdownMenuItem onClick={() => handleStatusChange("pendente")}>
               <Clock className="mr-2 h-4 w-4" />
               Marcar como Pendente

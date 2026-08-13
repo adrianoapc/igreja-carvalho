@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useHideValues } from "@/hooks/useHideValues";
 import { useLotesAntecipacao } from "@/features/financeiro/core/hooks/useLotesAntecipacao";
+import { usePodeReverterDesagioAntecipacao } from "@/features/financeiro/core/hooks/usePodeReverterDesagioAntecipacao";
 import {
   listarLedgerConciliacaoCartao,
   buscarRecebiveisGetnetOferta,
@@ -433,11 +434,12 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
   });
 
   // Reverte a saída "Deságio de antecipação Getnet" direto desta tela —
-  // porta fin_reverter_desagio_antecipacao (mesma permissão do lançar;
-  // HFA na filial efetiva). O trigger sincronizar_lote_antecipacao_ao_
-  // reverter_desagio (20260731180000) volta o lote pra 'vinculado' e
-  // limpa lancamento_desagio_id ao detectar pago -> não-pago; o vínculo
-  // com o extrato bancário (extrato_bancario_id) não é tocado.
+  // porta fin_reverter_desagio_antecipacao (autorizado_lancar_despesas
+  // no bot e no JWT; HFA na filial efetiva). O trigger sincronizar_
+  // lote_antecipacao_ao_reverter_desagio (20260731180000) volta o lote
+  // pra 'vinculado' e limpa lancamento_desagio_id ao detectar pago ->
+  // não-pago; o vínculo com o extrato bancário não é tocado.
+  const podeReverterDesagio = usePodeReverterDesagioAntecipacao();
   const reverterDesagio = useMutation({
     mutationFn: (loteId: string) => reverterDesagioAntecipacao(loteId),
     onSuccess: () => {
@@ -445,6 +447,9 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
       refetch();
       queryClient.invalidateQueries({ queryKey: ["getnet-antecipacao-lotes"] });
       queryClient.invalidateQueries({ queryKey: ["conferencia-totais-getnet"] });
+      // Codex #102: a saída deixa de ser paga — listas/totais de caixa
+      // em Saídas ficam stale sem isto (TransacaoActionsMenu já invalidava).
+      queryClient.invalidateQueries({ queryKey: ["saidas"] });
     },
     onError: (err) => {
       toast.error(rpcErrorMessage(err) ?? "Erro ao reverter deságio");
@@ -594,6 +599,7 @@ export function ConciliacaoCartaoLedger({ filters }: ConciliacaoCartaoLedgerProp
                           revertendo={
                             reverterDesagio.isPending && reverterDesagio.variables === lote.lote_id
                           }
+                          podeReverterDesagio={podeReverterDesagio}
                           dadosStatus={dadosStatus}
                         />
                       );
@@ -949,6 +955,7 @@ function LoteRow({
   onLancarSaida,
   onReverterDesagio,
   revertendo,
+  podeReverterDesagio,
   dadosStatus,
 }: {
   lote: LedgerCartaoLote;
@@ -959,6 +966,7 @@ function LoteRow({
   onLancarSaida: () => void;
   onReverterDesagio: () => void;
   revertendo: boolean;
+  podeReverterDesagio: boolean;
   dadosStatus: LoteDadosStatus;
 }) {
   const meta = LOTE_STATUS_META[lote.status];
@@ -1073,19 +1081,21 @@ function LoteRow({
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <Landmark className="w-3.5 h-3.5" /> Lote concluído
                 </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={onReverterDesagio}
-                  disabled={!lote.lancamento_desagio_id || revertendo || !temDadosCompletos}
-                >
-                  {revertendo ? (
-                    <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-                  ) : (
-                    <Undo2 className="w-3.5 h-3.5 mr-1" />
-                  )}
-                  Reverter deságio
-                </Button>
+                {podeReverterDesagio && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onReverterDesagio}
+                    disabled={!lote.lancamento_desagio_id || revertendo || !temDadosCompletos}
+                  >
+                    {revertendo ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                    ) : (
+                      <Undo2 className="w-3.5 h-3.5 mr-1" />
+                    )}
+                    Reverter deságio
+                  </Button>
+                )}
               </>
             )}
             {!temDadosCompletos && (

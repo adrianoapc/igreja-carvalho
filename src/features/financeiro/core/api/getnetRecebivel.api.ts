@@ -110,10 +110,10 @@ export function lancarDesagioAntecipacao(
 }
 
 /**
- * → fin_reverter_desagio_antecipacao. Mesma permissão do lançamento
- * (`autorizado_lancar_despesas` no canal bot). Recusa lote que não está
- * `lancamento_criado` ou sem HFA na filial efetiva. O trigger de
- * reversão volta o lote pra `vinculado`.
+ * → fin_reverter_desagio_antecipacao. Exige autorizado_lancar_despesas
+ * no bot E no JWT (tesoureiro sem o flag é recusado; admin/super_admin
+ * bypass). Recusa lote que não está `lancamento_criado` ou sem HFA na
+ * filial efetiva. O trigger de reversão volta o lote pra `vinculado`.
  */
 export function reverterDesagioAntecipacao(loteId: string): Promise<FinResultado> {
   return callFinRpc("fin_reverter_desagio_antecipacao", {
