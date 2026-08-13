@@ -2424,10 +2424,17 @@ serve(async (req) => {
           query = filialIdFromWhatsApp
             ? query.or(`filial_id.eq.${filialIdFromWhatsApp},filial_id.is.null`)
             : query.is("filial_id", null);
-          const { data } = await query
+          const { data, error } = await query
             .order("filial_id", { ascending: false, nullsFirst: false })
             .order("id")
             .limit(5);
+          if (error) {
+            console.error(
+              `[Financeiro] Erro ao buscar categoria "Transferência entre Contas" (tipo=${tipo}):`,
+              error
+            );
+            return null;
+          }
           const linhas = data ?? [];
           if (linhas.length === 0) return null;
           if (filialIdFromWhatsApp) {
