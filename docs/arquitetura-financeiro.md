@@ -211,9 +211,11 @@ flowchart TD
 - Financeiro/bancário: `getnet-sftp`, `pix-webhook` (ADR-024),
   `santander-api`/`santander-extrato`, `buscar-pix-recebidos`/
   `buscar-pix-cron`/`criar-cobranca-pix`, `finance-sync` (esqueleto),
-  `sync-transferencias-conciliacao`, `reclass-transacoes`/`undo-reclass`/
-  `undo-import`, `processar-nota-fiscal`, `integracoes-config` (secrets
-  criptografados tweetnacl).
+  `reclass-transacoes`/`undo-reclass`/`undo-import`,
+  `processar-nota-fiscal`, `integracoes-config` (secrets criptografados
+  tweetnacl). `sync-transferencias-conciliacao` REMOVIDA (§9.10.1) —
+  órfã desde a limpeza de código morto, nunca chegou a funcionar em
+  produção (bug de runtime pré-existente).
 - 3 padrões de segurança coexistem: `x-webhook-secret` timing-safe; secrets
   por igreja (tabela `webhooks` + `_shared/webhook-resolver.ts`, fallback
   filial→igreja→sistema); `_shared/internal-auth.ts`.
@@ -1493,6 +1495,42 @@ adicional: typecheck sem nenhum erro "cannot find module" após a remoção.
 sync-transferencias-conciliacao` ficou sem nenhum caller frontend
 identificado após a remoção do widget — não é código do módulo financeiro
 frontend, não foi tocado (limpeza de edge functions é outra frente).
+
+#### 9.10.1 Removida de vez (2026-08-13) — a edge nunca funcionou em produção
+
+Achado ao investigar um fix perdido num `git stash` de outra sessão: a
+edge decodificava o JWT com `Deno.core.decode(...)`, API interna do
+Deno que não existe no runtime público das Edge Functions, e usava
+`SERVICE_ROLE_KEY` (sem claims de usuário) pra chamar uma RPC que lê
+`get_jwt_igreja_id()`/`get_jwt_filial_id()`/`auth.uid()` da sessão
+Postgres. Ou seja: **nunca funcionou de verdade** — todo request caía
+em exceção antes de tocar em qualquer dado. Corrigir só o client teria
+reativado, pela primeira vez em produção, uma `RPC SECURITY DEFINER`
+que viola 3 guardrails ao mesmo tempo: `UPDATE` direto em
+`transacoes_financeiras` fora do padrão `fin_*` (regra de ouro, §0);
+sem `has_filial_access` (`v_filial_id IS NULL OR ...` sincroniza TODAS
+as filiais do tenant quando o JWT não tem filial); sem checagem de
+`autorizado_lancar_*` (qualquer autenticado com `igreja_id` no JWT
+dispara o lote).
+
+Decisão: **remover, não revive-la**. O trabalho que ela fazia
+(sincronizar a perna irmã de uma transferência quando a outra é
+conciliada) já é feito, melhor, dentro de `fin_confirmar_conciliacao`
+(`20260711140000`, L184-205) — atômico, na mesma transação da
+conciliação, já com `has_filial_access` (`20260804300000`). Removidos
+na mesma migration (`20260813170000`): as outras 2 funções mortas do
+mesmo sistema original de fev/2026
+(`docs/_archive/IMPLEMENTACAO_SINCRONIZACAO_TRANSFERENCIAS.md`) —
+`sincronizar_conciliacao_transferencias` (a metade "inline", já
+superada pelo F3/ADR-030) e `contar_transferencias_dessincronizadas`
+(diagnóstico auxiliar) — nenhuma com caller real em `src/`. Os scripts
+standalone `supabase/scripts/sync-transferencias-conciliacao.sql` e
+`helpers-sincronizacao-transferencias.sql` (cópias das mesmas
+definições, fora de `migrations/`) também removidos, senão ficariam
+documentando uma forma de recriar código que acabou de ser fechado por
+violar guardrail. `auditoria_conciliacoes` (tabela criada na mesma
+migration original) NÃO foi tocada — tem uso/policies mais amplos que
+só estas 3 funções, fora do escopo desta limpeza.
 
 **Frente 3 — Finanças no bottom-nav**: `MobileNavbar.tsx` ganha um item
 "Finanças" (ícone `DollarSign`, rota `/financas`) condicionado à mesma
