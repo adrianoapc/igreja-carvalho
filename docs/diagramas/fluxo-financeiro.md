@@ -253,7 +253,7 @@ flowchart TD
         W2[fin_atualizar_lancamento\nbloqueia conciliado D4]
         W3[fin_alterar_status_lancamento]
         W4[fin_excluir_lancamento]
-        W5[fin_criar_transferencia + estorno\nsaldo atômico]
+        W5["fin_criar_transferencia + estorno\nsaldo atômico\nvalida filial dos 5 catálogos (§9.110)"]
         W6[fin_ajustar_saldo\nlançamento auditável]
         W7[fin_lancar_sessao\nofertas em lote + finaliza sessão]
         W8[fin_pagar_reembolso\nD9 admin OU tesoureiro + notificação]

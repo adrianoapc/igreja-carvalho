@@ -6889,8 +6889,70 @@ com o resto de `runExtratoEletronicoV10`, que continua gravando
 `getnet_resumo`/`getnet_analitico`/`getnet_ajustes`/`getnet_financeiro_
 resumo`/`getnet_financeiro_detalhe`/`getnet_arquivos` exatamente igual).
 
+### 9.110 `fin_criar_transferencia` passa a validar filial (e tenant nos 3 campos que nunca tinham)
+
+Fecha o risco documentado em §11 desde §9.79: `fin_criar_transferencia`
+validava tenant de `categoria_saida_id`/`categoria_entrada_id` (só
+`fin_validar_fk_tenant`), mas `subcategoria_saida_id`/`base_
+ministerial_id`/`centro_custo_id` não tinham NENHUMA validação — nem
+tenant. Um tesoureiro restrito a uma filial podia transferir
+referenciando catálogo de outra filial/igreja sem bloqueio nenhum.
+
+**Backend** (`20260813150000`): `CREATE OR REPLACE` a partir do corpo
+mais recente (`20260731390000`, preserva HFA em contas + `p_extras.
+filial_id`, lock determinístico, resolução de forma "Transferência
+Bancária"). Adiciona `fin_validar_fk_tenant` nos 3 campos que nunca
+tinham + `fin_validar_fk_filial` (mesmo padrão de `fin_criar_
+lancamento`) nos 5 campos de catálogo, contra a filial EFETIVA da
+própria transferência.
+
+**Frontend**: `TransferenciaDialog.tsx` resolvia os 5 catálogos por
+nome só filtrando `igreja_id`, sem filial — extraído helper
+`primeiroCatalogoPorFilial`/`filtrarCatalogoPorFilial`
+(`src/features/financeiro/core/filialCatalogo.ts`, mesma regra de
+`useDadosApoio.ts`: filial específica → própria ou global via `.or(...)`,
+nunca `.eq()` puro). Achado de review (#103): a query de `contas` do
+mesmo dialog continuava com `.eq("filial_id", ...)` — excluía conta
+compartilhada (`filial_id IS NULL`) da lista, mesmo gap que
+`useDadosApoio.ts` já tinha corrigido antes; alinhado ao mesmo padrão
+`.or()`.
+
+**Bot WhatsApp** (`chatbot-financeiro/index.ts`): mesmo gap do dialog —
+resolvia a categoria "Transferência entre Contas" sem filtro de filial,
+o que quebraria transferências reais via bot em qualquer igreja com
+categoria filial-específica assim que a validação nova do backend
+entrasse em vigor. Corrigido com a mesma regra de filial. Achado de
+review (#103), adicional: a busca não filtrava por `tipo` (saída/
+entrada são categorias distintas com o mesmo nome) nem tinha `ORDER BY`
+— usava o 1º resultado não-determinístico pros dois lados da
+transferência, podendo gravar a categoria de SAÍDA em
+`categoria_entrada_id` (ou vice-versa). Corrigido buscando cada `tipo`
+separado, com o mesmo `ORDER BY` determinístico de
+`primeiroCatalogoPorFilial`.
+
+**Testado** em transação com `ROLLBACK` contra produção (harness Docker
+local quebrado por um problema pré-existente de replay de migration
+antiga, não relacionado a esta mudança): categoria de outra filial
+rejeitada (`FIN_VALIDACAO`), FK inexistente rejeitada (`FIN_FK`),
+transferência legítima na mesma filial passa.
+
 ## 11. Riscos
 
+- **`chatbot-financeiro`: `filialIdFromWhatsApp` fica `null` quando o payload
+  do Make já traz `igreja_id` direto** (achado de review, PR #103,
+  não corrigido) — o lookup em `whatsapp_numeros` (que resolve
+  `filial_id`) só roda em `if (!igrejaId && whatsappNumeroNormalizado)`;
+  se o Make manda `igreja_id` (body ou querystring) junto com
+  `display_phone_number`, o lookup é pulado inteiro e `filialIdFromWhatsApp`
+  nunca é preenchido. Afeta todo write-path do bot que depende dessa
+  variável (lançamento/reembolso/transferência), não só o caminho de
+  transferência que a §9.110 tocou. Não é regressão de segurança — os
+  campos de catálogo filial-scoped são opcionais nas RPCs (`NULLIF`), o
+  sintoma é dado incompleto (ex.: transferência sem categoria), não
+  vínculo com filial errada. Fix real exige decidir precedência entre
+  `igreja_id`/`filial_id` explícitos no payload vs. o lookup em
+  `whatsapp_numeros` — mudança no roteamento do bot inteiro, fase
+  dedicada com harness próprio, fora do escopo de uma PR pontual.
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
   inegociável; revisão de segurança dedicada (checklist de
   `docs/01-Arquitetura/04-rls-e-seguranca.MD`).
@@ -6950,25 +7012,13 @@ resumo`/`getnet_financeiro_detalhe`/`getnet_arquivos` exatamente igual).
   client-side vazava no payload de rede antes de rodar) sem tocar na RLS
   compartilhada — os outros 14 read-paths diretos ficaram sem proteção
   até §9.85 corrigir a policy em si.
-- **`fin_criar_transferencia` nunca valida filial (nem tenant, em 3 dos 4
+- ~~`fin_criar_transferencia` nunca valida filial (nem tenant, em 3 dos 4
   campos) das categorias/subcategoria/base/centro de custo que resolve
-  automaticamente** (achado adjacente do §9.79, não corrigido) — só
-  chama `fin_validar_fk_tenant` pra `categoria_saida_id`/`categoria_
-  entrada_id`; `subcategoria_saida_id`, `base_ministerial_id` e
-  `centro_custo_id` não têm NENHUMA validação (nem tenant). O frontend
-  (`TransferenciaDialog.tsx`) resolve os 4 automaticamente por nome
-  (`.ilike(...).limit(1).single()`, tenant-scoped só na query, sem
-  filtro de filial nenhum) — se existirem registros com o mesmo nome em
-  filiais diferentes, uma transferência pode silenciosamente ficar
-  associada à categoria/subcategoria/base/centro de custo da filial
-  ERRADA, sem rejeição nenhuma (ao contrário do padrão categoria/
-  `fin_validar_fk_filial` já usado em `fin_criar_lancamento`/`fin_
-  atualizar_lancamento`/`fin_lancar_desagio_antecipacao`). Diferente da
-  classe "seletor oferece o que o backend rejeita" (§9.65/§9.78/§9.79
-  item 2) — aqui é omissão de validação, sintoma silencioso, não
-  rejeição. Fix real exige nova migration (adicionar `fin_validar_fk_
-  tenant`+`fin_validar_fk_filial` nos 4 campos) + harness — fora do
-  escopo desta PR, fase dedicada futura.
+  automaticamente~~ **CORRIGIDA em §9.110** (PR #103) — `fin_validar_fk_
+  tenant` nos 3 campos que nunca tinham + `fin_validar_fk_filial` nos 5
+  campos de catálogo, contra a filial efetiva; `TransferenciaDialog.tsx`
+  e o bot WhatsApp passam a resolver os catálogos com filtro de filial
+  compartilhada (`.or(...)`, nunca `.eq()` puro).
 - ~~`fin_pagar_reembolso` ainda nunca valida filial de `conta_id`~~
   **CORRIGIDA em §9.84, Fase 2/4** — trazida pro escopo por decisão
   explícita em vez de ficar "próximo item" adiado de novo. Tinha 2 gaps:
