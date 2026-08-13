@@ -1188,36 +1188,131 @@ serve(async (req: Request) => {
     ];
 
     let aiContent = "";
+    const FALLBACK_ERRO_IA =
+      "Desculpe, tivemos um problema técnico ao processar sua mensagem. Por favor, tente novamente em instantes.";
 
-    if (config.textModel.startsWith("google/") && LOVABLE_API_KEY) {
-      const res = await fetch(
-        "https://ai.gateway.lovable.dev/v1/chat/completions",
-        {
+    // Cobre os dois jeitos de a IA falhar: exceção na chamada (timeout,
+    // conexão resetada, corpo não-JSON de um 502/503 — mais comuns que um
+    // 200 vazio) e resposta bem-formada sem conteúdo utilizável. Sem
+    // persistir/notificar aqui, a mensagem do usuário some da sessão e a
+    // equipe pastoral nunca fica sabendo — só um log de edge function.
+    const responderComFalhaIA = async (motivo: string) => {
+      console.error(
+        `[Triagem] ${motivo} — respondendo com fallback pro usuário.`,
+      );
+
+      await supabase
+        .from("atendimentos_bot")
+        .update({
+          historico_conversa: [
+            ...historico,
+            { role: "user", content: inputTexto },
+            { role: "assistant", content: FALLBACK_ERRO_IA },
+          ],
+        })
+        .eq("id", sessao.id);
+
+      await supabase.from("logs_auditoria_chat").insert({
+        sessao_id: sessao.id,
+        ator: "BOT",
+        payload_raw: { resposta: FALLBACK_ERRO_IA, erro: motivo },
+      });
+
+      try {
+        await supabase.rpc("log_edge_function_with_metrics", {
+          p_function_name: FUNCTION_NAME,
+          p_status: "error",
+          p_execution_time_ms: Date.now() - startTime,
+          p_request_payload: requestPayload,
+          p_response_payload: { reply: FALLBACK_ERRO_IA, erro: motivo },
+        });
+      } catch {
+        // Falha no logging não impede resposta
+      }
+
+      // notificar_admin: true — falha de IA sem visibilidade nenhuma pra
+      // equipe pastoral (só log de edge function) é pior que um alerta
+      // ocasional de mais. Status 200, não 5xx (achado do review, PR #100):
+      // reply_message/notificar_admin só chegam no WhatsApp do usuário/
+      // pastor se o módulo HTTP do Make não tratar a resposta como erro —
+      // o comportamento padrão do Make (e de qualquer cenário com
+      // "Evaluate all states as errors" ligado) para no 5xx, nunca lê o
+      // body, e pode reprocessar depois da janela de idempotência de 5s,
+      // reanexando a mesma mensagem em historico_conversa. `erro_ia: true`
+      // no body sinaliza a falha pra quem quiser distinguir, sem quebrar
+      // a entrega. A falha técnica em si já fica registrada em
+      // logs_auditoria_chat/log_edge_function_with_metrics acima.
+      return respostaJson(FALLBACK_ERRO_IA, {
+        erro_ia: true,
+        notificar_admin: true,
+        telefone_admin_destino: TELEFONE_PASTOR_PLANTAO,
+        dados_contato: {
+          telefone_usuario: telefone,
+          nome_usuario: nome_perfil,
+          motivo: `Falha técnica: ${motivo}`,
+        },
+      });
+    };
+
+    // 30s: sem isso, um provedor que trava (não retorna erro nenhum, só não
+    // responde) nunca faz o fetch lançar — o try/catch abaixo nunca dispara
+    // e o fallback inteiro (persistir/logar/notificar) é pulado.
+    const AI_TIMEOUT_MS = 30_000;
+
+    try {
+      if (config.textModel.startsWith("google/") && LOVABLE_API_KEY) {
+        const res = await fetch(
+          "https://ai.gateway.lovable.dev/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ model: config.textModel, messages }),
+            signal: AbortSignal.timeout(AI_TIMEOUT_MS),
+          },
+        );
+        const data = await res.json();
+        if (!res.ok) {
+          console.error(
+            `[Triagem] Lovable AI gateway falhou (status ${res.status}):`,
+            JSON.stringify(data),
+          );
+          return await responderComFalhaIA(`Lovable AI gateway HTTP ${res.status}`);
+        }
+        aiContent = data.choices?.[0]?.message?.content || "";
+      } else {
+        const res = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ model: config.textModel, messages }),
-        },
-      );
-      const data = await res.json();
-      aiContent = data.choices?.[0]?.message?.content || "";
-    } else {
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: config.textModel,
-          messages,
-          temperature: 0.3,
-        }),
-      });
-      const data = await res.json();
-      aiContent = data.choices?.[0]?.message?.content || "";
+          body: JSON.stringify({
+            model: config.textModel,
+            messages,
+            temperature: 0.3,
+          }),
+          signal: AbortSignal.timeout(AI_TIMEOUT_MS),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          console.error(
+            `[Triagem] OpenAI falhou (status ${res.status}):`,
+            JSON.stringify(data),
+          );
+          return await responderComFalhaIA(`OpenAI HTTP ${res.status}`);
+        }
+        aiContent = data.choices?.[0]?.message?.content || "";
+      }
+    } catch (aiErr) {
+      const msg = aiErr instanceof Error ? aiErr.message : "erro desconhecido";
+      return await responderComFalhaIA(`IA indisponível (${msg})`);
+    }
+
+    if (!aiContent) {
+      return await responderComFalhaIA("IA não retornou conteúdo utilizável");
     }
 
     // Limpeza e Extração
