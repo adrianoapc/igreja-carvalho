@@ -118,7 +118,7 @@ própria function; funções que importam `_shared/internal-auth.ts` também exi
 | getnet-sftp | ENCRYPTION_KEY |
 | integracoes-config | ENCRYPTION_KEY |
 | debug-certificate | ENCRYPTION_KEY |
-| pix-webhook | PIX_WEBHOOK_SECRET |
+| pix-webhook | (nenhuma — ver nota abaixo) |
 | criar-cobranca-pix | ENCRYPTION_KEY |
 | buscar-pix-recebidos | ENCRYPTION_KEY |
 | set-webhook-secret | WEBHOOK_ENCRYPTION_KEY |
@@ -139,6 +139,13 @@ própria function; funções que importam `_shared/internal-auth.ts` também exi
 
 Outras funções com `_shared/internal-auth.ts` (exigem `INTERNAL_FUNCTION_SECRET`):
 `disparar-escala`, `verificar-escalas-pendentes`, `automacao-duplicidade-pessoas`.
+
+**`pix-webhook` não usa `PIX_WEBHOOK_SECRET`** (removido em 2026-08-14,
+ver `docs/arquitetura-financeiro.md` §9.113 / ADR-024): o Santander/BACEN
+não suporta enviar um shared secret customizado nas notificações PIX —
+um gate desse tipo rejeitava 100% das notificações reais com 401.
+Segurança é validação de estrutura do payload + idempotência por
+`pix_id` (UNIQUE) no banco.
 
 ## ⚠️ Alertas críticos da migração
 

@@ -7264,3 +7264,49 @@ funcionou desde a criação e o erro do provedor é genérico/confuso, vale
 testar a chamada real (Postman, curl) com as mesmas credenciais antes de
 continuar advinhando a partir do código.
 
+### 9.113 `pix-webhook` rejeitava 100% das notificações reais do Santander (achado após §9.112)
+
+Depois de validar a documentação oficial do webhook PIX do Santander
+(usuário colou o trecho relevante), achado que `pix-webhook/index.ts`
+exigia um header `X-Webhook-Secret` batendo com a env secret
+`PIX_WEBHOOK_SECRET`, retornando 401 sem ele. A própria doc do banco
+afirma: "é necessário que a URL aceite qualquer chamada (ignore os
+headers) que encaminhamos" — o Santander/BACEN **não suporta** enviar
+um shared secret customizado nas notificações PIX. Isso já era a
+decisão original do ADR-024 ("Webhook autenticado por token secreto:
+não suportado pelo provedor; BACEN entrega sem header customizado"),
+mas o código nunca refletiu isso — o check foi adicionado num commit
+antigo da era Lovable (`77906b5d`, mensagem genérica "Changes", sem
+justificativa), provavelmente um hardening automático que não
+considerou a restrição do provedor.
+
+**Impacto real**: toda notificação genuína do Santander batia 401 e
+era descartada, sem log de erro visível pro usuário (só
+`console.warn`). Nunca detectado porque o polling
+(`buscar-pix-cron`/`buscar-pix-recebidos`, corrigido em §9.112 na mesma
+sessão) sempre cobriu a ingestão na prática — os docs descreviam isso
+como "webhook nem sempre entrega em tempo real" (`docs/automacoes/
+cron-buscar-pix.md`), quando na realidade o webhook nunca entregava
+nada.
+
+**Corrigido**: removido o gate de secret. Segurança fica só por
+validação de estrutura do payload (já existia: `endToEndId`/`chave`/
+`horario`/limite de 100 itens) + idempotência por `pix_id` (`UNIQUE` em
+`pix_webhook_temp`) — mesma mitigação que o ADR-024 já documentava
+como aceitável desde a decisão original.
+
+**Validado end-to-end contra produção**: POST simulando uma notificação
+real do Santander (CNPJ de uma igreja real como chave) processou com
+sucesso (`200`, `1 PIX processados, 0 erros`); linha de teste removida
+depois via `DELETE` direto (endToEndId continha "teste", fácil de
+identificar). `PIX_WEBHOOK_SECRET` (secret de edge function) fica órfã
+— pode ser removida das secrets do projeto, não é mais lida por
+nenhuma function.
+
+**Lição**: a mesma pergunta que destravou §9.112 (usuário compartilhando
+a documentação oficial do provedor) achou este segundo bug — reforça
+[[feedback-decisao-cara-amostra-pequena-consultar-doc-oficial]]: pra
+integração com sistema externo que nunca funcionou como esperado,
+ler a doc oficial do provedor é mais confiável que confiar no que o
+código "parece" estar tentando fazer.
+

@@ -117,37 +117,16 @@ serve(async (req) => {
       );
     }
 
-    // Validar shared secret (Santander deve enviar header X-Webhook-Secret)
-    const expectedSecret = Deno.env.get("PIX_WEBHOOK_SECRET");
-    if (!expectedSecret) {
-      console.error("[pix-webhook] PIX_WEBHOOK_SECRET não configurado");
-      return new Response(
-        JSON.stringify({ error: "Webhook não configurado" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    const providedSecret =
-      req.headers.get("x-webhook-secret") ||
-      req.headers.get("X-Webhook-Secret") ||
-      "";
-    // Comparação tempo-constante
-    const enc = new TextEncoder();
-    const a = enc.encode(providedSecret);
-    const b = enc.encode(expectedSecret);
-    let secretOk = a.length === b.length;
-    const len = Math.max(a.length, b.length);
-    let diff = a.length ^ b.length;
-    for (let i = 0; i < len; i++) {
-      diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
-    }
-    secretOk = secretOk && diff === 0;
-    if (!secretOk) {
-      console.warn("[pix-webhook] Secret inválido ou ausente");
-      return new Response(
-        JSON.stringify({ error: "Não autorizado" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // SEM auth por header: o Santander/BACEN não suporta enviar um shared
+    // secret customizado nas notificações PIX (confirmado na documentação
+    // oficial do webhook — "é necessário que a URL aceite qualquer chamada,
+    // ignore os headers que encaminhamos"; já era a decisão original do
+    // ADR-024). Um gate de X-Webhook-Secret aqui rejeitaria 100% das
+    // notificações reais com 401 — achado real em 2026-08-14, nunca
+    // detectado porque o polling (buscar-pix-cron/buscar-pix-recebidos)
+    // sempre cobriu a ingestão na prática. Segurança fica por validação de
+    // estrutura do payload (abaixo) + idempotência por `pix_id` (UNIQUE) no
+    // banco — mitigação já documentada no ADR-024.
 
     // Parse do payload
     const payload: PixWebhookPayload = await req.json();
