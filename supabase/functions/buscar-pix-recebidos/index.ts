@@ -215,10 +215,10 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const encryptionKey = Deno.env.get("WEBHOOK_ENCRYPTION_KEY");
+    const encryptionKey = Deno.env.get("ENCRYPTION_KEY");
 
     if (!encryptionKey) {
-      return jsonResponse({ error: "WEBHOOK_ENCRYPTION_KEY não configurada" }, 500);
+      return jsonResponse({ error: "ENCRYPTION_KEY não configurada" }, 500);
     }
 
     const supabaseAdmin = createClient(supabaseUrl, serviceKey);

@@ -119,8 +119,8 @@ própria function; funções que importam `_shared/internal-auth.ts` também exi
 | integracoes-config | ENCRYPTION_KEY |
 | debug-certificate | ENCRYPTION_KEY |
 | pix-webhook | PIX_WEBHOOK_SECRET |
-| criar-cobranca-pix | WEBHOOK_ENCRYPTION_KEY |
-| buscar-pix-recebidos | WEBHOOK_ENCRYPTION_KEY |
+| criar-cobranca-pix | ENCRYPTION_KEY |
+| buscar-pix-recebidos | ENCRYPTION_KEY |
 | set-webhook-secret | WEBHOOK_ENCRYPTION_KEY |
 | chatbot-financeiro | MAKE_WEBHOOK_SECRET, WHATSAPP_API_TOKEN |
 | chatbot-triagem | APP_URL, LOVABLE_API_KEY, OPENAI_API_KEY, WHATSAPP_API_TOKEN |
