@@ -405,6 +405,50 @@ async function getSantanderToken(
   }
 }
 
+// ==================== PIX DATE HELPERS ====================
+//
+// Achados reais testando contra produção (2026-08-14): a API de listagem
+// de PIX do Santander (GET /pix) (1) rejeita milissegundos no formato de
+// data (o parser trata a data como inválida e devolve um 403 confuso
+// "Data FIM menor que Data Início" mesmo com fim > início) e (2) só aceita
+// consultas dentro do MESMO dia-calendário — período maior que 1 dia
+// devolve 403 "Período ... maior que 1 dia". `buscar-pix-cron` computa
+// janelas que podem passar de 1 dia (fallback de 7 dias na 1ª execução, ou
+// depois de qualquer gap — como o próprio incidente de 2 meses do cron,
+// ver docs/automacoes/cron-buscar-pix.md), então isso precisa ser tratado
+// aqui, não só no formato de uma chamada única.
+
+// Remove milissegundos de um ISO 8601: "...T00:00:00.000Z" -> "...T00:00:00Z"
+function formatarDataPix(iso: string): string {
+  return iso.replace(/\.\d{3}Z$/, 'Z')
+}
+
+// Divide [inicioISO, fimISO] em pedaços que nunca cruzam a meia-noite UTC
+// (dia-calendário), já sem milissegundos.
+function dividirEmDiasCalendario(
+  inicioISO: string,
+  fimISO: string
+): Array<{ inicio: string; fim: string }> {
+  const inicio = new Date(inicioISO)
+  const fim = new Date(fimISO)
+  const chunks: Array<{ inicio: string; fim: string }> = []
+
+  let cursor = new Date(inicio)
+  while (cursor <= fim) {
+    const fimDoDia = new Date(
+      Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), cursor.getUTCDate(), 23, 59, 59)
+    )
+    const fimChunk = fimDoDia < fim ? fimDoDia : fim
+    chunks.push({
+      inicio: formatarDataPix(cursor.toISOString()),
+      fim: formatarDataPix(fimChunk.toISOString()),
+    })
+    cursor = new Date(fimDoDia.getTime() + 1000)
+  }
+
+  return chunks
+}
+
 // ==================== PIX API CALLS ====================
 
 async function getSantanderPixToken(
@@ -413,26 +457,25 @@ async function getSantanderPixToken(
   console.log('[santander-api] Requesting PIX OAuth2 token from trust-pix.santander.com.br...')
   console.log('[santander-api] mTLS httpClient present:', !!creds.httpClient)
 
-  // PIX API usa Basic Auth com client_id:client_secret
-  const basicAuth = btoa(`${creds.clientId}:${creds.clientSecret}`)
-
-  // Santander PIX: enviar Basic Auth no header E client_id/client_secret no body
-  // (combinação exigida pelo gateway PIX da BCB/Santander)
+  // grant_type vai na QUERY STRING, não no body — achado real testando
+  // contra produção (Postman com o mesmo certificado mTLS, 2026-08-14):
+  // o gateway PIX do Santander lê grant_type da URL, não do form body;
+  // sem ele na query, a API responde 400 "não possui os parâmetros
+  // necessários" mesmo com grant_type presente no body. Body só com
+  // client_id/client_secret — sem scope, sem Basic Auth (a request que
+  // funcionou no Postman não manda nenhum dos dois).
+  const tokenUrl = `${SANTANDER_PIX_TOKEN_URL}?grant_type=client_credentials`
   const tokenBody = new URLSearchParams({
-    grant_type: 'client_credentials',
-    scope: 'cob.write cob.read pix.write pix.read',
     client_id: creds.clientId,
     client_secret: creds.clientSecret,
   }).toString()
 
-  console.log('[santander-api] PIX Token request URL:', SANTANDER_PIX_TOKEN_URL)
-  console.log('[santander-api] PIX Token body params: grant_type, scope, client_id, client_secret + Basic header')
+  console.log('[santander-api] PIX Token request URL:', tokenUrl)
 
   const fetchOptions: RequestInit & { client?: Deno.HttpClient } = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': `Basic ${basicAuth}`,
     },
     body: tokenBody,
   }
@@ -445,7 +488,7 @@ async function getSantanderPixToken(
     console.warn('[santander-api] No mTLS client - request may fail!')
   }
 
-  const tokenResponse = await fetch(SANTANDER_PIX_TOKEN_URL, fetchOptions)
+  const tokenResponse = await fetch(tokenUrl, fetchOptions)
 
   if (!tokenResponse.ok) {
     const errorText = await tokenResponse.text()
@@ -1222,37 +1265,55 @@ Deno.serve(async (req) => {
       const fim = data_fim || new Date().toISOString()
       const inicio = data_inicio || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-      const pixUrl = `${SANTANDER_PIX_BASE_URL}/pix?inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}`
-      console.log(`[santander-api] GET ${pixUrl}`)
+      // deno-lint-ignore no-explicit-any
+      const allPixItems: any[] = []
+      const errosConsulta: Array<{ periodo: string; erro: string }> = []
 
-      const pixFetchOptions: RequestInit & { client?: Deno.HttpClient } = {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${pixTokenResult.token}`,
-          'Content-Type': 'application/json',
-        },
+      for (const chunk of dividirEmDiasCalendario(inicio, fim)) {
+        const pixUrl = `${SANTANDER_PIX_BASE_URL}/pix?inicio=${encodeURIComponent(chunk.inicio)}&fim=${encodeURIComponent(chunk.fim)}`
+        console.log(`[santander-api] GET ${pixUrl}`)
+
+        const pixFetchOptions: RequestInit & { client?: Deno.HttpClient } = {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${pixTokenResult.token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+        if (httpClient) pixFetchOptions.client = httpClient
+
+        const pixResponse = await fetch(pixUrl, pixFetchOptions)
+
+        // 404 = "nenhum PIX no período" (resposta normal da API do Santander
+        // pra dia sem movimento) — não é falha, só não acrescenta itens.
+        if (pixResponse.status === 404) {
+          continue
+        }
+
+        if (!pixResponse.ok) {
+          const errorText = await pixResponse.text()
+          console.error('[santander-api] Santander pix error:', pixResponse.status, errorText)
+          errosConsulta.push({ periodo: `${chunk.inicio}..${chunk.fim}`, erro: `${pixResponse.status}: ${errorText}` })
+          continue
+        }
+
+        const resposta = await pixResponse.json()
+        if (Array.isArray(resposta.pix)) {
+          allPixItems.push(...resposta.pix)
+        }
       }
-      if (httpClient) pixFetchOptions.client = httpClient
 
-      const pixResponse = await fetch(pixUrl, pixFetchOptions)
+      console.log(`[santander-api] PIX encontrados: ${allPixItems.length}`)
 
-      if (!pixResponse.ok) {
-        const errorText = await pixResponse.text()
-        console.error('[santander-api] Santander pix error:', pixResponse.status, errorText)
-        return jsonResponse({ success: false, error: `Santander API error: ${pixResponse.status}`, detail: errorText }, 500)
-      }
-
-      const resposta = await pixResponse.json()
-      console.log(`[santander-api] PIX encontrados: ${resposta.pix?.length || 0}`)
-
-      if (!resposta.pix || resposta.pix.length === 0) {
+      if (allPixItems.length === 0) {
         return jsonResponse({
-          success: true,
+          success: errosConsulta.length === 0,
           action: 'buscar_pix',
-          message: 'Nenhum PIX encontrado no período',
+          message: errosConsulta.length === 0 ? 'Nenhum PIX encontrado no período' : 'Erro ao consultar 1 ou mais dias do período',
           importados: 0,
           duplicados: 0,
-        })
+          erros: errosConsulta.length > 0 ? errosConsulta : undefined,
+        }, errosConsulta.length > 0 ? 500 : 200)
       }
 
       // Buscar igreja_id da integração
@@ -1262,7 +1323,7 @@ Deno.serve(async (req) => {
       let duplicados = 0
       const erros: Array<{ endToEndId: string; erro: string }> = []
 
-      for (const pixItem of resposta.pix) {
+      for (const pixItem of allPixItems) {
         try {
           const endToEndId = pixItem.endToEndId
           const valorPix = parseFloat(pixItem.valor)
@@ -1378,6 +1439,7 @@ Deno.serve(async (req) => {
         importados,
         duplicados,
         erros: erros.length > 0 ? erros : undefined,
+        erros_consulta: errosConsulta.length > 0 ? errosConsulta : undefined,
       })
     }
 

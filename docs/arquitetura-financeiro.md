@@ -7187,3 +7187,80 @@ Mesmo pacote de fixes: `TELEFONE_PASTOR_PLANTAO` (hardcoded,
 resolvido no fluxo, com o valor fixo antigo como fallback quando a
 config não existe pra uma igreja (`resolverTelefonePlantaoPastoral`).
 
+### 9.112 API PIX do Santander (token OAuth) — causa raiz real encontrada e corrigida
+
+Desde a criação da integração PIX, `buscar_pix`/`criar_cobranca`/
+`registrar_webhook` (3 arquivos: `santander-api`, `criar-cobranca-pix`,
+`buscar-pix-recebidos`) nunca funcionaram de verdade — só ficou visível
+depois que o incidente de cron (§ acima, PR #101) foi corrigido e o
+polling passou a rodar de verdade. 4 causas encadeadas, cada uma só
+visível depois da anterior resolvida — mesmo padrão do incidente de
+cron, achadas e corrigidas na mesma sessão (2026-08-14), a última com
+ajuda decisiva do usuário testando a API real via Postman com o mesmo
+certificado mTLS:
+
+1. **`WEBHOOK_ENCRYPTION_KEY` inexistente** — `criar-cobranca-pix` e
+   `buscar-pix-recebidos` liam essa secret de edge function (nunca
+   configurada; é de um subsistema DIFERENTE, `set-webhook-secret`) em
+   vez de `ENCRYPTION_KEY` (a que `santander-api` usa corretamente pra
+   descriptografar `integracoes_financeiras_secrets`). As duas sempre
+   retornavam 500 antes de tentar qualquer coisa. Doc
+   `deploy-migracao-supabase.md` também tinha o nome errado — corrigido
+   junto.
+2. **`grant_type` precisa ir na QUERY STRING do POST de token, não no
+   body form-urlencoded** (`https://trust-pix.santander.com.br/oauth/
+   token?grant_type=client_credentials`) — achado testando com Postman
+   (mesmo certificado mTLS instalado, request equivalente funcionou de
+   primeira). O código antigo mandava `grant_type` só no body (junto
+   com `scope` e header `Authorization: Basic`, nenhum dos dois
+   necessário) — o gateway respondia 400 `RequisicaoInvalida`/"não
+   possui os parâmetros necessários" mesmo com `grant_type` presente,
+   só que no lugar errado. 3 hipóteses alternativas testadas ao vivo
+   contra produção e refutadas antes de achar esta: remover scope+Basic
+   (nenhuma mudança), mTLS puro sem client_id/secret no body (nenhuma
+   mudança), credenciais novas do usuário (nenhuma mudança) — nenhuma
+   delas tocava a query string, por isso todas falhavam igual.
+3. **`GET /pix` (listagem) rejeita milissegundos no formato de data e só
+   aceita janela dentro do MESMO dia-calendário** (mais de 1 dia = 403
+   "Período... maior que 1 dia"; com milissegundos, o erro fica confuso
+   — "Data FIM menor que Data Início" mesmo com fim > início). `buscar-
+   pix-cron` computa janelas que podem passar de 1 dia (fallback de 7
+   dias na 1ª execução, ou depois de qualquer gap — como o próprio
+   incidente de 2 meses do cron). Corrigido dividindo a janela pedida em
+   pedaços de 1 dia-calendário (`dividirEmDiasCalendario`, duplicada em
+   `santander-api` e `buscar-pix-recebidos` — mesmo padrão de
+   `getSantanderPixToken` já duplicado antes), tratando 404 "sem PIX no
+   dia" como resultado vazio (não erro).
+4. **`criar-cobranca-pix`/`buscar-pix-recebidos` nunca liam
+   `pix_client_id`/`pix_client_secret`** (credenciais de uma aplicação
+   SEPARADA no portal Santander Developers, específica pro produto PIX)
+   — só usavam `client_id`/`client_secret` de Open Banking. O token
+   ainda saía (mesmo mecanismo OAuth2 pro client_credentials), mas a
+   chamada a `/pix` falhava com um erro genérico e enganoso do gateway
+   ("Um erro ocorreu ao tentar consulta qrcodes gerados" — sobre COB,
+   não sobre listagem de PIX recebido) porque a aplicação Open Banking
+   não tem escopo pro produto PIX. `santander-api` já tinha o fallback
+   certo (`pixClientId || obClientId`) desde antes; replicado nos outros
+   2 arquivos.
+
+**Validado end-to-end contra produção** (não harness — é chamada de API
+externa real, sem como simular sem credenciais reais): `santander-api`
+action `buscar_pix` importou 14 PIX reais represados (janela de 7 dias);
+`buscar-pix-recebidos` achou os mesmos 14 como duplicados (dedupe OK,
+sem gravar de novo); `buscar-pix-cron` (o job real, hourly) rodou limpo
+— `edge_function_config.last_execution_status` virou `'success'` pela
+primeira vez desde a criação da integração. `criar-cobranca-pix` teve o
+mesmo fix aplicado por consistência mas não testado ao vivo (evita gerar
+uma cobrança PIX real de teste); revisar se `webhookUrl` registrado
+manualmente pelo usuário via Postman continua correto quando for usado
+de verdade.
+
+**Lição**: 2 das 4 causas (grant_type na query string, credenciais PIX
+separadas de Open Banking) só foram confirmadas testando a API real do
+banco — nenhuma delas seria encontrada só lendo/comparando código, e 3
+hipóteses razoáveis (baseadas em padrões OAuth2 comuns) foram testadas e
+refutadas antes da correta. Quando uma integração externa nunca
+funcionou desde a criação e o erro do provedor é genérico/confuso, vale
+testar a chamada real (Postman, curl) com as mesmas credenciais antes de
+continuar advinhando a partir do código.
+

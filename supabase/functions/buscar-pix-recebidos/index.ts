@@ -138,6 +138,42 @@ function pfxToPem(pfxData: string, password?: string): { cert: string; key: stri
   }
 }
 
+// ==================== PIX DATE HELPERS ====================
+//
+// Achados reais testando contra produção (2026-08-14): a API de listagem
+// de PIX do Santander (GET /pix) (1) rejeita milissegundos no formato de
+// data e (2) só aceita consultas dentro do MESMO dia-calendário — período
+// maior que 1 dia devolve 403. Ver santander-api/index.ts (mesmo achado,
+// mesma correção).
+
+function formatarDataPix(iso: string): string {
+  return iso.replace(/\.\d{3}Z$/, "Z");
+}
+
+function dividirEmDiasCalendario(
+  inicioISO: string,
+  fimISO: string
+): Array<{ inicio: string; fim: string }> {
+  const inicio = new Date(inicioISO);
+  const fim = new Date(fimISO);
+  const chunks: Array<{ inicio: string; fim: string }> = [];
+
+  let cursor = new Date(inicio);
+  while (cursor <= fim) {
+    const fimDoDia = new Date(
+      Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), cursor.getUTCDate(), 23, 59, 59)
+    );
+    const fimChunk = fimDoDia < fim ? fimDoDia : fim;
+    chunks.push({
+      inicio: formatarDataPix(cursor.toISOString()),
+      fim: formatarDataPix(fimChunk.toISOString()),
+    });
+    cursor = new Date(fimDoDia.getTime() + 1000);
+  }
+
+  return chunks;
+}
+
 // ==================== PIX TOKEN (mTLS + Basic Auth) ====================
 
 interface SantanderPixCredentials {
@@ -151,19 +187,22 @@ async function getSantanderPixToken(
 ): Promise<{ token: string } | { error: string }> {
   console.log("[buscar-pix] Requesting PIX OAuth2 token (mTLS)...");
 
-  const basicAuth = btoa(`${creds.clientId}:${creds.clientSecret}`);
+  // grant_type vai na QUERY STRING, não no body — achado real testando
+  // contra produção (Postman com o mesmo certificado mTLS, 2026-08-14):
+  // o gateway PIX do Santander lê grant_type da URL, não do form body;
+  // sem ele na query, a API responde 400 "não possui os parâmetros
+  // necessários" mesmo com grant_type presente no body. Body só com
+  // client_id/client_secret — sem scope, sem Basic Auth.
+  const tokenUrl = `${SANTANDER_PIX_TOKEN_URL}?grant_type=client_credentials`;
   const tokenBody = new URLSearchParams({
     client_id: creds.clientId,
     client_secret: creds.clientSecret,
-    grant_type: "client_credentials",
-    scope: "cob.read pix.read",
   }).toString();
 
   const fetchOptions: RequestInit & { client?: Deno.HttpClient } = {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${basicAuth}`,
     },
     body: tokenBody,
   };
@@ -174,7 +213,7 @@ async function getSantanderPixToken(
     console.warn("[buscar-pix] No mTLS client - request may fail!");
   }
 
-  const response = await fetch(SANTANDER_PIX_TOKEN_URL, fetchOptions);
+  const response = await fetch(tokenUrl, fetchOptions);
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -237,20 +276,32 @@ serve(async (req) => {
 
     // Descriptografar
     const derivedKey = deriveKey(encryptionKey);
-    let clientId: string | null = null;
-    let clientSecret: string | null = null;
+    let obClientId: string | null = null;
+    let obClientSecret: string | null = null;
+    let pixClientId: string | null = null;
+    let pixClientSecret: string | null = null;
     let pfxBlob: string | null = null;
     let pfxPassword: string | null = null;
 
     try {
-      if (secrets.client_id) clientId = decryptData(secrets.client_id, derivedKey);
-      if (secrets.client_secret) clientSecret = decryptData(secrets.client_secret, derivedKey);
+      if (secrets.client_id) obClientId = decryptData(secrets.client_id, derivedKey);
+      if (secrets.client_secret) obClientSecret = decryptData(secrets.client_secret, derivedKey);
+      if (secrets.pix_client_id) pixClientId = decryptData(secrets.pix_client_id, derivedKey);
+      if (secrets.pix_client_secret) pixClientSecret = decryptData(secrets.pix_client_secret, derivedKey);
       if (secrets.pfx_blob) pfxBlob = decryptData(secrets.pfx_blob, derivedKey);
       if (secrets.pfx_password) pfxPassword = decryptData(secrets.pfx_password, derivedKey);
     } catch (error) {
       console.error("[buscar-pix] Decryption failed:", error);
       return jsonResponse({ error: "Falha na descriptografia das credenciais" }, 500);
     }
+
+    // Credenciais PIX específicas (aplicação separada no portal Santander
+    // Developers) têm prioridade — mesmo padrão de santander-api. Usar só
+    // client_id/client_secret de Open Banking aqui causava erro genérico
+    // do gateway PIX (app sem escopo pro produto PIX), achado real
+    // testando contra produção em 2026-08-14.
+    const clientId = pixClientId || obClientId;
+    const clientSecret = pixClientSecret || obClientSecret;
 
     if (!clientId || !clientSecret) {
       return jsonResponse({ error: "Client ID ou Secret não encontrado" }, 400);
@@ -279,37 +330,55 @@ serve(async (req) => {
     const fim = body.fim || new Date().toISOString();
     const inicio = body.inicio || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    // Buscar PIX recebidos
-    const pixUrl = `${SANTANDER_PIX_BASE_URL}/pix?inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}`;
-    console.log(`[buscar-pix] GET ${pixUrl}`);
+    // Buscar PIX recebidos — dividido por dia-calendário (limite da API)
+    // deno-lint-ignore no-explicit-any
+    const allPixItems: any[] = [];
+    const errosConsulta: Array<{ periodo: string; erro: string }> = [];
 
-    const pixFetchOptions: RequestInit & { client?: Deno.HttpClient } = {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${tokenResult.token}`,
-        "Content-Type": "application/json",
-      },
-    };
-    if (httpClient) pixFetchOptions.client = httpClient;
+    for (const chunk of dividirEmDiasCalendario(inicio, fim)) {
+      const pixUrl = `${SANTANDER_PIX_BASE_URL}/pix?inicio=${encodeURIComponent(chunk.inicio)}&fim=${encodeURIComponent(chunk.fim)}`;
+      console.log(`[buscar-pix] GET ${pixUrl}`);
 
-    const pixResponse = await fetch(pixUrl, pixFetchOptions);
+      const pixFetchOptions: RequestInit & { client?: Deno.HttpClient } = {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${tokenResult.token}`,
+          "Content-Type": "application/json",
+        },
+      };
+      if (httpClient) pixFetchOptions.client = httpClient;
 
-    if (!pixResponse.ok) {
-      const errorText = await pixResponse.text();
-      console.error("[buscar-pix] Santander error:", pixResponse.status, errorText);
-      return jsonResponse({ error: `Santander API error: ${pixResponse.status}`, detail: errorText }, 500);
+      const pixResponse = await fetch(pixUrl, pixFetchOptions);
+
+      // 404 = "nenhum PIX no período" (resposta normal do Santander pra dia
+      // sem movimento) — não é falha.
+      if (pixResponse.status === 404) {
+        continue;
+      }
+
+      if (!pixResponse.ok) {
+        const errorText = await pixResponse.text();
+        console.error("[buscar-pix] Santander error:", pixResponse.status, errorText);
+        errosConsulta.push({ periodo: `${chunk.inicio}..${chunk.fim}`, erro: `${pixResponse.status}: ${errorText}` });
+        continue;
+      }
+
+      const resposta = await pixResponse.json();
+      if (Array.isArray(resposta.pix)) {
+        allPixItems.push(...resposta.pix);
+      }
     }
 
-    const resposta = await pixResponse.json();
-    console.log(`[buscar-pix] PIX encontrados: ${resposta.pix?.length || 0}`);
+    console.log(`[buscar-pix] PIX encontrados: ${allPixItems.length}`);
 
-    if (!resposta.pix || resposta.pix.length === 0) {
+    if (allPixItems.length === 0) {
       return jsonResponse({
-        success: true,
-        message: "Nenhum PIX encontrado no período",
+        success: errosConsulta.length === 0,
+        message: errosConsulta.length === 0 ? "Nenhum PIX encontrado no período" : "Erro ao consultar 1 ou mais dias do período",
         importados: 0,
         duplicados: 0,
-      });
+        erros: errosConsulta.length > 0 ? errosConsulta : undefined,
+      }, errosConsulta.length > 0 ? 500 : 200);
     }
 
     // Buscar igreja_id da integração (para vincular PIX)
@@ -325,7 +394,7 @@ serve(async (req) => {
     let duplicados = 0;
     const erros: Array<{ endToEndId: string; erro: string }> = [];
 
-    for (const pixItem of resposta.pix) {
+    for (const pixItem of allPixItems) {
       try {
         const endToEndId = pixItem.endToEndId;
         const valor = parseFloat(pixItem.valor);
@@ -442,6 +511,7 @@ serve(async (req) => {
       importados,
       duplicados,
       erros: erros.length > 0 ? erros : undefined,
+      erros_consulta: errosConsulta.length > 0 ? errosConsulta : undefined,
     });
   } catch (error) {
     console.error("[buscar-pix] Erro:", error);
