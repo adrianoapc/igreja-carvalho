@@ -67,7 +67,9 @@ const APP_URL = Deno.env.get("APP_URL") || "https://appcarvalho.lovable.app";
 const FUNCTION_NAME = "chatbot-triagem";
 const UUID_PASTOR_PLANTAO: string | null =
   "a4097879-f52a-4bf2-86e6-62ad02a06268";
-const TELEFONE_PASTOR_PLANTAO = "5517988216456";
+// Fallback só usado quando a igreja não tem configuracoes_igreja.telefone_plantao_pastoral
+// cadastrado — ver resolverTelefonePlantaoPastoral.
+const TELEFONE_PASTOR_PLANTAO_FALLBACK = "5517988216456";
 
 const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -194,6 +196,33 @@ function pickFlowFromParsed(
 // Verificar se flow é válido
 function isFlowValido(flow?: string | null): boolean {
   return !!flow && FLOWS_VALIDOS.includes(flow);
+}
+
+// Tenant-scoped: cada igreja pode ter seu próprio telefone de plantão
+// pastoral (configuracoes_igreja.telefone_plantao_pastoral, editável em
+// /configuracoes-igreja). Sem igrejaId resolvido ou sem config cadastrada,
+// cai no fallback fixo — mesmo comportamento de antes desta função existir.
+async function resolverTelefonePlantaoPastoral(
+  supabaseClient: SupabaseClient,
+  igrejaId: string | null,
+): Promise<string> {
+  if (!igrejaId) return TELEFONE_PASTOR_PLANTAO_FALLBACK;
+
+  const { data, error } = await supabaseClient
+    .from("configuracoes_igreja")
+    .select("telefone_plantao_pastoral")
+    .eq("igreja_id", igrejaId)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      `[Triagem] Erro ao buscar telefone_plantao_pastoral (igreja=${igrejaId}):`,
+      error,
+    );
+    return TELEFONE_PASTOR_PLANTAO_FALLBACK;
+  }
+
+  return data?.telefone_plantao_pastoral || TELEFONE_PASTOR_PLANTAO_FALLBACK;
 }
 
 // Buscar eventos abertos para inscrição
@@ -1201,6 +1230,11 @@ serve(async (req: Request) => {
         `[Triagem] ${motivo} — respondendo com fallback pro usuário.`,
       );
 
+      const telefoneAdminDestino = await resolverTelefonePlantaoPastoral(
+        supabase,
+        igrejaId,
+      );
+
       await supabase
         .from("atendimentos_bot")
         .update({
@@ -1245,7 +1279,7 @@ serve(async (req: Request) => {
       return respostaJson(FALLBACK_ERRO_IA, {
         erro_ia: true,
         notificar_admin: true,
-        telefone_admin_destino: TELEFONE_PASTOR_PLANTAO,
+        telefone_admin_destino: telefoneAdminDestino,
         dados_contato: {
           telefone_usuario: telefone,
           nome_usuario: nome_perfil,
@@ -1530,11 +1564,15 @@ serve(async (req: Request) => {
     }
 
     // Retorno para o Make
+    const telefoneAdminDestino = await resolverTelefonePlantaoPastoral(
+      supabase,
+      igrejaId,
+    );
     return new Response(
       JSON.stringify({
         reply_message: responseMessage,
         notificar_admin: notificarAdmin,
-        telefone_admin_destino: TELEFONE_PASTOR_PLANTAO,
+        telefone_admin_destino: telefoneAdminDestino,
         dados_contato: {
           telefone_usuario: telefone,
           nome_usuario: parsedJson?.nome_final || nome_perfil,

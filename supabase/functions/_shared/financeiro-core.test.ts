@@ -8,7 +8,7 @@
 // Rodar: deno test supabase/functions/_shared/financeiro-core.test.ts
 
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { resolverContaPix } from "./financeiro-core.ts";
+import { resolverContaPix, resolverIgrejaEFilialWhatsApp } from "./financeiro-core.ts";
 
 // deno-lint-ignore no-explicit-any
 type AnyClient = any;
@@ -131,4 +131,76 @@ Deno.test("erro na consulta de contas é propagado como conta_santander_nao_enco
     motivo: "conta_santander_nao_encontrada",
     detalhe: "boom",
   });
+});
+
+// --- resolverIgrejaEFilialWhatsApp (bot financeiro) ---
+//
+// Cobre o bug real registrado em docs/arquitetura-financeiro.md §11: o
+// lookup em whatsapp_numeros era pulado inteiro quando igreja_id já vinha
+// no payload do Make, deixando filial_id sempre null nesse caso (payload
+// documentado do Make manda os dois campos juntos).
+
+/** Mock mínimo pra `.from("whatsapp_numeros").select().eq().eq().maybeSingle()`. */
+function mockSupabaseWhatsapp(opts: {
+  rota?: { igreja_id: string; filial_id: string | null } | null;
+  error?: { message: string };
+}): AnyClient {
+  return {
+    from(_table: string) {
+      const chain = {
+        select() {
+          return chain;
+        },
+        eq() {
+          return chain;
+        },
+        async maybeSingle() {
+          return { data: opts.rota ?? null, error: opts.error ?? null };
+        },
+      };
+      return chain;
+    },
+  };
+}
+
+Deno.test("sem whatsapp_number: retorna igreja_id explícito, filial sempre null", async () => {
+  const supabase = mockSupabaseWhatsapp({});
+  const result = await resolverIgrejaEFilialWhatsApp(supabase, "igreja-1", "");
+  assertEquals(result, { igrejaId: "igreja-1", filialId: null });
+});
+
+Deno.test("sem igreja_id explícito: resolve igreja E filial pelo whatsapp_number (caminho pré-existente)", async () => {
+  const supabase = mockSupabaseWhatsapp({
+    rota: { igreja_id: "igreja-1", filial_id: "filial-A" },
+  });
+  const result = await resolverIgrejaEFilialWhatsApp(supabase, null, "5511999999999");
+  assertEquals(result, { igrejaId: "igreja-1", filialId: "filial-A" });
+});
+
+Deno.test("com igreja_id explícito E whatsapp_number da MESMA igreja: resolve filial (bug corrigido)", async () => {
+  const supabase = mockSupabaseWhatsapp({
+    rota: { igreja_id: "igreja-1", filial_id: "filial-A" },
+  });
+  const result = await resolverIgrejaEFilialWhatsApp(supabase, "igreja-1", "5511999999999");
+  assertEquals(result, { igrejaId: "igreja-1", filialId: "filial-A" });
+});
+
+Deno.test("com igreja_id explícito e whatsapp_number de OUTRA igreja: ignora filial do lookup", async () => {
+  const supabase = mockSupabaseWhatsapp({
+    rota: { igreja_id: "igreja-2", filial_id: "filial-B" },
+  });
+  const result = await resolverIgrejaEFilialWhatsApp(supabase, "igreja-1", "5511999999999");
+  assertEquals(result, { igrejaId: "igreja-1", filialId: null });
+});
+
+Deno.test("whatsapp_number sem rota cadastrada: mantém igreja_id explícito, filial null", async () => {
+  const supabase = mockSupabaseWhatsapp({ rota: null });
+  const result = await resolverIgrejaEFilialWhatsApp(supabase, "igreja-1", "5511999999999");
+  assertEquals(result, { igrejaId: "igreja-1", filialId: null });
+});
+
+Deno.test("erro na consulta de whatsapp_numeros: mantém igreja_id explícito, filial null", async () => {
+  const supabase = mockSupabaseWhatsapp({ error: { message: "boom" } });
+  const result = await resolverIgrejaEFilialWhatsApp(supabase, "igreja-1", "5511999999999");
+  assertEquals(result, { igrejaId: "igreja-1", filialId: null });
 });

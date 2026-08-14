@@ -2,6 +2,12 @@
 
 - **Status**: Aceito
 - **Data**: 2026-01-19
+- **Nota (2026-08-14)**: um commit posterior (fora desta ADR, era Lovable)
+  tinha introduzido um gate de `X-Webhook-Secret` que contradizia a
+  decisão abaixo ("Webhook autenticado por token secreto: não
+  suportado pelo provedor") — rejeitava 100% das notificações reais.
+  Removido, código voltado a refletir esta ADR. Ver
+  `docs/arquitetura-financeiro.md` §9.113.
 - **Contexto**:
   - Santander exige endpoint HTTP com **GET health check** e **POST** seguindo o payload BACEN (`pix[]`).
   - É necessário ingestão imediata de PIX recebidos (domingo/noite) sem expor credenciais no frontend e preservando multi-tenant.

@@ -365,3 +365,62 @@ export async function ingerirExtratoPix(
     };
   }
 }
+
+export interface ResolucaoIgrejaFilial {
+  igrejaId: string | null;
+  filialId: string | null;
+}
+
+/**
+ * Resolve igreja_id/filial_id do bot financeiro a partir do payload do Make
+ * (`body.igreja_id`) + tabela `whatsapp_numeros`.
+ *
+ * O lookup em `whatsapp_numeros` roda SEMPRE que há um número normalizado —
+ * inclusive quando `igrejaIdExplicito` já veio no payload — porque
+ * `filial_id` nunca vem do Make, só desta tabela. Antes desta função, o
+ * lookup inteiro (igreja+filial) era pulado quando `igreja_id` já estava
+ * presente, deixando a filial sempre `null` nesse caso — todo
+ * lançamento/reembolso/transferência via bot perdia a filial em silêncio
+ * quando o Make manda os dois campos juntos (payload documentado inclui
+ * `igreja_id` E `display_phone_number`). Se o número mapear pra uma igreja
+ * DIFERENTE do `igrejaIdExplicito`, a filial do lookup é descartada — não é
+ * o mesmo tenant, o `igreja_id` explícito manda.
+ */
+export async function resolverIgrejaEFilialWhatsApp(
+  supabase: SupabaseClientAny,
+  igrejaIdExplicito: string | null,
+  whatsappNumeroNormalizado: string,
+): Promise<ResolucaoIgrejaFilial> {
+  if (!whatsappNumeroNormalizado) {
+    return { igrejaId: igrejaIdExplicito, filialId: null };
+  }
+
+  const { data: rota, error } = await supabase
+    .from("whatsapp_numeros")
+    .select("igreja_id, filial_id")
+    .eq("display_phone_number", whatsappNumeroNormalizado)
+    .eq("enabled", true)
+    .maybeSingle();
+
+  if (error) {
+    console.error(`[financeiro-core] Erro ao buscar whatsapp_numeros:`, error);
+    return { igrejaId: igrejaIdExplicito, filialId: null };
+  }
+
+  if (!rota) {
+    return { igrejaId: igrejaIdExplicito, filialId: null };
+  }
+
+  if (!igrejaIdExplicito) {
+    return { igrejaId: rota.igreja_id, filialId: rota.filial_id };
+  }
+
+  if (rota.igreja_id === igrejaIdExplicito) {
+    return { igrejaId: igrejaIdExplicito, filialId: rota.filial_id };
+  }
+
+  console.warn(
+    `[financeiro-core] whatsapp_number aponta pra igreja ${rota.igreja_id}, mas o payload trouxe igreja_id=${igrejaIdExplicito} — ignorando filial do lookup.`,
+  );
+  return { igrejaId: igrejaIdExplicito, filialId: null };
+}

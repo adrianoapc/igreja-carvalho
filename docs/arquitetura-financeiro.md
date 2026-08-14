@@ -6976,21 +6976,10 @@ transferência legítima na mesma filial passa.
 
 ## 11. Riscos
 
-- **`chatbot-financeiro`: `filialIdFromWhatsApp` fica `null` quando o payload
-  do Make já traz `igreja_id` direto** (achado de review, PR #103,
-  não corrigido) — o lookup em `whatsapp_numeros` (que resolve
-  `filial_id`) só roda em `if (!igrejaId && whatsappNumeroNormalizado)`;
-  se o Make manda `igreja_id` (body ou querystring) junto com
-  `display_phone_number`, o lookup é pulado inteiro e `filialIdFromWhatsApp`
-  nunca é preenchido. Afeta todo write-path do bot que depende dessa
-  variável (lançamento/reembolso/transferência), não só o caminho de
-  transferência que a §9.110 tocou. Não é regressão de segurança — os
-  campos de catálogo filial-scoped são opcionais nas RPCs (`NULLIF`), o
-  sintoma é dado incompleto (ex.: transferência sem categoria), não
-  vínculo com filial errada. Fix real exige decidir precedência entre
-  `igreja_id`/`filial_id` explícitos no payload vs. o lookup em
-  `whatsapp_numeros` — mudança no roteamento do bot inteiro, fase
-  dedicada com harness próprio, fora do escopo de uma PR pontual.
+- ~~`chatbot-financeiro`: `filialIdFromWhatsApp` fica `null` quando o
+  payload do Make já traz `igreja_id` direto~~ **RESOLVIDO (§9.111)** —
+  `resolverIgrejaEFilialWhatsApp` roda o lookup em `whatsapp_numeros`
+  mesmo com `igreja_id` explícito no payload.
 - **`SECURITY DEFINER` bypassa RLS** → padrão de resolução de tenant (7.2) é
   inegociável; revisão de segurança dedicada (checklist de
   `docs/01-Arquitetura/04-rls-e-seguranca.MD`).
@@ -7171,4 +7160,153 @@ achou 3 furos nessa superfície, fechados em `20260813150000` +
 
 A mutation do revert invalida `["saidas"]` além do ledger (Codex: a
 saída deixa de ser paga; listas/totais de caixa ficavam stale).
+
+### 9.111 `chatbot-financeiro` resolve filial mesmo com `igreja_id` explícito no payload
+
+Fecha o risco registrado em §11 (achado da PR #103, não corrigido
+naquela PR por escopo). `filialIdFromWhatsApp` só era preenchido dentro
+de `if (!igrejaId && whatsappNumeroNormalizado)` — como `filial_id`
+nunca vem no payload do Make (só `igreja_id` + `display_phone_number`),
+todo request com os dois campos (o formato documentado) pulava o
+lookup em `whatsapp_numeros` inteiro, e a filial ficava `null` em
+qualquer lançamento/reembolso/transferência via bot.
+
+Extraída `resolverIgrejaEFilialWhatsApp` pra `_shared/financeiro-core.ts`
+(mesmo padrão de `resolverContaPix`, testável sem mock de rede — 6
+cenários em `financeiro-core.test.ts`, incluindo o caso que reproduzia
+o bug antigo). Precedência decidida: o lookup em `whatsapp_numeros`
+roda SEMPRE que há telefone normalizado, mesmo com `igreja_id`
+explícito; se o número mapear pra uma igreja DIFERENTE da explícita no
+payload, a filial do lookup é descartada (tenant já veio decidido, não
+é o mesmo número). `igreja_id` explícito nunca é sobrescrito pelo
+lookup — só a filial passa a ser preenchida no caso que faltava.
+
+Mesmo pacote de fixes: `TELEFONE_PASTOR_PLANTAO` (hardcoded,
+`chatbot-triagem/index.ts`, achado da PR #100) passou a ler
+`configuracoes_igreja.telefone_plantao_pastoral` por `igreja_id`
+resolvido no fluxo, com o valor fixo antigo como fallback quando a
+config não existe pra uma igreja (`resolverTelefonePlantaoPastoral`).
+
+### 9.112 API PIX do Santander (token OAuth) — causa raiz real encontrada e corrigida
+
+Desde a criação da integração PIX, `buscar_pix`/`criar_cobranca`/
+`registrar_webhook` (3 arquivos: `santander-api`, `criar-cobranca-pix`,
+`buscar-pix-recebidos`) nunca funcionaram de verdade — só ficou visível
+depois que o incidente de cron (§ acima, PR #101) foi corrigido e o
+polling passou a rodar de verdade. 4 causas encadeadas, cada uma só
+visível depois da anterior resolvida — mesmo padrão do incidente de
+cron, achadas e corrigidas na mesma sessão (2026-08-14), a última com
+ajuda decisiva do usuário testando a API real via Postman com o mesmo
+certificado mTLS:
+
+1. **`WEBHOOK_ENCRYPTION_KEY` inexistente** — `criar-cobranca-pix` e
+   `buscar-pix-recebidos` liam essa secret de edge function (nunca
+   configurada; é de um subsistema DIFERENTE, `set-webhook-secret`) em
+   vez de `ENCRYPTION_KEY` (a que `santander-api` usa corretamente pra
+   descriptografar `integracoes_financeiras_secrets`). As duas sempre
+   retornavam 500 antes de tentar qualquer coisa. Doc
+   `deploy-migracao-supabase.md` também tinha o nome errado — corrigido
+   junto.
+2. **`grant_type` precisa ir na QUERY STRING do POST de token, não no
+   body form-urlencoded** (`https://trust-pix.santander.com.br/oauth/
+   token?grant_type=client_credentials`) — achado testando com Postman
+   (mesmo certificado mTLS instalado, request equivalente funcionou de
+   primeira). O código antigo mandava `grant_type` só no body (junto
+   com `scope` e header `Authorization: Basic`, nenhum dos dois
+   necessário) — o gateway respondia 400 `RequisicaoInvalida`/"não
+   possui os parâmetros necessários" mesmo com `grant_type` presente,
+   só que no lugar errado. 3 hipóteses alternativas testadas ao vivo
+   contra produção e refutadas antes de achar esta: remover scope+Basic
+   (nenhuma mudança), mTLS puro sem client_id/secret no body (nenhuma
+   mudança), credenciais novas do usuário (nenhuma mudança) — nenhuma
+   delas tocava a query string, por isso todas falhavam igual.
+3. **`GET /pix` (listagem) rejeita milissegundos no formato de data e só
+   aceita janela dentro do MESMO dia-calendário** (mais de 1 dia = 403
+   "Período... maior que 1 dia"; com milissegundos, o erro fica confuso
+   — "Data FIM menor que Data Início" mesmo com fim > início). `buscar-
+   pix-cron` computa janelas que podem passar de 1 dia (fallback de 7
+   dias na 1ª execução, ou depois de qualquer gap — como o próprio
+   incidente de 2 meses do cron). Corrigido dividindo a janela pedida em
+   pedaços de 1 dia-calendário (`dividirEmDiasCalendario`, duplicada em
+   `santander-api` e `buscar-pix-recebidos` — mesmo padrão de
+   `getSantanderPixToken` já duplicado antes), tratando 404 "sem PIX no
+   dia" como resultado vazio (não erro).
+4. **`criar-cobranca-pix`/`buscar-pix-recebidos` nunca liam
+   `pix_client_id`/`pix_client_secret`** (credenciais de uma aplicação
+   SEPARADA no portal Santander Developers, específica pro produto PIX)
+   — só usavam `client_id`/`client_secret` de Open Banking. O token
+   ainda saía (mesmo mecanismo OAuth2 pro client_credentials), mas a
+   chamada a `/pix` falhava com um erro genérico e enganoso do gateway
+   ("Um erro ocorreu ao tentar consulta qrcodes gerados" — sobre COB,
+   não sobre listagem de PIX recebido) porque a aplicação Open Banking
+   não tem escopo pro produto PIX. `santander-api` já tinha o fallback
+   certo (`pixClientId || obClientId`) desde antes; replicado nos outros
+   2 arquivos.
+
+**Validado end-to-end contra produção** (não harness — é chamada de API
+externa real, sem como simular sem credenciais reais): `santander-api`
+action `buscar_pix` importou 14 PIX reais represados (janela de 7 dias);
+`buscar-pix-recebidos` achou os mesmos 14 como duplicados (dedupe OK,
+sem gravar de novo); `buscar-pix-cron` (o job real, hourly) rodou limpo
+— `edge_function_config.last_execution_status` virou `'success'` pela
+primeira vez desde a criação da integração. `criar-cobranca-pix` teve o
+mesmo fix aplicado por consistência mas não testado ao vivo (evita gerar
+uma cobrança PIX real de teste); revisar se `webhookUrl` registrado
+manualmente pelo usuário via Postman continua correto quando for usado
+de verdade.
+
+**Lição**: 2 das 4 causas (grant_type na query string, credenciais PIX
+separadas de Open Banking) só foram confirmadas testando a API real do
+banco — nenhuma delas seria encontrada só lendo/comparando código, e 3
+hipóteses razoáveis (baseadas em padrões OAuth2 comuns) foram testadas e
+refutadas antes da correta. Quando uma integração externa nunca
+funcionou desde a criação e o erro do provedor é genérico/confuso, vale
+testar a chamada real (Postman, curl) com as mesmas credenciais antes de
+continuar advinhando a partir do código.
+
+### 9.113 `pix-webhook` rejeitava 100% das notificações reais do Santander (achado após §9.112)
+
+Depois de validar a documentação oficial do webhook PIX do Santander
+(usuário colou o trecho relevante), achado que `pix-webhook/index.ts`
+exigia um header `X-Webhook-Secret` batendo com a env secret
+`PIX_WEBHOOK_SECRET`, retornando 401 sem ele. A própria doc do banco
+afirma: "é necessário que a URL aceite qualquer chamada (ignore os
+headers) que encaminhamos" — o Santander/BACEN **não suporta** enviar
+um shared secret customizado nas notificações PIX. Isso já era a
+decisão original do ADR-024 ("Webhook autenticado por token secreto:
+não suportado pelo provedor; BACEN entrega sem header customizado"),
+mas o código nunca refletiu isso — o check foi adicionado num commit
+antigo da era Lovable (`77906b5d`, mensagem genérica "Changes", sem
+justificativa), provavelmente um hardening automático que não
+considerou a restrição do provedor.
+
+**Impacto real**: toda notificação genuína do Santander batia 401 e
+era descartada, sem log de erro visível pro usuário (só
+`console.warn`). Nunca detectado porque o polling
+(`buscar-pix-cron`/`buscar-pix-recebidos`, corrigido em §9.112 na mesma
+sessão) sempre cobriu a ingestão na prática — os docs descreviam isso
+como "webhook nem sempre entrega em tempo real" (`docs/automacoes/
+cron-buscar-pix.md`), quando na realidade o webhook nunca entregava
+nada.
+
+**Corrigido**: removido o gate de secret. Segurança fica só por
+validação de estrutura do payload (já existia: `endToEndId`/`chave`/
+`horario`/limite de 100 itens) + idempotência por `pix_id` (`UNIQUE` em
+`pix_webhook_temp`) — mesma mitigação que o ADR-024 já documentava
+como aceitável desde a decisão original.
+
+**Validado end-to-end contra produção**: POST simulando uma notificação
+real do Santander (CNPJ de uma igreja real como chave) processou com
+sucesso (`200`, `1 PIX processados, 0 erros`); linha de teste removida
+depois via `DELETE` direto (endToEndId continha "teste", fácil de
+identificar). `PIX_WEBHOOK_SECRET` (secret de edge function) fica órfã
+— pode ser removida das secrets do projeto, não é mais lida por
+nenhuma function.
+
+**Lição**: a mesma pergunta que destravou §9.112 (usuário compartilhando
+a documentação oficial do provedor) achou este segundo bug — reforça
+[[feedback-decisao-cara-amostra-pequena-consultar-doc-oficial]]: pra
+integração com sistema externo que nunca funcionou como esperado,
+ler a doc oficial do provedor é mais confiável que confiar no que o
+código "parece" estar tentando fazer.
 

@@ -155,19 +155,22 @@ async function getSantanderPixToken(
 ): Promise<{ token: string } | { error: string }> {
   console.log("[criar-cobranca-pix] Requesting PIX OAuth2 token (mTLS)...");
 
-  const basicAuth = btoa(`${creds.clientId}:${creds.clientSecret}`);
+  // grant_type vai na QUERY STRING, não no body — achado real testando
+  // contra produção (Postman com o mesmo certificado mTLS, 2026-08-14):
+  // o gateway PIX do Santander lê grant_type da URL, não do form body;
+  // sem ele na query, a API responde 400 "não possui os parâmetros
+  // necessários" mesmo com grant_type presente no body. Body só com
+  // client_id/client_secret — sem scope, sem Basic Auth.
+  const tokenUrl = `${SANTANDER_PIX_TOKEN_URL}?grant_type=client_credentials`;
   const tokenBody = new URLSearchParams({
     client_id: creds.clientId,
     client_secret: creds.clientSecret,
-    grant_type: "client_credentials",
-    scope: "cob.write cob.read pix.write pix.read",
   }).toString();
 
   const fetchOptions: RequestInit & { client?: Deno.HttpClient } = {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${basicAuth}`,
     },
     body: tokenBody,
   };
@@ -178,7 +181,7 @@ async function getSantanderPixToken(
     console.warn("[criar-cobranca-pix] No mTLS client - request may fail!");
   }
 
-  const response = await fetch(SANTANDER_PIX_TOKEN_URL, fetchOptions);
+  const response = await fetch(tokenUrl, fetchOptions);
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -230,10 +233,10 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const encryptionKey = Deno.env.get("WEBHOOK_ENCRYPTION_KEY");
+    const encryptionKey = Deno.env.get("ENCRYPTION_KEY");
 
     if (!encryptionKey) {
-      return jsonResponse({ error: "WEBHOOK_ENCRYPTION_KEY não configurada" }, 500);
+      return jsonResponse({ error: "ENCRYPTION_KEY não configurada" }, 500);
     }
 
     const supabaseAdmin = createClient(supabaseUrl, serviceKey);
@@ -265,20 +268,32 @@ serve(async (req) => {
 
     // Descriptografar
     const derivedKey = deriveKey(encryptionKey);
-    let clientId: string | null = null;
-    let clientSecret: string | null = null;
+    let obClientId: string | null = null;
+    let obClientSecret: string | null = null;
+    let pixClientId: string | null = null;
+    let pixClientSecret: string | null = null;
     let pfxBlob: string | null = null;
     let pfxPassword: string | null = null;
 
     try {
-      if (secrets.client_id) clientId = decryptData(secrets.client_id, derivedKey);
-      if (secrets.client_secret) clientSecret = decryptData(secrets.client_secret, derivedKey);
+      if (secrets.client_id) obClientId = decryptData(secrets.client_id, derivedKey);
+      if (secrets.client_secret) obClientSecret = decryptData(secrets.client_secret, derivedKey);
+      if (secrets.pix_client_id) pixClientId = decryptData(secrets.pix_client_id, derivedKey);
+      if (secrets.pix_client_secret) pixClientSecret = decryptData(secrets.pix_client_secret, derivedKey);
       if (secrets.pfx_blob) pfxBlob = decryptData(secrets.pfx_blob, derivedKey);
       if (secrets.pfx_password) pfxPassword = decryptData(secrets.pfx_password, derivedKey);
     } catch (error) {
       console.error("[criar-cobranca-pix] Decryption failed:", error);
       return jsonResponse({ error: "Falha na descriptografia das credenciais" }, 500);
     }
+
+    // Credenciais PIX específicas (aplicação separada no portal Santander
+    // Developers) têm prioridade — mesmo padrão de santander-api. Usar só
+    // client_id/client_secret de Open Banking causava erro genérico do
+    // gateway PIX (app sem escopo pro produto PIX), achado real testando
+    // contra produção em 2026-08-14.
+    const clientId = pixClientId || obClientId;
+    const clientSecret = pixClientSecret || obClientSecret;
 
     if (!clientId || !clientSecret) {
       return jsonResponse({ error: "Client ID ou Secret não encontrado" }, 400);
