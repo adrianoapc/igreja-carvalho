@@ -8,7 +8,12 @@
 // Rodar: deno test supabase/functions/_shared/financeiro-core.test.ts
 
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { resolverContaPix, resolverIgrejaEFilialWhatsApp } from "./financeiro-core.ts";
+import {
+  resolverContaPix,
+  resolverIgrejaEFilialWhatsApp,
+  extrairDataHoraUtcDoEndToEndId,
+  resolverDataHoraPixUtc,
+} from "./financeiro-core.ts";
 
 // deno-lint-ignore no-explicit-any
 type AnyClient = any;
@@ -203,4 +208,44 @@ Deno.test("erro na consulta de whatsapp_numeros: mantém igreja_id explícito, f
   const supabase = mockSupabaseWhatsapp({ error: { message: "boom" } });
   const result = await resolverIgrejaEFilialWhatsApp(supabase, "igreja-1", "5511999999999");
   assertEquals(result, { igrejaId: "igreja-1", filialId: null });
+});
+
+// --- extrairDataHoraUtcDoEndToEndId / resolverDataHoraPixUtc ---
+//
+// Achado real em produção (2026-08-15): o campo `horario` que a API de
+// CONSULTA (polling) do Santander devolve vem com os números do horário de
+// Brasília rotulados como UTC — 3h atrasado do instante real. Confirmado
+// comparando, pro MESMO endToEndId, o `horario` que o WEBHOOK mandou
+// (correto) contra o que a consulta manual devolveu depois (errado).
+// endToEndId é padrão BACEN (E + ISPB(8) + AAAAMMDDHHmm(12) + sequencial),
+// sempre UTC, não depende do provedor nem do canal.
+
+Deno.test("extrai data/hora UTC de um endToEndId real (BACEN)", () => {
+  const result = extrairDataHoraUtcDoEndToEndId("E31872495202608152000p1ivIXRFUNk");
+  assertEquals(result, "2026-08-15T20:00:00.000Z");
+});
+
+Deno.test("extrai data/hora UTC — outro endToEndId real, minuto diferente", () => {
+  const result = extrairDataHoraUtcDoEndToEndId("E31872495202608151726htzhabAFpLI");
+  assertEquals(result, "2026-08-15T17:26:00.000Z");
+});
+
+Deno.test("endToEndId fora do formato BACEN esperado: retorna null", () => {
+  assertEquals(extrairDataHoraUtcDoEndToEndId("nao-e-um-e2e-id"), null);
+  assertEquals(extrairDataHoraUtcDoEndToEndId(""), null);
+});
+
+Deno.test("resolverDataHoraPixUtc prioriza o endToEndId sobre o horario informado", () => {
+  // horario (do Santander) diz 17:00 — 3h atrasado do real (bug achado em
+  // produção); endToEndId diz 20:00 — este é o valor que deve prevalecer.
+  const result = resolverDataHoraPixUtc(
+    "E31872495202608152000p1ivIXRFUNk",
+    "2026-08-15T17:00:31Z",
+  );
+  assertEquals(result, "2026-08-15T20:00:00.000Z");
+});
+
+Deno.test("resolverDataHoraPixUtc cai pro horario quando endToEndId não é BACEN válido", () => {
+  const result = resolverDataHoraPixUtc("id-invalido", "2026-08-15T17:00:31Z");
+  assertEquals(result, "2026-08-15T17:00:31.000Z");
 });

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-import { ingerirExtratoPix } from "../_shared/financeiro-core.ts";
+import { ingerirExtratoPix, resolverDataHoraPixUtc } from "../_shared/financeiro-core.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") || "",
@@ -278,6 +278,12 @@ async function processarRequisicao(
           continue;
         }
 
+        // Prioriza o endToEndId (padrão BACEN, sempre UTC) sobre `horario` —
+        // achado real: `horario` do canal de consulta do Santander vem com
+        // os números do horário de Brasília rotulados como UTC, 3h atrasado
+        // do instante real (ver resolverDataHoraPixUtc).
+        const dataPixUtc = resolverDataHoraPixUtc(pixId, pixItem.horario);
+
         // Tentar vincular com cobrança (se txid presente) — feito ANTES de
         // resolver igreja: cob_pix.igreja_id (gravado na criação da
         // cobrança) é uma fonte mais confiável que a chave PIX do payload.
@@ -306,7 +312,7 @@ async function processarRequisicao(
               .from('cob_pix')
               .update({
                 status: 'CONCLUIDA',
-                data_conclusao: new Date(pixItem.horario).toISOString(),
+                data_conclusao: dataPixUtc,
               })
               .eq('id', cobPixId);
           }
@@ -342,7 +348,7 @@ async function processarRequisicao(
           pagador_cpf_cnpj: pixItem.pagador?.cpf || pixItem.pagador?.cnpj || null,
           pagador_nome: pixItem.pagador?.nome || null,
           descricao: pixItem.infoPagador || "PIX Recebido",
-          data_pix: new Date(pixItem.horario).toISOString(),
+          data_pix: dataPixUtc,
           banco_id: "90400888000142", // Santander CNPJ
           igreja_id: igrejaId,
           webhook_payload: pixItem,

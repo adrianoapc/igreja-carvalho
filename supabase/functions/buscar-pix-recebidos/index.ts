@@ -6,7 +6,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import nacl from "npm:tweetnacl@1.0.3";
 import forge from "npm:node-forge@1.3.1";
-import { ingerirExtratoPix } from "../_shared/financeiro-core.ts";
+import { ingerirExtratoPix, resolverDataHoraPixUtc } from "../_shared/financeiro-core.ts";
 
 const SANTANDER_PIX_TOKEN_URL = "https://trust-pix.santander.com.br/oauth/token";
 const SANTANDER_PIX_BASE_URL = "https://trust-pix.santander.com.br/api/v1";
@@ -398,6 +398,11 @@ serve(async (req) => {
       try {
         const endToEndId = pixItem.endToEndId;
         const valor = parseFloat(pixItem.valor);
+        // Prioriza o endToEndId (padrão BACEN, sempre UTC) sobre `horario`
+        // — achado real: `horario` do canal de consulta (GET /pix) do
+        // Santander vem com os números do horário de Brasília rotulados
+        // como UTC, 3h atrasado do instante real.
+        const dataPixUtc = resolverDataHoraPixUtc(endToEndId, pixItem.horario);
 
         // Vincular cobrança se txid existir — feito ANTES da checagem de
         // duplicata: mesmo um PIX já registrado (ex.: pelo webhook, sem
@@ -438,7 +443,7 @@ serve(async (req) => {
               igreja_id: igrejaId,
               pix_id: endToEndId,
               valor,
-              data_pix: new Date(pixItem.horario).toISOString(),
+              data_pix: dataPixUtc,
               descricao: "PIX Recebido (polling)",
               conta_id: cobPixContaId,
               integracao_id: body.integracao_id,
@@ -457,7 +462,7 @@ serve(async (req) => {
             txid: pixItem.txid || null,
             cob_pix_id: cobPixId,
             valor,
-            data_pix: new Date(pixItem.horario).toISOString(),
+            data_pix: dataPixUtc,
             descricao: "PIX Recebido (polling)",
             banco_id: "90400888000142",
             igreja_id: igrejaId,
@@ -472,7 +477,7 @@ serve(async (req) => {
           if (cobPixId) {
             await supabaseAdmin
               .from("cob_pix")
-              .update({ status: "CONCLUIDA", data_conclusao: new Date(pixItem.horario).toISOString() })
+              .update({ status: "CONCLUIDA", data_conclusao: dataPixUtc })
               .eq("id", cobPixId);
           }
 
@@ -487,7 +492,7 @@ serve(async (req) => {
               igreja_id: igrejaId,
               pix_id: endToEndId,
               valor,
-              data_pix: new Date(pixItem.horario).toISOString(),
+              data_pix: dataPixUtc,
               descricao: "PIX Recebido (polling)",
               conta_id: cobPixContaId,
               integracao_id: body.integracao_id,

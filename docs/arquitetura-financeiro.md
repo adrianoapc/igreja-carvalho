@@ -7356,3 +7356,43 @@ ele. Pra qualquer integração de webhook com provedor externo sem painel
 de tentativas, logar a requisição crua do lado da própria aplicação
 deveria ser passo zero, não um "nice to have" adicionado depois.
 
+### 9.115 `horario` do Santander vem 3h atrasado no canal de consulta — `data_pix` passa a vir do `endToEndId`
+
+Usuário testou mais um PIX (com QR code) e pediu pra conferir se o
+horário gravado batia com o real — importante pro caso de uso (vincular
+oferta ao culto/relatório certo). Achado: **o campo `horario` que a API
+de CONSULTA do Santander (`GET /pix`, canal polling) devolve vem com os
+números do horário de Brasília, mas rotulado como UTC (`...Z`)** — 3h
+atrasado do instante real. Confirmado comparando, pro MESMO PIX, o
+`horario` que o WEBHOOK mandou (correto, sem esse bug) contra o que a
+consulta manual devolveu depois pro mesmo `endToEndId`.
+
+**Fonte de verdade real**: `endToEndId` (padrão BACEN — `E` + ISPB (8
+dígitos) + `AAAAMMDDHHmm` (12 dígitos, sempre UTC por spec) +
+sequencial (11 caracteres)) não depende do provedor nem do canal.
+Decodificar dele bate exatamente com o horário real, nos dois canais.
+
+**Corrigido**: `extrairDataHoraUtcDoEndToEndId`/`resolverDataHoraPixUtc`
+centralizadas em `_shared/financeiro-core.ts` (8 testes, incluindo os 2
+`endToEndId` reais que expuseram o bug) — prioriza decodificar do
+`endToEndId`, cai pro `horario` só se o `endToEndId` não bater com o
+formato BACEN esperado (defensivo). Aplicado nos 3 pontos de escrita de
+`data_pix`/`data_conclusao` (`pix-webhook`, `santander-api` ação
+`buscar_pix`, `buscar-pix-recebidos`) — 10 call sites no total.
+
+**Correção retroativa de dado já gravado**: 20 dos 21 registros em
+`pix_webhook_temp` (todos os vindos por polling, desde 07/08) tinham o
+desvio de ~3h — incluindo ofertas reais (R$1.400, R$727,50, R$318,
+etc., não só os testes desta sessão). Corrigidos via `UPDATE` direto
+(nenhum ainda estava conciliado/vinculado a lançamento —
+`transacao_id`/`oferta_id`/`processado_em` todos `NULL`, seguro de
+corrigir sem tocar em nada financeiro já lançado). 1 caso cruzou a
+virada do dia (09/08 23h→10/08 00h real) — `extratos_bancarios.
+data_transacao` espelhado com a data errada, corrigido junto.
+
+**Lição**: mesma classe de achado dos itens anteriores (§9.112-9.114) —
+só apareceu perguntando "o horário bate com o real?" e comparando contra
+uma fonte independente do provedor (aqui, o próprio `endToEndId`, que é
+padrão BACEN e não pode estar errado). Reforça
+[[feedback-decisao-cara-amostra-pequena-consultar-doc-oficial]].
+
