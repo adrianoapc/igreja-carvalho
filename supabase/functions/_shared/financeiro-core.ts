@@ -13,6 +13,38 @@
 // deno-lint-ignore no-explicit-any
 type SupabaseClientAny = any;
 
+/**
+ * Extrai data/hora em UTC do `endToEndId` de um PIX (padrão BACEN: `E` +
+ * ISPB (8 dígitos) + `AAAAMMDDHHmm` (12 dígitos, sempre UTC por spec) +
+ * sequencial (11 caracteres)) — ex.: `E31872495202608152000p1ivIXRFUNk`
+ * → 2026-08-15 20:00 UTC.
+ *
+ * Mais confiável que o campo `horario` que a API do Santander devolve:
+ * achado real em produção (2026-08-15) — no canal de CONSULTA (polling,
+ * `GET /pix`), `horario` vem com os números do horário de Brasília mas
+ * rotulado como UTC (`...Z`), 3h atrasado em relação ao instante real
+ * (confirmado comparando contra o próprio `endToEndId` da mesma
+ * transação — o canal de WEBHOOK não tem esse bug, só a consulta). Como
+ * `endToEndId` é padrão BACEN (não depende do provedor nem do canal),
+ * decodificar dele é a fonte confiável nos dois canais.
+ */
+export function extrairDataHoraUtcDoEndToEndId(endToEndId: string): string | null {
+  const m = /^E\d{8}(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})/.exec(endToEndId);
+  if (!m) return null;
+  const [, ano, mes, dia, hora, minuto] = m;
+  return `${ano}-${mes}-${dia}T${hora}:${minuto}:00.000Z`;
+}
+
+/**
+ * Resolve a data/hora UTC de um PIX: prioriza o `endToEndId` (ver
+ * `extrairDataHoraUtcDoEndToEndId`); cai pro campo `horario` só quando o
+ * `endToEndId` não bate com o formato BACEN esperado (defensivo, não
+ * deveria acontecer com PIX reais).
+ */
+export function resolverDataHoraPixUtc(endToEndId: string, horarioFallback: string): string {
+  return extrairDataHoraUtcDoEndToEndId(endToEndId) ?? new Date(horarioFallback).toISOString();
+}
+
 export interface FinContexto {
   igreja_id: string;
   filial_id?: string | null;
