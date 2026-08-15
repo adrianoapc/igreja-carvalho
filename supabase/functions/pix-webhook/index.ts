@@ -93,24 +93,84 @@ async function buscarIgrejaPorCnpj(chave: string): Promise<string | null> {
   return null;
 }
 
+// Loga TODA requisição recebida (payload cru + resposta devolvida) em
+// edge_function_logs — o Santander não expõe um painel de tentativas de
+// entrega de webhook no portal do desenvolvedor, então esse é o único jeito
+// de confirmar se eles estão de fato chamando esta URL. Sem isso, uma
+// notificação que nunca chega é indistinguível (do nosso lado) de uma que
+// chega e falha silenciosamente — achado real em 2026-08-14, depois do
+// fix do gate de secret (§9.113): mesmo sem 401 nenhum mais, nada apareceu
+// em tempo real, sem log nenhum pra confirmar se a causa é "Santander não
+// chamou" ou "chamou e algo deu errado antes do log de sucesso".
+async function logRequisicao(
+  startTime: number,
+  method: string,
+  requestPayload: unknown,
+  response: Response
+): Promise<void> {
+  try {
+    const responseText = await response.clone().text();
+    let responsePayload: unknown = responseText;
+    try {
+      responsePayload = JSON.parse(responseText);
+    } catch {
+      // corpo não-JSON (ex.: 405 texto puro) — loga como string mesmo
+    }
+
+    await supabase.rpc("log_edge_function_with_metrics", {
+      p_function_name: "pix-webhook",
+      p_status: response.ok ? "success" : "error",
+      p_execution_time_ms: Date.now() - startTime,
+      p_error_message: response.ok ? null : `HTTP ${response.status}`,
+      p_request_payload: { method, body: requestPayload },
+      p_response_payload: responsePayload,
+    });
+  } catch (logErr) {
+    console.error("[pix-webhook] Falha ao gravar log da requisição:", logErr);
+  }
+}
+
 serve(async (req) => {
+  const startTime = Date.now();
+  const method = req.method;
+
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+  if (method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   // Health check GET - Requisito Santander
-  if (req.method === 'GET') {
+  if (method === 'GET') {
     console.log('[pix-webhook] Health check GET recebido');
-    return new Response(
+    const response = new Response(
       JSON.stringify({ status: 'ok', message: 'Webhook PIX ativo' }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+    await logRequisicao(startTime, method, null, response);
+    return response;
   }
 
+  // Lê o corpo cru ANTES de qualquer parse — garante que o payload fica
+  // disponível pro log mesmo se o JSON.parse falhar adiante.
+  const rawBody = method === "POST" ? await req.text().catch(() => null) : null;
+
+  const response = await processarRequisicao(method, rawBody);
+  await logRequisicao(startTime, method, rawBody ? tryParseJson(rawBody) : null, response);
+  return response;
+});
+
+function tryParseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+async function processarRequisicao(method: string, rawBody: string | null): Promise<Response> {
   try {
     // Validar método POST para notificações PIX
-    if (req.method !== "POST") {
+    if (method !== "POST") {
       return new Response(
         JSON.stringify({ error: "Método não permitido. Use GET ou POST." }),
         { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -129,7 +189,7 @@ serve(async (req) => {
     // banco — mitigação já documentada no ADR-024.
 
     // Parse do payload
-    const payload: PixWebhookPayload = await req.json();
+    const payload: PixWebhookPayload = JSON.parse(rawBody ?? "{}");
     console.log("[pix-webhook] Recebido payload:", JSON.stringify(payload));
 
 
@@ -280,17 +340,17 @@ serve(async (req) => {
     }
 
     // Retornar resultado consolidado
-    const response = {
+    const resultadoFinal = {
       success: resultados.length > 0,
       message: `${resultados.length} PIX processados, ${erros.length} erros`,
       processados: resultados,
       erros: erros.length > 0 ? erros : undefined,
     };
 
-    console.log("[pix-webhook] Resposta:", JSON.stringify(response));
+    console.log("[pix-webhook] Resposta:", JSON.stringify(resultadoFinal));
 
     return new Response(
-      JSON.stringify(response),
+      JSON.stringify(resultadoFinal),
       {
         status: erros.length === payload.pix.length ? 400 : 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -306,4 +366,4 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+}
