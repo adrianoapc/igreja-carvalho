@@ -186,7 +186,8 @@ serve(async (req) => {
   // disponível pro log mesmo se o JSON.parse falhar adiante.
   const rawBody = method === "POST" ? await req.text().catch(() => null) : null;
 
-  const response = await processarRequisicao(method, rawBody);
+  const igrejaIdDaUrl = new URL(req.url).searchParams.get("igreja_id");
+  const response = await processarRequisicao(method, rawBody, igrejaIdDaUrl);
   await logRequisicao(startTime, method, rawBody ? tryParseJson(rawBody) : null, response);
   return response;
 });
@@ -199,7 +200,11 @@ function tryParseJson(text: string): unknown {
   }
 }
 
-async function processarRequisicao(method: string, rawBody: string | null): Promise<Response> {
+async function processarRequisicao(
+  method: string,
+  rawBody: string | null,
+  igrejaIdDaUrl: string | null
+): Promise<Response> {
   try {
     // Validar método POST para notificações PIX
     if (method !== "POST") {
@@ -307,12 +312,18 @@ async function processarRequisicao(method: string, rawBody: string | null): Prom
           }
         }
 
-        // Ordem de resolução: (1) igreja da cobrança vinculada por txid —
-        // mais confiável; (2) CNPJ da chave PIX, quando presente; (3) única
-        // integração Santander ativa, se só existir uma (chave PIX estática
-        // sem cobrança nossa, achado real em produção — ver comentário de
-        // buscarIgrejaIntegracaoSantanderUnica).
+        // Ordem de resolução: (1) igreja_id no query string da própria URL
+        // do webhook — cada chave PIX só pode estar associada a UMA URL no
+        // Santander (doc oficial do banco), então a URL registrada já é,
+        // na prática, a chave de roteamento por igreja; nós escolhemos essa
+        // URL ao registrar (`?igreja_id=...`), então é a fonte MAIS
+        // confiável, sem depender de nada no payload. (2) igreja da
+        // cobrança vinculada por txid. (3) CNPJ da chave PIX, quando
+        // presente. (4) única integração Santander ativa, se só existir
+        // uma — fallbacks pra quando a URL ainda não foi re-registrada com
+        // o parâmetro (ou pra uma chave PIX estática sem cobrança nossa).
         const igrejaId =
+          igrejaIdDaUrl ??
           igrejaIdDaCobranca ??
           (pixItem.chave ? await buscarIgrejaPorCnpj(pixItem.chave) : null) ??
           (await buscarIgrejaIntegracaoSantanderUnica());
