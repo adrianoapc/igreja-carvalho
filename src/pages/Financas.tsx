@@ -17,6 +17,7 @@ import {
   FileText,
   Receipt,
   Upload,
+  QrCode,
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -440,7 +441,7 @@ export default function Financas() {
       {/* Ações Rápidas */}
       <div>
         <h2 className="text-lg md:text-xl font-semibold mb-4">Ações Rápidas</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <Card
             className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] border-2 border-amber-200 dark:border-amber-800"
             onClick={() => navigate("/financas/ofertas")}
@@ -517,6 +518,24 @@ export default function Financas() {
               <h3 className="font-semibold text-base mb-1">Reconciliação</h3>
               <p className="text-xs text-muted-foreground">
                 Acesse a conciliação bancária
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] border-2 border-cyan-200 dark:border-cyan-800"
+            onClick={() => navigate("/financas/pix-recebido")}
+          >
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="p-3 rounded-lg bg-cyan-100 dark:bg-cyan-900/20 flex-shrink-0">
+                  <QrCode className="w-6 h-6 text-cyan-600" />
+                </div>
+                <ArrowRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+              </div>
+              <h3 className="font-semibold text-base mb-1">PIX Recebidos</h3>
+              <p className="text-xs text-muted-foreground">
+                Veja os PIX recebidos direto do banco
               </p>
             </CardContent>
           </Card>
