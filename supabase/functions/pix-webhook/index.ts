@@ -11,7 +11,7 @@ const supabase = createClient(
 interface PixItemSantander {
   endToEndId: string;
   txid?: string;
-  chave: string;           // Chave PIX (CNPJ da igreja)
+  chave?: string;          // Chave PIX (CNPJ da igreja) — nem sempre presente no payload real
   valor: string;           // String no formato "150.00"
   horario: string;
   infoPagador?: string;
@@ -90,6 +90,38 @@ async function buscarIgrejaPorCnpj(chave: string): Promise<string | null> {
   }
   
   console.warn(`[pix-webhook] Igreja não encontrada para CNPJ: ${chave}`);
+  return null;
+}
+
+// Último fallback: quando o payload não tem `chave` nem um `txid` vinculado
+// a uma cobrança nossa (ex.: chave PIX estática cadastrada direto no portal
+// do banco, sem passar por `criar-cobranca-pix`) — achado real em produção,
+// 2026-08-15. Cada chave PIX só pode estar associada a UMA URL de webhook
+// (regra do próprio Santander), então, HOJE, com uma única integração PIX
+// ativa, a URL só pode estar recebendo notificação dela. Se um dia existir
+// mais de uma integração Santander (multi-tenant real), isso vira ambíguo
+// de propósito — melhor não resolver do que resolver errado.
+async function buscarIgrejaIntegracaoSantanderUnica(): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('integracoes_financeiras')
+    .select('igreja_id')
+    .eq('provedor', 'santander');
+
+  if (error) {
+    console.error('[pix-webhook] Erro ao buscar integração Santander única:', error);
+    return null;
+  }
+
+  if (data && data.length === 1) {
+    return data[0].igreja_id;
+  }
+
+  if (data && data.length > 1) {
+    console.warn(
+      `[pix-webhook] ${data.length} integrações Santander ativas — não dá pra resolver igreja sem chave/txid, ficando null.`
+    );
+  }
+
   return null;
 }
 
@@ -235,41 +267,35 @@ async function processarRequisicao(method: string, rawBody: string | null): Prom
           continue;
         }
 
-        // Validate chave (PIX key) - must be present and reasonable length
-        if (!pixItem.chave || typeof pixItem.chave !== 'string' || pixItem.chave.length > 100) {
-          erros.push({ pixId, erro: 'Chave PIX ausente ou inválida' });
-          continue;
-        }
-
         // Validate horario
         if (!pixItem.horario || isNaN(Date.parse(pixItem.horario))) {
           erros.push({ pixId, erro: 'Horário ausente ou inválido' });
           continue;
         }
 
-        // Buscar igreja pelo CNPJ da chave PIX
-        const igrejaId = await buscarIgrejaPorCnpj(pixItem.chave);
-        
-        if (!igrejaId) {
-          console.warn(`[pix-webhook] PIX ${pixId} sem igreja vinculada (chave: ${pixItem.chave})`);
-          // Continua processando mas registra sem igreja_id
-        }
-
-        // Tentar vincular com cobrança (se txid presente)
+        // Tentar vincular com cobrança (se txid presente) — feito ANTES de
+        // resolver igreja: cob_pix.igreja_id (gravado na criação da
+        // cobrança) é uma fonte mais confiável que a chave PIX do payload.
+        // Achado real em produção (2026-08-15, log de edge_function_logs):
+        // a notificação real do Santander pro webhook NÃO manda o campo
+        // `chave` (só endToEndId/txid/valor/horario) — um `chave` obrigatório
+        // rejeitava 100% das notificações reais com cobrança vinculada.
         let cobPixId: string | null = null;
         let cobPixContaId: string | null = null;
+        let igrejaIdDaCobranca: string | null = null;
         if (pixItem.txid) {
           const { data: cobranca } = await supabase
             .from('cob_pix')
-            .select('id, sessao_item_id, conta_id')
+            .select('id, sessao_item_id, conta_id, igreja_id')
             .eq('txid', pixItem.txid)
             .maybeSingle();
 
           if (cobranca) {
             cobPixId = cobranca.id;
             cobPixContaId = cobranca.conta_id ?? null;
+            igrejaIdDaCobranca = cobranca.igreja_id ?? null;
             console.log(`[pix-webhook] PIX ${pixId} vinculado à cobrança ${pixItem.txid}`);
-            
+
             // Atualizar status da cobrança para CONCLUIDA
             await supabase
               .from('cob_pix')
@@ -279,6 +305,21 @@ async function processarRequisicao(method: string, rawBody: string | null): Prom
               })
               .eq('id', cobPixId);
           }
+        }
+
+        // Ordem de resolução: (1) igreja da cobrança vinculada por txid —
+        // mais confiável; (2) CNPJ da chave PIX, quando presente; (3) única
+        // integração Santander ativa, se só existir uma (chave PIX estática
+        // sem cobrança nossa, achado real em produção — ver comentário de
+        // buscarIgrejaIntegracaoSantanderUnica).
+        const igrejaId =
+          igrejaIdDaCobranca ??
+          (pixItem.chave ? await buscarIgrejaPorCnpj(pixItem.chave) : null) ??
+          (await buscarIgrejaIntegracaoSantanderUnica());
+
+        if (!igrejaId) {
+          console.warn(`[pix-webhook] PIX ${pixId} sem igreja vinculada (txid: ${pixItem.txid ?? "—"}, chave: ${pixItem.chave ?? "—"})`);
+          // Continua processando mas registra sem igreja_id
         }
 
         // Montar dados para inserção
