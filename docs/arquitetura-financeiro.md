@@ -7310,3 +7310,49 @@ integração com sistema externo que nunca funcionou como esperado,
 ler a doc oficial do provedor é mais confiável que confiar no que o
 código "parece" estar tentando fazer.
 
+### 9.114 `pix-webhook` — log de toda requisição + `chave` era exigida mas o payload real não manda
+
+Fechamento de §9.113: mesmo sem o gate de secret, o usuário reportou que
+um PIX de teste não aparecia. Sem painel de tentativas de webhook no
+portal do Santander (usuário confirmou), a única forma de saber se o
+banco está de fato chamando a URL é logar do nosso lado.
+
+**Log de toda requisição** (PR #107): toda chamada a `pix-webhook`
+(GET/POST, sucesso ou erro) passa a gravar em `edge_function_logs` via
+`log_edge_function_with_metrics` (mesma RPC de `chatbot-triagem`) —
+payload cru + resposta + status + tempo. Refatorado pra ler o corpo
+(`req.text()`) uma vez só antes de qualquer parse, garantindo que o
+payload fica disponível pro log mesmo se `JSON.parse` falhar; lógica
+principal extraída pra `processarRequisicao()`, sem mudança de
+comportamento.
+
+**Achado imediato com o log novo**: o Santander JÁ estava chamando o
+webhook em tempo real — 4 tentativas reais capturadas em poucos
+segundos (padrão de retry) — mas todas rejeitadas com 400 "Chave PIX
+ausente ou inválida". O payload real só tem `endToEndId`/`txid`/
+`valor`/`horario`/`infoPagador` — **sem `chave`**. `chave` virou
+opcional na interface.
+
+**Reordenada a resolução de `igreja_id`** (antes: só via CNPJ da
+`chave`, obrigatória):
+1. `cob_pix.igreja_id` (via `txid`) — já existia, mas rodava DEPOIS do
+   check de `chave` que travava a requisição antes de chegar lá.
+2. CNPJ da `chave`, quando presente.
+3. **Novo**: única integração Santander ativa (`integracoes_
+   financeiras`, `provedor='santander'`) — só resolve quando existe
+   EXATAMENTE uma (múltiplas fica ambíguo de propósito, `igreja_id`
+   fica `null`). Cobre o caso achado em produção: o `txid` da
+   notificação de teste (`SAN20260807...`, formato sugerindo origem no
+   portal do banco, não em `criar-cobranca-pix`) não tem `cob_pix`
+   correspondente — provável **chave PIX estática cadastrada direto no
+   Santander**, fora do nosso sistema de QR codes.
+
+**Testado com o payload exato capturado do Santander real** (via o log
+novo): 200, PIX processado. Linha de teste removida depois.
+
+**Lição**: o log de requisição (item anterior) não é só observabilidade
+— foi o que revelou este bug em minutos, contra horas de suposição sem
+ele. Pra qualquer integração de webhook com provedor externo sem painel
+de tentativas, logar a requisição crua do lado da própria aplicação
+deveria ser passo zero, não um "nice to have" adicionado depois.
+
