@@ -441,7 +441,7 @@ export default function Financas() {
       {/* Ações Rápidas */}
       <div>
         <h2 className="text-lg md:text-xl font-semibold mb-4">Ações Rápidas</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           <Card
             className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] border-2 border-amber-200 dark:border-amber-800"
             onClick={() => navigate("/financas/ofertas")}
