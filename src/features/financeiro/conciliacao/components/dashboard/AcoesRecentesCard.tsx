@@ -13,25 +13,29 @@ interface AcoesRecentesCardProps {
 }
 
 function getTipoIcon(tipo: string | null, hasLote: boolean) {
-  if (hasLote) return <Layers className="w-4 h-4 text-purple-600" />;
+  if (hasLote || tipo === "lote") return <Layers className="w-4 h-4 text-purple-600" />;
+  // CHECK: automatica|manual|lote|desconciliacao (não "automatico")
   switch (tipo) {
-    case "automatico":
+    case "automatica":
       return <Sparkles className="w-4 h-4 text-green-600" />;
     case "manual":
       return <CheckCircle2 className="w-4 h-4 text-blue-600" />;
+    case "desconciliacao":
+      return <FileCheck className="w-4 h-4 text-muted-foreground" />;
     default:
       return <FileCheck className="w-4 h-4 text-muted-foreground" />;
   }
 }
 
 function getTipoLabel(tipo: string | null, hasLote: boolean) {
-  if (hasLote) return "Lote";
-  if (tipo === "automatico") return "Auto";
+  if (hasLote || tipo === "lote") return "Lote";
+  if (tipo === "automatica") return "Auto";
   if (tipo === "manual") return "Manual";
+  if (tipo === "desconciliacao") return "Desconciliado";
   return tipo || "Conciliado";
 }
 
-/** Card "Ações Recentes" — últimas 10 entradas do audit log de conciliação. */
+/** Card "Ações Recentes" — últimas 10 entradas do audit log (respeita filtros do Dashboard). */
 export function AcoesRecentesCard({ recentActions, className }: AcoesRecentesCardProps) {
   return (
     <Card className={className}>
