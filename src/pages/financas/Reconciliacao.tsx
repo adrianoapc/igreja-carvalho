@@ -1,15 +1,17 @@
+import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { DashboardConciliacao } from "@/features/financeiro/conciliacao/DashboardConciliacao";
 import { ConciliacaoManual } from "@/features/financeiro/conciliacao/ConciliacaoManual";
 import { ConciliacaoInteligente } from "@/features/financeiro/conciliacao/ConciliacaoInteligente";
-import { HistoricoExtratos } from "@/components/financas/HistoricoExtratos";
+import { ExtratosTab } from "@/components/financas/ExtratosTab";
 import { LotesAntecipacaoTab } from "@/components/financas/LotesAntecipacaoTab";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Reconciliacao() {
   const navigate = useNavigate();
+  const [tab, setTab] = useState("inteligente");
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -34,7 +36,7 @@ export default function Reconciliacao() {
         </div>
       </div>
 
-      <Tabs defaultValue="inteligente" className="w-full">
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
         {/*
           5 abas não cabem legíveis num TabsList `grid-cols-5` fixo abaixo de
           ~640px (F7 §6.3/§6.5). Sem convenção existente no app para "muitas
@@ -55,8 +57,8 @@ export default function Reconciliacao() {
           <TabsTrigger value="manual" className="shrink-0 sm:shrink">
             Modo Clássico
           </TabsTrigger>
-          <TabsTrigger value="historico" className="shrink-0 sm:shrink">
-            Histórico
+          <TabsTrigger value="extratos" className="shrink-0 sm:shrink">
+            Extratos
           </TabsTrigger>
           <TabsTrigger value="antecipacao" className="shrink-0 sm:shrink">
             Conciliação Cartão
@@ -71,8 +73,8 @@ export default function Reconciliacao() {
         <TabsContent value="manual">
           <ConciliacaoManual />
         </TabsContent>
-        <TabsContent value="historico">
-          <HistoricoExtratos />
+        <TabsContent value="extratos">
+          <ExtratosTab onIrParaConciliacaoCartao={() => setTab("antecipacao")} />
         </TabsContent>
         <TabsContent value="antecipacao">
           <LotesAntecipacaoTab />
