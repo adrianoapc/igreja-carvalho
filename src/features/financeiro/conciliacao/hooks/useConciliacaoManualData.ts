@@ -296,7 +296,13 @@ export function useConciliacaoManualData() {
   const extratosFiltrados = useMemo(() => {
     if (!extratosSemCandidato) return [];
     return extratosSemCandidato.filter((e) => {
-      if (e.descricao?.toUpperCase().includes("CONTAMAX")) return false;
+      // NÃO filtra CONTAMAX aqui (diferente de HistoricoExtratos.tsx/
+      // ExtratoPreviewDialog.tsx/useConciliacaoLote.ts, onde o objetivo é
+      // não oferecer a linha como candidata a match de uma transação real).
+      // Modo Clássico é o destino final dessas linhas — a RPC já rotula
+      // com motivo `aplicacao_financeira_automatica` (20260817); escondê-las
+      // aqui as tornava invisíveis mesmo já classificadas (achado do review
+      // do PR #112, commit 7f64e33f).
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         if (

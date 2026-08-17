@@ -17,14 +17,43 @@ interface ExtratoManualCardProps {
 /**
  * Rótulo legível pro `motivo` de `fin_listar_extratos_sem_candidato` (C2-1) —
  * chaves batem com o CASE da RPC (`supabase/migrations/
- * 20260810100000_fin_listar_extratos_sem_candidato.sql`).
+ * 20260817120000_fin_listar_extratos_sem_candidato_motivos_reais.sql`).
  */
 const MOTIVO_LABEL: Record<string, string> = {
   venda_getnet_sem_vinculo_confirmado:
     "Parece Getnet, mas nenhum motor confirmou o vínculo ainda",
+  tarifa_bancaria_sem_lancamento:
+    "Tarifa bancária — provavelmente falta lançar essa despesa",
+  aplicacao_financeira_automatica:
+    "Aplicação/resgate automático do banco (ContaMax) — não é receita ou despesa da igreja",
+  cheque_sem_lancamento_correspondente:
+    "Cheque sem lançamento correspondente — confira manualmente",
   sem_transacao_compativel_no_periodo:
     "Nenhuma transação compatível encontrada no período",
 };
+
+/**
+ * Motivos onde a movimentação NUNCA é receita/despesa real da igreja — só
+ * `aplicacao_financeira_automatica` (ContaMax é um sweep de caixa dentro do
+ * próprio banco, sem contrapartida no DRE). "Dividir" não faz sentido (linha
+ * única) e "Ignorar" vira a ação primária; "Buscar manualmente" continua
+ * disponível (só secundário/menos destacado) porque a classificação é um
+ * heurístico de texto (`descricao ILIKE '%CONTAMAX%'`) — se errar numa linha
+ * real, o tesoureiro ainda precisa de uma saída pra vincular.
+ *
+ * `tarifa_bancaria_sem_lancamento` NÃO entra aqui (achado P1 do @codex no
+ * commit `deeb5ee9`, PR #112): tarifa é uma despesa REAL — `Ignorar` só
+ * marca `extratos_bancarios.reconciliado=true`
+ * (`fin_marcar_extrato_ignorado`), não cria nenhum lançamento de despesa.
+ * Promover Ignorar a ação primária pra tarifa incentivava o tesoureiro a
+ * descartar a linha sem nunca registrar o gasto, subestimando despesas no
+ * DRE. Tarifa mantém o conjunto de ações padrão (Buscar manualmente
+ * primário) igual a Getnet/genérico — cheque também fica de fora pelo
+ * mesmo motivo original (pode corresponder a uma oferta/pagamento real).
+ */
+const MOTIVOS_NUNCA_RECEITA_OU_DESPESA = new Set([
+  "aplicacao_financeira_automatica",
+]);
 
 /** Card de um extrato pendente na aba "Por Extrato" do Modo Clássico. */
 export function ExtratoManualCard({
@@ -35,6 +64,9 @@ export function ExtratoManualCard({
 }: ExtratoManualCardProps) {
   const { formatValue } = useHideValues();
   const isCredito = extrato.tipo === "credito" || extrato.tipo === "CREDIT";
+  const nuncaReceitaOuDespesa = extrato.motivo
+    ? MOTIVOS_NUNCA_RECEITA_OU_DESPESA.has(extrato.motivo)
+    : false;
 
   return (
     <div
@@ -91,18 +123,32 @@ export function ExtratoManualCard({
         </div>
       </div>
       <div className="flex items-center gap-2 mt-3 flex-wrap">
-        <Button size="sm" variant="default" onClick={() => onVincular(extrato)}>
+        {nuncaReceitaOuDespesa && (
+          <Button size="sm" variant="default" onClick={() => onIgnorar(extrato.id)}>
+            <X className="w-3 h-3 mr-1" />
+            Ignorar
+          </Button>
+        )}
+        <Button
+          size="sm"
+          variant={nuncaReceitaOuDespesa ? "ghost" : "default"}
+          onClick={() => onVincular(extrato)}
+        >
           <Search className="w-3 h-3 mr-1" />
           Buscar manualmente
         </Button>
-        <Button size="sm" variant="outline" onClick={() => onDividir(extrato)}>
-          <Split className="w-3 h-3 mr-1" />
-          Dividir
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => onIgnorar(extrato.id)}>
-          <X className="w-3 h-3 mr-1" />
-          Ignorar
-        </Button>
+        {!nuncaReceitaOuDespesa && (
+          <>
+            <Button size="sm" variant="outline" onClick={() => onDividir(extrato)}>
+              <Split className="w-3 h-3 mr-1" />
+              Dividir
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => onIgnorar(extrato.id)}>
+              <X className="w-3 h-3 mr-1" />
+              Ignorar
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
