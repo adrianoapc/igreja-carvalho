@@ -19,6 +19,9 @@ interface ExtratosTabProps {
  */
 export function ExtratosTab({ onIrParaConciliacaoCartao }: ExtratosTabProps) {
   const [modo, setModo] = useState<ModoExtrato>("banco");
+  // Cartão só monta na 1ª visita (não dispara Getnet enquanto o tesoureiro
+  // fica em Banco) e depois permanece montado pra não perder o MonthPicker.
+  const [cartaoVisitado, setCartaoVisitado] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -29,7 +32,12 @@ export function ExtratosTab({ onIrParaConciliacaoCartao }: ExtratosTabProps) {
           variant="outline"
           size="sm"
           value={modo}
-          onValueChange={(v) => v && setModo(v as ModoExtrato)}
+          onValueChange={(v) => {
+            if (!v) return;
+            const next = v as ModoExtrato;
+            if (next === "cartao") setCartaoVisitado(true);
+            setModo(next);
+          }}
         >
           <ToggleGroupItem value="banco" className="gap-1.5">
             <Landmark className="w-3.5 h-3.5" />
@@ -42,10 +50,16 @@ export function ExtratosTab({ onIrParaConciliacaoCartao }: ExtratosTabProps) {
         </ToggleGroup>
       </div>
 
-      {modo === "banco" ? (
+      {/* Banco fica sempre montado (filtros/página sobrevivem). Cartão
+          monta na 1ª visita e permanece — o ternário antigo desmontava
+          o inativo e zerava o estado (Codex P2). */}
+      <div hidden={modo !== "banco"}>
         <HistoricoExtratos />
-      ) : (
-        <CartaoExtratoResumo onIrParaConciliacaoCartao={onIrParaConciliacaoCartao} />
+      </div>
+      {cartaoVisitado && (
+        <div hidden={modo !== "cartao"}>
+          <CartaoExtratoResumo onIrParaConciliacaoCartao={onIrParaConciliacaoCartao} />
+        </div>
       )}
     </div>
   );

@@ -7525,7 +7525,9 @@ separados com clareza.
   `MonthPicker` próprio + `CartaoStatsCard` (mesma RPC
   `fin_stats_cartao_getnet`) + botão "Ver em Conciliação Cartão" que
   troca a aba da página sem duplicar a UI de ação que já existe em
-  `ConciliacaoCartaoLedger.tsx`.
+  `ConciliacaoCartaoLedger.tsx`. O toggle **não** desmonta o ramo
+  inativo (Codex P2): Banco fica sempre montado (filtros/página
+  sobrevivem) e Cartão monta na 1ª visita e permanece.
 - `Reconciliacao.tsx` precisou virar `Tabs` **controlado**
   (`value`/`onValueChange`, antes `defaultValue` não controlado) só
   por causa desse botão — nenhum outro comportamento de aba mudou.
