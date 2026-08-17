@@ -123,23 +123,22 @@ export function ExtratoManualCard({
         </div>
       </div>
       <div className="flex items-center gap-2 mt-3 flex-wrap">
-        {nuncaReceitaOuDespesa ? (
+        {nuncaReceitaOuDespesa && (
+          <Button size="sm" variant="default" onClick={() => onIgnorar(extrato.id)}>
+            <X className="w-3 h-3 mr-1" />
+            Ignorar
+          </Button>
+        )}
+        <Button
+          size="sm"
+          variant={nuncaReceitaOuDespesa ? "ghost" : "default"}
+          onClick={() => onVincular(extrato)}
+        >
+          <Search className="w-3 h-3 mr-1" />
+          Buscar manualmente
+        </Button>
+        {!nuncaReceitaOuDespesa && (
           <>
-            <Button size="sm" variant="default" onClick={() => onIgnorar(extrato.id)}>
-              <X className="w-3 h-3 mr-1" />
-              Ignorar
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => onVincular(extrato)}>
-              <Search className="w-3 h-3 mr-1" />
-              Buscar manualmente
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button size="sm" variant="default" onClick={() => onVincular(extrato)}>
-              <Search className="w-3 h-3 mr-1" />
-              Buscar manualmente
-            </Button>
             <Button size="sm" variant="outline" onClick={() => onDividir(extrato)}>
               <Split className="w-3 h-3 mr-1" />
               Dividir
