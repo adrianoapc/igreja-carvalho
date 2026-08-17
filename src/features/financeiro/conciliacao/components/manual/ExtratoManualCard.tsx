@@ -22,6 +22,12 @@ interface ExtratoManualCardProps {
 const MOTIVO_LABEL: Record<string, string> = {
   venda_getnet_sem_vinculo_confirmado:
     "Parece Getnet, mas nenhum motor confirmou o vínculo ainda",
+  tarifa_bancaria_sem_lancamento:
+    "Tarifa bancária — não espera lançamento correspondente",
+  aplicacao_financeira_automatica:
+    "Aplicação/resgate automático do banco (ContaMax) — não é receita ou despesa da igreja",
+  cheque_sem_lancamento_correspondente:
+    "Cheque sem lançamento correspondente — confira manualmente",
   sem_transacao_compativel_no_periodo:
     "Nenhuma transação compatível encontrada no período",
 };
