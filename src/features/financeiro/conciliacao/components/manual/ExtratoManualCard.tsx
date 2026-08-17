@@ -17,7 +17,7 @@ interface ExtratoManualCardProps {
 /**
  * Rótulo legível pro `motivo` de `fin_listar_extratos_sem_candidato` (C2-1) —
  * chaves batem com o CASE da RPC (`supabase/migrations/
- * 20260810100000_fin_listar_extratos_sem_candidato.sql`).
+ * 20260817120000_fin_listar_extratos_sem_candidato_motivos_reais.sql`).
  */
 const MOTIVO_LABEL: Record<string, string> = {
   venda_getnet_sem_vinculo_confirmado:
@@ -32,6 +32,24 @@ const MOTIVO_LABEL: Record<string, string> = {
     "Nenhuma transação compatível encontrada no período",
 };
 
+/**
+ * Motivos onde a movimentação normalmente NÃO vai ter um lançamento
+ * correspondente (tarifa bancária, aplicação/resgate automático) — "Dividir"
+ * não faz sentido (linha única, não é uma oferta pra fatiar) e "Ignorar" vira
+ * a ação primária. "Buscar manualmente" continua disponível (só
+ * secundário/menos destacado), de propósito: a classificação é um heurístico
+ * de texto (`descricao ILIKE 'TARIFA%'`/`'%CONTAMAX%'`) — se ele errar numa
+ * linha real, o tesoureiro ainda precisa de uma saída pra vincular (achado
+ * do review do PR #112: esconder Buscar manualmente por completo deixaria
+ * um falso positivo sem forma de ser conciliado, só "Ignorar"). Cheque fica
+ * de fora deste conjunto: pode sim corresponder a uma oferta/pagamento real
+ * que precisa ser localizado, então mantém as 3 ações normalmente.
+ */
+const MOTIVOS_SEM_LANCAMENTO_ESPERADO = new Set([
+  "tarifa_bancaria_sem_lancamento",
+  "aplicacao_financeira_automatica",
+]);
+
 /** Card de um extrato pendente na aba "Por Extrato" do Modo Clássico. */
 export function ExtratoManualCard({
   extrato,
@@ -41,6 +59,9 @@ export function ExtratoManualCard({
 }: ExtratoManualCardProps) {
   const { formatValue } = useHideValues();
   const isCredito = extrato.tipo === "credito" || extrato.tipo === "CREDIT";
+  const semLancamentoEsperado = extrato.motivo
+    ? MOTIVOS_SEM_LANCAMENTO_ESPERADO.has(extrato.motivo)
+    : false;
 
   return (
     <div
@@ -97,18 +118,33 @@ export function ExtratoManualCard({
         </div>
       </div>
       <div className="flex items-center gap-2 mt-3 flex-wrap">
-        <Button size="sm" variant="default" onClick={() => onVincular(extrato)}>
-          <Search className="w-3 h-3 mr-1" />
-          Buscar manualmente
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => onDividir(extrato)}>
-          <Split className="w-3 h-3 mr-1" />
-          Dividir
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => onIgnorar(extrato.id)}>
-          <X className="w-3 h-3 mr-1" />
-          Ignorar
-        </Button>
+        {semLancamentoEsperado ? (
+          <>
+            <Button size="sm" variant="default" onClick={() => onIgnorar(extrato.id)}>
+              <X className="w-3 h-3 mr-1" />
+              Ignorar
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => onVincular(extrato)}>
+              <Search className="w-3 h-3 mr-1" />
+              Buscar manualmente
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button size="sm" variant="default" onClick={() => onVincular(extrato)}>
+              <Search className="w-3 h-3 mr-1" />
+              Buscar manualmente
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onDividir(extrato)}>
+              <Split className="w-3 h-3 mr-1" />
+              Dividir
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => onIgnorar(extrato.id)}>
+              <X className="w-3 h-3 mr-1" />
+              Ignorar
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
