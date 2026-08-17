@@ -1,0 +1,9 @@
+flowchart TD
+    FILTROS["Período 3/6/12 + Conta + Filial"] --> COB["view_reconciliacao_cobertura\n.or(filial_id.eq.X, is.null)"]
+    FILTROS --> AUD["reconciliacao_audit_logs\nstats por tipo + Ações Recentes\nmesmos filtros · .or filial"]
+    COB --> CARDS["Cobertura · Reconciliados · Pendentes · Valor"]
+    COB --> CHART["Evolução Mensal + Detalhamento por Conta"]
+    AUD --> PIE["Por Tipo + Estatísticas por Tipo"]
+    AUD --> FEED["AcoesRecentesCard · últimas 10"]
+    ACAO["Vincular / Dividir / Ignorar /\nReconciliar Automático"] -.->|"saiu do Dashboard"| MI["Modo Inteligente"]
+    ACAO -.->|"saiu do Dashboard"| MC["Modo Clássico"]

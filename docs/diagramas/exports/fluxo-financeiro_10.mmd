@@ -10,15 +10,14 @@ flowchart TD
         MF["components/manual/\nManualFiltrosBar · ExtratoManualCard ·\nTransacaoManualCard · PaginacaoCompacta"]
     end
 
-    subgraph DASH["DashboardConciliacao.tsx (orquestrador)"]
-        DD["hooks/useDashboardConciliacaoData.ts\n+ fetchSugestoes1x1 (score 0-100 p/ exibição)"]
-        DF["components/dashboard/\nConciliacaoStatsCards · AcoesRecentesCard ·\nPendentesCard · PendenteExtratoCard"]
+    subgraph DASH["DashboardConciliacao.tsx (orquestrador — só indicadores desde ago/2026)"]
+        DD["hooks/useDashboardConciliacaoData.ts\nAções Recentes (filtra período/conta/filial)"]
+        DF["cobertura + gráficos + detalhamento\n(view_reconciliacao_cobertura)\n+ AcoesRecentesCard"]
     end
 
     SHARED --> MANUAL
-    SHARED --> DASH
+    SHARED -.já não acionado pelo Dashboard.-> DASH
     MD --> MF
     DD --> DF
 
-    DD -."score/100 → score 0..1\n(escala nativa da RPC)".-> AR
     MD -->|"score 0..1 já nativo"| AR
