@@ -275,7 +275,7 @@ flowchart TD
     RPC --> AUD
     RPC --> T[(transacoes_financeiras\ntransferencias_contas)]
     T -->|trigger saldo| SALDO[contas.saldo_atual]
-    READ -.consumido por.-> DASH[Dashboard, DashboardOfertas,\nProjeção, DRE, RelatorioCobertura]
+    READ -.consumido por.-> DASH[Dashboard, DashboardOfertas,\nProjeção, DRE, DashboardConciliacao]
 ```
 
 ## Conciliação transacional — Fase F3 (ADR-030)
@@ -538,19 +538,24 @@ flowchart TD
         MF["components/manual/\nManualFiltrosBar · ExtratoManualCard ·\nTransacaoManualCard · PaginacaoCompacta"]
     end
 
-    subgraph DASH["DashboardConciliacao.tsx (orquestrador)"]
-        DD["hooks/useDashboardConciliacaoData.ts\n+ fetchSugestoes1x1 (score 0-100 p/ exibição)"]
-        DF["components/dashboard/\nConciliacaoStatsCards · AcoesRecentesCard ·\nPendentesCard · PendenteExtratoCard"]
+    subgraph DASH["DashboardConciliacao.tsx (orquestrador — só indicadores desde ago/2026)"]
+        DD["hooks/useDashboardConciliacaoData.ts\nAções Recentes (filtra período/conta/filial)"]
+        DF["cobertura + gráficos + detalhamento\n(view_reconciliacao_cobertura)\n+ AcoesRecentesCard"]
     end
 
     SHARED --> MANUAL
-    SHARED --> DASH
+    SHARED -.já não acionado pelo Dashboard.-> DASH
     MD --> MF
     DD --> DF
 
-    DD -."score/100 → score 0..1\n(escala nativa da RPC)".-> AR
     MD -->|"score 0..1 já nativo"| AR
 ```
+
+> **Atualização ago/2026 (PR #111):** o Dashboard deixou de ser superfície de
+> ação (pendentes / Reconciliar Automático / diálogos). `useAutoReconciliar` e
+> `ConciliacaoDialogs` continuam compartilhados com o Modo Clássico; o
+> Dashboard só consome leitura (`view_reconciliacao_cobertura` + audit logs).
+> Ver seção "Dashboard só indicadores" no final deste arquivo.
 
 ## F7 — frentes 3, 4 e 5 (bottom-nav, DRE mobile, código morto, jul/2026)
 
@@ -1005,7 +1010,7 @@ flowchart TD
     BYPASS -->|não| REJD["FIN_VALIDACAO:\ndivergência divisoes×transacao_ids\n(fecha bypass de tenant/filial)"]
     BYPASS -->|sim| WRITE
 
-    FORMATO -->|"1:1 / N:1"| WRITE["conciliacoes_lote/divisao:\nfilial_id = v_filial_efetiva (RECURSO)\n\nreconciliacao_audit_logs/\nconciliacao_ml_feedback:\nfilial_id = v_ctx (ATOR — RelatorioCobertura\nfiltra por isso, .or(eq,is.null))"]
+    FORMATO -->|"1:1 / N:1"| WRITE["conciliacoes_lote/divisao:\nfilial_id = v_filial_efetiva (RECURSO)\n\nreconciliacao_audit_logs/\nconciliacao_ml_feedback:\nfilial_id = v_ctx (ATOR — DashboardConciliacao\nfiltra por isso, .or(eq,is.null))"]
 ```
 
 Achado pelo review multi-agente, não pela filial-access em si: o ramo 1:N
@@ -1199,7 +1204,7 @@ flowchart TD
 
     F4 -.-> SEMCAND["fin_listar_extratos_sem_candidato\n(Modo Clássico)"]
     SEMCAND -.->|"mesmo filtro, own query"| CHECK2
-    EB3 -.-> COBERTURA["view_reconciliacao_cobertura\n(Relatório)"]
+    EB3 -.-> COBERTURA["view_reconciliacao_cobertura\n(Dashboard)"]
     COBERTURA -.->|"mesmo filtro"| CHECK2
     EB3 -.-> LOTE["useConciliacaoLote.ts\n(lote manual N:1, frontend)"]
     LOTE -.->|"FILTRO_EXCLUI_ESPELHO_GETNET\n(extratos.api.ts, mesma lista SQL)"| CHECK2
@@ -1305,5 +1310,30 @@ flowchart TD
     RPC --> ST["fin_alterar_status_lancamento\npendente, v_ctx\n(mesmo check se rpc/menu direto)"]
     ST --> TRG["trigger: lote → vinculado"]
 ```
+
+## Dashboard de Conciliação — só indicadores (PR #111, ago/2026)
+
+A aba **Relatório** (componente `RelatorioCobertura`) foi absorvida pelo
+**Dashboard**. A tela `/financas/reconciliacao` passa de 6 para 5 abas
+(Dashboard · Inteligente · Clássico · Histórico · Cartão). O Dashboard
+deixa de listar pendentes / Reconciliar Automático — essa jornada fica
+só no Modo Inteligente e no Modo Clássico.
+
+```mermaid
+flowchart TD
+    FILTROS["Período 3/6/12 + Conta + Filial"] --> COB["view_reconciliacao_cobertura\n.or(filial_id.eq.X, is.null)"]
+    FILTROS --> AUD["reconciliacao_audit_logs\nstats por tipo + Ações Recentes\nmesmos filtros · .or filial"]
+    COB --> CARDS["Cobertura · Reconciliados · Pendentes · Valor"]
+    COB --> CHART["Evolução Mensal + Detalhamento por Conta"]
+    AUD --> PIE["Por Tipo + Estatísticas por Tipo"]
+    AUD --> FEED["AcoesRecentesCard · últimas 10"]
+    ACAO["Vincular / Dividir / Ignorar /\nReconciliar Automático"] -.->|"saiu do Dashboard"| MI["Modo Inteligente"]
+    ACAO -.->|"saiu do Dashboard"| MC["Modo Clássico"]
+```
+
+Filtros do Dashboard passam também pro feed de Ações Recentes (período +
+conta + filial com Guardrail A) — sem isso o card mostrava ações de
+outras contas/períodos enquanto cobertura/estatísticas já estavam
+filtradas.
 
 

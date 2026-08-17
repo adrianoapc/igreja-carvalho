@@ -5410,8 +5410,9 @@ introduzido pela filial-access em si, mas expostos ao mexer na função:
    filial do CONTEXTO do ator (`v_ctx`) — generalizar `v_filial_efetiva`
    pra essas duas fazia sumir do Relatório de Cobertura (filtro Filial
    X) um evento de conciliação de recurso compartilhado feito DENTRO de
-   X. `RelatorioCobertura.tsx` corrigido pra `.or(filial_id.eq.X,
-   filial_id.is.null)` (não mais `.eq()` puro).
+   X. `RelatorioCobertura.tsx` (depois absorvido pelo
+   `DashboardConciliacao`, PR #111 / §9.117) corrigido pra
+   `.or(filial_id.eq.X, filial_id.is.null)` (não mais `.eq()` puro).
 5. **`ORDER BY id`** nos 2 loops `FOR UPDATE` — pré-existente, fechado
    de passagem (evita deadlock em concorrência com ids em ordem
    invertida).
@@ -7475,4 +7476,33 @@ candidatos_oferta_venda_getnet` devolve os 2 candidatos reais (score
 pergunta do usuário sobre um sintoma real na tela, não por auditoria
 de código; validação contra CSV oficial do provedor antes de decidir
 trocar fonte de dado, não assumir.
+
+### 9.117 Dashboard de Conciliação vira "só indicadores" (absorve Relatório)
+
+PR #111: a aba **Relatório** (`RelatorioCobertura.tsx`) foi fundida no
+**Dashboard** de `/financas/reconciliacao` (6→5 abas). O Dashboard
+passa a exibir cobertura (`view_reconciliacao_cobertura`), evolução
+mensal, por tipo, detalhamento por conta e estatísticas — e mantém o
+feed de Ações Recentes. Sai a lista de pendentes / "Reconciliar
+Automático" / diálogos associados: essa jornada já é coberta por Modo
+Inteligente e Modo Clássico.
+
+Achados corrigidos na mesma PR / revisão:
+1. Filial compartilhada nas queries herdadas do Relatório (contas +
+   cobertura) e no feed de Ações Recentes — `.or(filial_id.eq.X,
+   filial_id.is.null)` em vez de `.eq()` puro (Guardrail A).
+2. Parsing de período com `parseISO` (não `new Date()` UTC) na
+   evolução mensal — mesma classe do bug de §9.115 / #109.
+3. Cor do gráfico de pizza por categoria (`COR_POR_TIPO`), não por
+   índice do array.
+4. Codex P2: Ações Recentes passa a respeitar os mesmos filtros de
+   período/conta do Dashboard (e a `queryKey` correspondente).
+5. Labels do feed alinhados ao CHECK
+   `automatica|manual|lote|desconciliacao` (antes lia `"automatico"`,
+   valor que nunca existiu).
+6. `contaFiltro` reseta ao trocar igreja/filial (Guardrail A.4).
+
+Componentes removidos: `RelatorioCobertura`, `ConciliacaoStatsCards`,
+`PendentesCard`, `PendenteExtratoCard`. Diagrama:
+`docs/diagramas/fluxo-financeiro.md` (seção "Dashboard só indicadores").
 

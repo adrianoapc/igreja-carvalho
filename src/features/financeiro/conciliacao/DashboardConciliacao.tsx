@@ -52,7 +52,23 @@ const COR_POR_TIPO: Record<string, string> = {
   Automática: "hsl(var(--chart-1))",
   Manual: "hsl(var(--chart-2))",
   "Em Lote": "hsl(var(--chart-3))",
+  Desconciliação: "hsl(var(--chart-4))",
 };
+
+function labelTipoReconciliacao(tipo: string): string {
+  switch (tipo) {
+    case "automatica":
+      return "Automática";
+    case "manual":
+      return "Manual";
+    case "lote":
+      return "Em Lote";
+    case "desconciliacao":
+      return "Desconciliação";
+    default:
+      return tipo;
+  }
+}
 
 interface CoberturaData {
   igreja_id: string;
@@ -92,9 +108,26 @@ export function DashboardConciliacao() {
   const { igrejaId, loading: igrejaLoading } = useIgrejaId();
   const { filialId, isAllFiliais, loading: filialLoading } = useFilialId();
   const { formatValue } = useHideValues();
-  const { recentActions } = useDashboardConciliacaoData();
   const [periodoMeses, setPeriodoMeses] = useState("6");
-  const [contaFiltro, setContaFiltro] = useState<string>("all");
+
+  // Guardrail A.4: contaFiltro escopado pelo contexto igreja/filial —
+  // ao trocar o contexto, o valor efetivo volta a "all" sem setState em
+  // useEffect (react-hooks/set-state-in-effect).
+  const filtroContextoKey = `${igrejaId ?? ""}:${filialId ?? ""}:${isAllFiliais}`;
+  const [contaFiltroRaw, setContaFiltroRaw] = useState({
+    key: filtroContextoKey,
+    value: "all",
+  });
+  const contaFiltro =
+    contaFiltroRaw.key === filtroContextoKey ? contaFiltroRaw.value : "all";
+  const setContaFiltro = (value: string) => {
+    setContaFiltroRaw({ key: filtroContextoKey, value });
+  };
+
+  const { recentActions } = useDashboardConciliacaoData({
+    periodoMeses,
+    contaFiltro,
+  });
 
   const { data: contas } = useQuery({
     queryKey: ["contas-relatorio", igrejaId, filialId, isAllFiliais],
@@ -275,9 +308,7 @@ export function DashboardConciliacao() {
     .sort((a, b) => a.periodo.localeCompare(b.periodo)) || [];
 
   const pieDataTipo = estatisticasData?.map((item) => ({
-    name: item.tipo_reconciliacao === "automatica" ? "Automática"
-      : item.tipo_reconciliacao === "manual" ? "Manual"
-        : "Em Lote",
+    name: labelTipoReconciliacao(item.tipo_reconciliacao),
     value: item.quantidade,
     valor: item.valor_total,
   })) || [];
@@ -555,9 +586,7 @@ export function DashboardConciliacao() {
                             : "outline"
                       }
                     >
-                      {stat.tipo_reconciliacao === "automatica" ? "Automática"
-                        : stat.tipo_reconciliacao === "manual" ? "Manual"
-                          : "Em Lote"}
+                      {labelTipoReconciliacao(stat.tipo_reconciliacao)}
                     </Badge>
                   </div>
                   <div className="space-y-2 text-sm">
