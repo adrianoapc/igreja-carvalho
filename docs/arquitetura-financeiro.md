@@ -7396,3 +7396,83 @@ uma fonte independente do provedor (aqui, o próprio `endToEndId`, que é
 padrão BACEN e não pode estar errado). Reforça
 [[feedback-decisao-cara-amostra-pequena-consultar-doc-oficial]].
 
+### 9.116 Hop 2 (Oferta↔Venda) passa a considerar SFTP (getnet_analitico), não só CSV
+
+Prioridade confirmada pelo usuário (2026-08-17): **SFTP é a fonte
+primária pra conciliação de cartão, CSV vira só backup pra quando o
+SFTP falhar** — "se tiver que fazer os dois não há sentido ter o
+SFTP". O gap achado em §9.114 (log de requisição do webhook PIX levou
+a investigar a tela de Reconciliação, que mostrava "Nenhuma sugestão
+automática" pros PIX/cartão importados via `getnet-sftp` mais cedo no
+mesmo dia) motivou reabrir a discussão adiada em `docs/getnet-edi-vs-
+csv-hop2-spike.md` (memória `project-getnet-conciliacao-cartao-
+completo`, seção "Fora de escopo do plano").
+
+**Por que o spike anterior ficou inconclusivo**: rodou com dado de
+ANTES do cron do Getnet funcionar de verdade (só corrigido em 13/08,
+ver §9.112) — amostra inevitavelmente pequena/não confiável (18% de
+cobertura tipo-2 em 11 arquivos).
+
+**Validação nova com dado real pós-fix (17/08)**: usuário forneceu o
+CSV oficial "Extrato Detalhado de Cartão" do portal Getnet pro dia
+16/08 — bateu byte a byte (NSU, cartão truncado, valor) com o que
+`getnet_analitico` (tipo 2 do SFTP) já tinha capturado sozinho.
+Cobertura 2/2 no dia, com verificação de conteúdo, não só contagem.
+
+**Escopo desta fase**: só Hop 2 (venda↔oferta). Hop 1 do crédito
+(antecipação/deságio/`contrato_registradora`/lotes) continua 100%
+dependente do CSV — decisão explícita do usuário, fica pra fase
+futura. Débito resolve 100% (liquida direto, sem antecipação);
+crédito resolve só a sugestão/vínculo Hop 2.
+
+**Implementação** (migration `20260817180000`):
+1. Nova coluna `getnet_analitico.transacao_financeira_id` (mesmo
+   padrão de `getnet_recebivel_lancamentos.transacao_financeira_id`).
+2. `fin_gerar_candidatos_oferta_venda_getnet`: `vendas` vira `UNION
+   ALL` das 2 fontes. Direção (crédito/débito) da fonte SFTP vem do
+   `codigo_produto` do RV correspondente em `getnet_resumo` — mapeado
+   contra a **Tabela I (Código de Produtos) do Manual Técnico Getnet**
+   (pg. 27 do manual, não é heurística): SM/SV/EC/AC/HC = crédito,
+   SR/SE/ED = débito (só os produtos plausíveis pra cartão físico
+   crédito/débito comum; convênio/crediário/carnê/voucher/pré-pago
+   ficam de fora). NSU normalizado (`ltrim(nsu, '0')`) em todo lugar
+   que agrupa/compara entre as 2 fontes — CSV usa 9 dígitos, SFTP usa
+   12, mesmo NSU físico.
+3. `fin_vincular_venda_getnet_oferta`: passa a travar/validar/gravar
+   nas 2 tabelas (ids são uuid globais — cada um só existe numa das
+   duas, então rodar a mesma operação nas duas é seguro, no-op na que
+   não tem o id). Taxa/líquido da fonte SFTP vem de
+   `getnet_analitico.valor_comissao` (confirmado batendo com
+   `getnet_resumo.valor_taxa_desconto` da mesma RV) e
+   `getnet_resumo.data_pagamento_rv` como data de pagamento.
+   Parcelamento (Fase 2b) continua só-CSV, inerte desde
+   `20260807100000` (sem dado real de "N de M" em nenhuma fonte).
+4. `fin_listar_ledger_conciliacao_cartao`: `recebiveis_grupo` passa a
+   unir as 2 fontes — recebível vinculado via SFTP entra na
+   contagem/exibição do ledger. `hop1_status` fica `'aguardando'`
+   naturalmente pra esses (sem `contrato_registradora`/
+   `extrato_bancario_id` — Hop 1 do crédito via SFTP é fase futura) —
+   resultado correto: sai de `sem_hop2`, fica em `aguardando_banco`
+   até uma fase futura de Hop 1 fechar o ciclo.
+
+**Testado em transação com ROLLBACK contra produção** (dado real, os
+2 lançamentos reais de R$200 débito / R$100 crédito, 15/08 — screenshot
+do usuário mostrando "Pendente vínculo" motivou a investigação
+inteira): `fin_vincular_venda_getnet_oferta` no débito devolveu
+`taxas_administrativas: 3.58, valor_liquido: 196.42` — exatos;
+`fin_listar_ledger_conciliacao_cartao` confirmou os 2 grupos saindo de
+`sem_hop2` pra `aguardando_banco`, com `data_vencimento_real` do
+crédito puxando certo a data futura da RV (16/09, indicador PF).
+Deployado direto via `supabase db query -f` (não `db push` — colisão
+de timestamp preexistente entre 2 migrations não relacionadas de
+13/08, achado nesta sessão, não é problema desta migration; registro
+manual em `schema_migrations` pra manter git/produção sincronizados).
+Confirmado ao vivo em produção (fora da transação): `fin_gerar_
+candidatos_oferta_venda_getnet` devolve os 2 candidatos reais (score
+0.85, 1 dia de diferença venda×vencimento).
+
+**Lição**: o mesmo padrão de §9.112-9.115 — achado motivado por
+pergunta do usuário sobre um sintoma real na tela, não por auditoria
+de código; validação contra CSV oficial do provedor antes de decidir
+trocar fonte de dado, não assumir.
+
