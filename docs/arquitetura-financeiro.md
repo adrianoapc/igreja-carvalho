@@ -7506,3 +7506,44 @@ Componentes removidos: `RelatorioCobertura`, `ConciliacaoStatsCards`,
 `PendentesCard`, `PendenteExtratoCard`. Diagrama:
 `docs/diagramas/fluxo-financeiro.md` (seção "Dashboard só indicadores").
 
+### 9.118 "Histórico" vira "Extratos" com toggle Banco/Cartão
+
+PR #114: aba **Histórico** renomeada pra **Extratos**, com um
+`ToggleGroup` Banco/Cartão no topo (`ExtratosTab.tsx`, novo). O card
+"Cartão" (`CartaoStatsCard`, já existente desde §9.100) estava
+empilhado dentro de `HistoricoExtratos.tsx` acima dos stats de Banco,
+sem separação visual clara entre as duas fontes — pedido explícito do
+usuário foi "juntar as duas propostas" do mockup original
+(`claude.ai/code/artifact/278692b8...`): cards de resumo + as ações que
+já existiam na lista de Banco (vincular/ignorar/ver/desvincular),
+separados com clareza.
+
+- **Banco** (default, preserva o comportamento anterior de quem já
+  usava a aba): `HistoricoExtratos.tsx` sem mudança de funcionalidade —
+  só o embed do `CartaoStatsCard` saiu de dentro dele.
+- **Cartão**: novo `CartaoExtratoResumo.tsx`, somente-leitura —
+  `MonthPicker` próprio + `CartaoStatsCard` (mesma RPC
+  `fin_stats_cartao_getnet`) + botão "Ver em Conciliação Cartão" que
+  troca a aba da página sem duplicar a UI de ação que já existe em
+  `ConciliacaoCartaoLedger.tsx`.
+- `Reconciliacao.tsx` precisou virar `Tabs` **controlado**
+  (`value`/`onValueChange`, antes `defaultValue` não controlado) só
+  por causa desse botão — nenhum outro comportamento de aba mudou.
+
+Achado de passagem, via skill `dataviz`: os stat cards
+"Pendentes"/"Conciliados" (e o badge de status por linha) usavam
+`text-yellow-600`/`text-green-600` cru do Tailwind. `validate_palette.js`
+reprova o par — ΔE 3.6 sob protanopia, abaixo do piso de 6 — e o
+mesmo verde ainda era reaproveitado pra dois significados na mesma
+tela: status "Conciliado" **e** tipo de transação "Crédito" (fundo da
+linha). Fix: extraída a paleta de status já validada em
+`ConciliacaoCartaoLedger.tsx` (§9.100 região; `good`/`warning`/
+`serious`/`critical`, ΔE 27.6 no par good/warning) pra
+`src/features/financeiro/core/lib/statusPalette.ts`, reaproveitada nos
+dois componentes. Padrão: cor só no ícone+número, label sempre em tom
+neutro (`text-muted-foreground`) — nunca o texto inteiro na cor de
+status.
+
+Diagrama: `docs/diagramas/fluxo-financeiro.md` (seção ""Histórico" vira
+"Extratos" com toggle Banco/Cartão").
+

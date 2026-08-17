@@ -592,9 +592,9 @@ Para entender a composição do DRE em detalhes, consulte: [Diagrama DRE](diagra
    - **Dashboard**: só indicadores — cobertura geral, evolução mensal, distribuição por tipo, detalhamento por conta e ações recentes. Filtre por período (3/6/12 meses) e conta; os gráficos e o feed de ações recentes usam o mesmo filtro
    - **Modo Inteligente**: sugere vínculos por score e é a porta principal para confirmar, dividir ou ignorar pendências
    - **Modo Clássico**: lista/extrato manual para vincular o que o Inteligente não cobriu
-   - **Histórico**: extratos importados
+   - **Extratos**: histórico completo com toggle **Banco** (lista com vincular/ignorar/ver/desvincular) / **Cartão** (resumo Getnet só-leitura + link pra Conciliação Cartão)
    - **Conciliação Cartão**: lotes de antecipação Getnet
-3. Importe o extrato bancário (Excel) quando necessário (via Histórico / importação)
+3. Importe o extrato bancário (Excel) quando necessário (via Extratos / importação)
 4. Confirme ou ajuste os vínculos no Modo Inteligente ou no Modo Clássico
 5. Identifique divergências (juros, taxas, lançamentos não previstos)
 
