@@ -23,7 +23,7 @@ const MOTIVO_LABEL: Record<string, string> = {
   venda_getnet_sem_vinculo_confirmado:
     "Parece Getnet, mas nenhum motor confirmou o vínculo ainda",
   tarifa_bancaria_sem_lancamento:
-    "Tarifa bancária — não espera lançamento correspondente",
+    "Tarifa bancária — provavelmente falta lançar essa despesa",
   aplicacao_financeira_automatica:
     "Aplicação/resgate automático do banco (ContaMax) — não é receita ou despesa da igreja",
   cheque_sem_lancamento_correspondente:
@@ -33,20 +33,25 @@ const MOTIVO_LABEL: Record<string, string> = {
 };
 
 /**
- * Motivos onde a movimentação normalmente NÃO vai ter um lançamento
- * correspondente (tarifa bancária, aplicação/resgate automático) — "Dividir"
- * não faz sentido (linha única, não é uma oferta pra fatiar) e "Ignorar" vira
- * a ação primária. "Buscar manualmente" continua disponível (só
- * secundário/menos destacado), de propósito: a classificação é um heurístico
- * de texto (`descricao ILIKE 'TARIFA%'`/`'%CONTAMAX%'`) — se ele errar numa
- * linha real, o tesoureiro ainda precisa de uma saída pra vincular (achado
- * do review do PR #112: esconder Buscar manualmente por completo deixaria
- * um falso positivo sem forma de ser conciliado, só "Ignorar"). Cheque fica
- * de fora deste conjunto: pode sim corresponder a uma oferta/pagamento real
- * que precisa ser localizado, então mantém as 3 ações normalmente.
+ * Motivos onde a movimentação NUNCA é receita/despesa real da igreja — só
+ * `aplicacao_financeira_automatica` (ContaMax é um sweep de caixa dentro do
+ * próprio banco, sem contrapartida no DRE). "Dividir" não faz sentido (linha
+ * única) e "Ignorar" vira a ação primária; "Buscar manualmente" continua
+ * disponível (só secundário/menos destacado) porque a classificação é um
+ * heurístico de texto (`descricao ILIKE '%CONTAMAX%'`) — se errar numa linha
+ * real, o tesoureiro ainda precisa de uma saída pra vincular.
+ *
+ * `tarifa_bancaria_sem_lancamento` NÃO entra aqui (achado P1 do @codex no
+ * commit `deeb5ee9`, PR #112): tarifa é uma despesa REAL — `Ignorar` só
+ * marca `extratos_bancarios.reconciliado=true`
+ * (`fin_marcar_extrato_ignorado`), não cria nenhum lançamento de despesa.
+ * Promover Ignorar a ação primária pra tarifa incentivava o tesoureiro a
+ * descartar a linha sem nunca registrar o gasto, subestimando despesas no
+ * DRE. Tarifa mantém o conjunto de ações padrão (Buscar manualmente
+ * primário) igual a Getnet/genérico — cheque também fica de fora pelo
+ * mesmo motivo original (pode corresponder a uma oferta/pagamento real).
  */
-const MOTIVOS_SEM_LANCAMENTO_ESPERADO = new Set([
-  "tarifa_bancaria_sem_lancamento",
+const MOTIVOS_NUNCA_RECEITA_OU_DESPESA = new Set([
   "aplicacao_financeira_automatica",
 ]);
 
@@ -59,8 +64,8 @@ export function ExtratoManualCard({
 }: ExtratoManualCardProps) {
   const { formatValue } = useHideValues();
   const isCredito = extrato.tipo === "credito" || extrato.tipo === "CREDIT";
-  const semLancamentoEsperado = extrato.motivo
-    ? MOTIVOS_SEM_LANCAMENTO_ESPERADO.has(extrato.motivo)
+  const nuncaReceitaOuDespesa = extrato.motivo
+    ? MOTIVOS_NUNCA_RECEITA_OU_DESPESA.has(extrato.motivo)
     : false;
 
   return (
@@ -118,7 +123,7 @@ export function ExtratoManualCard({
         </div>
       </div>
       <div className="flex items-center gap-2 mt-3 flex-wrap">
-        {semLancamentoEsperado ? (
+        {nuncaReceitaOuDespesa ? (
           <>
             <Button size="sm" variant="default" onClick={() => onIgnorar(extrato.id)}>
               <X className="w-3 h-3 mr-1" />
