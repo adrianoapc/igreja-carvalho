@@ -840,6 +840,20 @@ Referências: §9.62.
 
 ---
 
+## K. Paleta de status (`statusPalette.ts`)
+
+`STATUS_COLOR` em `src/features/financeiro/core/lib/statusPalette.ts` é
+swatch de **fundo** (pill/chip), não tinta. `warning` (#fab219) tem
+~1.83:1 no branco — abaixo do piso WCAG 3:1 até pra texto grande. Nunca
+use `style={{ color: STATUS_COLOR.* }}` em superfície clara (card
+branco). Use `pillStyle(tone)` (`STATUS_TEXT` no swatch, já medido) pra
+ícone+número/badge. Achado Codex P2 na PR #114 (§9.118); o mesmo
+anti-padrão existia na tira de resumo de `ConciliacaoCartaoLedger.tsx`.
+
+Referências: §9.118.
+
+---
+
 ## Como usar este documento
 
 - **Antes de escrever uma query nova que filtra por `filial_id`**: seção A.
@@ -859,6 +873,8 @@ Referências: §9.62.
   quando rodar `@codex review`)**: seção I.
 - **Antes de adicionar `ON DELETE SET NULL` numa FK existente (ou revisar
   uma migration que faz isso)**: seção J.
+- **Antes de pintar status com `STATUS_COLOR` como `color` em card/página
+  clara**: seção K.
 
 Encontrou um padrão novo numa rodada de review que não está aqui? Adicione
 uma seção (ou um item numa seção existente) citando o `§9.NN`

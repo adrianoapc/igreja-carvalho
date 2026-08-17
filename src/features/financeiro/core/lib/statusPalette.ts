@@ -29,6 +29,12 @@ export const STATUS_TEXT: Record<StatusTone, string> = {
   critical: "#ffffff",
 };
 
+/**
+ * `STATUS_COLOR` é swatch de **fundo** (pill/chip). Não use como `color` em
+ * superfície clara: `warning` (#fab219) tem ~1.83:1 no branco — abaixo do
+ * piso 3:1 até pra texto grande — e o ícone de 16px some igual. `pillStyle`
+ * já aplica o par medido (`STATUS_TEXT` no swatch). Achado Codex P2, PR #114.
+ */
 export function pillStyle(tone: StatusTone): { backgroundColor: string; color: string } {
   return { backgroundColor: STATUS_COLOR[tone], color: STATUS_TEXT[tone] };
 }

@@ -1360,7 +1360,9 @@ validada em `ConciliacaoCartaoLedger.tsx` (`good`/`warning`/`serious`/
 `critical`, ΔE 27.6 no par good/warning) foi extraída pra
 `src/features/financeiro/core/lib/statusPalette.ts` e reaproveitada
 nos dois componentes — cor só no ícone+número, label sempre em tom
-neutro (`text-muted-foreground`).
+neutro (`text-muted-foreground`). `STATUS_COLOR` é fundo de pill, não
+tinta: `warning` (#fab219) no branco tem ~1.83:1 (Codex P2). Stats
+usam `pillStyle(tone)`.
 
 ```mermaid
 flowchart TD
@@ -1369,7 +1371,7 @@ flowchart TD
     EXTRATOS -->|Cartão| RESUMO["CartaoExtratoResumo.tsx\nCartaoStatsCard\n(fin_stats_cartao_getnet)"]
     RESUMO -->|"onIrParaConciliacaoCartao()"| ANTECIPACAO["aba Conciliação Cartão\n(troca sem reload)"]
     HIST --> PALETA["statusPalette.ts\n(extraído de ConciliacaoCartaoLedger.tsx)"]
-    PALETA --> BADGE["Badge Pendente/Conciliado\n+ stat cards — cor só no ícone+número\nlabel em tom neutro"]
+    PALETA --> BADGE["Badge + stat cards via pillStyle\n(STATUS_COLOR = fundo, STATUS_TEXT = tinta)\nlabel em tom neutro"]
 ```
 
 

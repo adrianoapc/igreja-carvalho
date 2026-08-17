@@ -7542,7 +7542,12 @@ linha). Fix: extraída a paleta de status já validada em
 `src/features/financeiro/core/lib/statusPalette.ts`, reaproveitada nos
 dois componentes. Padrão: cor só no ícone+número, label sempre em tom
 neutro (`text-muted-foreground`) — nunca o texto inteiro na cor de
-status.
+status. `STATUS_COLOR` é swatch de **fundo** (pill): usar como `color`
+em superfície clara falha WCAG — `warning` (#fab219) tem ~1.83:1 no
+branco, abaixo do piso 3:1 até pra texto grande (Codex P2 na PR #114).
+Stat cards (Pendentes/Conciliados e a tira de resumo do ledger) usam
+`pillStyle(tone)` (`STATUS_TEXT` no swatch, já medido), não
+`color: STATUS_COLOR`.
 
 Diagrama: `docs/diagramas/fluxo-financeiro.md` (seção ""Histórico" vira
 "Extratos" com toggle Banco/Cartão").

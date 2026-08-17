@@ -701,7 +701,10 @@ function SummaryCell({ label, value, tone }: { label: string; value: number; ton
   const Icon = STATUS_ICON[tone];
   return (
     <div className="bg-card p-4">
-      <span className="flex items-center gap-1.5 text-2xl font-semibold" style={{ color: STATUS_COLOR[tone] }}>
+      <span
+        className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-2xl font-semibold"
+        style={pillStyle(tone)}
+      >
         <Icon className="w-4 h-4" />
         {value}
       </span>

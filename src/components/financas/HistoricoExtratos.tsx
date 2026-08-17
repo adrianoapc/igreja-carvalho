@@ -55,7 +55,6 @@ import { VincularTransacaoDialog } from "./VincularTransacaoDialog";
 import { anonymizePixDescription } from "@/utils/anonymization";
 import { ExtratoDetalheDrawer } from "./ExtratoDetalheDrawer";
 import {
-  STATUS_COLOR,
   STATUS_ICON,
   pillStyle,
   type StatusTone,
@@ -662,8 +661,8 @@ export function HistoricoExtratos() {
         <Card className="p-3">
           <div className="text-sm text-muted-foreground">Pendentes</div>
           <div
-            className="flex items-center gap-1.5 text-2xl font-bold"
-            style={{ color: STATUS_COLOR.warning }}
+            className="mt-1 inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-2xl font-bold"
+            style={pillStyle("warning")}
           >
             <STATUS_ICON.warning className="w-4 h-4" />
             {stats.pendentes}
@@ -672,8 +671,8 @@ export function HistoricoExtratos() {
         <Card className="p-3">
           <div className="text-sm text-muted-foreground">Conciliados</div>
           <div
-            className="flex items-center gap-1.5 text-2xl font-bold"
-            style={{ color: STATUS_COLOR.good }}
+            className="mt-1 inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-2xl font-bold"
+            style={pillStyle("good")}
           >
             <STATUS_ICON.good className="w-4 h-4" />
             {stats.conciliados}
