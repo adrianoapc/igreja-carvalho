@@ -1,3 +1,13 @@
+-- Renomeada de 20260813150000 pra 20260818200000 em 2026-08-18: o timestamp
+-- original colidia (mesma versão de outro arquivo já aplicado —
+-- 20260813150000_fin_criar_transferencia_valida_filial_categorias.sql),
+-- travando `supabase db push` com "duplicate key ... schema_migrations_pkey".
+-- Este arquivo nunca tinha sido aplicado em produção (só existia local),
+-- então renomear é seguro — não reescreve histórico já rodado. Conteúdo
+-- também mesclado nesta data com a fonte SFTP (getnet_analitico) de
+-- 20260817180000, que teria sido revertida por este CREATE OR REPLACE se
+-- aplicada sem a mesclagem (ver nota logo abaixo do parágrafo P4).
+--
 -- Review #102 (cursoragent + Codex) sobre 20260813130000/20260813140000:
 --
 -- P1: "Reverter deságio" no ledger chamava fin_alterar_status_lancamento,
@@ -21,6 +31,24 @@
 --
 -- Guardrail 6b: CREATE OR REPLACE numa migration NOVA — 20260813140000
 -- já aplicada em produção.
+--
+-- ── Mesclagem 2026-08-18 (PR #115, achado durante deploy) ──────────────────
+-- Este arquivo nunca chegou a rodar no banco remoto (supabase migration
+-- list confirmou remote vazio pra esta versão). Nesse meio-tempo,
+-- 20260817180000 (Hop2/SFTP) fez CREATE OR REPLACE da MESMA função
+-- fin_listar_ledger_conciliacao_cartao a partir de uma base anterior a
+-- 20260807120000/20260813140000 — já aplicada em produção, ela reverteu
+-- SILENCIOSAMENTE o filtro conciliacao_status (bug original do
+-- 20260807120000 voltou a acontecer: linhas fechadas por outro canal
+-- reaparecem como "sem_hop2") e nunca teve lancamento_desagio_id/
+-- hop2_pendente. A CTE recebiveis_grupo abaixo foi mesclada com a fonte
+-- SFTP (UNION ALL em getnet_analitico) do Hop2 pra que, quando esta
+-- migration enfim rodar (supabase db push --include-all, depois de
+-- 20260817180000 já aplicada), o resultado final tenha os 3: filtro
+-- conciliacao_status + lancamento_desagio_id/hop2_pendente com HFA + fonte
+-- SFTP. Sem esta mesclagem, --include-all reverteria o SFTP da Hop2 em
+-- produção; sem tocar aqui, o filtro conciliacao_status e HFA seguiriam
+-- ausentes (bug já ao vivo desde 17/08, anterior a esta sessão).
 
 -- ─── 1. fin_reverter_desagio_antecipacao ────────────────────────────────────
 
@@ -267,7 +295,9 @@ BEGIN
     FROM membros
     GROUP BY grupo_id
   ),
-  -- ─── Recebíveis Getnet já casados (Hop 2 feito) com cada membro ──────────
+  -- ─── Recebíveis Getnet já casados (Hop 2 feito) com cada membro — 2 fontes ─
+  -- (CSV getnet_recebivel_lancamentos + SFTP getnet_analitico, mescladas do
+  -- Hop2/20260817180000 — ver nota de mesclagem no cabeçalho do arquivo)
   recebiveis_grupo AS (
     SELECT
       m.grupo_id,
@@ -289,6 +319,28 @@ BEGIN
      AND g.igreja_id = v_igreja
      AND g.integracao_id = p_integracao_id
      AND public.has_filial_access(v_igreja, g.filial_id)
+    UNION ALL
+    -- Fonte SFTP: sem contrato_registradora/extrato_bancario_id (Hop 1 do
+    -- crédito via SFTP é fase futura) — hop1_status cai em 'aguardando'
+    -- naturalmente, o que já é o comportamento certo pro escopo desta fase.
+    SELECT
+      m.grupo_id,
+      ga.id AS recebivel_id,
+      ga.nsu_cv AS nsu,
+      ga.valor_transacao - COALESCE(ga.valor_comissao, 0) AS valor_liquido,
+      (SELECT gr.data_pagamento_rv FROM public.getnet_resumo gr
+        WHERE gr.integracao_id = ga.integracao_id AND gr.rv = ga.rv
+        LIMIT 1) AS data_vencimento_real,
+      NULL::uuid AS extrato_bancario_id,
+      NULL::text AS contrato_registradora,
+      COALESCE(m.numero_parcela, 1) AS numero_parcela,
+      COALESCE(m.total_parcelas, 1) AS total_parcelas
+    FROM membros m
+    JOIN public.getnet_analitico ga
+      ON ga.transacao_financeira_id = m.trans_id
+     AND ga.igreja_id = v_igreja
+     AND ga.integracao_id = p_integracao_id
+     AND public.has_filial_access(v_igreja, ga.filial_id)
   ),
   recebiveis_status AS (
     SELECT
@@ -591,7 +643,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.fin_listar_ledger_conciliacao_cartao(uuid, uuid, date, date, jsonb, uuid) IS
-  'Fase 7a/7b Conciliação Cartão Getnet (só leitura): monta o ledger unificado Oferta→Venda→Banco + lotes de antecipação por período. Status de linha (sem_hop2/aguardando_banco/fechado/divergencia) deliberadamente distinto do enum getnet_antecipacao_lotes.status. raizes usa allow-list conciliacao_status IN (nao_conciliado, conciliado_manual) — exclui conciliado_extrato E conciliado_bot (fechados por outro canal — nunca ganham recebível Getnet, ficariam presos em sem_hop2 com ações que sempre falham com FIN_JA_LANCADO; fix 20260807120000); conciliado_manual continua aparecendo (setado por fin_vincular_venda_getnet_oferta no Hop 2 confirmado). Sugestão Hop 2 via 1 chamada de fin_gerar_candidatos_oferta_venda_getnet por período (join único por transacao_id, DISTINCT ON score DESC). Divergência = Σ valor_liquido do EC por extrato vs extratos_bancarios.valor, tol. R$0,01; gate has_filial_access só no extrato (eb) — soma g2 completa (igreja+integracao, sem HFA por recebível) pra não gerar divergencia falsa com âncora compartilhada #13 (review #83); lancamentos escopados por transacoes_financeiras.conta_id = p_conta_id; recebíveis/lotes/vendas_origem por integracao_id = p_integracao_id; lotes vinculados só entram se o extrato é da mesma conta, lotes pendente_vinculo aparecem sem escopo de conta. Extrato do lote e metadados de oferta em vendas_origem exigem has_filial_access. fechado exige n_batidas = n_recebiveis >= n_membros. lotes.lancamento_desagio_id exposto só com HFA na transação (20260813150000 — lote global + deságio de outra filial devolve NULL). vendas_origem.hop2_pendente = (oferta inexistente), distinto de metadados anulados por falta de HFA.';
+  'Fase 7a/7b/Hop2-SFTP Conciliação Cartão Getnet (só leitura): monta o ledger unificado Oferta→Venda→Banco + lotes de antecipação por período. Status de linha (sem_hop2/aguardando_banco/fechado/divergencia) deliberadamente distinto do enum getnet_antecipacao_lotes.status. raizes usa allow-list conciliacao_status IN (nao_conciliado, conciliado_manual) — exclui conciliado_extrato E conciliado_bot (fechados por outro canal — nunca ganham recebível Getnet, ficariam presos em sem_hop2 com ações que sempre falham com FIN_JA_LANCADO; fix 20260807120000). recebiveis_grupo une 2 fontes de venda (CSV getnet_recebivel_lancamentos, SFTP getnet_analitico — mesclado do Hop2/20260817180000 em 2026-08-18, ver nota no cabeçalho do arquivo); SFTP entra sem contrato_registradora/extrato_bancario_id (Hop 1 do crédito via SFTP é fase futura), hop1_status fica "aguardando" naturalmente. Sugestão Hop 2 via 1 chamada de fin_gerar_candidatos_oferta_venda_getnet por período (já soma as 2 fontes; join único por transacao_id, DISTINCT ON score DESC). Divergência = Σ valor_liquido do EC por extrato vs extratos_bancarios.valor, tol. R$0,01; gate has_filial_access só no extrato (eb) — soma g2 completa (igreja+integracao, sem HFA por recebível) pra não gerar divergencia falsa com âncora compartilhada #13 (review #83); lancamentos escopados por transacoes_financeiras.conta_id = p_conta_id; recebíveis/lotes/vendas_origem por integracao_id = p_integracao_id; lotes vinculados só entram se o extrato é da mesma conta, lotes pendente_vinculo aparecem sem escopo de conta. Extrato do lote e metadados de oferta em vendas_origem exigem has_filial_access. fechado exige n_batidas = n_recebiveis >= n_membros. lotes.lancamento_desagio_id exposto só com HFA na transação (20260813150000 — lote global + deságio de outra filial devolve NULL). vendas_origem.hop2_pendente = (oferta inexistente), distinto de metadados anulados por falta de HFA.';
 
 GRANT EXECUTE ON FUNCTION public.fin_listar_ledger_conciliacao_cartao(uuid, uuid, date, date, jsonb, uuid)
   TO authenticated, service_role;

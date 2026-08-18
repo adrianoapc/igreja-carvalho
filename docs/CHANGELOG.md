@@ -10,6 +10,13 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Corrigido
 
+#### 🔧 Colisão de timestamp em migration + regressão silenciosa no Ledger Cartão (18 Ago/2026)
+
+- **Tipo**: fix + infra (deploy)
+- **Resumo**: `supabase db push` estava bloqueado desde 17/Ago por dois problemas: (1) duas migrations com timestamp idêntico `20260813150000`, violando a PK de `schema_migrations`; (2) a migration Hop2/SFTP (`20260817180000`, já aplicada) tinha feito `CREATE OR REPLACE` de `fin_listar_ledger_conciliacao_cartao` a partir de uma base desatualizada, revertendo silenciosamente em produção o filtro `conciliacao_status` (bug de 20260807120000 voltando a acontecer) e os campos `lancamento_desagio_id`/`hop2_pendente` (20260813140000/150000). Migration renomeada para `20260818200000` e o corpo da função mesclado (SFTP + filtro + campos), testado num Postgres isolado (Docker) com 3 cenários sintéticos antes de aplicar em produção.
+- **Módulos afetados**: Infra de deploy (CI), Conciliação Cartão Getnet (Fase 7)
+- **Impacto no usuário**: Ledger de conciliação de cartão volta a excluir lançamentos já fechados por outro canal (evita ações que sempre falhavam com `FIN_JA_LANCADO`) e a expor corretamente `lancamento_desagio_id`/`hop2_pendente`, sem perder o suporte a vendas via SFTP.
+
 #### 💬 Comprovante via WhatsApp — Graph API, OCR de print e falhas visíveis (18 Ago/2026)
 
 - **Tipo**: fix + ux
