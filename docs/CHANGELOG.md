@@ -8,6 +8,28 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+### Corrigido
+
+#### 💬 Comprovante via WhatsApp — Graph API, OCR de print e falhas visíveis (18 Ago/2026)
+
+- **Tipo**: fix + ux
+- **Resumo**: Bot financeiro deixa de confirmar comprovante sem valor, relata falha de gravação (sem vazar SQL), baixa mídia na Graph API v21.0, OCR aceita print de compra em app/site reusando o fornecedor pelo nome, e a tela de Saídas no mobile mostra upload também na edição.
+- **Módulos afetados**: Finanças (bot WhatsApp, OCR, Saídas)
+- **Impacto no usuário**:
+  - Print de Shopee/Mercado Livre pode ser lançado; "Sim" sem valor é recusado com instrução clara.
+  - Se um comprovante não gravar, o WhatsApp lista qual e pede contato com o financeiro.
+  - No celular, editar uma saída existente volta a mostrar o anexo de comprovante.
+
+**Arquivos modificados:**
+
+- `supabase/functions/chatbot-financeiro/index.ts`
+- `supabase/functions/processar-nota-fiscal/index.ts`
+- `supabase/functions/chatbot-triagem/index.ts`
+- `supabase/functions/disparar-alerta/index.ts`
+- `src/components/financas/TransacaoDialog.tsx`
+
+---
+
 ### Alterado
 
 #### 👤 Padronização de Contatos em Pessoas + Backfill Legado (8 Jun/2026)

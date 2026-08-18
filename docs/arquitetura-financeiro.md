@@ -191,13 +191,17 @@ flowchart TD
 
 ### 4.1 O bot financeiro já existe — e é o segundo maior monólito
 
-- **`supabase/functions/chatbot-financeiro/index.ts` (2538 l.,
-  `verify_jwt=false`)** — lançamento via WhatsApp (Make). Máquina de estados
-  em `atendimentos_bot.meta_dados` (fluxos DESPESAS, CONTA_UNICA, REEMBOLSO,
-  TRANSFERENCIA). Baixa anexo do WhatsApp (Graph API), salva em Storage
-  `transaction-attachments`, chama OCR, confirma com o usuário e **insere
-  direto** em `transacoes_financeiras` (~l.1612, 2399, 2422) e
-  `transferencias_contas` (~l.2372) com service role.
+- **`supabase/functions/chatbot-financeiro/index.ts` (`verify_jwt=false`)**
+  — lançamento via WhatsApp (Make). Máquina de estados em
+  `atendimentos_bot.meta_dados` (fluxos DESPESAS, CONTA_UNICA, REEMBOLSO,
+  TRANSFERENCIA). Baixa anexo do WhatsApp (**Graph API v21.0**, alinhado a
+  `send-otp` / `chatbot-triagem` / `disparar-alerta`; v18.0 foi aposentada
+  pela Meta), salva em Storage `transaction-attachments`, chama OCR
+  (`processar-nota-fiscal`, que também aceita print de compra em app/site),
+  confirma com o usuário (**não aceita "Sim" sem valor identificado**) e
+  grava via shim `criarLancamento` → `fin_criar_lancamento`. Falha de RPC
+  ou insert de item de reembolso é relatada no WhatsApp com texto
+  sanitizado (`mensagemErroParaUsuario` — raw Postgres só no log).
 - Autorização por pessoa: `profiles.autorizado_bot_financeiro` + flags
   `autorizado_lancar_despesas`/`_depositos`/`_reembolsos` — validadas dentro
   do Deno, longe das demais regras.
@@ -7553,4 +7557,42 @@ Stat cards (Pendentes/Conciliados e a tira de resumo do ledger) usam
 
 Diagrama: `docs/diagramas/fluxo-financeiro.md` (seção ""Histórico" vira
 "Extratos" com toggle Banco/Cartão").
+
+### 9.119 Comprovante via WhatsApp — Graph v21, print de app, erros visíveis
+
+PR #115: o bot recusava (ou pior: aceitava "Sim" e falhava depois em
+silêncio) comprovantes que não eram nota fiscal formal — print de
+carrinho Shopee/Mercado Livre, OCR sem valor, mídia WhatsApp via Graph
+API v18.0 já aposentada. Três correções no canal + uma na tela web:
+
+1. **Graph API `v18.0` → `v21.0`** em `chatbot-financeiro`,
+   `chatbot-triagem` e `disparar-alerta` (mesma versão que `send-otp`).
+   Sem isso, `resolverMediaUrl` falha e o usuário vê "Erro ao salvar o
+   comprovante" mesmo com `WHATSAPP_API_TOKEN` válido.
+2. **Confirmação sem valor**: em `CONFIRMANDO_ITEM`, "Sim" é bloqueado
+   quando `item_pendente.valor` é ausente/≤0 — a RPC `fin_criar_
+   lancamento` rejeitaria depois (`FIN_VALIDACAO`) e a sessão só
+   logava. Pede correção (`valor 89,90`) ou *Remover*.
+3. **Falha de gravação visível**: Despesas/Conta Única e Reembolso
+   acumulam `falhasCriacao` e listam no WhatsApp. Codex P2: o raw
+   `error.message` (constraint, RLS, schema) **não** vai pro usuário —
+   `mensagemErroParaUsuario` mapeia `FIN_*` e cai em texto genérico;
+   o detalhe fica no log. Totais da mensagem final usam só os itens
+   que de fato gravaram; reembolso sem nenhum item **não** vira
+   `pendente` nem dispara alerta à tesouraria.
+4. **OCR de print de app/site** (`processar-nota-fiscal`): o prompt
+   padrão passa a tratar checkout/carrinho (Shopee, Mercado Livre,
+   etc.) — total final + nome da plataforma como fornecedor, CNPJ
+   nulo. Codex P1: o lookup antigo fazia `.eq("cpf_cnpj", "")` (string
+   vazia) e o insert gravava `null`, então cada print recriava
+   "Shopee". Sem documento fiscal, reusa por nome (`ilike` exato,
+   `filial_id IS NULL`, `ativo`, o mais antigo); com CNPJ/CPF, continua
+   o lookup por documento.
+5. **Tela de Saídas, mobile**: `TransacaoDialog` mostra o upload de
+   comprovante também ao **editar** uma saída, não só ao criar
+   (paridade com o split view desktop).
+
+Diagrama: `docs/diagramas/fluxo-financeiro.md` (seção "Comprovante via
+WhatsApp"). Guardrail L.
+
 

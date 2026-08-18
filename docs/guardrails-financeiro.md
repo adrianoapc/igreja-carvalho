@@ -854,6 +854,34 @@ Referências: §9.118.
 
 ---
 
+## L. Canal WhatsApp — não vazar erro de banco; reusar fornecedor sem CNPJ
+
+O bot financeiro fala com tesoureiro/líder no WhatsApp. A partir da PR
+#115 (§9.119) falhas de gravação **aparecem** na conversa (antes só
+iam pro log). Isso não autoriza mandar `error.message` cru:
+
+1. **Loga o raw, mostra texto limitado.** Mapeie `FIN_*` pra frases
+   curtas; `FIN_VALIDACAO` pode repetir o detalhe só se for curto e
+   sem cheiro de SQL (`relation`, `constraint`, `duplicate key`,
+   `permission denied`…). Qualquer outra coisa (RLS, schema, PostgREST)
+   vira "Não foi possível registrar este comprovante. Contate o
+   financeiro." Achado Codex P2 na #115 — `limparMensagemErro` só
+   tirava prefixo `foo: ` e deixava o resto ir pro usuário.
+2. **OCR sem CPF/CNPJ não cria fornecedor duplicado.** Print de app
+   (Shopee, Mercado Livre) chega com nome de plataforma e documento
+   nulo. Lookup por `cpf_cnpj = ''` **não** acha a linha gravada com
+   `cpf_cnpj IS NULL`. Sem documento, reusar por nome normalizado
+   (`ilike` exato no cadastro global da igreja) ou não criar
+   automaticamente. Achado Codex P1 na #115.
+3. **Totais da mensagem final = o que gravou.** Não use
+   `valor_total_acumulado` / `itens.length` da sessão se parte do lote
+   falhou. Reembolso sem nenhum item não vai pra `pendente` nem notifica
+   tesouraria.
+
+Referências: §9.119.
+
+---
+
 ## Como usar este documento
 
 - **Antes de escrever uma query nova que filtra por `filial_id`**: seção A.
@@ -875,6 +903,8 @@ Referências: §9.118.
   uma migration que faz isso)**: seção J.
 - **Antes de pintar status com `STATUS_COLOR` como `color` em card/página
   clara**: seção K.
+- **Antes de mostrar erro de RPC/Postgres no WhatsApp, ou de criar
+  fornecedor a partir de OCR sem CPF/CNPJ**: seção L.
 
 Encontrou um padrão novo numa rodada de review que não está aqui? Adicione
 uma seção (ou um item numa seção existente) citando o `§9.NN`

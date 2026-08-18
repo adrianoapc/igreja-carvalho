@@ -361,10 +361,48 @@ function formatarValor(valor: number): string {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-// Remove prefixos técnicos (ex: "fin_criar_lancamento: FIN_VALIDACAO: ") de
-// mensagens de erro de RPC antes de mostrar ao usuário no WhatsApp.
-function limparMensagemErro(mensagem: string): string {
-  return mensagem.replace(/^(?:[a-zA-Z_]+:\s*)+/, "");
+const MSG_ERRO_COMPROVANTE_GENERICA =
+  "Não foi possível registrar este comprovante. Contate o financeiro.";
+
+const MSG_POR_CODIGO_FIN: Record<string, string> = {
+  FIN_VALIDACAO:
+    "Não foi possível registrar: dados inválidos. Corrija o valor ou contate o financeiro.",
+  FIN_TENANT:
+    "Você não tem permissão para lançar nesta filial. Contate o financeiro.",
+  FIN_SEM_PERMISSAO:
+    "Você não tem permissão para este lançamento. Contate o financeiro.",
+  FIN_NAO_ENCONTRADO:
+    "Não foi possível registrar: cadastro não encontrado. Contate o financeiro.",
+  FIN_FK:
+    "Não foi possível registrar: cadastro incompleto. Contate o financeiro.",
+  FIN_CONCILIADO:
+    "Não foi possível alterar um lançamento já conciliado.",
+};
+
+function pareceDetalheSeguroParaUsuario(detalhe: string): boolean {
+  if (!detalhe || detalhe.length > 140) return false;
+  return !/(relation|constraint|column|permission denied|duplicate key|syntax|violates|pg_|sqlstate|supabase|stack|schema)/i.test(
+    detalhe
+  );
+}
+
+// Converte erro de RPC/Postgres em texto curto para o WhatsApp.
+// O raw fica só no log do servidor — constraint, RLS e schema não vazam.
+function mensagemErroParaUsuario(mensagem: string): string {
+  const semRpc = mensagem.replace(/^(?:fin_[a-z0-9_]+:\s*)+/i, "").trim();
+  const m = semRpc.match(/^(FIN_[A-Z_]+)(?::\s*(.*))?$/);
+  if (m) {
+    const [, codigo, detalhe] = m;
+    if (
+      codigo === "FIN_VALIDACAO" &&
+      detalhe &&
+      pareceDetalheSeguroParaUsuario(detalhe)
+    ) {
+      return detalhe;
+    }
+    return MSG_POR_CODIGO_FIN[codigo] ?? MSG_ERRO_COMPROVANTE_GENERICA;
+  }
+  return MSG_ERRO_COMPROVANTE_GENERICA;
 }
 
 // Baixa, persiste no Storage e roda o OCR de um comprovante recebido,
@@ -1712,23 +1750,34 @@ serve(async (req) => {
         .eq("id", sessao.id)
         .eq("igreja_id", igrejaId);
 
-      // Mensagem diferenciada por status
-      let msgFinal = `✅ ${transacoesCriadas.length} despesa(s) registrada(s)!\n\n💰 Total: ${formatarValor(metaDados.valor_total_acumulado)}`;
-      
-      if (metaDados.fluxo === "DESPESAS" && metaDados.forma_pagamento) {
-        msgFinal += `\n💳 Forma: ${textoForma[metaDados.forma_pagamento]}`;
-      }
-      
-      if (observacaoFinal) {
+      const valorRegistrado = metaDados.itens
+        .filter((item) => !falhasCriacao.some((f) => f.item === item))
+        .reduce((acc, item) => acc + (item.valor || 0), 0);
+
+      // Totais só do que de fato gravou — valor_total_acumulado inclui falhas
+      let msgFinal =
+        transacoesCriadas.length > 0
+          ? `✅ ${transacoesCriadas.length} despesa(s) registrada(s)!\n\n💰 Total: ${formatarValor(valorRegistrado)}`
+          : `⚠️ Nenhuma despesa foi registrada.`;
+
+      if (transacoesCriadas.length > 0) {
+        if (metaDados.fluxo === "DESPESAS" && metaDados.forma_pagamento) {
+          msgFinal += `\n💳 Forma: ${textoForma[metaDados.forma_pagamento]}`;
+        }
+
+        if (observacaoFinal) {
+          msgFinal += `\n📝 Obs: ${observacaoFinal}`;
+        }
+
+        if (metaDados.fluxo === "DESPESAS") {
+          msgFinal += metaDados.baixa_automatica
+            ? "\n\n💚 Baixa automática realizada!"
+            : "\n\n⏳ Aguardando aprovação do tesoureiro.";
+        } else {
+          msgFinal += "\n\nO financeiro irá processar em breve.";
+        }
+      } else if (observacaoFinal) {
         msgFinal += `\n📝 Obs: ${observacaoFinal}`;
-      }
-      
-      if (metaDados.fluxo === "DESPESAS") {
-        msgFinal += metaDados.baixa_automatica
-          ? "\n\n💚 Baixa automática realizada!"
-          : "\n\n⏳ Aguardando aprovação do tesoureiro.";
-      } else {
-        msgFinal += "\n\nO financeiro irá processar em breve.";
       }
 
       if (falhasCriacao.length > 0) {
@@ -1737,7 +1786,7 @@ serve(async (req) => {
           falhasCriacao
             .map(
               (f) =>
-                `• ${f.item.fornecedor || "Fornecedor não identificado"} (${formatarValor(f.item.valor || 0)}): ${limparMensagemErro(f.motivo)}`
+                `• ${f.item.fornecedor || "Fornecedor não identificado"} (${formatarValor(f.item.valor || 0)}): ${mensagemErroParaUsuario(f.motivo)}`
             )
             .join("\n") +
           `\n\nContate o financeiro para lançar manualmente.`;
@@ -1984,22 +2033,30 @@ serve(async (req) => {
         }
       }
 
-      // 3. Atualizar status para pendente (agora que os itens foram criados)
-      const { error: updateStatusError } = await supabase
-        .from("solicitacoes_reembolso")
-        .update({ status: "pendente" })
-        .eq("id", solicitacao.id)
-        .eq("igreja_id", igrejaId);
+      const valorRegistradoReembolso = metaDados.itens
+        .filter((item) => !falhasCriacao.some((f) => f.item === item))
+        .reduce((acc, item) => acc + (item.valor || 0), 0);
 
-      if (updateStatusError) {
-        console.error("Erro ao atualizar status:", updateStatusError);
+      // 3. Atualizar status para pendente só se pelo menos um item entrou —
+      // solicitação vazia não deve ir pra fila da tesouraria.
+      let updateStatusError: { message?: string } | null = null;
+      if (itensCriados.length > 0) {
+        const { error } = await supabase
+          .from("solicitacoes_reembolso")
+          .update({ status: "pendente" })
+          .eq("id", solicitacao.id)
+          .eq("igreja_id", igrejaId);
+        updateStatusError = error;
+        if (updateStatusError) {
+          console.error("Erro ao atualizar status:", updateStatusError);
+        }
       }
 
       // 3.5 Disparar notificação para tesoureiros/admins (apenas após confirmação bem-sucedida)
-      if (!updateStatusError) {
+      if (itensCriados.length > 0 && !updateStatusError) {
         try {
           const solicitanteNome = metaDados.nome_perfil || "Membro";
-          const valorFormatado = formatarValor(metaDados.valor_total_acumulado);
+          const valorFormatado = formatarValor(valorRegistradoReembolso);
 
           await supabase.functions.invoke("disparar-alerta", {
             body: {
@@ -2007,7 +2064,7 @@ serve(async (req) => {
               dados: {
                 solicitante: solicitanteNome,
                 valor: valorFormatado,
-                itens: metaDados.itens.length,
+                itens: itensCriados.length,
                 solicitacao_id: solicitacao.id,
                 forma_pagamento: formaPagamento,
                 observacao: metaDados.observacao_usuario || null,
@@ -2054,7 +2111,10 @@ serve(async (req) => {
         ? `\n📝 Obs: ${metaDados.observacao_usuario}`
         : "";
 
-      let msgFinalReembolso = `✅ *Reembolso Solicitado!*\n\n💰 Valor: ${formatarValor(metaDados.valor_total_acumulado)}\n📦 Itens: ${metaDados.itens.length}\n📅 Previsão: ${dataFormatada}\n💳 Forma: ${formaPgtoTexto}${msgObs}\n\n🔖 Protocolo: #${solicitacao.id.slice(0, 8).toUpperCase()}\n\nO financeiro irá analisar e aprovar.`;
+      let msgFinalReembolso =
+        itensCriados.length > 0
+          ? `✅ *Reembolso Solicitado!*\n\n💰 Valor: ${formatarValor(valorRegistradoReembolso)}\n📦 Itens: ${itensCriados.length}\n📅 Previsão: ${dataFormatada}\n💳 Forma: ${formaPgtoTexto}${msgObs}\n\n🔖 Protocolo: #${solicitacao.id.slice(0, 8).toUpperCase()}\n\nO financeiro irá analisar e aprovar.`
+          : `⚠️ Nenhum comprovante entrou nesta solicitação de reembolso.${msgObs}`;
 
       if (falhasCriacao.length > 0) {
         msgFinalReembolso +=
@@ -2062,7 +2122,7 @@ serve(async (req) => {
           falhasCriacao
             .map(
               (f) =>
-                `• ${f.item.fornecedor || "Fornecedor não identificado"} (${formatarValor(f.item.valor || 0)}): ${limparMensagemErro(f.motivo)}`
+                `• ${f.item.fornecedor || "Fornecedor não identificado"} (${formatarValor(f.item.valor || 0)}): ${mensagemErroParaUsuario(f.motivo)}`
             )
             .join("\n") +
           `\n\nContate o financeiro para incluir manualmente.`;

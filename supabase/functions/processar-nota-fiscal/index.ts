@@ -49,6 +49,17 @@ Em caso de dúvida entre dois valores candidatos, prefira sempre o que está ide
 
 Retorne os dados no formato estruturado solicitado. Se algum campo não estiver visível, retorne null.`;
 
+const NOME_FORNECEDOR_GENERICO =
+  /^(fornecedor|n\/?a|n\.a\.?|não identificado|nao identificado)$/i;
+
+function nomeFornecedorAproveitavel(nome: string): boolean {
+  return nome.trim().length >= 2 && !NOME_FORNECEDOR_GENERICO.test(nome.trim());
+}
+
+function escapeIlikeExact(valor: string): string {
+  return valor.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
 // Fetch chatbot config from database (global, not per igreja)
 async function getChatbotConfig(
   supabase: SupabaseClient
@@ -757,24 +768,50 @@ serve(async (req) => {
       );
 
       if (normalizedDoc || fornecedorNome) {
-        // Lookup: global por igreja (filial_id = null)
-        const { data: found, error: findErr } = await supabaseService
-          .from("fornecedores")
-          .select("id")
-          .eq("igreja_id", igrejaId)
-          .eq("filial_id", null)
-          .eq("cpf_cnpj", normalizedDoc)
-          .limit(1);
-        if (findErr) {
-          console.error("Erro ao buscar fornecedor por cpf_cnpj:", findErr);
+        // Lookup global por igreja (filial_id = null). Com documento fiscal,
+        // busca por CPF/CNPJ; sem documento (print de app/site), reusa o
+        // cadastro pelo nome — senão cada print de "Shopee" cria um
+        // fornecedor novo (insert grava cpf_cnpj NULL, lookup antigo
+        // procurava string vazia e nunca encontrava o que criou).
+        if (normalizedDoc) {
+          const { data: found, error: findErr } = await supabaseService
+            .from("fornecedores")
+            .select("id")
+            .eq("igreja_id", igrejaId)
+            .eq("filial_id", null)
+            .eq("cpf_cnpj", normalizedDoc)
+            .limit(1);
+          if (findErr) {
+            console.error("Erro ao buscar fornecedor por cpf_cnpj:", findErr);
+          } else if (found && found.length > 0) {
+            fornecedorId = (found[0] as any).id as string;
+            console.log(
+              `[processar-nota-fiscal] Fornecedor encontrado por documento: ${fornecedorId}`
+            );
+          }
         }
 
-        if (found && found.length > 0) {
-          fornecedorId = (found[0] as any).id as string;
-          console.log(
-            `[processar-nota-fiscal] Fornecedor encontrado: ${fornecedorId}`
-          );
-        } else {
+        if (!fornecedorId && nomeFornecedorAproveitavel(fornecedorNome)) {
+          const { data: foundByName, error: findNameErr } = await supabaseService
+            .from("fornecedores")
+            .select("id")
+            .eq("igreja_id", igrejaId)
+            .eq("filial_id", null)
+            .eq("ativo", true)
+            .ilike("nome", escapeIlikeExact(fornecedorNome))
+            .order("created_at", { ascending: true })
+            .limit(1);
+          if (findNameErr) {
+            console.error("Erro ao buscar fornecedor por nome:", findNameErr);
+          } else if (foundByName && foundByName.length > 0) {
+            fornecedorId = (foundByName[0] as any).id as string;
+            console.log(
+              `[processar-nota-fiscal] Fornecedor encontrado por nome: ${fornecedorId}`
+            );
+          }
+        }
+
+        if (!fornecedorId) {
           const tipoPessoa =
             normalizedDoc && normalizedDoc.length === 11
               ? "fisica"
