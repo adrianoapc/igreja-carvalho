@@ -1,0 +1,7 @@
+flowchart TD
+    RECON["Reconciliacao.tsx\nTabs vira controlado\n(value/onValueChange)"] --> EXTRATOS["ExtratosTab.tsx\nToggle Banco/Cartão\n(default Banco)"]
+    EXTRATOS -->|Banco sempre montado| HIST["HistoricoExtratos.tsx\nlista + vincular/ignorar/ver/desvincular\n(CartaoStatsCard saiu daqui)"]
+    EXTRATOS -->|Cartão monta na 1ª visita| RESUMO["CartaoExtratoResumo.tsx\nCartaoStatsCard\n(fin_stats_cartao_getnet)"]
+    RESUMO -->|"onIrParaConciliacaoCartao()"| ANTECIPACAO["aba Conciliação Cartão\n(troca sem reload)"]
+    HIST --> PALETA["statusPalette.ts\n(extraído de ConciliacaoCartaoLedger.tsx)"]
+    PALETA --> BADGE["Badge + stat cards via pillStyle\n(STATUS_COLOR = fundo, STATUS_TEXT = tinta)\nlabel em tom neutro"]
