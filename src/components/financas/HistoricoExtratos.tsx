@@ -54,7 +54,11 @@ import { VincularTransacaoDialog } from "./VincularTransacaoDialog";
 
 import { anonymizePixDescription } from "@/utils/anonymization";
 import { ExtratoDetalheDrawer } from "./ExtratoDetalheDrawer";
-import { CartaoStatsCard } from "./CartaoStatsCard";
+import {
+  STATUS_ICON,
+  pillStyle,
+  type StatusTone,
+} from "@/features/financeiro/core/lib/statusPalette";
 
 interface ExtratoItem {
   id: string;
@@ -370,24 +374,19 @@ export function HistoricoExtratos() {
     }
   };
 
-  // Get status info
-  const getStatusInfo = (extrato: ExtratoItem) => {
+  // Get status info — "Ignorado" fica fora da paleta de status (good/warning/
+  // serious/critical): é um estado neutro de exclusão, não um ponto na escala
+  // ruim→bom, então continua em tom neutro (muted), sem tone.
+  const getStatusInfo = (
+    extrato: ExtratoItem,
+  ): { label: string; tone: StatusTone | null } => {
     if (extrato.transacao_vinculada_id) {
-      return {
-        label: "Conciliado",
-        color: "bg-green-500/10 text-green-600 border-green-200",
-      };
+      return { label: "Conciliado", tone: "good" };
     }
     if (extrato.reconciliado) {
-      return {
-        label: "Ignorado",
-        color: "bg-muted text-muted-foreground border-muted",
-      };
+      return { label: "Ignorado", tone: null };
     }
-    return {
-      label: "Pendente",
-      color: "bg-yellow-500/10 text-yellow-600 border-yellow-200",
-    };
+    return { label: "Pendente", tone: "warning" };
   };
 
   // Actions
@@ -501,9 +500,19 @@ export function HistoricoExtratos() {
             <span className="font-medium truncate">
               {anonymizePixDescription(extrato.descricao)}
             </span>
-            <Badge variant="outline" className={cn("text-xs", status.color)}>
-              {status.label}
-            </Badge>
+            {status.tone ? (
+              <Badge style={pillStyle(status.tone)} className="text-xs gap-1">
+                {(() => {
+                  const Icon = STATUS_ICON[status.tone];
+                  return <Icon className="w-3 h-3" />;
+                })()}
+                {status.label}
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs bg-muted text-muted-foreground">
+                {status.label}
+              </Badge>
+            )}
             {extrato.origem && (
               <Badge variant="secondary" className="text-xs">
                 {extrato.origem === "api_santander"
@@ -643,14 +652,6 @@ export function HistoricoExtratos() {
           if (!open) setExtratoParaVisualizar(null);
         }}
       />
-      {/* Card "Cartão" (Ciclo 2, C2-2) — some se não houver integração Getnet ativa */}
-      <CartaoStatsCard
-        igrejaId={igrejaId}
-        filialId={filialId}
-        selectedMonth={selectedMonth}
-        customRange={customRange}
-      />
-
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="p-3">
@@ -658,14 +659,22 @@ export function HistoricoExtratos() {
           <div className="text-2xl font-bold">{stats.total}</div>
         </Card>
         <Card className="p-3">
-          <div className="text-sm text-yellow-600">Pendentes</div>
-          <div className="text-2xl font-bold text-yellow-600">
+          <div className="text-sm text-muted-foreground">Pendentes</div>
+          <div
+            className="mt-1 inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-2xl font-bold"
+            style={pillStyle("warning")}
+          >
+            <STATUS_ICON.warning className="w-4 h-4" />
             {stats.pendentes}
           </div>
         </Card>
         <Card className="p-3">
-          <div className="text-sm text-green-600">Conciliados</div>
-          <div className="text-2xl font-bold text-green-600">
+          <div className="text-sm text-muted-foreground">Conciliados</div>
+          <div
+            className="mt-1 inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-2xl font-bold"
+            style={pillStyle("good")}
+          >
+            <STATUS_ICON.good className="w-4 h-4" />
             {stats.conciliados}
           </div>
         </Card>
@@ -682,8 +691,11 @@ export function HistoricoExtratos() {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <FileText className="w-5 h-5" />
-            Histórico de Extratos Importados
+            Banco
           </CardTitle>
+          <p className="text-xs text-muted-foreground font-mono">
+            extratos_bancarios
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">

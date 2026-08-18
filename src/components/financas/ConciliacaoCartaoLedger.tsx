@@ -3,10 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
-  AlertCircle,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
   Landmark,
   Link2,
   Loader2,
@@ -21,6 +17,12 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useHideValues } from "@/hooks/useHideValues";
+import {
+  STATUS_COLOR,
+  STATUS_ICON,
+  type StatusTone,
+  pillStyle,
+} from "@/features/financeiro/core/lib/statusPalette";
 import { useLotesAntecipacao } from "@/features/financeiro/core/hooks/useLotesAntecipacao";
 import { usePodeReverterDesagioAntecipacao } from "@/features/financeiro/core/hooks/usePodeReverterDesagioAntecipacao";
 import {
@@ -49,46 +51,6 @@ const BUSCA_MANUAL_THRESHOLDS = { alta: 60, media: 30 };
 // tolerante, mesmo corte 85/50 que ConciliacaoCartaoHopSections usava pras
 // duas.
 const SUGESTAO_HOP_THRESHOLDS = { alta: 85, media: 50 };
-
-/**
- * Paleta de status validada (skill dataviz, references/palette.md) — 4 cores
- * reservadas, cada uma com ícone + rótulo (nunca só cor). O par âmbar/vermelho
- * herdado do app (`--destructive`) e do mockup original não separa (ΔE < 15
- * entre os dois, medido com `validate_palette.js` — abaixo do piso de visão
- * normal, não só daltonismo). Divergência é o status mais crítico da feature
- * (mismatch contábil real que a Fase 0-4 existe pra detectar), por isso ganhou
- * cor própria em vez de herdar o `--destructive` genérico do app — mudança
- * local a este componente, não toca o token global.
- */
-const STATUS_COLOR = {
-  good: "#0ca30c",
-  warning: "#fab219",
-  serious: "#ec835a",
-  critical: "#d03b3b",
-} as const;
-
-type StatusTone = keyof typeof STATUS_COLOR;
-
-// Contraste de texto medido por swatch (WCAG relative luminance) — preto
-// (tom "primary ink" do skill) pra good/warning/serious, branco só pra
-// critical (é o único em que branco vence: 4.80:1 vs 4.37:1 de preto).
-const STATUS_TEXT: Record<StatusTone, string> = {
-  good: "#0b0b0b",
-  warning: "#0b0b0b",
-  serious: "#0b0b0b",
-  critical: "#ffffff",
-};
-
-function pillStyle(tone: StatusTone): { backgroundColor: string; color: string } {
-  return { backgroundColor: STATUS_COLOR[tone], color: STATUS_TEXT[tone] };
-}
-
-const STATUS_ICON: Record<StatusTone, typeof CheckCircle2> = {
-  good: CheckCircle2,
-  warning: Clock,
-  serious: AlertTriangle,
-  critical: AlertCircle,
-};
 
 function StatusPillBadge({ tone, label }: { tone: StatusTone; label: string }) {
   const Icon = STATUS_ICON[tone];
@@ -739,7 +701,10 @@ function SummaryCell({ label, value, tone }: { label: string; value: number; ton
   const Icon = STATUS_ICON[tone];
   return (
     <div className="bg-card p-4">
-      <span className="flex items-center gap-1.5 text-2xl font-semibold" style={{ color: STATUS_COLOR[tone] }}>
+      <span
+        className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-2xl font-semibold"
+        style={pillStyle(tone)}
+      >
         <Icon className="w-4 h-4" />
         {value}
       </span>

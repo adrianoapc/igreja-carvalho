@@ -42,6 +42,9 @@ próprio arquivo):
 - **Processo de PR**: 1 fase = 1 PR, harness completo antes de abrir, `/code-
   review` local antes do 1º `@codex review`, batelar fixes antes de
   re-disparar review (cada disparo rescaneia a PR inteira).
+- **Paleta de status**: `STATUS_COLOR` em `statusPalette.ts` é fundo de
+  pill, não tinta — nunca `color: STATUS_COLOR` em card claro (`warning`
+  falha WCAG 3:1). Use `pillStyle(tone)`.
 
 Este arquivo é o resumo. O detalhe (com exemplos de bug real por item) está em
 `docs/guardrails-financeiro.md`, que cresce a cada rodada de review que achar

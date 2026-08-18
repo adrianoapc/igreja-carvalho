@@ -1315,7 +1315,8 @@ flowchart TD
 
 A aba **Relatório** (componente `RelatorioCobertura`) foi absorvida pelo
 **Dashboard**. A tela `/financas/reconciliacao` passa de 6 para 5 abas
-(Dashboard · Inteligente · Clássico · Histórico · Cartão). O Dashboard
+(Dashboard · Inteligente · Clássico · Extratos · Cartão — "Histórico"
+foi renomeada pra "Extratos" em PR #114, ver seção abaixo). O Dashboard
 deixa de listar pendentes / Reconciliar Automático — essa jornada fica
 só no Modo Inteligente e no Modo Clássico.
 
@@ -1335,5 +1336,42 @@ Filtros do Dashboard passam também pro feed de Ações Recentes (período +
 conta + filial com Guardrail A) — sem isso o card mostrava ações de
 outras contas/períodos enquanto cobertura/estatísticas já estavam
 filtradas.
+
+## "Histórico" vira "Extratos" com toggle Banco/Cartão (PR #114, §9.118)
+
+A aba **Histórico** é renomeada pra **Extratos** e ganha um
+`ToggleGroup` Banco/Cartão no topo (`ExtratosTab.tsx`, novo). O card
+"Cartão" (`CartaoStatsCard`, RPC `fin_stats_cartao_getnet`) sai de
+dentro de `HistoricoExtratos.tsx` — onde ficava empilhado sem separação
+visual clara com os stats de Banco — e vira o conteúdo do lado
+"Cartão" do toggle (`CartaoExtratoResumo.tsx`, novo), com `MonthPicker`
+próprio e um botão que troca a `Tabs` da página pra "Conciliação
+Cartão" sem reload (`Reconciliacao.tsx` precisou virar `Tabs`
+controlado — `value`/`onValueChange` — só por causa desse CTA).
+
+De passagem (achado via skill `dataviz`): os stat cards
+"Pendentes"/"Conciliados" e o badge de status da linha usavam
+`text-yellow-600`/`text-green-600` cru do Tailwind, reprovados no
+validador do skill por CVD insuficiente (`validate_palette.js`: ΔE 3.6
+entre os dois, abaixo do piso de 6) — e o verde ainda era reaproveitado
+pra dois significados na mesma tela (status "Conciliado" **e** tipo de
+transação "Crédito", fundo da linha). Fix: a paleta de status já
+validada em `ConciliacaoCartaoLedger.tsx` (`good`/`warning`/`serious`/
+`critical`, ΔE 27.6 no par good/warning) foi extraída pra
+`src/features/financeiro/core/lib/statusPalette.ts` e reaproveitada
+nos dois componentes — cor só no ícone+número, label sempre em tom
+neutro (`text-muted-foreground`). `STATUS_COLOR` é fundo de pill, não
+tinta: `warning` (#fab219) no branco tem ~1.83:1 (Codex P2). Stats
+usam `pillStyle(tone)`.
+
+```mermaid
+flowchart TD
+    RECON["Reconciliacao.tsx\nTabs vira controlado\n(value/onValueChange)"] --> EXTRATOS["ExtratosTab.tsx\nToggle Banco/Cartão\n(default Banco)"]
+    EXTRATOS -->|Banco sempre montado| HIST["HistoricoExtratos.tsx\nlista + vincular/ignorar/ver/desvincular\n(CartaoStatsCard saiu daqui)"]
+    EXTRATOS -->|Cartão monta na 1ª visita| RESUMO["CartaoExtratoResumo.tsx\nCartaoStatsCard\n(fin_stats_cartao_getnet)"]
+    RESUMO -->|"onIrParaConciliacaoCartao()"| ANTECIPACAO["aba Conciliação Cartão\n(troca sem reload)"]
+    HIST --> PALETA["statusPalette.ts\n(extraído de ConciliacaoCartaoLedger.tsx)"]
+    PALETA --> BADGE["Badge + stat cards via pillStyle\n(STATUS_COLOR = fundo, STATUS_TEXT = tinta)\nlabel em tom neutro"]
+```
 
 
