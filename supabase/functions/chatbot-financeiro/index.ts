@@ -122,7 +122,7 @@ async function resolverMediaUrl(
   if (/^\d+$/.test(mediaIdOrUrl) && whatsappToken) {
     try {
       console.log(`[Storage] Resolvendo media_id ${mediaIdOrUrl} via Graph API...`);
-      const urlRes = await fetch(`https://graph.facebook.com/v18.0/${mediaIdOrUrl}`, {
+      const urlRes = await fetch(`https://graph.facebook.com/v21.0/${mediaIdOrUrl}`, {
         headers: { Authorization: `Bearer ${whatsappToken}` },
       });
       
@@ -359,6 +359,12 @@ async function deletarAnexosSessao(
 // Formatar valor em reais
 function formatarValor(valor: number): string {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+// Remove prefixos técnicos (ex: "fin_criar_lancamento: FIN_VALIDACAO: ") de
+// mensagens de erro de RPC antes de mostrar ao usuário no WhatsApp.
+function limparMensagemErro(mensagem: string): string {
+  return mensagem.replace(/^(?:[a-zA-Z_]+:\s*)+/, "");
 }
 
 // Baixa, persiste no Storage e roda o OCR de um comprovante recebido,
@@ -1288,6 +1294,18 @@ serve(async (req) => {
       // Confirmação positiva: aceita o item pendente, grava e avança para o
       // próximo da fila (se houver) ou finaliza (se "Fechar" já foi pedido)
       if (/^(sim|s|ok|certo|correto|confirma|confirmado|confirmar|isso|exato|perfeito)$/i.test(textoLower)) {
+        // Sem valor identificado não há o que lançar — a RPC de criação
+        // rejeitaria (valor deve ser positivo) e o usuário só saberia disso
+        // depois, ao ver "Erro ao salvar". Barra aqui e pede a correção.
+        if (!itemPendente.valor || itemPendente.valor <= 0) {
+          return new Response(
+            JSON.stringify({
+              text: `⚠️ Não consigo confirmar sem um valor identificado.\n\n✏️ Informe o valor, ex: "valor 89,90"\n🗑️ Ou digite *Remover* para descartar este comprovante.`,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
         const itensAtualizados = [...metaDados.itens, itemPendente];
         const valorTotal = itensAtualizados.reduce((acc, item) => acc + item.valor, 0);
         const filaRestante = [...fila];
@@ -1601,6 +1619,7 @@ serve(async (req) => {
 
       // Criar transações para cada item
       const transacoesCriadas: string[] = [];
+      const falhasCriacao: { item: ItemProcessado; motivo: string }[] = [];
       for (const item of metaDados.itens) {
         // Converter data de DD/MM/YYYY para YYYY-MM-DD
         let dataVencimento = new Date().toISOString().split("T")[0];
@@ -1667,7 +1686,9 @@ serve(async (req) => {
             console.log(`[Transação] Criada com sucesso: ${resultado.id}`);
           }
         } catch (err) {
-          console.error(`[Transação] Erro ao criar:`, err instanceof Error ? err.message : err);
+          const motivo = err instanceof Error ? err.message : String(err);
+          console.error(`[Transação] Erro ao criar:`, motivo);
+          falhasCriacao.push({ item, motivo });
         }
       }
 
@@ -1708,6 +1729,18 @@ serve(async (req) => {
           : "\n\n⏳ Aguardando aprovação do tesoureiro.";
       } else {
         msgFinal += "\n\nO financeiro irá processar em breve.";
+      }
+
+      if (falhasCriacao.length > 0) {
+        msgFinal +=
+          `\n\n⚠️ ${falhasCriacao.length} comprovante(s) NÃO foram registrados:\n` +
+          falhasCriacao
+            .map(
+              (f) =>
+                `• ${f.item.fornecedor || "Fornecedor não identificado"} (${formatarValor(f.item.valor || 0)}): ${limparMensagemErro(f.motivo)}`
+            )
+            .join("\n") +
+          `\n\nContate o financeiro para lançar manualmente.`;
       }
 
       return new Response(
@@ -1905,6 +1938,7 @@ serve(async (req) => {
 
       // 2. Criar ITENS de reembolso (fato gerador/competência - para DRE)
       const itensCriados: string[] = [];
+      const falhasCriacao: { item: ItemProcessado; motivo: string }[] = [];
       for (const item of metaDados.itens) {
         // Incluir observação do usuário na descrição do item
         const descricaoItem = metaDados.observacao_usuario
@@ -1944,7 +1978,9 @@ serve(async (req) => {
         if (!itemError && itemReembolso) {
           itensCriados.push(itemReembolso.id);
         } else {
+          const motivo = itemError?.message || "erro desconhecido";
           console.error("Erro ao criar item de reembolso:", itemError);
+          falhasCriacao.push({ item, motivo });
         }
       }
 
@@ -2014,14 +2050,26 @@ serve(async (req) => {
       const formaPgtoTexto = formaPagamento === "pix" ? "PIX" : "Dinheiro";
       
       // Incluir observação na mensagem final se existir
-      const msgObs = metaDados.observacao_usuario 
-        ? `\n📝 Obs: ${metaDados.observacao_usuario}` 
+      const msgObs = metaDados.observacao_usuario
+        ? `\n📝 Obs: ${metaDados.observacao_usuario}`
         : "";
 
+      let msgFinalReembolso = `✅ *Reembolso Solicitado!*\n\n💰 Valor: ${formatarValor(metaDados.valor_total_acumulado)}\n📦 Itens: ${metaDados.itens.length}\n📅 Previsão: ${dataFormatada}\n💳 Forma: ${formaPgtoTexto}${msgObs}\n\n🔖 Protocolo: #${solicitacao.id.slice(0, 8).toUpperCase()}\n\nO financeiro irá analisar e aprovar.`;
+
+      if (falhasCriacao.length > 0) {
+        msgFinalReembolso +=
+          `\n\n⚠️ ${falhasCriacao.length} comprovante(s) NÃO entraram nesta solicitação:\n` +
+          falhasCriacao
+            .map(
+              (f) =>
+                `• ${f.item.fornecedor || "Fornecedor não identificado"} (${formatarValor(f.item.valor || 0)}): ${limparMensagemErro(f.motivo)}`
+            )
+            .join("\n") +
+          `\n\nContate o financeiro para incluir manualmente.`;
+      }
+
       return new Response(
-        JSON.stringify({
-          text: `✅ *Reembolso Solicitado!*\n\n💰 Valor: ${formatarValor(metaDados.valor_total_acumulado)}\n📦 Itens: ${metaDados.itens.length}\n📅 Previsão: ${dataFormatada}\n💳 Forma: ${formaPgtoTexto}${msgObs}\n\n🔖 Protocolo: #${solicitacao.id.slice(0, 8).toUpperCase()}\n\nO financeiro irá analisar e aprovar.`,
-        }),
+        JSON.stringify({ text: msgFinalReembolso }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
