@@ -41,6 +41,9 @@ Sem isso, não é possível gerar relatórios confiáveis.
 O comprovante será avaliado pela tesouraria.  
 Sempre que possível, a igreja prioriza documentos formais para manter a organização e a transparência.
 
+### E se for só um print da compra no aplicativo (Shopee, Mercado Livre)?
+O bot do WhatsApp aceita esse print quando não há nota fiscal formal: usa o **total final** da compra e trata o nome da plataforma (ex.: Shopee) como fornecedor, reaproveitando o mesmo cadastro nas próximas compras. Se o valor não aparecer na revisão, informe na conversa (ex.: `valor 89,90`) — o bot não confirma um comprovante sem valor.
+
 ---
 
 ## 💰 Sobre pagamentos

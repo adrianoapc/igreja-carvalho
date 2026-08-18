@@ -45,6 +45,9 @@ próprio arquivo):
 - **Paleta de status**: `STATUS_COLOR` em `statusPalette.ts` é fundo de
   pill, não tinta — nunca `color: STATUS_COLOR` em card claro (`warning`
   falha WCAG 3:1). Use `pillStyle(tone)`.
+- **Canal WhatsApp**: erro de RPC/Postgres não vai cru pra conversa
+  (mapear `FIN_*`, resto genérico; raw só no log). OCR sem CPF/CNPJ
+  reusa fornecedor por nome — não criar "Shopee" duplicado a cada print.
 
 Este arquivo é o resumo. O detalhe (com exemplos de bug real por item) está em
 `docs/guardrails-financeiro.md`, que cresce a cada rodada de review que achar

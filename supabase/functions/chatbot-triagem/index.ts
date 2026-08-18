@@ -385,7 +385,7 @@ async function processarAudio(
 ): Promise<string | null> {
   try {
     if (!WHATSAPP_API_TOKEN || !OPENAI_API_KEY) return null;
-    const urlRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, {
+    const urlRes = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
       headers: { Authorization: `Bearer ${WHATSAPP_API_TOKEN}` },
     });
     const mediaData = await urlRes.json();

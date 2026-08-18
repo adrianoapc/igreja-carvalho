@@ -1374,4 +1374,29 @@ flowchart TD
     PALETA --> BADGE["Badge + stat cards via pillStyle\n(STATUS_COLOR = fundo, STATUS_TEXT = tinta)\nlabel em tom neutro"]
 ```
 
+---
+
+## Comprovante via WhatsApp (PR #115 / §9.119)
+
+O bot baixa mídia pela Graph API **v21.0** (v18.0 aposentada), roda OCR
+também em print de compra em app/site, **não confirma "Sim" sem valor**
+e relata falha de gravação com texto sanitizado. Sem CPF/CNPJ, o
+fornecedor é reusado pelo nome (plataforma), não recriado a cada print.
+
+```mermaid
+flowchart TD
+    WA[WhatsApp mídia] --> GRAPH["Graph API v21.0\nresolverMediaUrl"]
+    GRAPH -->|token inválido / versão morta| ERRSAVE["Erro ao salvar o comprovante"]
+    GRAPH --> OCR["processar-nota-fiscal\nNF/cupom OU print de app"]
+    OCR --> FORN{"CPF/CNPJ no documento?"}
+    FORN -->|sim| DOC["lookup fornecedores.cpf_cnpj"]
+    FORN -->|não — Shopee etc.| NOME["lookup por nome ilike\nfilial_id IS NULL, ativo"]
+    DOC --> REV[CONFIRMANDO_ITEM]
+    NOME --> REV
+    REV -->|Sim sem valor| BLOQ["bloqueia — pede 'valor 89,90' ou Remover"]
+    REV -->|Sim com valor| GRAVA["fin_criar_lancamento\nou insert itens_reembolso"]
+    GRAVA -->|ok| OK["totais = só o que gravou"]
+    GRAVA -->|erro| SAFE["mensagemErroParaUsuario\nFIN_* mapeado; SQL só no log"]
+```
+
 

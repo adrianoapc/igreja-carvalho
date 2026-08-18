@@ -1808,7 +1808,7 @@ export function TransacaoDialog({
               {/* Mobile: Coluna única */}
               <div className="md:hidden flex-1 min-h-0 overflow-y-auto space-y-4 pb-20">
                 {/* Upload em destaque no topo */}
-                {tipo === "saida" && !transacao && (
+                {tipo === "saida" && (
                   <TransacaoUploadSection
                     anexoPreview={anexoPreview}
                     anexoUrl={anexoUrl}

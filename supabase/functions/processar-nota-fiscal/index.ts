@@ -16,16 +16,22 @@ const FUNCTION_NAME = "processar-nota-fiscal";
 
 // Default config if not in database
 const DEFAULT_MODEL = "google/gemini-2.5-pro";
-const DEFAULT_VISION_PROMPT = `Você é um assistente especializado em extrair informações de notas fiscais, cupons fiscais e recibos brasileiros (NFe, NFCe, cupons fiscais, recibos, etc).
+const DEFAULT_VISION_PROMPT = `Você é um assistente especializado em extrair informações de comprovantes de despesa brasileiros: notas fiscais, cupons fiscais e recibos (NFe, NFCe, cupons fiscais, recibos, etc) E TAMBÉM prints de compras feitas em apps/sites (Shopee, Mercado Livre, Amazon, AliExpress, etc) — carrinho, checkout ou confirmação de pedido — quando não há nota fiscal formal disponível.
 
 Analise o documento e extraia as seguintes informações:
-- CNPJ ou CPF do fornecedor/emissor
-- Nome/Razão Social do fornecedor
+- CNPJ ou CPF do fornecedor/emissor (se houver; em print de app/site normalmente não há — nesse caso deixe null)
+- Nome/Razão Social do fornecedor (em print de app/site, use o nome da plataforma/loja, ex: "Shopee", "Mercado Livre")
 - Data de emissão (formato YYYY-MM-DD)
 - Valor total
 - Data de vencimento (se houver, formato YYYY-MM-DD)
 - Descrição dos itens/serviços
-- Número da nota fiscal
+- Número da nota fiscal (se houver; em print de app/site normalmente não há — nesse caso deixe null)
+
+## PRINTS DE COMPRA EM APP/SITE (sem nota fiscal formal)
+Quando o documento for um print de carrinho, checkout ou resumo de pedido de um app/site de compras (ao invés de nota fiscal/cupom fiscal tradicional):
+- Use como "valor_total" o total final da compra (ex: linha "Total de X itens"), já com frete/descontos aplicados — o mesmo critério do dicionário abaixo.
+- Use como "fornecedor_nome" o nome da plataforma/loja (ex: "Shopee"), não o nome de produtos individuais.
+- Ignore elementos de interface que não são parte da compra em si (banners de assinatura, sugestões de cupom não aplicado, "convide amigos", etc).
 
 ## DICIONÁRIO — COMO IDENTIFICAR O "valor_total" CORRETO
 O campo "valor_total" deve ser SEMPRE o valor final efetivamente cobrado/pago pelo cliente. Em cupons e recibos brasileiros, esse valor costuma aparecer perto de termos como:
@@ -42,6 +48,17 @@ Exemplo: se o cupom mostra "Bônus na compra: R$ 12,50" em destaque e, mais abai
 Em caso de dúvida entre dois valores candidatos, prefira sempre o que está identificado como "Total"/"Total a pagar"/"Valor pago" sobre qualquer valor rotulado como benefício, desconto ou economia.
 
 Retorne os dados no formato estruturado solicitado. Se algum campo não estiver visível, retorne null.`;
+
+const NOME_FORNECEDOR_GENERICO =
+  /^(fornecedor|n\/?a|n\.a\.?|não identificado|nao identificado)$/i;
+
+function nomeFornecedorAproveitavel(nome: string): boolean {
+  return nome.trim().length >= 2 && !NOME_FORNECEDOR_GENERICO.test(nome.trim());
+}
+
+function escapeIlikeExact(valor: string): string {
+  return valor.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
 
 // Fetch chatbot config from database (global, not per igreja)
 async function getChatbotConfig(
@@ -751,24 +768,50 @@ serve(async (req) => {
       );
 
       if (normalizedDoc || fornecedorNome) {
-        // Lookup: global por igreja (filial_id = null)
-        const { data: found, error: findErr } = await supabaseService
-          .from("fornecedores")
-          .select("id")
-          .eq("igreja_id", igrejaId)
-          .eq("filial_id", null)
-          .eq("cpf_cnpj", normalizedDoc)
-          .limit(1);
-        if (findErr) {
-          console.error("Erro ao buscar fornecedor por cpf_cnpj:", findErr);
+        // Lookup global por igreja (filial_id = null). Com documento fiscal,
+        // busca por CPF/CNPJ; sem documento (print de app/site), reusa o
+        // cadastro pelo nome — senão cada print de "Shopee" cria um
+        // fornecedor novo (insert grava cpf_cnpj NULL, lookup antigo
+        // procurava string vazia e nunca encontrava o que criou).
+        if (normalizedDoc) {
+          const { data: found, error: findErr } = await supabaseService
+            .from("fornecedores")
+            .select("id")
+            .eq("igreja_id", igrejaId)
+            .eq("filial_id", null)
+            .eq("cpf_cnpj", normalizedDoc)
+            .limit(1);
+          if (findErr) {
+            console.error("Erro ao buscar fornecedor por cpf_cnpj:", findErr);
+          } else if (found && found.length > 0) {
+            fornecedorId = (found[0] as any).id as string;
+            console.log(
+              `[processar-nota-fiscal] Fornecedor encontrado por documento: ${fornecedorId}`
+            );
+          }
         }
 
-        if (found && found.length > 0) {
-          fornecedorId = (found[0] as any).id as string;
-          console.log(
-            `[processar-nota-fiscal] Fornecedor encontrado: ${fornecedorId}`
-          );
-        } else {
+        if (!fornecedorId && nomeFornecedorAproveitavel(fornecedorNome)) {
+          const { data: foundByName, error: findNameErr } = await supabaseService
+            .from("fornecedores")
+            .select("id")
+            .eq("igreja_id", igrejaId)
+            .eq("filial_id", null)
+            .eq("ativo", true)
+            .ilike("nome", escapeIlikeExact(fornecedorNome))
+            .order("created_at", { ascending: true })
+            .limit(1);
+          if (findNameErr) {
+            console.error("Erro ao buscar fornecedor por nome:", findNameErr);
+          } else if (foundByName && foundByName.length > 0) {
+            fornecedorId = (foundByName[0] as any).id as string;
+            console.log(
+              `[processar-nota-fiscal] Fornecedor encontrado por nome: ${fornecedorId}`
+            );
+          }
+        }
+
+        if (!fornecedorId) {
           const tipoPessoa =
             normalizedDoc && normalizedDoc.length === 11
               ? "fisica"
