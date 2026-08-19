@@ -15,23 +15,28 @@ const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const FUNCTION_NAME = "processar-nota-fiscal";
 
 // Default config if not in database
-const DEFAULT_MODEL = "google/gemini-2.5-pro";
-const DEFAULT_VISION_PROMPT = `Você é um assistente especializado em extrair informações de comprovantes de despesa brasileiros: notas fiscais, cupons fiscais e recibos (NFe, NFCe, cupons fiscais, recibos, etc) E TAMBÉM prints de compras feitas em apps/sites (Shopee, Mercado Livre, Amazon, AliExpress, etc) — carrinho, checkout ou confirmação de pedido — quando não há nota fiscal formal disponível.
+const DEFAULT_MODEL = "claude-sonnet-5";
+const DEFAULT_VISION_PROMPT = `Você é um assistente especializado em extrair informações de QUALQUER documento que comprove uma despesa/compra/contratação brasileira — não só nota fiscal formal. Isso inclui, sem se limitar a:
+- Nota fiscal, cupom fiscal, recibo (NFe, NFCe, cupom fiscal, recibo simples)
+- Print de compra em app/site (Shopee, Mercado Livre, Amazon, AliExpress, etc) — carrinho, checkout ou confirmação de pedido
+- Pedido, orçamento, contrato de locação/serviço ou qualquer formulário comercial próprio do fornecedor (papel timbrado, layout customizado) que mostre valor total e o nome de quem está cobrando — mesmo sem CNPJ/CPF visível
+- Comprovante de pagamento (PIX, transferência, boleto pago) quando é a única evidência da despesa
+
+Regra central: **se o documento mostra um valor total cobrado/pago E algum nome identificando quem vendeu/prestou o serviço, extraia — não exija que pareça uma nota fiscal tradicional.** Só retorne null pros campos que genuinamente não aparecem em lugar nenhum do documento.
 
 Analise o documento e extraia as seguintes informações:
-- CNPJ ou CPF do fornecedor/emissor (se houver; em print de app/site normalmente não há — nesse caso deixe null)
-- Nome/Razão Social do fornecedor (em print de app/site, use o nome da plataforma/loja, ex: "Shopee", "Mercado Livre")
-- Data de emissão (formato YYYY-MM-DD)
+- CNPJ ou CPF do fornecedor/emissor (se houver; em documentos informais costuma faltar — nesse caso deixe null, mas ainda assim extraia o resto)
+- Nome/Razão Social do fornecedor — em print de app/site, o nome da plataforma/loja (ex: "Shopee"); em pedido/orçamento/locação, o nome do negócio ou de quem está cobrando (ex: nome da empresa no cabeçalho, ou o nome ao lado de "Locador(a)"/"Prestador"/"Vendedor")
+- Data de emissão (formato YYYY-MM-DD) — se o documento só tiver "criado em" ou data do evento, use essa
 - Valor total
 - Data de vencimento (se houver, formato YYYY-MM-DD)
 - Descrição dos itens/serviços
-- Número da nota fiscal (se houver; em print de app/site normalmente não há — nesse caso deixe null)
+- Número da nota fiscal/pedido (se houver; senão deixe null)
 
-## PRINTS DE COMPRA EM APP/SITE (sem nota fiscal formal)
-Quando o documento for um print de carrinho, checkout ou resumo de pedido de um app/site de compras (ao invés de nota fiscal/cupom fiscal tradicional):
-- Use como "valor_total" o total final da compra (ex: linha "Total de X itens"), já com frete/descontos aplicados — o mesmo critério do dicionário abaixo.
-- Use como "fornecedor_nome" o nome da plataforma/loja (ex: "Shopee"), não o nome de produtos individuais.
-- Ignore elementos de interface que não são parte da compra em si (banners de assinatura, sugestões de cupom não aplicado, "convide amigos", etc).
+## DOCUMENTOS SEM NOTA FISCAL FORMAL (print de app/site, pedido, orçamento, contrato de locação/serviço)
+- Use como "valor_total" o total final cobrado (ex: "Total de X itens", "Valor Total", "Valor por pessoa" × quantidade) — mesmo critério do dicionário abaixo pra distinguir de desconto/bônus.
+- Use como "fornecedor_nome" o nome do negócio/plataforma emissor do documento (cabeçalho, logo, ou campo "Locador(a)"/"Prestador"), não o nome do cliente/comprador nem de produtos individuais.
+- Ignore elementos de interface/formulário que não são parte do valor da compra em si (banners de assinatura, cupom não aplicado, "convide amigos", checkboxes de status como "Entregue"/"Pago" vazios).
 
 ## DICIONÁRIO — COMO IDENTIFICAR O "valor_total" CORRETO
 O campo "valor_total" deve ser SEMPRE o valor final efetivamente cobrado/pago pelo cliente. Em cupons e recibos brasileiros, esse valor costuma aparecer perto de termos como:
@@ -423,28 +428,50 @@ serve(async (req) => {
     );
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
     // Choose provider:
-    // - PDFs: prefer Lovable AI Gateway (Gemini supports PDFs natively), then Gemini direct
-    // - Images: prefer Gemini direct, then OpenAI, then Lovable AI Gateway
+    // - PDFs: prefer Claude ou Lovable AI Gateway/Gemini direto (suportam PDF nativo), OpenAI não aceita PDF
+    // - Imagens: prefer Claude, depois Gemini direto, depois OpenAI, depois Lovable AI Gateway
     const GEMINI_API_KEY =
       Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_API_KEY");
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
-    let provider: "gemini" | "openai" | "lovable" | null = null;
+    // Limite de imagem da Anthropic é 5MB (bem menor que o teto de 10MB
+    // que este endpoint aceita, checado acima) — foto de celular passa
+    // fácil disso. Se a imagem for grande demais pro Claude, pula pro
+    // próximo provedor em vez de deixar a Anthropic rejeitar com 400 sem
+    // fallback (Codex P1 na PR #117). PDF não entra nessa conta — limite
+    // de documento da Anthropic é bem maior (32MB) que o teto deste
+    // endpoint.
+    const CLAUDE_MAX_IMAGE_BASE64_LENGTH = Math.floor(
+      5 * 1024 * 1024 * (4 / 3)
+    );
+    const imagemGrandeDemaisPraClaude =
+      !isPdf && imageBase64.length > CLAUDE_MAX_IMAGE_BASE64_LENGTH;
+    const claudeDisponivel = ANTHROPIC_API_KEY && !imagemGrandeDemaisPraClaude;
+    if (imagemGrandeDemaisPraClaude) {
+      console.log(
+        `[processar-nota-fiscal] Imagem grande demais pro limite de 5MB da Anthropic (${imageBase64.length} chars base64) — pulando Claude, tentando próximo provedor.`
+      );
+    }
+
+    let provider: "claude" | "gemini" | "openai" | "lovable" | null = null;
     if (isPdf) {
-      provider = LOVABLE_API_KEY
+      provider = claudeDisponivel
+        ? "claude"
+        : LOVABLE_API_KEY
         ? "lovable"
         : GEMINI_API_KEY
         ? "gemini"
         : null;
       if (!provider) {
         console.error(
-          "[processar-nota-fiscal] PDF recebido mas nenhum provedor compatível com PDF está configurado (LOVABLE_API_KEY ou GEMINI_API_KEY). OpenAI não aceita PDFs."
+          "[processar-nota-fiscal] PDF recebido mas nenhum provedor compatível com PDF está configurado (ANTHROPIC_API_KEY, LOVABLE_API_KEY ou GEMINI_API_KEY). OpenAI não aceita PDFs."
         );
         return new Response(
           JSON.stringify({
             error:
-              "Processamento de PDFs indisponível: configure LOVABLE_API_KEY ou GEMINI_API_KEY.",
+              "Processamento de PDFs indisponível: configure ANTHROPIC_API_KEY, LOVABLE_API_KEY ou GEMINI_API_KEY.",
           }),
           {
             status: 500,
@@ -453,7 +480,9 @@ serve(async (req) => {
         );
       }
     } else {
-      provider = GEMINI_API_KEY
+      provider = claudeDisponivel
+        ? "claude"
+        : GEMINI_API_KEY
         ? "gemini"
         : OPENAI_API_KEY
         ? "openai"
@@ -463,7 +492,7 @@ serve(async (req) => {
     }
     if (!provider) {
       console.error(
-        "Nenhum provedor de IA configurado (LOVABLE_API_KEY, GEMINI_API_KEY/GOOGLE_API_KEY ou OPENAI_API_KEY)"
+        "Nenhum provedor de IA configurado (ANTHROPIC_API_KEY, LOVABLE_API_KEY, GEMINI_API_KEY/GOOGLE_API_KEY ou OPENAI_API_KEY)"
       );
       return new Response(
         JSON.stringify({ error: "Serviço de processamento não configurado" }),
@@ -497,10 +526,117 @@ serve(async (req) => {
       systemPrompt + buildCategoryContext(financialOptions);
 
     let notaFiscalData: any = null;
-    if (provider === "openai") {
-      const mappedModel = model?.startsWith("google/")
-        ? "gpt-4o-mini"
-        : model || "gpt-4o-mini";
+    if (provider === "claude") {
+      const claudeModel = model?.startsWith("claude")
+        ? model
+        : "claude-sonnet-5";
+      const promptText = isPdf
+        ? "Extraia as informações deste documento PDF de nota fiscal e sugira a categorização financeira mais adequada:"
+        : "Extraia as informações desta imagem de nota fiscal e sugira a categorização financeira mais adequada:";
+
+      const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": ANTHROPIC_API_KEY!,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: claudeModel,
+          max_tokens: 1536,
+          system: enhancedPrompt,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: promptText },
+                isPdf
+                  ? {
+                      type: "document",
+                      source: {
+                        type: "base64",
+                        media_type: "application/pdf",
+                        data: imageBase64,
+                      },
+                    }
+                  : {
+                      type: "image",
+                      source: {
+                        type: "base64",
+                        media_type: effectiveMimeType,
+                        data: imageBase64,
+                      },
+                    },
+              ],
+            },
+          ],
+          tools: [
+            {
+              name: "extrair_nota_fiscal",
+              description:
+                "Extrai informações estruturadas de uma nota fiscal e sugere categorização",
+              input_schema: {
+                type: "object",
+                properties: {
+                  fornecedor_cnpj_cpf: { type: "string" },
+                  fornecedor_nome: { type: "string" },
+                  data_emissao: { type: "string" },
+                  valor_total: { type: "number" },
+                  data_vencimento: { type: "string" },
+                  descricao: { type: "string" },
+                  numero_nota: { type: "string" },
+                  tipo_documento: {
+                    type: "string",
+                    enum: ["nfe", "nfce", "cupom_fiscal", "recibo", "outro"],
+                  },
+                  categoria_sugerida_id: { type: "string" },
+                  categoria_sugerida_nome: { type: "string" },
+                  subcategoria_sugerida_id: { type: "string" },
+                  subcategoria_sugerida_nome: { type: "string" },
+                  centro_custo_sugerido_id: { type: "string" },
+                  centro_custo_sugerido_nome: { type: "string" },
+                },
+                required: [
+                  "fornecedor_nome",
+                  "data_emissao",
+                  "valor_total",
+                  "descricao",
+                ],
+              },
+            },
+          ],
+          tool_choice: { type: "tool", name: "extrair_nota_fiscal" },
+        }),
+      });
+
+      if (!claudeResp.ok) {
+        const errorText = await claudeResp.text();
+        console.error("Claude erro:", claudeResp.status, errorText);
+        throw new Error("Erro ao processar documento via Claude");
+      }
+      const claudeData = await claudeResp.json();
+      const toolUse = claudeData.content?.find(
+        (block: any) =>
+          block.type === "tool_use" && block.name === "extrair_nota_fiscal"
+      );
+      if (!toolUse) {
+        console.error(
+          "Claude: resposta sem tool_use estruturado",
+          JSON.stringify(claudeData).slice(0, 500)
+        );
+        throw new Error("Resposta da IA não contém dados estruturados");
+      }
+      // Anthropic já devolve `input` como objeto — diferente da OpenAI, que
+      // devolve `arguments` como string JSON exigindo JSON.parse.
+      notaFiscalData = toolUse.input;
+    } else if (provider === "openai") {
+      // `model` vem de chatbot_configs.modelo_visao — pode estar apontando
+      // pra outro provedor (ex: "claude-sonnet-5", "google/gemini-2.5-pro")
+      // se o provedor preferencial não tiver a API key configurada nesta
+      // implantação. Só repassa se realmente parecer um model id da OpenAI.
+      const mappedModel = /^(gpt-|o1|o3|o4)/.test(model || "")
+        ? model!
+        : "gpt-4o-mini";
       const oaResp = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -684,10 +820,13 @@ serve(async (req) => {
       notaFiscalData = JSON.parse(toolCall.function.arguments);
     } else {
 
-      // Gemini
+      // Gemini — mesmo cuidado do branch OpenAI: só repassa `model` se
+      // parecer um model id do Gemini, senão usa o default seguro.
       const geminiModelId = model?.startsWith("google/")
         ? model.split("/")[1]
-        : model || "gemini-2.0-pro";
+        : model?.startsWith("gemini")
+        ? model
+        : "gemini-2.0-pro";
       const promptText =
         (isPdf
           ? "Extraia as informações deste documento PDF de nota fiscal e sugira a categorização financeira mais adequada:"

@@ -10,6 +10,13 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Corrigido
 
+#### 🤖 OCR de comprovante ignorava melhorias do código (config no banco sobrescrevendo) + Claude como provedor (19 Ago/2026)
+
+- **Tipo**: fix + feature
+- **Resumo**: comprovantes legíveis (ex: pedido/orçamento de locação de eventos com fornecedor, itens e valor total bem visíveis) continuavam voltando "não consegui identificar" mesmo depois das melhorias de prompt da PR #115. Causa: `chatbot_configs.role_visao` (`processar-nota-fiscal`, `ativo=true`) tinha uma linha antiga de 236 caracteres, escopada só a "notas fiscais brasileiras" — sobrescrevia o `DEFAULT_VISION_PROMPT` do código toda vez, então nenhuma melhoria anterior surtia efeito em produção. Prompt generalizado (qualquer documento com valor total + nome de quem cobra, não só nota fiscal formal) e sincronizado no banco. Adicionado Claude (Anthropic) como provedor de visão — prioridade sobre Gemini/OpenAI quando `ANTHROPIC_API_KEY` está configurada — com mapeamento de modelo defensivo por provedor (não repassa cegamente um model id de outro provedor vindo da config do banco).
+- **Módulos afetados**: OCR de comprovantes (`processar-nota-fiscal`), bot financeiro WhatsApp
+- **Impacto no usuário**: comprovantes informais (pedido, orçamento, contrato de locação/serviço, print de compra) voltam a ser extraídos automaticamente em vez de exigir correção manual toda vez.
+
 #### 🔧 Colisão de timestamp em migration + regressão silenciosa no Ledger Cartão (18 Ago/2026)
 
 - **Tipo**: fix + infra (deploy)

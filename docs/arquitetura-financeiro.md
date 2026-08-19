@@ -7638,4 +7638,41 @@ Padrão generalizado: **antes de renomear uma migration nunca-aplicada,
 `grep -l` toda função que ela redefine contra QUALQUER migration mais
 recente que também a redefina** — aplicada ou não. Guardrail E.
 
+### 9.121 OCR ignorava melhorias do código (config no banco venceu) + Claude como provedor
+
+Comprovante legível (pedido/orçamento de locação de eventos com
+fornecedor, itens e "VALOR TOTAL: R$ 152,00" bem visíveis) continuava
+voltando "não consegui identificar" mesmo depois de todas as melhorias
+de prompt da #115/#116. `getChatbotConfig` (`processar-nota-fiscal`)
+prioriza `chatbot_configs.role_visao` quando `ativo=true` — e a linha
+pra `processar-nota-fiscal` tinha 236 caracteres, escrita antes de
+qualquer trabalho de prompt desta sessão, escopada só a "notas fiscais
+brasileiras" (CNPJ, razão social, data, valor, itens — sem dicionário
+anti-bônus, sem suporte a print de app, sem suporte a formulário
+próprio do fornecedor). Toda melhoria em `DEFAULT_VISION_PROMPT` no
+código teve zero efeito em produção até essa linha do banco ser
+atualizada também.
+
+Fix: `DEFAULT_VISION_PROMPT` generalizado — extrai de QUALQUER
+documento que mostre valor total + nome de quem cobra (nota fiscal,
+print de app, pedido/orçamento/contrato de locação/serviço, comprovante
+de pagamento), não só nota fiscal formal; regra central deixada
+explícita ("se mostra valor total E nome de quem vendeu, extraia — não
+exija que pareça nota fiscal tradicional"). Prompt sincronizado direto
+no banco via `supabase db query` (urgência), código também atualizado
+pra manter os dois em sincronia daqui pra frente.
+
+Adicionado **Claude (Anthropic)** como provedor de visão (`ANTHROPIC_
+API_KEY`), prioridade sobre Gemini/OpenAI/Lovable Gateway quando
+configurada — mesmo padrão `tool_choice` forçado dos outros provedores,
+mas `tool_use.input` já vem como objeto (não precisa `JSON.parse` como
+a OpenAI). Mapeamento de model id por provedor tornado defensivo
+(`model?.startsWith("gpt-")`/`"gemini"`/`"claude"`) — sem isso, um
+`modelo_visao` do banco apontando pra um provedor sem API key nesta
+implantação (ex: `"claude-sonnet-5"` caindo no branch da OpenAI)
+vazaria como model id literal e quebraria a chamada. Testado com o
+documento real que expôs o bug — extraiu fornecedor e valor
+corretamente.
+
+Guardrail L (itens 4-5).
 
