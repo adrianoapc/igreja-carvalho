@@ -48,6 +48,12 @@ próprio arquivo):
 - **Canal WhatsApp**: erro de RPC/Postgres não vai cru pra conversa
   (mapear `FIN_*`, resto genérico; raw só no log). OCR sem CPF/CNPJ
   reusa fornecedor por nome — não criar "Shopee" duplicado a cada print.
+- **Renomear migration nunca-aplicada** (fix de colisão de timestamp):
+  `grep -l` por toda função que o arquivo redefine, comparar contra
+  QUALQUER migration mais recente que também a redefina (aplicada ou
+  não) e mesclar os corpos — senão o `CREATE OR REPLACE` da renomeada
+  roda por último e reverte silenciosamente a mais recente (sem erro,
+  sem warning).
 
 Este arquivo é o resumo. O detalhe (com exemplos de bug real por item) está em
 `docs/guardrails-financeiro.md`, que cresce a cada rodada de review que achar

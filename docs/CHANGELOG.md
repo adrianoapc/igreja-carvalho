@@ -10,6 +10,13 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Corrigido
 
+#### 🔧 Colisão de timestamp em migration + regressão silenciosa no Ledger Cartão (18 Ago/2026)
+
+- **Tipo**: fix + infra (deploy)
+- **Resumo**: `supabase db push` estava bloqueado desde 17/Ago por dois problemas: (1) duas migrations com timestamp idêntico `20260813150000`, violando a PK de `schema_migrations`; (2) a migration Hop2/SFTP (`20260817180000`, já aplicada) tinha feito `CREATE OR REPLACE` de `fin_listar_ledger_conciliacao_cartao` a partir de uma base desatualizada, revertendo silenciosamente em produção o filtro `conciliacao_status` (bug de 20260807120000 voltando a acontecer) e os campos `lancamento_desagio_id`/`hop2_pendente` — `20260813140000` só tinha exposto `lancamento_desagio_id` sem HFA e sem `hop2_pendente`; o gate de HFA e o campo `hop2_pendente` vieram do conteúdo original de `20260813150000` (agora renomeada `20260818200000`). Migration renomeada e o corpo da função mesclado (SFTP + filtro + campos), testado num Postgres isolado (Docker) com 3 cenários sintéticos antes de aplicar em produção. Review automático (Cursor Agent) na PR pegou um 2º caso do mesmo padrão: a mesma migration renomeada também redefinia `fin_reverter_desagio_antecipacao` a partir de uma base anterior a `20260813160000`, que tinha trocado a checagem de autorização por `_fin_exigir_autorizado_lancar_despesas` (o 2º argumento de `fin_resolver_contexto` só vale no canal bot — tesoureiro JWT sem o flag ia além da entrada da função antes de ser barrado só pela checagem aninhada). Corrigido e aplicado direto em produção (`supabase db query`) assim que achado; formalizado numa migration nova (`20260818210000`) marcada `applied` via `supabase migration repair` (o conteúdo já tinha rodado manualmente — só documenta no histórico; um ambiente linked que ainda não tenha esse fix precisa rodar `db push` de verdade, não só repair) — testado com usuário sem/com o flag.
+- **Módulos afetados**: Infra de deploy (CI), Conciliação Cartão Getnet (Fase 7), Antecipação Getnet (reversão de deságio)
+- **Impacto no usuário**: Ledger de conciliação de cartão volta a excluir lançamentos já fechados por outro canal (evita ações que sempre falhavam com `FIN_JA_LANCADO`) e a expor corretamente `lancamento_desagio_id`/`hop2_pendente`, sem perder o suporte a vendas via SFTP. Reversão de deságio via web volta a barrar tesoureiro sem a permissão imediatamente na entrada, não só depois de validar lote/tenant/filial.
+
 #### 💬 Comprovante via WhatsApp — Graph API, OCR de print e falhas visíveis (18 Ago/2026)
 
 - **Tipo**: fix + ux

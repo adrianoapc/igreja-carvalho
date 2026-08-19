@@ -628,7 +628,30 @@ que ela deveria proteger contra já está ativo desde `210000`, e o
 backfill de `220000` (11 migrations antes) já dispara o recálculo que
 apaga o drift (§9.77).
 
-Referências: §9.35, §9.39, §9.51, §9.53, §9.73, §9.77.
+**Renomear uma migration nunca-aplicada pra resolver colisão de timestamp
+pode reverter silenciosamente uma migration POSTERIOR já aplicada, se as
+duas fazem `CREATE OR REPLACE` da MESMA função.** O rename muda a ordem
+de execução (a renomeada passa a rodar depois de tudo que já foi
+aplicado) — se o corpo da renomeada não incorporar as mudanças da
+migration mais recente, o `CREATE OR REPLACE` dela apaga essas mudanças
+ao rodar por último. Sintoma: nenhum erro, nenhum warning — a função
+troca de definição silenciosamente. Fix: antes de renomear, `grep -l`
+por toda função que o arquivo redefine em `supabase/migrations/*.sql`,
+comparar contra QUALQUER migration mais recente que também a redefina
+(aplicada ou não), e mesclar os dois corpos — não só o primeiro achado.
+Achado real: `20260813150000` (nunca aplicada, renomeada `20260818200000`
+por colidir com outro arquivo do mesmo timestamp) redefinia DUAS funções
+já também redefinidas por migrations posteriores já aplicadas —
+`fin_listar_ledger_conciliacao_cartao` (por `20260817180000`, Hop2/SFTP)
+e `fin_reverter_desagio_antecipacao` (por `20260813160000`, fecha bypass
+de autorização JWT). A primeira foi mesclada de cara; a segunda só foi
+achada num review automático posterior (Cursor Agent) — já tinha sido
+aplicada em produção com o corpo antigo por um `db push --include-all`
+anterior, exigindo correção direta via `supabase db query` + migration
+forward de formalização (`migration repair`), já que editar o arquivo
+já-aplicado não reexecuta no próximo push (§6b) (§9.120).
+
+Referências: §9.35, §9.39, §9.51, §9.53, §9.73, §9.77, §9.120.
 
 ---
 
@@ -891,7 +914,8 @@ Referências: §9.119.
 - **Antes de adicionar um `SELECT ... FOR UPDATE` (ou qualquer lock
   explícito) num fluxo que pode rodar concorrente com outro**: seção D.
 - **Antes de escrever uma migration com `ADD CONSTRAINT`/`CREATE UNIQUE
-  INDEX`**: seção E.
+  INDEX`, ou de renomear uma migration nunca-aplicada pra resolver
+  colisão de timestamp**: seção E.
 - **Antes de commitar qualquer fix de SQL**: seção F (harness).
 - **Antes de escrever um `useEffect` que reage a dado de query, ou um
   botão que depende de múltiplas queries**: seção G.
