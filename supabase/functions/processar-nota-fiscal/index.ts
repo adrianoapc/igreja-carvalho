@@ -436,9 +436,28 @@ serve(async (req) => {
       Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_API_KEY");
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
+    // Limite de imagem da Anthropic é 5MB (bem menor que o teto de 10MB
+    // que este endpoint aceita, checado acima) — foto de celular passa
+    // fácil disso. Se a imagem for grande demais pro Claude, pula pro
+    // próximo provedor em vez de deixar a Anthropic rejeitar com 400 sem
+    // fallback (Codex P1 na PR #117). PDF não entra nessa conta — limite
+    // de documento da Anthropic é bem maior (32MB) que o teto deste
+    // endpoint.
+    const CLAUDE_MAX_IMAGE_BASE64_LENGTH = Math.floor(
+      5 * 1024 * 1024 * (4 / 3)
+    );
+    const imagemGrandeDemaisPraClaude =
+      !isPdf && imageBase64.length > CLAUDE_MAX_IMAGE_BASE64_LENGTH;
+    const claudeDisponivel = ANTHROPIC_API_KEY && !imagemGrandeDemaisPraClaude;
+    if (imagemGrandeDemaisPraClaude) {
+      console.log(
+        `[processar-nota-fiscal] Imagem grande demais pro limite de 5MB da Anthropic (${imageBase64.length} chars base64) — pulando Claude, tentando próximo provedor.`
+      );
+    }
+
     let provider: "claude" | "gemini" | "openai" | "lovable" | null = null;
     if (isPdf) {
-      provider = ANTHROPIC_API_KEY
+      provider = claudeDisponivel
         ? "claude"
         : LOVABLE_API_KEY
         ? "lovable"
@@ -461,7 +480,7 @@ serve(async (req) => {
         );
       }
     } else {
-      provider = ANTHROPIC_API_KEY
+      provider = claudeDisponivel
         ? "claude"
         : GEMINI_API_KEY
         ? "gemini"
