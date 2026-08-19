@@ -900,8 +900,28 @@ iam pro log). Isso não autoriza mandar `error.message` cru:
    `valor_total_acumulado` / `itens.length` da sessão se parte do lote
    falhou. Reembolso sem nenhum item não vai pra `pendente` nem notifica
    tesouraria.
+4. **Prompt/model de IA configurável no banco (`chatbot_configs`) sempre
+   vence o default do código quando `ativo=true`.** Melhorar
+   `DEFAULT_VISION_PROMPT`/`DEFAULT_MODEL` no código não tem NENHUM
+   efeito em produção se já existir uma linha ativa pra aquela
+   `edge_function_name` — `getChatbotConfig` prioriza a config do banco
+   incondicionalmente. Antes de testar/depurar qualidade de extração de
+   IA, `SELECT role_visao, modelo_visao FROM chatbot_configs WHERE
+   edge_function_name = '...'` pra confirmar qual prompt/modelo está
+   REALMENTE em uso — não assuma que é o do código. Achado real: linha
+   de `processar-nota-fiscal` ficou travada num prompt de 236 caracteres
+   escopado só a "notas fiscais brasileiras", escrita antes de qualquer
+   melhoria de prompt da #115/#116 — todas as correções de prompt do
+   código tiveram zero efeito até a linha do banco ser atualizada
+   também (§9.121).
+5. **Model id vindo da config do banco pode apontar pra outro provedor
+   se o preferencial não tiver API key nesta implantação.** Mapeamento
+   de model id por branch de provedor precisa ser defensivo (`model?.
+   startsWith("gpt-")`, não só "usa o que veio"), senão um `modelo_
+   visao` tipo `"claude-sonnet-5"` vaza pro branch da OpenAI/Gemini como
+   model id literal e quebra a chamada (§9.121).
 
-Referências: §9.119.
+Referências: §9.119, §9.121.
 
 ---
 
