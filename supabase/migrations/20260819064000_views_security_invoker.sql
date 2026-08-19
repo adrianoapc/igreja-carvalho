@@ -72,4 +72,4 @@ COMMENT ON VIEW public.eventos_publicos IS
   'comunicados (banner_url) é mais permissivo que a policy anon '
   '(anon_banners_site) daquela tabela — trocar pra security_invoker sem '
   'dado real pra testar arrisca esconder banner de evento público. '
-  'Ver migration 20260818124000.';
+  'Ver migration 20260819064000.';
