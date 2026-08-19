@@ -23,10 +23,17 @@
 --     liturgia_culto/midias_culto (já corrigidas na migration anterior).
 --
 -- Como a tabela está vazia e não é usada pelo app hoje, o risco de "quebrar
--- alguém" é zero; mesmo assim as policies abaixo replicam o desenho
--- original de cada tabela (documentado nas migrations de criação:
--- 20251130023429, 20251130062803, 20251203013050) para o caso de o módulo
--- voltar a ser usado — "admin gerencia tudo, membro autenticado só vê".
+-- alguém" é zero; as policies abaixo partem do desenho original de cada
+-- tabela (documentado nas migrations de criação: 20251130023429,
+-- 20251130062803, 20251203013050) — mas SEM repetir o "membro autenticado
+-- vê tudo" (USING true) do desenho original: `cultos` não tem igreja_id
+-- nem nenhuma coluna pra restringir por status/ativo (diferente de
+-- templates_liturgia/itens_template_liturgia, que ao menos filtram por
+-- `ativo`), então qualquer grant de SELECT pra `authenticated` seria
+-- necessariamente cross-tenant (achado no code-review desta PR). Fica
+-- admin-only, igual ao padrão já usado pra presencas_culto neste mesmo
+-- arquivo — se o módulo for reativado, quem adicionar igreja_id/filial_id
+-- decide ali a política de leitura correta.
 
 -- cultos (sem igreja_id/filial_id)
 CREATE POLICY "Admins podem gerenciar cultos"
@@ -35,12 +42,6 @@ CREATE POLICY "Admins podem gerenciar cultos"
   TO authenticated
   USING (has_role(auth.uid(), 'admin'::app_role))
   WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
-
-CREATE POLICY "Membros podem ver cultos"
-  ON public.cultos
-  FOR SELECT
-  TO authenticated
-  USING (true);
 
 ALTER TABLE public.cultos ENABLE ROW LEVEL SECURITY;
 
