@@ -628,7 +628,30 @@ que ela deveria proteger contra já está ativo desde `210000`, e o
 backfill de `220000` (11 migrations antes) já dispara o recálculo que
 apaga o drift (§9.77).
 
-Referências: §9.35, §9.39, §9.51, §9.53, §9.73, §9.77.
+**Renomear uma migration nunca-aplicada pra resolver colisão de timestamp
+pode reverter silenciosamente uma migration POSTERIOR já aplicada, se as
+duas fazem `CREATE OR REPLACE` da MESMA função.** O rename muda a ordem
+de execução (a renomeada passa a rodar depois de tudo que já foi
+aplicado) — se o corpo da renomeada não incorporar as mudanças da
+migration mais recente, o `CREATE OR REPLACE` dela apaga essas mudanças
+ao rodar por último. Sintoma: nenhum erro, nenhum warning — a função
+troca de definição silenciosamente. Fix: antes de renomear, `grep -l`
+por toda função que o arquivo redefine em `supabase/migrations/*.sql`,
+comparar contra QUALQUER migration mais recente que também a redefina
+(aplicada ou não), e mesclar os dois corpos — não só o primeiro achado.
+Achado real: `20260813150000` (nunca aplicada, renomeada `20260818200000`
+por colidir com outro arquivo do mesmo timestamp) redefinia DUAS funções
+já também redefinidas por migrations posteriores já aplicadas —
+`fin_listar_ledger_conciliacao_cartao` (por `20260817180000`, Hop2/SFTP)
+e `fin_reverter_desagio_antecipacao` (por `20260813160000`, fecha bypass
+de autorização JWT). A primeira foi mesclada de cara; a segunda só foi
+achada num review automático posterior (Cursor Agent) — já tinha sido
+aplicada em produção com o corpo antigo por um `db push --include-all`
+anterior, exigindo correção direta via `supabase db query` + migration
+forward de formalização (`migration repair`), já que editar o arquivo
+já-aplicado não reexecuta no próximo push (§6b) (§9.120).
+
+Referências: §9.35, §9.39, §9.51, §9.53, §9.73, §9.77, §9.120.
 
 ---
 
@@ -854,6 +877,54 @@ Referências: §9.118.
 
 ---
 
+## L. Canal WhatsApp — não vazar erro de banco; reusar fornecedor sem CNPJ
+
+O bot financeiro fala com tesoureiro/líder no WhatsApp. A partir da PR
+#115 (§9.119) falhas de gravação **aparecem** na conversa (antes só
+iam pro log). Isso não autoriza mandar `error.message` cru:
+
+1. **Loga o raw, mostra texto limitado.** Mapeie `FIN_*` pra frases
+   curtas; `FIN_VALIDACAO` pode repetir o detalhe só se for curto e
+   sem cheiro de SQL (`relation`, `constraint`, `duplicate key`,
+   `permission denied`…). Qualquer outra coisa (RLS, schema, PostgREST)
+   vira "Não foi possível registrar este comprovante. Contate o
+   financeiro." Achado Codex P2 na #115 — `limparMensagemErro` só
+   tirava prefixo `foo: ` e deixava o resto ir pro usuário.
+2. **OCR sem CPF/CNPJ não cria fornecedor duplicado.** Print de app
+   (Shopee, Mercado Livre) chega com nome de plataforma e documento
+   nulo. Lookup por `cpf_cnpj = ''` **não** acha a linha gravada com
+   `cpf_cnpj IS NULL`. Sem documento, reusar por nome normalizado
+   (`ilike` exato no cadastro global da igreja) ou não criar
+   automaticamente. Achado Codex P1 na #115.
+3. **Totais da mensagem final = o que gravou.** Não use
+   `valor_total_acumulado` / `itens.length` da sessão se parte do lote
+   falhou. Reembolso sem nenhum item não vai pra `pendente` nem notifica
+   tesouraria.
+4. **Prompt/model de IA configurável no banco (`chatbot_configs`) sempre
+   vence o default do código quando `ativo=true`.** Melhorar
+   `DEFAULT_VISION_PROMPT`/`DEFAULT_MODEL` no código não tem NENHUM
+   efeito em produção se já existir uma linha ativa pra aquela
+   `edge_function_name` — `getChatbotConfig` prioriza a config do banco
+   incondicionalmente. Antes de testar/depurar qualidade de extração de
+   IA, `SELECT role_visao, modelo_visao FROM chatbot_configs WHERE
+   edge_function_name = '...'` pra confirmar qual prompt/modelo está
+   REALMENTE em uso — não assuma que é o do código. Achado real: linha
+   de `processar-nota-fiscal` ficou travada num prompt de 236 caracteres
+   escopado só a "notas fiscais brasileiras", escrita antes de qualquer
+   melhoria de prompt da #115/#116 — todas as correções de prompt do
+   código tiveram zero efeito até a linha do banco ser atualizada
+   também (§9.121).
+5. **Model id vindo da config do banco pode apontar pra outro provedor
+   se o preferencial não tiver API key nesta implantação.** Mapeamento
+   de model id por branch de provedor precisa ser defensivo (`model?.
+   startsWith("gpt-")`, não só "usa o que veio"), senão um `modelo_
+   visao` tipo `"claude-sonnet-5"` vaza pro branch da OpenAI/Gemini como
+   model id literal e quebra a chamada (§9.121).
+
+Referências: §9.119, §9.121.
+
+---
+
 ## Como usar este documento
 
 - **Antes de escrever uma query nova que filtra por `filial_id`**: seção A.
@@ -863,7 +934,8 @@ Referências: §9.118.
 - **Antes de adicionar um `SELECT ... FOR UPDATE` (ou qualquer lock
   explícito) num fluxo que pode rodar concorrente com outro**: seção D.
 - **Antes de escrever uma migration com `ADD CONSTRAINT`/`CREATE UNIQUE
-  INDEX`**: seção E.
+  INDEX`, ou de renomear uma migration nunca-aplicada pra resolver
+  colisão de timestamp**: seção E.
 - **Antes de commitar qualquer fix de SQL**: seção F (harness).
 - **Antes de escrever um `useEffect` que reage a dado de query, ou um
   botão que depende de múltiplas queries**: seção G.
@@ -875,6 +947,8 @@ Referências: §9.118.
   uma migration que faz isso)**: seção J.
 - **Antes de pintar status com `STATUS_COLOR` como `color` em card/página
   clara**: seção K.
+- **Antes de mostrar erro de RPC/Postgres no WhatsApp, ou de criar
+  fornecedor a partir de OCR sem CPF/CNPJ**: seção L.
 
 Encontrou um padrão novo numa rodada de review que não está aqui? Adicione
 uma seção (ou um item numa seção existente) citando o `§9.NN`

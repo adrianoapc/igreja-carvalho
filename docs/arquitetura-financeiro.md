@@ -191,13 +191,17 @@ flowchart TD
 
 ### 4.1 O bot financeiro já existe — e é o segundo maior monólito
 
-- **`supabase/functions/chatbot-financeiro/index.ts` (2538 l.,
-  `verify_jwt=false`)** — lançamento via WhatsApp (Make). Máquina de estados
-  em `atendimentos_bot.meta_dados` (fluxos DESPESAS, CONTA_UNICA, REEMBOLSO,
-  TRANSFERENCIA). Baixa anexo do WhatsApp (Graph API), salva em Storage
-  `transaction-attachments`, chama OCR, confirma com o usuário e **insere
-  direto** em `transacoes_financeiras` (~l.1612, 2399, 2422) e
-  `transferencias_contas` (~l.2372) com service role.
+- **`supabase/functions/chatbot-financeiro/index.ts` (`verify_jwt=false`)**
+  — lançamento via WhatsApp (Make). Máquina de estados em
+  `atendimentos_bot.meta_dados` (fluxos DESPESAS, CONTA_UNICA, REEMBOLSO,
+  TRANSFERENCIA). Baixa anexo do WhatsApp (**Graph API v21.0**, alinhado a
+  `send-otp` / `chatbot-triagem` / `disparar-alerta`; v18.0 foi aposentada
+  pela Meta), salva em Storage `transaction-attachments`, chama OCR
+  (`processar-nota-fiscal`, que também aceita print de compra em app/site),
+  confirma com o usuário (**não aceita "Sim" sem valor identificado**) e
+  grava via shim `criarLancamento` → `fin_criar_lancamento`. Falha de RPC
+  ou insert de item de reembolso é relatada no WhatsApp com texto
+  sanitizado (`mensagemErroParaUsuario` — raw Postgres só no log).
 - Autorização por pessoa: `profiles.autorizado_bot_financeiro` + flags
   `autorizado_lancar_despesas`/`_depositos`/`_reembolsos` — validadas dentro
   do Deno, longe das demais regras.
@@ -7553,4 +7557,122 @@ Stat cards (Pendentes/Conciliados e a tira de resumo do ledger) usam
 
 Diagrama: `docs/diagramas/fluxo-financeiro.md` (seção ""Histórico" vira
 "Extratos" com toggle Banco/Cartão").
+
+### 9.119 Comprovante via WhatsApp — Graph v21, print de app, erros visíveis
+
+PR #115: o bot recusava (ou pior: aceitava "Sim" e falhava depois em
+silêncio) comprovantes que não eram nota fiscal formal — print de
+carrinho Shopee/Mercado Livre, OCR sem valor, mídia WhatsApp via Graph
+API v18.0 já aposentada. Três correções no canal + uma na tela web:
+
+1. **Graph API `v18.0` → `v21.0`** em `chatbot-financeiro`,
+   `chatbot-triagem` e `disparar-alerta` (mesma versão que `send-otp`).
+   Sem isso, `resolverMediaUrl` falha e o usuário vê "Erro ao salvar o
+   comprovante" mesmo com `WHATSAPP_API_TOKEN` válido.
+2. **Confirmação sem valor**: em `CONFIRMANDO_ITEM`, "Sim" é bloqueado
+   quando `item_pendente.valor` é ausente/≤0 — a RPC `fin_criar_
+   lancamento` rejeitaria depois (`FIN_VALIDACAO`) e a sessão só
+   logava. Pede correção (`valor 89,90`) ou *Remover*.
+3. **Falha de gravação visível**: Despesas/Conta Única e Reembolso
+   acumulam `falhasCriacao` e listam no WhatsApp. Codex P2: o raw
+   `error.message` (constraint, RLS, schema) **não** vai pro usuário —
+   `mensagemErroParaUsuario` mapeia `FIN_*` e cai em texto genérico;
+   o detalhe fica no log. Totais da mensagem final usam só os itens
+   que de fato gravaram; reembolso sem nenhum item **não** vira
+   `pendente` nem dispara alerta à tesouraria.
+4. **OCR de print de app/site** (`processar-nota-fiscal`): o prompt
+   padrão passa a tratar checkout/carrinho (Shopee, Mercado Livre,
+   etc.) — total final + nome da plataforma como fornecedor, CNPJ
+   nulo. Codex P1: o lookup antigo fazia `.eq("cpf_cnpj", "")` (string
+   vazia) e o insert gravava `null`, então cada print recriava
+   "Shopee". Sem documento fiscal, reusa por nome (`ilike` exato,
+   `filial_id IS NULL`, `ativo`, o mais antigo); com CNPJ/CPF, continua
+   o lookup por documento.
+5. **Tela de Saídas, mobile**: `TransacaoDialog` mostra o upload de
+   comprovante também ao **editar** uma saída, não só ao criar
+   (paridade com o split view desktop).
+
+Diagrama: `docs/diagramas/fluxo-financeiro.md` (seção "Comprovante via
+WhatsApp"). Guardrail L.
+
+### 9.120 Colisão de timestamp em migration + CREATE OR REPLACE silencioso
+
+PR #116, destravando o deploy da #115: `supabase db push` bloqueado desde
+17/Ago com "duplicate key ... schema_migrations_pkey" — duas migrations
+com timestamp idêntico `20260813150000` (`fin_criar_transferencia_valida_
+filial_categorias`, já aplicada, e `fin_reverter_desagio_antecipacao`,
+nunca aplicada; PK é só os 14 dígitos, não o nome do arquivo inteiro).
+
+Renomear a nunca-aplicada resolve a colisão, mas muda quando ela roda —
+passa a executar DEPOIS de tudo que já foi aplicado. Ela redefinia DUAS
+funções que migrations posteriores já aplicadas também redefiniam:
+
+1. **`fin_listar_ledger_conciliacao_cartao`**: `20260817180000` (Hop2/
+   SFTP, já aplicada) tinha feito `CREATE OR REPLACE` a partir de uma
+   base anterior a `20260807120000`/`20260813140000` — sem o filtro
+   `conciliacao_status IN (nao_conciliado, conciliado_manual)` (bug de
+   `20260807120000` reaparecendo: lançamento fechado por outro canal
+   volta a mostrar "sem_hop2", ação sempre falha com `FIN_JA_LANCADO`) e
+   sem `lancamento_desagio_id`/`hop2_pendente`. Mesclado: filtro + fonte
+   SFTP (`getnet_analitico`, `UNION ALL`) + os dois campos, todos juntos.
+2. **`fin_reverter_desagio_antecipacao`**: achado num review automático
+   (Cursor Agent) DEPOIS do 1º `db push --include-all` já ter aplicado o
+   corpo errado. `20260813160000` (aplicada) tinha trocado a checagem de
+   autorização por `_fin_exigir_autorizado_lancar_despesas` — o 2º
+   argumento de `fin_resolver_contexto` (`p_flag_bot`) só vale no canal
+   bot (ADR-029); sem o helper, tesoureiro JWT sem `autorizado_lancar_
+   despesas` passava por lote/tenant/filial antes de ser barrado só na
+   checagem aninhada de `fin_alterar_status_lancamento` — degradação de
+   defesa em profundidade (a mutação final continuava bloqueada), mas
+   real e já ao vivo. Corrigido direto em produção via `supabase db
+   query` assim que achado (urgência), formalizado numa migration nova
+   forward (`20260818210000`) marcada `applied` via `supabase migration
+   repair` — editar o arquivo já aplicado não reexecuta no próximo push.
+
+Ambas as mesclagens testadas num Postgres isolado (Docker, schema stub)
+antes de aplicar: ledger com 3 cenários sintéticos (venda via CSV, venda
+via SFTP, lançamento já conciliado por outro canal); reversão com
+usuário sem/com o flag de autorização.
+
+Padrão generalizado: **antes de renomear uma migration nunca-aplicada,
+`grep -l` toda função que ela redefine contra QUALQUER migration mais
+recente que também a redefina** — aplicada ou não. Guardrail E.
+
+### 9.121 OCR ignorava melhorias do código (config no banco venceu) + Claude como provedor
+
+Comprovante legível (pedido/orçamento de locação de eventos com
+fornecedor, itens e "VALOR TOTAL: R$ 152,00" bem visíveis) continuava
+voltando "não consegui identificar" mesmo depois de todas as melhorias
+de prompt da #115/#116. `getChatbotConfig` (`processar-nota-fiscal`)
+prioriza `chatbot_configs.role_visao` quando `ativo=true` — e a linha
+pra `processar-nota-fiscal` tinha 236 caracteres, escrita antes de
+qualquer trabalho de prompt desta sessão, escopada só a "notas fiscais
+brasileiras" (CNPJ, razão social, data, valor, itens — sem dicionário
+anti-bônus, sem suporte a print de app, sem suporte a formulário
+próprio do fornecedor). Toda melhoria em `DEFAULT_VISION_PROMPT` no
+código teve zero efeito em produção até essa linha do banco ser
+atualizada também.
+
+Fix: `DEFAULT_VISION_PROMPT` generalizado — extrai de QUALQUER
+documento que mostre valor total + nome de quem cobra (nota fiscal,
+print de app, pedido/orçamento/contrato de locação/serviço, comprovante
+de pagamento), não só nota fiscal formal; regra central deixada
+explícita ("se mostra valor total E nome de quem vendeu, extraia — não
+exija que pareça nota fiscal tradicional"). Prompt sincronizado direto
+no banco via `supabase db query` (urgência), código também atualizado
+pra manter os dois em sincronia daqui pra frente.
+
+Adicionado **Claude (Anthropic)** como provedor de visão (`ANTHROPIC_
+API_KEY`), prioridade sobre Gemini/OpenAI/Lovable Gateway quando
+configurada — mesmo padrão `tool_choice` forçado dos outros provedores,
+mas `tool_use.input` já vem como objeto (não precisa `JSON.parse` como
+a OpenAI). Mapeamento de model id por provedor tornado defensivo
+(`model?.startsWith("gpt-")`/`"gemini"`/`"claude"`) — sem isso, um
+`modelo_visao` do banco apontando pra um provedor sem API key nesta
+implantação (ex: `"claude-sonnet-5"` caindo no branch da OpenAI)
+vazaria como model id literal e quebraria a chamada. Testado com o
+documento real que expôs o bug — extraiu fornecedor e valor
+corretamente.
+
+Guardrail L (itens 4-5).
 

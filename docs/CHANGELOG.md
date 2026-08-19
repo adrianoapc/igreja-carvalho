@@ -8,6 +8,42 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não Lançado]
 
+### Corrigido
+
+#### 🤖 OCR de comprovante ignorava melhorias do código (config no banco sobrescrevendo) + Claude como provedor (19 Ago/2026)
+
+- **Tipo**: fix + feature
+- **Resumo**: comprovantes legíveis (ex: pedido/orçamento de locação de eventos com fornecedor, itens e valor total bem visíveis) continuavam voltando "não consegui identificar" mesmo depois das melhorias de prompt da PR #115. Causa: `chatbot_configs.role_visao` (`processar-nota-fiscal`, `ativo=true`) tinha uma linha antiga de 236 caracteres, escopada só a "notas fiscais brasileiras" — sobrescrevia o `DEFAULT_VISION_PROMPT` do código toda vez, então nenhuma melhoria anterior surtia efeito em produção. Prompt generalizado (qualquer documento com valor total + nome de quem cobra, não só nota fiscal formal) e sincronizado no banco. Adicionado Claude (Anthropic) como provedor de visão — prioridade sobre Gemini/OpenAI quando `ANTHROPIC_API_KEY` está configurada — com mapeamento de modelo defensivo por provedor (não repassa cegamente um model id de outro provedor vindo da config do banco).
+- **Módulos afetados**: OCR de comprovantes (`processar-nota-fiscal`), bot financeiro WhatsApp
+- **Impacto no usuário**: comprovantes informais (pedido, orçamento, contrato de locação/serviço, print de compra) voltam a ser extraídos automaticamente em vez de exigir correção manual toda vez.
+
+#### 🔧 Colisão de timestamp em migration + regressão silenciosa no Ledger Cartão (18 Ago/2026)
+
+- **Tipo**: fix + infra (deploy)
+- **Resumo**: `supabase db push` estava bloqueado desde 17/Ago por dois problemas: (1) duas migrations com timestamp idêntico `20260813150000`, violando a PK de `schema_migrations`; (2) a migration Hop2/SFTP (`20260817180000`, já aplicada) tinha feito `CREATE OR REPLACE` de `fin_listar_ledger_conciliacao_cartao` a partir de uma base desatualizada, revertendo silenciosamente em produção o filtro `conciliacao_status` (bug de 20260807120000 voltando a acontecer) e os campos `lancamento_desagio_id`/`hop2_pendente` — `20260813140000` só tinha exposto `lancamento_desagio_id` sem HFA e sem `hop2_pendente`; o gate de HFA e o campo `hop2_pendente` vieram do conteúdo original de `20260813150000` (agora renomeada `20260818200000`). Migration renomeada e o corpo da função mesclado (SFTP + filtro + campos), testado num Postgres isolado (Docker) com 3 cenários sintéticos antes de aplicar em produção. Review automático (Cursor Agent) na PR pegou um 2º caso do mesmo padrão: a mesma migration renomeada também redefinia `fin_reverter_desagio_antecipacao` a partir de uma base anterior a `20260813160000`, que tinha trocado a checagem de autorização por `_fin_exigir_autorizado_lancar_despesas` (o 2º argumento de `fin_resolver_contexto` só vale no canal bot — tesoureiro JWT sem o flag ia além da entrada da função antes de ser barrado só pela checagem aninhada). Corrigido e aplicado direto em produção (`supabase db query`) assim que achado; formalizado numa migration nova (`20260818210000`) marcada `applied` via `supabase migration repair` (o conteúdo já tinha rodado manualmente — só documenta no histórico; um ambiente linked que ainda não tenha esse fix precisa rodar `db push` de verdade, não só repair) — testado com usuário sem/com o flag.
+- **Módulos afetados**: Infra de deploy (CI), Conciliação Cartão Getnet (Fase 7), Antecipação Getnet (reversão de deságio)
+- **Impacto no usuário**: Ledger de conciliação de cartão volta a excluir lançamentos já fechados por outro canal (evita ações que sempre falhavam com `FIN_JA_LANCADO`) e a expor corretamente `lancamento_desagio_id`/`hop2_pendente`, sem perder o suporte a vendas via SFTP. Reversão de deságio via web volta a barrar tesoureiro sem a permissão imediatamente na entrada, não só depois de validar lote/tenant/filial.
+
+#### 💬 Comprovante via WhatsApp — Graph API, OCR de print e falhas visíveis (18 Ago/2026)
+
+- **Tipo**: fix + ux
+- **Resumo**: Bot financeiro deixa de confirmar comprovante sem valor, relata falha de gravação (sem vazar SQL), baixa mídia na Graph API v21.0, OCR aceita print de compra em app/site reusando o fornecedor pelo nome, e a tela de Saídas no mobile mostra upload também na edição.
+- **Módulos afetados**: Finanças (bot WhatsApp, OCR, Saídas)
+- **Impacto no usuário**:
+  - Print de Shopee/Mercado Livre pode ser lançado; "Sim" sem valor é recusado com instrução clara.
+  - Se um comprovante não gravar, o WhatsApp lista qual e pede contato com o financeiro.
+  - No celular, editar uma saída existente volta a mostrar o anexo de comprovante.
+
+**Arquivos modificados:**
+
+- `supabase/functions/chatbot-financeiro/index.ts`
+- `supabase/functions/processar-nota-fiscal/index.ts`
+- `supabase/functions/chatbot-triagem/index.ts`
+- `supabase/functions/disparar-alerta/index.ts`
+- `src/components/financas/TransacaoDialog.tsx`
+
+---
+
 ### Alterado
 
 #### 👤 Padronização de Contatos em Pessoas + Backfill Legado (8 Jun/2026)

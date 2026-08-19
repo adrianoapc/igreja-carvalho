@@ -264,7 +264,7 @@ async function dispararWhatsAppMultiTenant(
     }
 
     const templateName = templateMeta || evento;
-    const metaUrl = `https://graph.facebook.com/v18.0/${config.url}/messages`;
+    const metaUrl = `https://graph.facebook.com/v21.0/${config.url}/messages`;
 
     try {
       const payload = {
