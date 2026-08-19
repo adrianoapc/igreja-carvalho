@@ -73,11 +73,11 @@ BEGIN
     RAISE EXCEPTION 'FIN_VALIDACAO: p_lote_id é obrigatório';
   END IF;
 
-  -- Mesma permissão de fin_lancar_desagio_antecipacao (simetria lançar/
-  -- desfazer). No canal JWT o flag é ignorado (só admin|tesoureiro|
-  -- super_admin); no canal bot é o que impede membro autorizado no bot
-  -- sem autorizado_lancar_despesas de reverter a saída.
-  v_ctx := public.fin_resolver_contexto(p_contexto, 'autorizado_lancar_despesas');
+  -- Bot: flag via fin_resolver_contexto. JWT: o resolver ignora o flag
+  -- — _fin_exigir_autorizado_lancar_despesas cobre os dois canais
+  -- (Codex #102 P1, mesclado de 20260813160000 em 2026-08-19 — ver nota
+  -- de mesclagem no cabeçalho do arquivo).
+  v_ctx := public._fin_exigir_autorizado_lancar_despesas(p_contexto);
   v_igreja := (v_ctx ->> 'igreja_id')::uuid;
 
   -- Sem FOR UPDATE no lote: fin_alterar_status_lancamento trava a
@@ -154,7 +154,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.fin_reverter_desagio_antecipacao(uuid, jsonb) IS
-  'Reverte a saída de deságio de um lote Getnet em lancamento_criado. Mesma permissão de fin_lancar_desagio_antecipacao (autorizado_lancar_despesas no canal bot). Valida has_filial_access no lote, na filial efetiva do extrato e na transação. Aninha fin_alterar_status_lancamento(..., v_ctx) — o trigger sincronizar_lote_antecipacao_ao_reverter_desagio volta o lote pra vinculado. Não trava o lote antes da transação (ordem igual ao menu, evita deadlock).';
+  'Reverte a saída de deságio de um lote Getnet em lancamento_criado. Exige autorizado_lancar_despesas no bot E no JWT (tesoureiro sem o flag é recusado; admin/super_admin bypass). Helper _fin_exigir_autorizado_lancar_despesas. Valida has_filial_access no lote, na filial efetiva do extrato e na transação. Aninha fin_alterar_status_lancamento(..., v_ctx) — o trigger sincronizar_lote_antecipacao_ao_reverter_desagio volta o lote pra vinculado. Não trava o lote antes da transação (ordem igual ao menu, evita deadlock).';
 
 GRANT EXECUTE ON FUNCTION public.fin_reverter_desagio_antecipacao(uuid, jsonb)
   TO authenticated, service_role;
