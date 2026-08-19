@@ -53,7 +53,17 @@ próprio arquivo):
   QUALQUER migration mais recente que também a redefina (aplicada ou
   não) e mesclar os corpos — senão o `CREATE OR REPLACE` da renomeada
   roda por último e reverte silenciosamente a mais recente (sem erro,
-  sem warning).
+  sem warning). PR mergeada em `main` **não** garante deploy aplicado —
+  `supabase db push` recusa o lote inteiro por timestamp fora de ordem
+  sem alertar além do X no GitHub Actions; checar `gh run list
+  --workflow=supabase-deploy.yml` antes de confiar num Advisor achado
+  "já corrigido".
+- **`REVOKE ALL ... FROM anon` não fecha nada** — `EXECUTE` é concedido
+  a `PUBLIC` por padrão, e `anon`/`authenticated` herdam via `PUBLIC`,
+  não por grant próprio. Só `REVOKE ... FROM PUBLIC` fecha de verdade;
+  revogar de um role nomeado é no-op se `PUBLIC` ainda segura o acesso.
+  Confirmar sempre com `supabase db advisors --linked` (não o cache do
+  dashboard).
 
 Este arquivo é o resumo. O detalhe (com exemplos de bug real por item) está em
 `docs/guardrails-financeiro.md`, que cresce a cada rodada de review que achar
