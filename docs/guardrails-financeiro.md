@@ -413,8 +413,44 @@ DEFINER`:**
     Não expor o botão sem essa permissão; a rota `AuthGate` não substitui
     (§9.110).
 
+20. **`REVOKE ALL ... FROM anon[, authenticated]` não fecha acesso
+    nenhum — só `REVOKE ... FROM PUBLIC` fecha.** `EXECUTE` numa função
+    nova é concedido a `PUBLIC` por padrão no Postgres; `anon`/
+    `authenticated` herdam esse acesso via `PUBLIC`, não por grant
+    próprio. Revogar de um role nomeado não remove o que veio de
+    `PUBLIC` — o role continua executando a função normalmente. Achado
+    real: `20260710120000` tentou fechar `fin_resolver_contexto`,
+    `fin_registrar_auditoria`, `fin_materializar_recorrencias`,
+    `fin_validar_fk_tenant` (+ outras 45 `fin_*`) com `REVOKE ALL ...
+    FROM anon, authenticated` — nenhuma fechou de verdade; o linter
+    Supabase (`anon_security_definer_function_executable`) continuou
+    acusando as 49 meses depois. `fin_registrar_auditoria` (INSERT
+    livre em `fin_audit_log`, zero validação) e
+    `fin_materializar_recorrencias` (job de cron sem parâmetro) eram
+    exploráveis de verdade por `anon`; as outras 45 só não foram
+    exploradas porque se protegem sozinhas via
+    `fin_resolver_contexto`/`fin_exigir_leitura_financeira` (que
+    barram sem JWT), não porque o grant estava fechado. Fix sempre
+    `REVOKE ALL ON FUNCTION ... FROM PUBLIC, anon;` (a segunda cláusula
+    cobre grant explícito a `anon` feito fora de migration — ver item
+    21) — nunca só `FROM anon`. Rodar `supabase db advisors --linked`
+    (não o cache do dashboard) pra confirmar o achado sumiu de verdade.
+
+21. **Grant/policy aplicado direto em produção fora de uma migration é
+    invisível no `git log` e sobrevive a qualquer auditoria de código.**
+    Achado real: `fin_resumo_periodo` e `fin_validar_fk_filial` tinham
+    `GRANT EXECUTE ... TO anon` ao vivo em produção sem nenhuma
+    migration correspondente no repo — alguém rodou o `GRANT` direto
+    (SQL editor do dashboard ou `psql`), sem deixar rastro versionado.
+    `grep` no repo não acha isso; só compara contra o schema real
+    (`supabase db dump --linked` ou `supabase db advisors --linked`)
+    revela a divergência. Ao investigar um achado do linter que
+    "não devia existir" dado o que as migrations mostram, sempre
+    considerar que o banco real pode ter mudado por fora do git.
+
 Referências: §9.30, §9.37, §9.61, §9.62, §9.63, §9.64, §9.65, §9.67,
-§9.73, §9.74, §9.80, §9.81, §9.82, §9.86, §9.96, §9.109, §9.110, checklist completo na memória de sessão.
+§9.73, §9.74, §9.80, §9.81, §9.82, §9.86, §9.96, §9.109, §9.110, §9.122,
+checklist completo na memória de sessão.
 
 ---
 
@@ -651,7 +687,31 @@ anterior, exigindo correção direta via `supabase db query` + migration
 forward de formalização (`migration repair`), já que editar o arquivo
 já-aplicado não reexecuta no próximo push (§6b) (§9.120).
 
-Referências: §9.35, §9.39, §9.51, §9.53, §9.73, §9.77, §9.120.
+**Um PR mergeado em `main` não significa que o deploy aplicou — `supabase
+db push` recusa o lote INTEIRO (não só o arquivo problemático) se
+qualquer migration tiver timestamp anterior ao último já aplicado no
+remoto, e isso só aparece como X vermelho no GitHub Actions, sem alertar
+em nenhum outro lugar.** Acontece quando duas PRs são criadas a partir do
+mesmo ponto de `main`, uma pega timestamp mais cedo mas mergeia/deploya
+depois da outra — a mais tardia (por timestamp de arquivo, mais cedo por
+deploy real) bloqueia a mais antiga. Achado real: PR #118 (fix de RLS
+desligado em 5 tabelas + views `SECURITY DEFINER` + escalação de
+privilégio) mergeou em `main` mas o deploy falhou (`supabase db push`:
+"Found local migration files to be inserted before the last migration on
+remote database") porque PRs #116/#117 tinham timestamp mais recente e
+deployaram primeiro — nenhuma correção da PR #118 chegou a ir pro ar, e o
+Security/Performance Advisor do Supabase continuou mostrando os achados
+como se a PR nunca tivesse existido (§9.123). **Ao investigar por que um
+achado do Advisor "já corrigido" numa PR mergeada continua aparecendo,
+sempre checar `gh run list --workflow=supabase-deploy.yml` antes de
+assumir que é cache do painel** — merge em `main` não garante que o
+deploy foi aplicado. Fix: mesmo procedimento do item acima (renomear pra
+depois do último timestamp real do remoto, checar colisão de função
+redefinida antes), confirmando com `supabase migration list --linked`
+(local==remote) e `supabase db advisors --linked` (achado sumiu de
+verdade) no final.
+
+Referências: §9.35, §9.39, §9.51, §9.53, §9.73, §9.77, §9.120, §9.123.
 
 ---
 
