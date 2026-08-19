@@ -7595,4 +7595,47 @@ API v18.0 já aposentada. Três correções no canal + uma na tela web:
 Diagrama: `docs/diagramas/fluxo-financeiro.md` (seção "Comprovante via
 WhatsApp"). Guardrail L.
 
+### 9.120 Colisão de timestamp em migration + CREATE OR REPLACE silencioso
+
+PR #116, destravando o deploy da #115: `supabase db push` bloqueado desde
+17/Ago com "duplicate key ... schema_migrations_pkey" — duas migrations
+com timestamp idêntico `20260813150000` (`fin_criar_transferencia_valida_
+filial_categorias`, já aplicada, e `fin_reverter_desagio_antecipacao`,
+nunca aplicada; PK é só os 14 dígitos, não o nome do arquivo inteiro).
+
+Renomear a nunca-aplicada resolve a colisão, mas muda quando ela roda —
+passa a executar DEPOIS de tudo que já foi aplicado. Ela redefinia DUAS
+funções que migrations posteriores já aplicadas também redefiniam:
+
+1. **`fin_listar_ledger_conciliacao_cartao`**: `20260817180000` (Hop2/
+   SFTP, já aplicada) tinha feito `CREATE OR REPLACE` a partir de uma
+   base anterior a `20260807120000`/`20260813140000` — sem o filtro
+   `conciliacao_status IN (nao_conciliado, conciliado_manual)` (bug de
+   `20260807120000` reaparecendo: lançamento fechado por outro canal
+   volta a mostrar "sem_hop2", ação sempre falha com `FIN_JA_LANCADO`) e
+   sem `lancamento_desagio_id`/`hop2_pendente`. Mesclado: filtro + fonte
+   SFTP (`getnet_analitico`, `UNION ALL`) + os dois campos, todos juntos.
+2. **`fin_reverter_desagio_antecipacao`**: achado num review automático
+   (Cursor Agent) DEPOIS do 1º `db push --include-all` já ter aplicado o
+   corpo errado. `20260813160000` (aplicada) tinha trocado a checagem de
+   autorização por `_fin_exigir_autorizado_lancar_despesas` — o 2º
+   argumento de `fin_resolver_contexto` (`p_flag_bot`) só vale no canal
+   bot (ADR-029); sem o helper, tesoureiro JWT sem `autorizado_lancar_
+   despesas` passava por lote/tenant/filial antes de ser barrado só na
+   checagem aninhada de `fin_alterar_status_lancamento` — degradação de
+   defesa em profundidade (a mutação final continuava bloqueada), mas
+   real e já ao vivo. Corrigido direto em produção via `supabase db
+   query` assim que achado (urgência), formalizado numa migration nova
+   forward (`20260818210000`) marcada `applied` via `supabase migration
+   repair` — editar o arquivo já aplicado não reexecuta no próximo push.
+
+Ambas as mesclagens testadas num Postgres isolado (Docker, schema stub)
+antes de aplicar: ledger com 3 cenários sintéticos (venda via CSV, venda
+via SFTP, lançamento já conciliado por outro canal); reversão com
+usuário sem/com o flag de autorização.
+
+Padrão generalizado: **antes de renomear uma migration nunca-aplicada,
+`grep -l` toda função que ela redefine contra QUALQUER migration mais
+recente que também a redefina** — aplicada ou não. Guardrail E.
+
 
