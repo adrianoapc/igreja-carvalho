@@ -19,6 +19,24 @@
 -- sem `(select ...)` remanescentes; TO/FOR das 9 policies da PR #124
 -- confirmados intactos; exploit de escrita/leitura anonima (SET ROLE
 -- anon sem NENHUM JWT) re-testado e continua bloqueado.
+--
+-- 2ª RODADA (mesmo dia): review do Codex/Cursor na PR achou que as
+-- policies de `profiles`, `inscricoes_eventos`, `eventos_convites`,
+-- `familias`, `fornecedores`, `visitante_contatos` e `escalas` já
+-- estão SEM `FOR` em PRODUÇÃO HOJE (bug pré-existente, não introduzido
+-- por esta fase — confirmado no dump bruto, de antes de qualquer
+-- migration desta branch): uma policy "ver"/"criar" nomeada como
+-- read/insert-only já é `FOR ALL` de fato, então quem passa no filtro
+-- de leitura também passa em UPDATE/DELETE (ex.: `profiles.
+-- users_can_view_own_profile` deixa o próprio usuário se auto-deletar,
+-- contrariando o comentário original da migration 20251130044928 —
+-- "não criar política de DELETE"). Fase 1 só espelha o `cmd` que já
+-- está em `pg_policies`, então isso já valia mesmo sem esta migration
+-- — mas consolidar/renomear um bug já-existente numa migration nova
+-- "revisada" piora a rastreabilidade dele. Estas 7 tabelas foram
+-- REMOVIDAS desta fase (nenhuma policy tocada nelas, nem o wrap de
+-- performance) até uma sessão de segurança dedicada restaurar o `FOR`
+-- correto — ver memória project-policies-for-clause-perdido-pendente.
 
 
 -- ==================== agenda_pastoral ====================
@@ -317,18 +335,6 @@ CREATE POLICY "Admins podem ver configurações" ON "public"."edge_function_conf
 DROP POLICY IF EXISTS "Admins podem visualizar logs" ON "public"."edge_function_logs";
 CREATE POLICY "Admins podem visualizar logs" ON "public"."edge_function_logs" FOR SELECT TO "authenticated" USING (has_role((select auth.uid()), 'admin'::app_role));
 
--- ==================== escalas ====================
-DROP POLICY IF EXISTS "Admin gerencia todas escalas" ON "public"."escalas";
-CREATE POLICY "Admin gerencia todas escalas" ON "public"."escalas" TO "authenticated" USING ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id))) WITH CHECK ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Lider gerencia escalas do seu time" ON "public"."escalas";
-CREATE POLICY "Lider gerencia escalas do seu time" ON "public"."escalas" TO "authenticated" USING ((is_time_leader((select auth.uid()), time_id) AND has_filial_access(igreja_id, filial_id))) WITH CHECK ((is_time_leader((select auth.uid()), time_id) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Voluntario confirma propria escala" ON "public"."escalas";
-CREATE POLICY "Voluntario confirma propria escala" ON "public"."escalas" USING (((pessoa_id IN ( SELECT profiles.id
-   FROM profiles
-  WHERE (profiles.user_id = (select auth.uid())))) AND has_filial_access(igreja_id, filial_id))) WITH CHECK (((pessoa_id IN ( SELECT profiles.id
-   FROM profiles
-  WHERE (profiles.user_id = (select auth.uid())))) AND has_filial_access(igreja_id, filial_id)));
-
 -- ==================== escalas_culto ====================
 DROP POLICY IF EXISTS "Admins podem gerenciar escalas" ON "public"."escalas_culto";
 CREATE POLICY "Admins podem gerenciar escalas" ON "public"."escalas_culto" TO "authenticated" USING ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id))) WITH CHECK ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
@@ -385,16 +391,6 @@ CREATE POLICY "Subtipos visiveis na igreja" ON "public"."evento_subtipos" FOR SE
 DROP POLICY IF EXISTS "Admin gerencia eventos" ON "public"."eventos";
 CREATE POLICY "Admin gerencia eventos" ON "public"."eventos" USING ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id))) WITH CHECK ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
 
--- ==================== eventos_convites ====================
-DROP POLICY IF EXISTS "Admin e lider podem ver todos os convites" ON "public"."eventos_convites";
-CREATE POLICY "Admin e lider podem ver todos os convites" ON "public"."eventos_convites" USING (((has_role((select auth.uid()), 'admin'::app_role) OR has_role((select auth.uid()), 'lider'::app_role)) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Admin pode atualizar convites" ON "public"."eventos_convites";
-CREATE POLICY "Admin pode atualizar convites" ON "public"."eventos_convites" USING ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id))) WITH CHECK ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Admin pode criar convites" ON "public"."eventos_convites";
-CREATE POLICY "Admin pode criar convites" ON "public"."eventos_convites" WITH CHECK ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Admin pode deletar convites" ON "public"."eventos_convites";
-CREATE POLICY "Admin pode deletar convites" ON "public"."eventos_convites" USING ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-
 -- ==================== extratos_bancarios ====================
 DROP POLICY IF EXISTS "Atualizar extratos bancarios" ON "public"."extratos_bancarios";
 CREATE POLICY "Atualizar extratos bancarios" ON "public"."extratos_bancarios" FOR UPDATE TO "authenticated" USING (((has_role((select auth.uid()), 'super_admin'::app_role) OR has_role((select auth.uid()), 'admin'::app_role) OR has_role((select auth.uid()), 'tesoureiro'::app_role)) AND (igreja_id = get_jwt_igreja_id()) AND has_filial_access(igreja_id, filial_id))) WITH CHECK (((has_role((select auth.uid()), 'super_admin'::app_role) OR has_role((select auth.uid()), 'admin'::app_role) OR has_role((select auth.uid()), 'tesoureiro'::app_role)) AND (igreja_id = get_jwt_igreja_id()) AND has_filial_access(igreja_id, filial_id)));
@@ -404,22 +400,6 @@ DROP POLICY IF EXISTS "Inserir extratos bancarios" ON "public"."extratos_bancari
 CREATE POLICY "Inserir extratos bancarios" ON "public"."extratos_bancarios" FOR INSERT TO "authenticated" WITH CHECK (((has_role((select auth.uid()), 'super_admin'::app_role) OR has_role((select auth.uid()), 'admin'::app_role) OR has_role((select auth.uid()), 'tesoureiro'::app_role)) AND (igreja_id = get_jwt_igreja_id()) AND has_filial_access(igreja_id, filial_id)));
 DROP POLICY IF EXISTS "Ver extratos bancarios" ON "public"."extratos_bancarios";
 CREATE POLICY "Ver extratos bancarios" ON "public"."extratos_bancarios" FOR SELECT TO "authenticated" USING (((has_role((select auth.uid()), 'super_admin'::app_role) OR has_role((select auth.uid()), 'admin'::app_role) OR has_role((select auth.uid()), 'tesoureiro'::app_role)) AND (igreja_id = get_jwt_igreja_id()) AND has_filial_access(igreja_id, filial_id)));
-
--- ==================== familias ====================
-DROP POLICY IF EXISTS "Admins podem atualizar relacionamentos familiares" ON "public"."familias";
-CREATE POLICY "Admins podem atualizar relacionamentos familiares" ON "public"."familias" USING ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id))) WITH CHECK ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Admins podem criar relacionamentos familiares" ON "public"."familias";
-CREATE POLICY "Admins podem criar relacionamentos familiares" ON "public"."familias" WITH CHECK ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Admins podem deletar relacionamentos familiares" ON "public"."familias";
-CREATE POLICY "Admins podem deletar relacionamentos familiares" ON "public"."familias" USING ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Admins podem ver todos os relacionamentos familiares" ON "public"."familias";
-CREATE POLICY "Admins podem ver todos os relacionamentos familiares" ON "public"."familias" USING ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "admins_can_manage_families" ON "public"."familias";
-CREATE POLICY "admins_can_manage_families" ON "public"."familias" USING ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id))) WITH CHECK ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "members_can_create_family_relationships" ON "public"."familias";
-CREATE POLICY "members_can_create_family_relationships" ON "public"."familias" FOR INSERT WITH CHECK ((((select auth.uid()) IS NOT NULL) AND (pessoa_id IN ( SELECT profiles.id
-   FROM profiles
-  WHERE (profiles.user_id = (select auth.uid()))))));
 
 -- ==================== filiais ====================
 DROP POLICY IF EXISTS "Admin igreja gerencia filiais" ON "public"."filiais";
@@ -476,16 +456,6 @@ DROP POLICY IF EXISTS "Admins e tesoureiros gerenciam formas pagamento" ON "publ
 CREATE POLICY "Admins e tesoureiros gerenciam formas pagamento" ON "public"."formas_pagamento" USING (((has_role((select auth.uid()), 'admin'::app_role) OR has_role((select auth.uid()), 'tesoureiro'::app_role)) AND has_filial_access(igreja_id, filial_id))) WITH CHECK (((has_role((select auth.uid()), 'admin'::app_role) OR has_role((select auth.uid()), 'tesoureiro'::app_role)) AND has_filial_access(igreja_id, filial_id)));
 DROP POLICY IF EXISTS "Usuarios autenticados podem ver formas pagamento ativas" ON "public"."formas_pagamento";
 CREATE POLICY "Usuarios autenticados podem ver formas pagamento ativas" ON "public"."formas_pagamento" FOR SELECT USING ((((select auth.uid()) IS NOT NULL) AND (ativo = true) AND has_filial_access(igreja_id, filial_id)));
-
--- ==================== fornecedores ====================
-DROP POLICY IF EXISTS "only_admins_can_delete_suppliers" ON "public"."fornecedores";
-CREATE POLICY "only_admins_can_delete_suppliers" ON "public"."fornecedores" USING ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "only_admins_treasurers_can_create_suppliers" ON "public"."fornecedores";
-CREATE POLICY "only_admins_treasurers_can_create_suppliers" ON "public"."fornecedores" WITH CHECK (((has_role((select auth.uid()), 'admin'::app_role) OR has_role((select auth.uid()), 'tesoureiro'::app_role)) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "only_admins_treasurers_can_update_suppliers" ON "public"."fornecedores";
-CREATE POLICY "only_admins_treasurers_can_update_suppliers" ON "public"."fornecedores" USING (((has_role((select auth.uid()), 'admin'::app_role) OR has_role((select auth.uid()), 'tesoureiro'::app_role)) AND has_filial_access(igreja_id, filial_id))) WITH CHECK (((has_role((select auth.uid()), 'admin'::app_role) OR has_role((select auth.uid()), 'tesoureiro'::app_role)) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "only_admins_treasurers_can_view_suppliers" ON "public"."fornecedores";
-CREATE POLICY "only_admins_treasurers_can_view_suppliers" ON "public"."fornecedores" FOR SELECT USING (((has_role((select auth.uid()), 'admin'::app_role) OR has_role((select auth.uid()), 'tesoureiro'::app_role)) AND ((select auth.uid()) IS NOT NULL) AND has_filial_access(igreja_id, filial_id)));
 
 -- ==================== funcoes_igreja ====================
 DROP POLICY IF EXISTS "Admins podem gerenciar funcoes" ON "public"."funcoes_igreja";
@@ -594,18 +564,6 @@ DROP POLICY IF EXISTS "Users can update their own presets" ON "public"."import_p
 CREATE POLICY "Users can update their own presets" ON "public"."import_presets" FOR UPDATE USING ((user_id = (select auth.uid())));
 DROP POLICY IF EXISTS "Users can view presets" ON "public"."import_presets";
 CREATE POLICY "Users can view presets" ON "public"."import_presets" FOR SELECT USING (((user_id = (select auth.uid())) OR has_filial_access(igreja_id, filial_id)));
-
--- ==================== inscricoes_eventos ====================
-DROP POLICY IF EXISTS "Admins podem gerenciar inscricoes_eventos" ON "public"."inscricoes_eventos";
-CREATE POLICY "Admins podem gerenciar inscricoes_eventos" ON "public"."inscricoes_eventos" USING ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id))) WITH CHECK ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Usuarios podem criar proprias inscricoes" ON "public"."inscricoes_eventos";
-CREATE POLICY "Usuarios podem criar proprias inscricoes" ON "public"."inscricoes_eventos" WITH CHECK (((pessoa_id IN ( SELECT profiles.id
-   FROM profiles
-  WHERE (profiles.user_id = (select auth.uid())))) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Usuarios podem ver proprias inscricoes" ON "public"."inscricoes_eventos";
-CREATE POLICY "Usuarios podem ver proprias inscricoes" ON "public"."inscricoes_eventos" USING (((pessoa_id IN ( SELECT profiles.id
-   FROM profiles
-  WHERE (profiles.user_id = (select auth.uid())))) AND has_filial_access(igreja_id, filial_id)));
 
 -- ==================== inscricoes_jornada ====================
 DROP POLICY IF EXISTS "Admins podem gerenciar inscrições" ON "public"."inscricoes_jornada";
@@ -930,32 +888,6 @@ CREATE POLICY "Users can view their own contacts" ON "public"."profile_contatos"
    FROM profiles
   WHERE ((profiles.id = profile_contatos.profile_id) AND (profiles.user_id = (select auth.uid()))))));
 
--- ==================== profiles ====================
-DROP POLICY IF EXISTS "Tecnico ver perfis da mesma igreja" ON "public"."profiles";
-CREATE POLICY "Tecnico ver perfis da mesma igreja" ON "public"."profiles" FOR SELECT TO "authenticated" USING ((has_role((select auth.uid()), 'tecnico'::app_role) AND (igreja_id = get_current_user_igreja_id())));
-DROP POLICY IF EXISTS "admins_can_create_profiles" ON "public"."profiles";
-CREATE POLICY "admins_can_create_profiles" ON "public"."profiles" WITH CHECK ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "admins_can_update_any_profile" ON "public"."profiles";
-CREATE POLICY "admins_can_update_any_profile" ON "public"."profiles" USING ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id))) WITH CHECK ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "admins_can_view_all_profiles" ON "public"."profiles";
-CREATE POLICY "admins_can_view_all_profiles" ON "public"."profiles" USING ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "members_can_create_dependents" ON "public"."profiles";
-CREATE POLICY "members_can_create_dependents" ON "public"."profiles" FOR INSERT WITH CHECK ((((select auth.uid()) IS NOT NULL) AND (user_id IS NULL) AND (familia_id IS NOT NULL) AND (familia_id = get_user_familia_id((select auth.uid())))));
-DROP POLICY IF EXISTS "members_can_create_family_profiles" ON "public"."profiles";
-CREATE POLICY "members_can_create_family_profiles" ON "public"."profiles" FOR INSERT TO "authenticated" WITH CHECK (((user_id IS NULL) OR (user_id = (select auth.uid()))));
-DROP POLICY IF EXISTS "members_can_update_dependents" ON "public"."profiles";
-CREATE POLICY "members_can_update_dependents" ON "public"."profiles" FOR UPDATE USING ((((select auth.uid()) IS NOT NULL) AND (user_id IS NULL) AND (familia_id IS NOT NULL) AND (familia_id = get_user_familia_id((select auth.uid())))));
-DROP POLICY IF EXISTS "members_can_view_family_members" ON "public"."profiles";
-CREATE POLICY "members_can_view_family_members" ON "public"."profiles" FOR SELECT USING ((((select auth.uid()) IS NOT NULL) AND ((user_id = (select auth.uid())) OR ((familia_id IS NOT NULL) AND (familia_id = get_user_familia_id((select auth.uid())))))));
-DROP POLICY IF EXISTS "users_can_create_own_profile" ON "public"."profiles";
-CREATE POLICY "users_can_create_own_profile" ON "public"."profiles" FOR INSERT WITH CHECK ((((select auth.uid()) = user_id) AND ((select auth.uid()) IS NOT NULL) AND (user_id IS NOT NULL)));
-DROP POLICY IF EXISTS "users_can_insert_own_profile" ON "public"."profiles";
-CREATE POLICY "users_can_insert_own_profile" ON "public"."profiles" FOR INSERT TO "authenticated" WITH CHECK (((select auth.uid()) = user_id));
-DROP POLICY IF EXISTS "users_can_update_own_profile" ON "public"."profiles";
-CREATE POLICY "users_can_update_own_profile" ON "public"."profiles" USING ((((select auth.uid()) = user_id) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "users_can_view_own_profile" ON "public"."profiles";
-CREATE POLICY "users_can_view_own_profile" ON "public"."profiles" USING ((((select auth.uid()) = user_id) AND has_filial_access(igreja_id, filial_id)));
-
 -- ==================== projetos ====================
 DROP POLICY IF EXISTS "Admins podem gerenciar projetos" ON "public"."projetos";
 CREATE POLICY "Admins podem gerenciar projetos" ON "public"."projetos" USING (((has_role((select auth.uid()), 'admin'::app_role) OR has_role((select auth.uid()), 'lider'::app_role)) AND has_filial_access(igreja_id, filial_id)));
@@ -1233,24 +1165,6 @@ DROP POLICY IF EXISTS "user_roles_select_own_or_admin" ON "public"."user_roles";
 CREATE POLICY "user_roles_select_own_or_admin" ON "public"."user_roles" FOR SELECT TO "authenticated" USING (((user_id = (select auth.uid())) OR (has_role((select auth.uid()), 'admin'::app_role) AND ((igreja_id IS NULL) OR (igreja_id = get_current_user_igreja_id()))) OR (has_role((select auth.uid()), 'admin_igreja'::app_role) AND (igreja_id = get_current_user_igreja_id())) OR has_role((select auth.uid()), 'super_admin'::app_role)));
 DROP POLICY IF EXISTS "user_roles_update_admin" ON "public"."user_roles";
 CREATE POLICY "user_roles_update_admin" ON "public"."user_roles" FOR UPDATE TO "authenticated" USING (((has_role((select auth.uid()), 'admin'::app_role) AND ((igreja_id IS NULL) OR (igreja_id = get_current_user_igreja_id()))) OR (has_role((select auth.uid()), 'admin_igreja'::app_role) AND (igreja_id = get_current_user_igreja_id()) AND (role <> ALL (ARRAY['super_admin'::app_role, 'admin'::app_role]))) OR has_role((select auth.uid()), 'super_admin'::app_role)));
-
--- ==================== visitante_contatos ====================
-DROP POLICY IF EXISTS "Admins podem atualizar contatos" ON "public"."visitante_contatos";
-CREATE POLICY "Admins podem atualizar contatos" ON "public"."visitante_contatos" USING ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id))) WITH CHECK ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Admins podem criar contatos" ON "public"."visitante_contatos";
-CREATE POLICY "Admins podem criar contatos" ON "public"."visitante_contatos" WITH CHECK ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Admins podem deletar contatos" ON "public"."visitante_contatos";
-CREATE POLICY "Admins podem deletar contatos" ON "public"."visitante_contatos" USING ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Admins podem ver todos os contatos" ON "public"."visitante_contatos";
-CREATE POLICY "Admins podem ver todos os contatos" ON "public"."visitante_contatos" USING ((has_role((select auth.uid()), 'admin'::app_role) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Church staff podem gerenciar contatos agendados da filial" ON "public"."visitante_contatos";
-CREATE POLICY "Church staff podem gerenciar contatos agendados da filial" ON "public"."visitante_contatos" FOR UPDATE USING (((has_role((select auth.uid()), 'admin'::app_role) OR has_role((select auth.uid()), 'super_admin'::app_role) OR has_role((select auth.uid()), 'admin_igreja'::app_role) OR has_role((select auth.uid()), 'pastor'::app_role) OR has_role((select auth.uid()), 'lider'::app_role) OR has_role((select auth.uid()), 'secretario'::app_role) OR has_role((select auth.uid()), 'tesoureiro'::app_role) OR has_role((select auth.uid()), 'professor'::app_role)) AND has_filial_access(igreja_id, filial_id))) WITH CHECK (((has_role((select auth.uid()), 'admin'::app_role) OR has_role((select auth.uid()), 'super_admin'::app_role) OR has_role((select auth.uid()), 'admin_igreja'::app_role) OR has_role((select auth.uid()), 'pastor'::app_role) OR has_role((select auth.uid()), 'lider'::app_role) OR has_role((select auth.uid()), 'secretario'::app_role) OR has_role((select auth.uid()), 'tesoureiro'::app_role) OR has_role((select auth.uid()), 'professor'::app_role)) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Church staff podem ver contatos agendados da filial" ON "public"."visitante_contatos";
-CREATE POLICY "Church staff podem ver contatos agendados da filial" ON "public"."visitante_contatos" FOR SELECT USING (((has_role((select auth.uid()), 'admin'::app_role) OR has_role((select auth.uid()), 'super_admin'::app_role) OR has_role((select auth.uid()), 'admin_igreja'::app_role) OR has_role((select auth.uid()), 'pastor'::app_role) OR has_role((select auth.uid()), 'lider'::app_role) OR has_role((select auth.uid()), 'secretario'::app_role) OR has_role((select auth.uid()), 'tesoureiro'::app_role) OR has_role((select auth.uid()), 'professor'::app_role)) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Membros responsáveis podem atualizar seus contatos" ON "public"."visitante_contatos";
-CREATE POLICY "Membros responsáveis podem atualizar seus contatos" ON "public"."visitante_contatos" USING (((membro_responsavel_id = (select auth.uid())) AND has_filial_access(igreja_id, filial_id))) WITH CHECK (((membro_responsavel_id = (select auth.uid())) AND has_filial_access(igreja_id, filial_id)));
-DROP POLICY IF EXISTS "Membros responsáveis podem ver seus contatos" ON "public"."visitante_contatos";
-CREATE POLICY "Membros responsáveis podem ver seus contatos" ON "public"."visitante_contatos" USING (((membro_responsavel_id = (select auth.uid())) AND has_filial_access(igreja_id, filial_id)));
 
 -- ==================== visitantes_leads ====================
 DROP POLICY IF EXISTS "Admins podem gerenciar visitantes leads" ON "public"."visitantes_leads";
