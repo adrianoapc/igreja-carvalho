@@ -75,8 +75,12 @@
 -- (qualquer usuário autenticado vê o dialog de edição, EventoDialog.tsx
 -- e MusicaTabContent.tsx) — depois desta migration, um membro comum
 -- que tentava salvar (e o RLS silenciosamente permitia, sem dever
--- permitir) passa a receber erro de permissão. escalas tem 2 versões
--- mais estreitas do mesmo problema: (a) EscalasTabContent.tsx gateia
+-- permitir) passa a receber erro de permissão. posicoes_time tem o
+-- mesmo problema numa 2ª tela além do GerenciarTimeDialog.tsx já
+-- citado: Posicoes.tsx (rota /eventos/posicoes) não tem NENHUM gate de
+-- role — qualquer autenticado vê "Nova Posição"/"Editar"/"Deletar" pra
+-- QUALQUER time, não só o próprio. escalas tem 2 versões mais estreitas
+-- do mesmo problema: (a) EscalasTabContent.tsx gateia
 -- adicionar/remover atrás de isAdmin = hasAccess("eventos",
 -- "aprovar_gerenciar") — um predicado DIFERENTE do que a policy do
 -- banco exige (has_role admin OU ser o líder/sublíder DAQUELE time
@@ -110,6 +114,22 @@
 -- de aplicar, e considerar corrigir `Public.tsx` (adicionar o mesmo
 -- filtro publicar_no_site que a policy já exige) como follow-up
 -- imediato de frontend.
+--
+-- Achado no review do Cursor/Codex nesta própria PR: `times_culto` é
+-- uma tabela morta separada (confirmada viva no dump real — CREATE
+-- TABLE, RLS habilitado, trigger set_tenant_defaults_times_culto()
+-- próprio — corrigi-la aqui é seguro e não quebra nada), mas a tabela
+-- REALMENTE usada pelo app é `times` (renomeada de times_culto em
+-- 20251228190007), com sua PRÓPRIA policy "Membros podem ver times
+-- ativos". Essa já era `FOR SELECT` (por isso não apareceu no scan
+-- original desta investigação, que procurava especificamente o padrão
+-- FOR-ALL-sem-WITH-CHECK de escrita) — mas também sem `TO
+-- authenticated`, com o mesmo vazamento de LEITURA cross-tenant pra
+-- anon que as outras 8. Fechando aqui junto, mesmo baixo risco (só
+-- adiciona TO authenticated, USING idêntico, já era SELECT-only).
+
+DROP POLICY IF EXISTS "Membros podem ver times ativos" ON "public"."times";
+CREATE POLICY "Membros podem ver times ativos" ON "public"."times" FOR SELECT TO "authenticated" USING (((("ativo" = true) OR "public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role")) AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "Membros visualizam eventos" ON "public"."eventos";
 CREATE POLICY "Membros visualizam eventos" ON "public"."eventos" FOR SELECT TO "authenticated" USING ((true AND "public"."has_filial_access"("igreja_id", "filial_id")));
@@ -136,4 +156,4 @@ DROP POLICY IF EXISTS "Membros podem ver posições ativas" ON "public"."posicoe
 CREATE POLICY "Membros podem ver posições ativas" ON "public"."posicoes_time" FOR SELECT TO "authenticated" USING ((("ativo" = true) AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "Lider gerencia posições do seu time" ON "public"."posicoes_time";
-CREATE POLICY "Lider gerencia posições do seu time" ON "public"."posicoes_time" TO "authenticated" USING (("public"."is_time_leader"("auth"."uid"(), "time_id") AND "public"."has_filial_access"("igreja_id", "filial_id"))) WITH CHECK (("public"."is_time_leader"("auth"."uid"(), "time_id") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "Lider gerencia posições do seu time" ON "public"."posicoes_time" FOR ALL TO "authenticated" USING (("public"."is_time_leader"("auth"."uid"(), "time_id") AND "public"."has_filial_access"("igreja_id", "filial_id"))) WITH CHECK (("public"."is_time_leader"("auth"."uid"(), "time_id") AND "public"."has_filial_access"("igreja_id", "filial_id")));
