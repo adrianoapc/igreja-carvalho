@@ -52,6 +52,31 @@
 -- de auth.uid()/auth.role()/current_setting() sem (select ...) nesta
 -- migration (827 chamadas auth.uid(), 3 current_setting(), todas
 -- envolvidas).
+--
+-- REGENERADA em 2026-08-20: a geração original (branch
+-- fix-perf-auth-rls-initplan, commit 47a5ccb8) rodou ANTES da PR #124
+-- (fecha escrita/leitura anônima cross-tenant — migration
+-- 20260820000000) e fundia as policies "Membros visualizam/podem ver X"
+-- de 8 tabelas usando a definição PRÉ-fix (sem TO authenticated, sem
+-- FOR SELECT explícito) em policies novas `perf_merge_*` — reabriria o
+-- mesmo bug crítico sob nomes diferentes. Em vez de re-derivar do zero
+-- a lógica de merge (mais arriscado que vale a pena numa 2ª rodada),
+-- as 8 seções afetadas foram REMOVIDAS desta migration — essas tabelas
+-- ficam com suas policies individuais (já corretas, pós-PR #124),
+-- perdendo só o ganho de performance nelas, sem risco de regressão de
+-- segurança. Tabelas excluídas: cancoes_culto, escalas, eventos,
+-- liturgia_culto, midias_culto, posicoes_time, times, times_culto
+-- (`membros_time`, também tocada pela PR #124, não precisou de exclusão
+-- — a policy "Membros podem ver membros de times" nunca fez parte de
+-- nenhum grupo de merge nesta tabela; confirmado no harness que ela
+-- permanece intocada e as `perf_merge_*` geradas aqui cobrem só as
+-- policies "Admin/Lider gerencia(m)", mais restritivas). Validado num
+-- Postgres local (Docker) restaurado de `supabase db dump --linked -s
+-- public` (já pós-PR #124), aplicado em sequência com a Fase 1
+-- regenerada: exploit de escrita/leitura anônima (SET ROLE anon sem
+-- NENHUM JWT) re-testado nas 8 tabelas excluídas e continua bloqueado.
+-- Follow-up (não nesta PR): reduzir multiple_permissive_policies nessas
+-- 8 tabelas também, com harness dedicado.
 
 
 
@@ -153,22 +178,6 @@ COMMENT ON POLICY "perf_merge_002_update_pub" ON "public"."bases_ministeriais" I
 CREATE POLICY "perf_merge_003_delete_pub" ON "public"."bases_ministeriais" FOR DELETE USING (((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") OR "public"."has_role"((select "auth"."uid"()), 'tesoureiro'::"public"."app_role")) AND "public"."has_filial_access"("igreja_id", "filial_id"))));
 COMMENT ON POLICY "perf_merge_003_delete_pub" ON "public"."bases_ministeriais" IS 'perf: merges Admins e tesoureiros podem gerenciar bases ministeriais';
 
--- ==================== cancoes_culto ====================
-DROP POLICY IF EXISTS "Admins podem gerenciar canções" ON "public"."cancoes_culto";
-DROP POLICY IF EXISTS "Membros podem ver canções" ON "public"."cancoes_culto";
--- merges: Admins podem gerenciar canções, Membros podem ver canções
-CREATE POLICY "perf_merge_000_select_pub" ON "public"."cancoes_culto" FOR SELECT USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_000_select_pub" ON "public"."cancoes_culto" IS 'perf: merges Admins podem gerenciar canções, Membros podem ver canções';
--- merges: Admins podem gerenciar canções, Membros podem ver canções
-CREATE POLICY "perf_merge_001_insert_pub" ON "public"."cancoes_culto" FOR INSERT WITH CHECK ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_001_insert_pub" ON "public"."cancoes_culto" IS 'perf: merges Admins podem gerenciar canções, Membros podem ver canções';
--- merges: Admins podem gerenciar canções, Membros podem ver canções
-CREATE POLICY "perf_merge_002_update_pub" ON "public"."cancoes_culto" FOR UPDATE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id")))) WITH CHECK ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_002_update_pub" ON "public"."cancoes_culto" IS 'perf: merges Admins podem gerenciar canções, Membros podem ver canções';
--- merges: Admins podem gerenciar canções, Membros podem ver canções
-CREATE POLICY "perf_merge_003_delete_pub" ON "public"."cancoes_culto" FOR DELETE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_003_delete_pub" ON "public"."cancoes_culto" IS 'perf: merges Admins podem gerenciar canções, Membros podem ver canções';
-
 -- ==================== candidatos_voluntario ====================
 DROP POLICY IF EXISTS "Admins podem gerenciar candidatos" ON "public"."candidatos_voluntario";
 DROP POLICY IF EXISTS "Ver própria candidatura" ON "public"."candidatos_voluntario";
@@ -267,46 +276,6 @@ COMMENT ON POLICY "perf_merge_002_update_pub" ON "public"."comunicados" IS 'perf
 CREATE POLICY "perf_merge_003_delete_pub" ON "public"."comunicados" FOR DELETE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))));
 COMMENT ON POLICY "perf_merge_003_delete_pub" ON "public"."comunicados" IS 'perf: merges comunicados_gestao_admin';
 
--- ==================== escalas ====================
-DROP POLICY IF EXISTS "Admin gerencia todas escalas" ON "public"."escalas";
-DROP POLICY IF EXISTS "Lider gerencia escalas do seu time" ON "public"."escalas";
-DROP POLICY IF EXISTS "Membros visualizam escalas" ON "public"."escalas";
-DROP POLICY IF EXISTS "Voluntario confirma propria escala" ON "public"."escalas";
--- merges: Admin gerencia todas escalas, Lider gerencia escalas do seu time
-CREATE POLICY "perf_merge_000_select_auth" ON "public"."escalas" FOR SELECT TO "authenticated" USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR (("public"."is_time_leader"((select "auth"."uid"()), "time_id") AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_000_select_auth" ON "public"."escalas" IS 'perf: merges Admin gerencia todas escalas, Lider gerencia escalas do seu time';
--- merges: Membros visualizam escalas, Voluntario confirma propria escala
-CREATE POLICY "perf_merge_001_select_pub" ON "public"."escalas" FOR SELECT USING (((true AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((("pessoa_id" IN ( SELECT "profiles"."id"
-   FROM "public"."profiles"
-  WHERE ("profiles"."user_id" = (select "auth"."uid"())))) AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_001_select_pub" ON "public"."escalas" IS 'perf: merges Membros visualizam escalas, Voluntario confirma propria escala';
--- merges: Admin gerencia todas escalas, Lider gerencia escalas do seu time
-CREATE POLICY "perf_merge_002_insert_auth" ON "public"."escalas" FOR INSERT TO "authenticated" WITH CHECK ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR (("public"."is_time_leader"((select "auth"."uid"()), "time_id") AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_002_insert_auth" ON "public"."escalas" IS 'perf: merges Admin gerencia todas escalas, Lider gerencia escalas do seu time';
--- merges: Membros visualizam escalas, Voluntario confirma propria escala
-CREATE POLICY "perf_merge_003_insert_pub" ON "public"."escalas" FOR INSERT WITH CHECK (((true AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((("pessoa_id" IN ( SELECT "profiles"."id"
-   FROM "public"."profiles"
-  WHERE ("profiles"."user_id" = (select "auth"."uid"())))) AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_003_insert_pub" ON "public"."escalas" IS 'perf: merges Membros visualizam escalas, Voluntario confirma propria escala';
--- merges: Admin gerencia todas escalas, Lider gerencia escalas do seu time
-CREATE POLICY "perf_merge_004_update_auth" ON "public"."escalas" FOR UPDATE TO "authenticated" USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR (("public"."is_time_leader"((select "auth"."uid"()), "time_id") AND "public"."has_filial_access"("igreja_id", "filial_id")))) WITH CHECK ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR (("public"."is_time_leader"((select "auth"."uid"()), "time_id") AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_004_update_auth" ON "public"."escalas" IS 'perf: merges Admin gerencia todas escalas, Lider gerencia escalas do seu time';
--- merges: Membros visualizam escalas, Voluntario confirma propria escala
-CREATE POLICY "perf_merge_005_update_pub" ON "public"."escalas" FOR UPDATE USING (((true AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((("pessoa_id" IN ( SELECT "profiles"."id"
-   FROM "public"."profiles"
-  WHERE ("profiles"."user_id" = (select "auth"."uid"())))) AND "public"."has_filial_access"("igreja_id", "filial_id")))) WITH CHECK (((true AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((("pessoa_id" IN ( SELECT "profiles"."id"
-   FROM "public"."profiles"
-  WHERE ("profiles"."user_id" = (select "auth"."uid"())))) AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_005_update_pub" ON "public"."escalas" IS 'perf: merges Membros visualizam escalas, Voluntario confirma propria escala';
--- merges: Admin gerencia todas escalas, Lider gerencia escalas do seu time
-CREATE POLICY "perf_merge_006_delete_auth" ON "public"."escalas" FOR DELETE TO "authenticated" USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR (("public"."is_time_leader"((select "auth"."uid"()), "time_id") AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_006_delete_auth" ON "public"."escalas" IS 'perf: merges Admin gerencia todas escalas, Lider gerencia escalas do seu time';
--- merges: Membros visualizam escalas, Voluntario confirma propria escala
-CREATE POLICY "perf_merge_007_delete_pub" ON "public"."escalas" FOR DELETE USING (((true AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((("pessoa_id" IN ( SELECT "profiles"."id"
-   FROM "public"."profiles"
-  WHERE ("profiles"."user_id" = (select "auth"."uid"())))) AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_007_delete_pub" ON "public"."escalas" IS 'perf: merges Membros visualizam escalas, Voluntario confirma propria escala';
-
 -- ==================== escalas_culto ====================
 DROP POLICY IF EXISTS "Admins podem gerenciar escalas" ON "public"."escalas_culto";
 DROP POLICY IF EXISTS "Membros podem ver escalas" ON "public"."escalas_culto";
@@ -356,22 +325,6 @@ COMMENT ON POLICY "perf_merge_002_update_pub" ON "public"."evento_lotes" IS 'per
 -- merges: Admins podem gerenciar evento_lotes
 CREATE POLICY "perf_merge_003_delete_pub" ON "public"."evento_lotes" FOR DELETE USING (("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role")));
 COMMENT ON POLICY "perf_merge_003_delete_pub" ON "public"."evento_lotes" IS 'perf: merges Admins podem gerenciar evento_lotes';
-
--- ==================== eventos ====================
-DROP POLICY IF EXISTS "Admin gerencia eventos" ON "public"."eventos";
-DROP POLICY IF EXISTS "Membros visualizam eventos" ON "public"."eventos";
--- merges: Admin gerencia eventos, Membros visualizam eventos
-CREATE POLICY "perf_merge_000_select_pub" ON "public"."eventos" FOR SELECT USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_000_select_pub" ON "public"."eventos" IS 'perf: merges Admin gerencia eventos, Membros visualizam eventos';
--- merges: Admin gerencia eventos, Membros visualizam eventos
-CREATE POLICY "perf_merge_001_insert_pub" ON "public"."eventos" FOR INSERT WITH CHECK ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_001_insert_pub" ON "public"."eventos" IS 'perf: merges Admin gerencia eventos, Membros visualizam eventos';
--- merges: Admin gerencia eventos, Membros visualizam eventos
-CREATE POLICY "perf_merge_002_update_pub" ON "public"."eventos" FOR UPDATE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id")))) WITH CHECK ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_002_update_pub" ON "public"."eventos" IS 'perf: merges Admin gerencia eventos, Membros visualizam eventos';
--- merges: Admin gerencia eventos, Membros visualizam eventos
-CREATE POLICY "perf_merge_003_delete_pub" ON "public"."eventos" FOR DELETE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_003_delete_pub" ON "public"."eventos" IS 'perf: merges Admin gerencia eventos, Membros visualizam eventos';
 
 -- ==================== eventos_convites ====================
 DROP POLICY IF EXISTS "Admin e lider podem ver todos os convites" ON "public"."eventos_convites";
@@ -837,22 +790,6 @@ COMMENT ON POLICY "perf_merge_002_update_pub" ON "public"."kids_checkins" IS 'pe
 CREATE POLICY "perf_merge_003_delete_pub" ON "public"."kids_checkins" FOR DELETE USING (((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") OR "public"."has_role"((select "auth"."uid"()), 'lider'::"public"."app_role") OR "public"."has_role"((select "auth"."uid"()), 'secretario'::"public"."app_role")) AND "public"."has_filial_access"("igreja_id", "filial_id"))));
 COMMENT ON POLICY "perf_merge_003_delete_pub" ON "public"."kids_checkins" IS 'perf: merges Staff pode gerenciar checkins kids';
 
--- ==================== liturgia_culto ====================
-DROP POLICY IF EXISTS "Admins podem gerenciar liturgia" ON "public"."liturgia_culto";
-DROP POLICY IF EXISTS "Membros podem ver liturgia" ON "public"."liturgia_culto";
--- merges: Admins podem gerenciar liturgia, Membros podem ver liturgia
-CREATE POLICY "perf_merge_000_select_pub" ON "public"."liturgia_culto" FOR SELECT USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_000_select_pub" ON "public"."liturgia_culto" IS 'perf: merges Admins podem gerenciar liturgia, Membros podem ver liturgia';
--- merges: Admins podem gerenciar liturgia, Membros podem ver liturgia
-CREATE POLICY "perf_merge_001_insert_pub" ON "public"."liturgia_culto" FOR INSERT WITH CHECK ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_001_insert_pub" ON "public"."liturgia_culto" IS 'perf: merges Admins podem gerenciar liturgia, Membros podem ver liturgia';
--- merges: Admins podem gerenciar liturgia, Membros podem ver liturgia
-CREATE POLICY "perf_merge_002_update_pub" ON "public"."liturgia_culto" FOR UPDATE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id")))) WITH CHECK ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_002_update_pub" ON "public"."liturgia_culto" IS 'perf: merges Admins podem gerenciar liturgia, Membros podem ver liturgia';
--- merges: Admins podem gerenciar liturgia, Membros podem ver liturgia
-CREATE POLICY "perf_merge_003_delete_pub" ON "public"."liturgia_culto" FOR DELETE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_003_delete_pub" ON "public"."liturgia_culto" IS 'perf: merges Admins podem gerenciar liturgia, Membros podem ver liturgia';
-
 -- ==================== liturgia_recursos ====================
 DROP POLICY IF EXISTS "Admins podem gerenciar recursos liturgia" ON "public"."liturgia_recursos";
 DROP POLICY IF EXISTS "Todos podem ver recursos liturgia" ON "public"."liturgia_recursos";
@@ -969,22 +906,6 @@ COMMENT ON POLICY "perf_merge_002_update_pub" ON "public"."midias" IS 'perf: mer
 CREATE POLICY "perf_merge_003_delete_pub" ON "public"."midias" FOR DELETE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role")));
 COMMENT ON POLICY "perf_merge_003_delete_pub" ON "public"."midias" IS 'perf: merges Admins podem gerenciar midias, Admins podem gerenciar mídias';
 
--- ==================== midias_culto ====================
-DROP POLICY IF EXISTS "Admins podem gerenciar mídias" ON "public"."midias_culto";
-DROP POLICY IF EXISTS "Membros podem ver mídias" ON "public"."midias_culto";
--- merges: Admins podem gerenciar mídias, Membros podem ver mídias
-CREATE POLICY "perf_merge_000_select_pub" ON "public"."midias_culto" FOR SELECT USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_000_select_pub" ON "public"."midias_culto" IS 'perf: merges Admins podem gerenciar mídias, Membros podem ver mídias';
--- merges: Admins podem gerenciar mídias, Membros podem ver mídias
-CREATE POLICY "perf_merge_001_insert_pub" ON "public"."midias_culto" FOR INSERT WITH CHECK ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_001_insert_pub" ON "public"."midias_culto" IS 'perf: merges Admins podem gerenciar mídias, Membros podem ver mídias';
--- merges: Admins podem gerenciar mídias, Membros podem ver mídias
-CREATE POLICY "perf_merge_002_update_pub" ON "public"."midias_culto" FOR UPDATE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id")))) WITH CHECK ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_002_update_pub" ON "public"."midias_culto" IS 'perf: merges Admins podem gerenciar mídias, Membros podem ver mídias';
--- merges: Admins podem gerenciar mídias, Membros podem ver mídias
-CREATE POLICY "perf_merge_003_delete_pub" ON "public"."midias_culto" FOR DELETE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((true AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_003_delete_pub" ON "public"."midias_culto" IS 'perf: merges Admins podem gerenciar mídias, Membros podem ver mídias';
-
 -- ==================== module_permissions ====================
 DROP POLICY IF EXISTS "Admins podem gerenciar permissões" ON "public"."module_permissions";
 DROP POLICY IF EXISTS "Todos podem ver permissões de módulos" ON "public"."module_permissions";
@@ -1067,22 +988,6 @@ CREATE POLICY "perf_merge_001_update_auth" ON "public"."pedidos_oracao" FOR UPDA
    FROM "public"."intercessores"
   WHERE (("intercessores"."user_id" = (select "auth"."uid"())) AND ("intercessores"."ativo" = true)))) AND "public"."has_filial_access"("igreja_id", "filial_id"))));
 COMMENT ON POLICY "perf_merge_001_update_auth" ON "public"."pedidos_oracao" IS 'perf: merges admin_pastor_update_todos, intercessor_update_designados';
-
--- ==================== posicoes_time ====================
-DROP POLICY IF EXISTS "Admins podem gerenciar posições" ON "public"."posicoes_time";
-DROP POLICY IF EXISTS "Membros podem ver posições ativas" ON "public"."posicoes_time";
--- merges: Admins podem gerenciar posições, Membros podem ver posições ativas
-CREATE POLICY "perf_merge_000_select_pub" ON "public"."posicoes_time" FOR SELECT USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((("ativo" = true) AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_000_select_pub" ON "public"."posicoes_time" IS 'perf: merges Admins podem gerenciar posições, Membros podem ver posições ativas';
--- merges: Admins podem gerenciar posições, Membros podem ver posições ativas
-CREATE POLICY "perf_merge_001_insert_pub" ON "public"."posicoes_time" FOR INSERT WITH CHECK ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((("ativo" = true) AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_001_insert_pub" ON "public"."posicoes_time" IS 'perf: merges Admins podem gerenciar posições, Membros podem ver posições ativas';
--- merges: Admins podem gerenciar posições, Membros podem ver posições ativas
-CREATE POLICY "perf_merge_002_update_pub" ON "public"."posicoes_time" FOR UPDATE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((("ativo" = true) AND "public"."has_filial_access"("igreja_id", "filial_id")))) WITH CHECK ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((("ativo" = true) AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_002_update_pub" ON "public"."posicoes_time" IS 'perf: merges Admins podem gerenciar posições, Membros podem ver posições ativas';
--- merges: Admins podem gerenciar posições, Membros podem ver posições ativas
-CREATE POLICY "perf_merge_003_delete_pub" ON "public"."posicoes_time" FOR DELETE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((("ativo" = true) AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_003_delete_pub" ON "public"."posicoes_time" IS 'perf: merges Admins podem gerenciar posições, Membros podem ver posições ativas';
 
 -- ==================== presencas_aula ====================
 DROP POLICY IF EXISTS "Admins podem gerenciar presencas" ON "public"."presencas_aula";
@@ -1481,38 +1386,6 @@ COMMENT ON POLICY "perf_merge_002_update_pub" ON "public"."testemunhos" IS 'perf
 -- merges: Admins podem gerenciar testemunhos
 CREATE POLICY "perf_merge_003_delete_pub" ON "public"."testemunhos" FOR DELETE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))));
 COMMENT ON POLICY "perf_merge_003_delete_pub" ON "public"."testemunhos" IS 'perf: merges Admins podem gerenciar testemunhos';
-
--- ==================== times ====================
-DROP POLICY IF EXISTS "Admins podem gerenciar times" ON "public"."times";
-DROP POLICY IF EXISTS "Membros podem ver times ativos" ON "public"."times";
--- merges: Admins podem gerenciar times, Membros podem ver times ativos
-CREATE POLICY "perf_merge_000_select_pub" ON "public"."times" FOR SELECT USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR (((("ativo" = true) OR "public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role")) AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_000_select_pub" ON "public"."times" IS 'perf: merges Admins podem gerenciar times, Membros podem ver times ativos';
--- merges: Admins podem gerenciar times
-CREATE POLICY "perf_merge_001_insert_pub" ON "public"."times" FOR INSERT WITH CHECK ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_001_insert_pub" ON "public"."times" IS 'perf: merges Admins podem gerenciar times';
--- merges: Admins podem gerenciar times
-CREATE POLICY "perf_merge_002_update_pub" ON "public"."times" FOR UPDATE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")))) WITH CHECK ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_002_update_pub" ON "public"."times" IS 'perf: merges Admins podem gerenciar times';
--- merges: Admins podem gerenciar times
-CREATE POLICY "perf_merge_003_delete_pub" ON "public"."times" FOR DELETE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_003_delete_pub" ON "public"."times" IS 'perf: merges Admins podem gerenciar times';
-
--- ==================== times_culto ====================
-DROP POLICY IF EXISTS "Admins podem gerenciar times" ON "public"."times_culto";
-DROP POLICY IF EXISTS "Membros podem ver times ativos" ON "public"."times_culto";
--- merges: Admins podem gerenciar times, Membros podem ver times ativos
-CREATE POLICY "perf_merge_000_select_pub" ON "public"."times_culto" FOR SELECT USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((("ativo" = true) AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_000_select_pub" ON "public"."times_culto" IS 'perf: merges Admins podem gerenciar times, Membros podem ver times ativos';
--- merges: Admins podem gerenciar times, Membros podem ver times ativos
-CREATE POLICY "perf_merge_001_insert_pub" ON "public"."times_culto" FOR INSERT WITH CHECK ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((("ativo" = true) AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_001_insert_pub" ON "public"."times_culto" IS 'perf: merges Admins podem gerenciar times, Membros podem ver times ativos';
--- merges: Admins podem gerenciar times, Membros podem ver times ativos
-CREATE POLICY "perf_merge_002_update_pub" ON "public"."times_culto" FOR UPDATE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((("ativo" = true) AND "public"."has_filial_access"("igreja_id", "filial_id")))) WITH CHECK ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((("ativo" = true) AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_002_update_pub" ON "public"."times_culto" IS 'perf: merges Admins podem gerenciar times, Membros podem ver times ativos';
--- merges: Admins podem gerenciar times, Membros podem ver times ativos
-CREATE POLICY "perf_merge_003_delete_pub" ON "public"."times_culto" FOR DELETE USING ((("public"."has_role"((select "auth"."uid"()), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) OR ((("ativo" = true) AND "public"."has_filial_access"("igreja_id", "filial_id"))));
-COMMENT ON POLICY "perf_merge_003_delete_pub" ON "public"."times_culto" IS 'perf: merges Admins podem gerenciar times, Membros podem ver times ativos';
 
 -- ==================== user_app_roles ====================
 DROP POLICY IF EXISTS "Admins podem gerenciar user_app_roles" ON "public"."user_app_roles";
