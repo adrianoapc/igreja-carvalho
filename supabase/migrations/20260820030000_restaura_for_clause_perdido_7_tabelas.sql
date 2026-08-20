@@ -1,7 +1,9 @@
 -- Restaura o FOR SELECT/INSERT/UPDATE/DELETE original em 25 RLS policies
 -- de 7 tabelas (profiles, eventos_convites, familias, fornecedores,
 -- inscricoes_eventos, visitante_contatos, escalas) que hoje em produção
--- estão CREATE POLICY sem FOR (= FOR ALL implícito no Postgres).
+-- estão CREATE POLICY sem FOR (= FOR ALL implícito no Postgres). Também
+-- adiciona 1 policy NOVA (profiles.admins_can_delete_profiles) — ver
+-- nota específica junto dela mais abaixo.
 --
 -- Achado no review (Codex + Cursor) da PR #125 (regeneração da Fase 1/2
 -- de performance), verificado policy por policy contra
@@ -90,6 +92,23 @@ CREATE POLICY "admins_can_update_any_profile" ON "public"."profiles" FOR UPDATE 
 
 DROP POLICY IF EXISTS "admins_can_create_profiles" ON "public"."profiles";
 CREATE POLICY "admins_can_create_profiles" ON "public"."profiles" FOR INSERT WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+
+-- admins_can_delete_profiles: NÃO existia em produção nem no design
+-- original (20251130044928 bloqueou DELETE de propósito: "soft delete
+-- via status é preferível... não criar política de DELETE significa
+-- que ninguém pode deletar"). Adicionada aqui, deliberadamente, porque
+-- src/pages/pessoas/Todos.tsx (handleDeletePessoa, gate `isAdmin`) faz
+-- DELETE direto em profiles hoje em produção — funcionava só por causa
+-- do bug FOR ALL sendo corrigido nesta mesma migration. Sem esta
+-- policy, esse botão passaria a falhar silenciosamente (RLS nega, 0
+-- linhas, toast de erro genérico) pra todo admin, no primeiro deploy
+-- deste fix. Decisão consciente do usuário: preservar a feature em vez
+-- de reativar o bloqueio original. Predicado idêntico às outras 3
+-- policies de admin em profiles (has_role(admin) — não super_admin,
+-- mesma convenção já usada por elas — + has_filial_access), sem
+-- reduzir a proteção de dados sensíveis (CPF/RG/endereço) contra
+-- QUALQUER outro ator: só admin da filial efetiva pode deletar.
+CREATE POLICY "admins_can_delete_profiles" ON "public"."profiles" FOR DELETE USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 -- =====================================================================
 -- eventos_convites
