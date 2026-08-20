@@ -73,25 +73,62 @@
 -- Depois desta migration, a branch fix-perf-auth-rls-initplan pode
 -- reaplicar o wrap de performance (Fase 1/2) nessas 7 tabelas, hoje
 -- excluídas dela.
+--
+-- UPDATE (review do Cursor bugbot na PR #126) — 2 correções:
+--
+-- 1) `eventos_convites."Admin pode criar convites"` e `"Admin pode
+-- deletar convites"` tinham perdido `lider` do WITH CHECK/USING numa
+-- `ALTER POLICY` de 20260105120000 (`20260105120000_add_filiais_and_
+-- filial_scope.sql:456-474`) — narrowing pra admin-only nunca
+-- documentado como intencional. `EnviarConvitesDialog.tsx` (sem
+-- nenhum gate de role) e `usePermissions.ts` (`eventos.admin` inclui
+-- `lider`) confirmam que líder cria convites hoje em produção — só
+-- funciona porque `"Admin e lider podem ver todos os convites"` é FOR
+-- ALL (o mesmo bug desta migration). Restaurar o FOR SELECT sem
+-- devolver `lider` às policies de INSERT/DELETE quebraria o envio de
+-- convites por líder silenciosamente, mesma classe do achado do botão
+-- "Excluir pessoa". Corrigido: `lider` de volta no WITH CHECK/USING de
+-- ambas (RSVP do convidado via "Usuario pode responder seu convite"
+-- não é afetado, não está nesta migration).
+--
+-- 2) As 26 policies (25 restauradas + admins_can_delete_profiles) não
+-- tinham `TO authenticated`, diferente do padrão já usado pelas
+-- policies "irmãs" dessas mesmas tabelas e da migration 20260820000000
+-- (PR #124). Defesa em profundidade de custo zero — todas as 26 já
+-- checam `auth.uid()`/`has_role()` no predicado, então `anon` já
+-- falhava mesmo sem `TO`; não há vazamento sendo fechado aqui, só
+-- reduz superfície. Adicionado `TO "authenticated"` nas 26.
+--
+-- Achado #3 do mesmo review (predicado `has_role(admin) AND
+-- has_filial_access(...)` de `admins_can_delete_profiles` equivale a
+-- "qualquer admin, qualquer tenant" porque `has_filial_access` já
+-- faz bypass total quando `has_role(admin)` é true) é PADRÃO
+-- PRÉ-EXISTENTE — as outras 3 policies de admin em `profiles`
+-- (view_all/update_any/create) usam o mesmo predicado, não é algo que
+-- esta policy nova introduz. Não corrigido aqui (reviewer concordou
+-- que não bloqueia o merge); registrado em
+-- project-policies-for-clause-perdido-pendente pra eventual sweep
+-- dedicado de has_filial_access(), mesmo já rastreado em
+-- project-vulnerabilidade-critica-escrita-anonima-has-filial-access.
 
 -- =====================================================================
 -- profiles
 -- =====================================================================
 
 DROP POLICY IF EXISTS "users_can_view_own_profile" ON "public"."profiles";
-CREATE POLICY "users_can_view_own_profile" ON "public"."profiles" FOR SELECT USING ((("auth"."uid"() = "user_id") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "users_can_view_own_profile" ON "public"."profiles" FOR SELECT TO "authenticated" USING ((("auth"."uid"() = "user_id") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "users_can_update_own_profile" ON "public"."profiles";
-CREATE POLICY "users_can_update_own_profile" ON "public"."profiles" FOR UPDATE USING ((("auth"."uid"() = "user_id") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "users_can_update_own_profile" ON "public"."profiles" FOR UPDATE TO "authenticated" USING ((("auth"."uid"() = "user_id") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "admins_can_view_all_profiles" ON "public"."profiles";
-CREATE POLICY "admins_can_view_all_profiles" ON "public"."profiles" FOR SELECT USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "admins_can_view_all_profiles" ON "public"."profiles" FOR SELECT TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "admins_can_update_any_profile" ON "public"."profiles";
-CREATE POLICY "admins_can_update_any_profile" ON "public"."profiles" FOR UPDATE USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "admins_can_update_any_profile" ON "public"."profiles" FOR UPDATE TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "admins_can_create_profiles" ON "public"."profiles";
-CREATE POLICY "admins_can_create_profiles" ON "public"."profiles" FOR INSERT WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "admins_can_create_profiles" ON "public"."profiles" FOR INSERT TO "authenticated" WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 -- admins_can_delete_profiles: NÃO existia em produção nem no design
 -- original (20251130044928 bloqueou DELETE de propósito: "soft delete
@@ -108,64 +145,64 @@ CREATE POLICY "admins_can_create_profiles" ON "public"."profiles" FOR INSERT WIT
 -- mesma convenção já usada por elas — + has_filial_access), sem
 -- reduzir a proteção de dados sensíveis (CPF/RG/endereço) contra
 -- QUALQUER outro ator: só admin da filial efetiva pode deletar.
-CREATE POLICY "admins_can_delete_profiles" ON "public"."profiles" FOR DELETE USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "admins_can_delete_profiles" ON "public"."profiles" FOR DELETE TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 -- =====================================================================
 -- eventos_convites
 -- =====================================================================
 
 DROP POLICY IF EXISTS "Admin e lider podem ver todos os convites" ON "public"."eventos_convites";
-CREATE POLICY "Admin e lider podem ver todos os convites" ON "public"."eventos_convites" FOR SELECT USING ((("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'lider'::"public"."app_role")) AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "Admin e lider podem ver todos os convites" ON "public"."eventos_convites" FOR SELECT TO "authenticated" USING ((("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'lider'::"public"."app_role")) AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "Admin pode atualizar convites" ON "public"."eventos_convites";
-CREATE POLICY "Admin pode atualizar convites" ON "public"."eventos_convites" FOR UPDATE USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "Admin pode atualizar convites" ON "public"."eventos_convites" FOR UPDATE TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "Admin pode criar convites" ON "public"."eventos_convites";
-CREATE POLICY "Admin pode criar convites" ON "public"."eventos_convites" FOR INSERT WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "Admin pode criar convites" ON "public"."eventos_convites" FOR INSERT TO "authenticated" WITH CHECK ((("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'lider'::"public"."app_role")) AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "Admin pode deletar convites" ON "public"."eventos_convites";
-CREATE POLICY "Admin pode deletar convites" ON "public"."eventos_convites" FOR DELETE USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "Admin pode deletar convites" ON "public"."eventos_convites" FOR DELETE TO "authenticated" USING ((("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'lider'::"public"."app_role")) AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 -- =====================================================================
 -- familias
 -- =====================================================================
 
 DROP POLICY IF EXISTS "Admins podem atualizar relacionamentos familiares" ON "public"."familias";
-CREATE POLICY "Admins podem atualizar relacionamentos familiares" ON "public"."familias" FOR UPDATE USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "Admins podem atualizar relacionamentos familiares" ON "public"."familias" FOR UPDATE TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "Admins podem criar relacionamentos familiares" ON "public"."familias";
-CREATE POLICY "Admins podem criar relacionamentos familiares" ON "public"."familias" FOR INSERT WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "Admins podem criar relacionamentos familiares" ON "public"."familias" FOR INSERT TO "authenticated" WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "Admins podem deletar relacionamentos familiares" ON "public"."familias";
-CREATE POLICY "Admins podem deletar relacionamentos familiares" ON "public"."familias" FOR DELETE USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "Admins podem deletar relacionamentos familiares" ON "public"."familias" FOR DELETE TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "Admins podem ver todos os relacionamentos familiares" ON "public"."familias";
-CREATE POLICY "Admins podem ver todos os relacionamentos familiares" ON "public"."familias" FOR SELECT USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "Admins podem ver todos os relacionamentos familiares" ON "public"."familias" FOR SELECT TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 -- =====================================================================
 -- fornecedores
 -- =====================================================================
 
 DROP POLICY IF EXISTS "only_admins_can_delete_suppliers" ON "public"."fornecedores";
-CREATE POLICY "only_admins_can_delete_suppliers" ON "public"."fornecedores" FOR DELETE USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "only_admins_can_delete_suppliers" ON "public"."fornecedores" FOR DELETE TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "only_admins_treasurers_can_create_suppliers" ON "public"."fornecedores";
-CREATE POLICY "only_admins_treasurers_can_create_suppliers" ON "public"."fornecedores" FOR INSERT WITH CHECK ((("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'tesoureiro'::"public"."app_role")) AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "only_admins_treasurers_can_create_suppliers" ON "public"."fornecedores" FOR INSERT TO "authenticated" WITH CHECK ((("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'tesoureiro'::"public"."app_role")) AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "only_admins_treasurers_can_update_suppliers" ON "public"."fornecedores";
-CREATE POLICY "only_admins_treasurers_can_update_suppliers" ON "public"."fornecedores" FOR UPDATE USING ((("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'tesoureiro'::"public"."app_role")) AND "public"."has_filial_access"("igreja_id", "filial_id"))) WITH CHECK ((("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'tesoureiro'::"public"."app_role")) AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "only_admins_treasurers_can_update_suppliers" ON "public"."fornecedores" FOR UPDATE TO "authenticated" USING ((("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'tesoureiro'::"public"."app_role")) AND "public"."has_filial_access"("igreja_id", "filial_id"))) WITH CHECK ((("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") OR "public"."has_role"("auth"."uid"(), 'tesoureiro'::"public"."app_role")) AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 -- =====================================================================
 -- inscricoes_eventos
 -- =====================================================================
 
 DROP POLICY IF EXISTS "Usuarios podem criar proprias inscricoes" ON "public"."inscricoes_eventos";
-CREATE POLICY "Usuarios podem criar proprias inscricoes" ON "public"."inscricoes_eventos" FOR INSERT WITH CHECK ((("pessoa_id" IN ( SELECT "profiles"."id"
+CREATE POLICY "Usuarios podem criar proprias inscricoes" ON "public"."inscricoes_eventos" FOR INSERT TO "authenticated" WITH CHECK ((("pessoa_id" IN ( SELECT "profiles"."id"
    FROM "public"."profiles"
   WHERE ("profiles"."user_id" = "auth"."uid"()))) AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "Usuarios podem ver proprias inscricoes" ON "public"."inscricoes_eventos";
-CREATE POLICY "Usuarios podem ver proprias inscricoes" ON "public"."inscricoes_eventos" FOR SELECT USING ((("pessoa_id" IN ( SELECT "profiles"."id"
+CREATE POLICY "Usuarios podem ver proprias inscricoes" ON "public"."inscricoes_eventos" FOR SELECT TO "authenticated" USING ((("pessoa_id" IN ( SELECT "profiles"."id"
    FROM "public"."profiles"
   WHERE ("profiles"."user_id" = "auth"."uid"()))) AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
@@ -174,29 +211,29 @@ CREATE POLICY "Usuarios podem ver proprias inscricoes" ON "public"."inscricoes_e
 -- =====================================================================
 
 DROP POLICY IF EXISTS "Admins podem atualizar contatos" ON "public"."visitante_contatos";
-CREATE POLICY "Admins podem atualizar contatos" ON "public"."visitante_contatos" FOR UPDATE USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "Admins podem atualizar contatos" ON "public"."visitante_contatos" FOR UPDATE TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id"))) WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "Admins podem criar contatos" ON "public"."visitante_contatos";
-CREATE POLICY "Admins podem criar contatos" ON "public"."visitante_contatos" FOR INSERT WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "Admins podem criar contatos" ON "public"."visitante_contatos" FOR INSERT TO "authenticated" WITH CHECK (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "Admins podem deletar contatos" ON "public"."visitante_contatos";
-CREATE POLICY "Admins podem deletar contatos" ON "public"."visitante_contatos" FOR DELETE USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "Admins podem deletar contatos" ON "public"."visitante_contatos" FOR DELETE TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "Admins podem ver todos os contatos" ON "public"."visitante_contatos";
-CREATE POLICY "Admins podem ver todos os contatos" ON "public"."visitante_contatos" FOR SELECT USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "Admins podem ver todos os contatos" ON "public"."visitante_contatos" FOR SELECT TO "authenticated" USING (("public"."has_role"("auth"."uid"(), 'admin'::"public"."app_role") AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "Membros responsáveis podem atualizar seus contatos" ON "public"."visitante_contatos";
-CREATE POLICY "Membros responsáveis podem atualizar seus contatos" ON "public"."visitante_contatos" FOR UPDATE USING ((("membro_responsavel_id" = "auth"."uid"()) AND "public"."has_filial_access"("igreja_id", "filial_id"))) WITH CHECK ((("membro_responsavel_id" = "auth"."uid"()) AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "Membros responsáveis podem atualizar seus contatos" ON "public"."visitante_contatos" FOR UPDATE TO "authenticated" USING ((("membro_responsavel_id" = "auth"."uid"()) AND "public"."has_filial_access"("igreja_id", "filial_id"))) WITH CHECK ((("membro_responsavel_id" = "auth"."uid"()) AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 DROP POLICY IF EXISTS "Membros responsáveis podem ver seus contatos" ON "public"."visitante_contatos";
-CREATE POLICY "Membros responsáveis podem ver seus contatos" ON "public"."visitante_contatos" FOR SELECT USING ((("membro_responsavel_id" = "auth"."uid"()) AND "public"."has_filial_access"("igreja_id", "filial_id")));
+CREATE POLICY "Membros responsáveis podem ver seus contatos" ON "public"."visitante_contatos" FOR SELECT TO "authenticated" USING ((("membro_responsavel_id" = "auth"."uid"()) AND "public"."has_filial_access"("igreja_id", "filial_id")));
 
 -- =====================================================================
 -- escalas
 -- =====================================================================
 
 DROP POLICY IF EXISTS "Voluntario confirma propria escala" ON "public"."escalas";
-CREATE POLICY "Voluntario confirma propria escala" ON "public"."escalas" FOR UPDATE USING ((("pessoa_id" IN ( SELECT "profiles"."id"
+CREATE POLICY "Voluntario confirma propria escala" ON "public"."escalas" FOR UPDATE TO "authenticated" USING ((("pessoa_id" IN ( SELECT "profiles"."id"
    FROM "public"."profiles"
   WHERE ("profiles"."user_id" = "auth"."uid"()))) AND "public"."has_filial_access"("igreja_id", "filial_id"))) WITH CHECK ((("pessoa_id" IN ( SELECT "profiles"."id"
    FROM "public"."profiles"
