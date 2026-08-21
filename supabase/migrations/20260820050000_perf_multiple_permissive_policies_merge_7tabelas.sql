@@ -59,6 +59,14 @@
 -- policies PUBLIC pra TO authenticated exigiria confirmar que nenhum
 -- caller anon/role interno do Supabase depende delas — fora do escopo
 -- desta PR (mesmo motivo do "Follow-up" na migration 20260820020000).
+--
+-- ATUALIZAÇÃO 2026-08-21: esta ressalva foi fechada pela migration
+-- 20260821200000_fecha_3_achados_pos_pr128_familias_public_convites.sql
+-- (confirmou via has_filial_access/rolbypassrls que nenhum caller
+-- anon/role interno dependia do PUBLIC, estreitou as 6 policies pra
+-- TO authenticated e mergeou cada uma na policy irmã pra não reabrir
+-- multiple_permissive_policies). Comentário acima mantido como
+-- histórico do porquê não foi feito nesta PR.
 
 -- ==================== profiles ====================
 DROP POLICY IF EXISTS "Tecnico ver perfis da mesma igreja" ON profiles;

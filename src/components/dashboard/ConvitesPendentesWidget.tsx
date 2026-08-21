@@ -100,7 +100,8 @@ export default function ConvitesPendentesWidget() {
         .order("enviado_em", { ascending: false });
 
       query = query.eq("igreja_id", igrejaId);
-      if (!isAllFiliais && filialId) query = query.eq("filial_id", filialId);
+      if (!isAllFiliais && filialId)
+        query = query.or(`filial_id.eq.${filialId},filial_id.is.null`);
 
       const { data, error } = await query;
 
@@ -139,6 +140,8 @@ export default function ConvitesPendentesWidget() {
       status: "confirmado" | "recusado";
       motivo?: string;
     }) => {
+      if (!profile?.id) throw new Error("Usuário não identificado.");
+
       const payload: {
         status: "confirmado" | "recusado";
         motivo_recusa?: string;
