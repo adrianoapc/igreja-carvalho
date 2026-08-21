@@ -1,0 +1,9 @@
+flowchart TD
+    A([Usuário abre Todos.tsx]) --> B{isAdminOrScopedAdmin?<br/>admin OU super_admin OU<br/>admin_igreja OU admin_filial}
+    B -->|Não| C[Botão Excluir não aparece]
+    B -->|Sim| D[Botão Excluir visível]
+    D --> E[Confirma exclusão]
+    E --> F[DELETE profiles WHERE id<br/>com count: exact]
+    F --> G{RLS: has_role uid, admin<br/>AND has_filial_access}
+    G -->|Passa| H[count > 0<br/>toast: Pessoa excluída]
+    G -->|Nega| I[count = 0, error = null<br/>toast: Não foi possível excluir]
