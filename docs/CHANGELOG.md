@@ -10,6 +10,13 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Corrigido
 
+#### 🔒 RLS perdeu FOR em 26 policies de 7 tabelas (self-delete de perfil e mais) (21 Ago/2026)
+
+- **Tipo**: fix (segurança)
+- **Resumo**: `profiles`, `eventos_convites`, `familias`, `fornecedores`, `inscricoes_eventos`, `visitante_contatos` e `escalas` tinham policies RLS criadas sem `FOR <comando>` explícito — o Postgres trata isso como `FOR ALL`, então uma policy nomeada "ver"/"criar" também liberava escrita/exclusão pra quem passasse no filtro de leitura. Caso mais grave: `profiles.users_can_view_own_profile` virou `FOR ALL`, permitindo que qualquer usuário autenticado deletasse o próprio perfil — contrariando o design original (`ninguém pode deletar profiles`, dado sensível: CPF/RG/endereço). Restauradas as 25 policies ao `FOR` original (confirmado via histórico de migrations) + adicionada `admins_can_delete_profiles` (nova, admin-only, pra não quebrar a exclusão de pessoa já usada no admin) + `TO authenticated` como defesa em profundidade. Três rodadas de review (Codex + Cursor) pegaram efeitos colaterais: líder perderia o envio de convites de evento (RLS restaurada não tinha `lider` numa policy que uma migration anterior já tinha estreitado sem documentar); tesoureiro conseguia excluir fornecedor só por causa do mesmo bug (UI corrigida pra exigir admin); e o gate de admin no front (`isAdmin`) era mais estreito que a policy (`has_role('admin')` também aceita `admin_igreja`/`admin_filial`) — corrigido com um helper novo (`isAdminOrScopedAdmin`) usado tanto na exclusão de fornecedor quanto na de pessoa, que de quebra ganhou uma checagem de linhas afetadas (evita toast de sucesso quando o RLS nega a exclusão).
+- **Módulos afetados**: Pessoas (perfis, exclusão), Eventos (convites), Família, Finanças (fornecedores), Escalas
+- **Impacto no usuário**: usuário comum não consegue mais excluir o próprio perfil sozinho. Admin continua excluindo pessoa/fornecedor normalmente (agora com aviso claro se a exclusão não for permitida). Líder de ministério continua enviando convites de evento. Tesoureiro não vê mais o botão de excluir fornecedor (nunca deveria ter tido).
+
 #### 🤖 OCR de comprovante ignorava melhorias do código (config no banco sobrescrevendo) + Claude como provedor (19 Ago/2026)
 
 - **Tipo**: fix + feature
