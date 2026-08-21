@@ -48,9 +48,11 @@
 -- #125): PUBLIC também cobre `authenticated`, então o Performance
 -- Advisor ainda conta multiple_permissive_policies pro role
 -- authenticated onde uma policy PUBLIC coexiste com um perf_merge_*_auth
--- na mesma ação — profiles INSERT/SELECT/UPDATE (members_can_create_
--- dependents/members_can_view_family_members/members_can_update_
--- dependents, todas PUBLIC), familias INSERT
+-- na mesma ação — profiles INSERT (perf_merge_001_insert_pub, que já
+-- mescla members_can_create_dependents + users_can_create_own_profile,
+-- PUBLIC), SELECT/UPDATE (members_can_view_family_members/
+-- members_can_update_dependents, PUBLIC, sem par pra mesclar na Fase 2),
+-- familias INSERT
 -- (members_can_create_family_relationships, PUBLIC) e visitante_contatos
 -- SELECT/UPDATE ("Church staff podem ver/gerenciar contatos agendados
 -- da filial", PUBLIC). Não mesclado aqui de propósito: estreitar essas
