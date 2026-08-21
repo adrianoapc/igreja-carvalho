@@ -64,6 +64,12 @@ próprio arquivo):
   revogar de um role nomeado é no-op se `PUBLIC` ainda segura o acesso.
   Confirmar sempre com `supabase db advisors --linked` (não o cache do
   dashboard).
+- **`CREATE POLICY` sem `FOR` vira `FOR ALL`** — restaurar sempre com
+  `git log -S` pra achar o `FOR` original. Gate de UI pra ação
+  destrutiva atrás de uma policy `has_role(admin)` precisa aceitar o
+  MESMO conjunto de roles que a função (`admin`/`admin_igreja`/
+  `admin_filial`, não só o `isAdmin` genérico do frontend). `.delete()`
+  sem `{ count: "exact" }` mostra sucesso mesmo quando o RLS nega.
 
 Este arquivo é o resumo. O detalhe (com exemplos de bug real por item) está em
 `docs/guardrails-financeiro.md`, que cresce a cada rodada de review que achar

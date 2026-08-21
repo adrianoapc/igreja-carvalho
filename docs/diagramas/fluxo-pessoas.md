@@ -129,3 +129,22 @@ flowchart TD
 ```
 
 Ver inventário completo de RLS em `docs/01-Arquitetura/04-rls-e-seguranca.MD`.
+
+## Exclusão de Pessoa (`Todos.tsx`) — gate de UI espelha `has_role('admin')` da RLS
+
+> Adicionado após o fix de RLS `FOR` clause perdido (PR #126, 21 Ago/2026) —
+> ver `docs/guardrails-financeiro.md` seção M. `profiles` nunca teve policy
+> de DELETE pra usuário comum (design original: dado sensível, ninguém
+> auto-deleta); só admin/admin_igreja/admin_filial passam.
+
+```mermaid
+flowchart TD
+    A([Usuário abre Todos.tsx]) --> B{isAdminOrScopedAdmin?<br/>admin OU super_admin OU<br/>admin_igreja OU admin_filial}
+    B -->|Não| C[Botão Excluir não aparece]
+    B -->|Sim| D[Botão Excluir visível]
+    D --> E[Confirma exclusão]
+    E --> F[DELETE profiles WHERE id<br/>com count: exact]
+    F --> G{RLS: has_role uid, admin<br/>AND has_filial_access}
+    G -->|Passa| H[count > 0<br/>toast: Pessoa excluída]
+    G -->|Nega| I[count = 0, error = null<br/>toast: Não foi possível excluir]
+```
