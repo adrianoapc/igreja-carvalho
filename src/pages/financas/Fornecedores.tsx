@@ -12,6 +12,7 @@ import { ArrowLeft, Plus, Pencil, Trash2, Search, Users, Mail, Phone } from "luc
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface Fornecedor {
   id: string;
@@ -34,6 +35,7 @@ interface Props {
 
 export default function Fornecedores({ onBack }: Props) {
   const navigate = useNavigate();
+  const { isAdminOrScopedAdmin } = usePermissions();
   const handleBack = onBack ?? (() => navigate('/financas'));
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,15 +119,20 @@ export default function Fornecedores({ onBack }: Props) {
   };
 
   const handleDelete = async (id: string) => {
+    if (!isAdminOrScopedAdmin) return;
     if (!confirm("Deseja excluir este fornecedor?")) return;
 
     try {
-      const { error } = await supabase
+      const { error, count } = await supabase
         .from("fornecedores")
-        .delete()
+        .delete({ count: "exact" })
         .eq("id", id);
-      
+
       if (error) throw error;
+      if (!count) {
+        toast.error("Não foi possível excluir o fornecedor");
+        return;
+      }
       toast.success("Fornecedor excluído");
       fetchFornecedores();
     } catch (error: unknown) {
@@ -235,9 +242,11 @@ export default function Fornecedores({ onBack }: Props) {
                         <Button variant="ghost" size="icon" onClick={() => openEdit(fornecedor)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(fornecedor.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        {isAdminOrScopedAdmin && (
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(fornecedor.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -299,15 +308,17 @@ export default function Fornecedores({ onBack }: Props) {
                     <Pencil className="h-4 w-4 mr-2" />
                     Editar
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleDelete(fornecedor.id)}
-                    className="flex-1"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2 text-destructive" />
-                    Excluir
-                  </Button>
+                  {isAdminOrScopedAdmin && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(fornecedor.id)}
+                      className="flex-1"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2 text-destructive" />
+                      Excluir
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

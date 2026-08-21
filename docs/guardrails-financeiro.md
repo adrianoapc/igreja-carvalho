@@ -985,6 +985,61 @@ Referências: §9.119, §9.121.
 
 ---
 
+## M. RLS sem `FOR` explícito vira `FOR ALL`; gate de UI precisa espelhar `has_role()`
+
+Achado na sessão de fix de `FOR` clause perdido (PR #126, 21 Ago/2026),
+generalizável pra qualquer tabela, não só financeiro.
+
+1. **`CREATE POLICY` sem `FOR SELECT/INSERT/UPDATE/DELETE` vira `FOR
+   ALL`.** Se só `USING` está preenchido (sem `WITH CHECK`), esse
+   `USING` passa a valer pra INSERT/UPDATE/DELETE também — uma policy
+   nomeada "ver X"/"criar X" que era `FOR SELECT`/`FOR INSERT` e perdeu
+   o `FOR` (ex.: via edição manual fora do fluxo de migration) deixa
+   quem passa no filtro de leitura/criação também escrever/apagar.
+   Caso real: `profiles.users_can_view_own_profile` virou `FOR ALL`,
+   permitindo self-delete de perfil — contrariando o design original
+   ("ninguém pode deletar profiles", dado sensível). Ao restaurar o
+   `FOR`, sempre `git log -S` a policy inteira pra achar a migration
+   que a criou e comparar contra `pg_policies` atual — pode ter mais de
+   uma tabela afetada pelo mesmo padrão.
+2. **`has_role(uid, 'admin')` no backend NÃO é só `role = 'admin'`** —
+   a função também aceita `admin_igreja`/`admin_filial` (ver corpo SQL
+   da função). Um gate de UI que usa só o `isAdmin` genérico do
+   frontend (`get_user_auth_context`, que calcula `is_admin` só como
+   `admin`/`super_admin`) é MAIS ESTREITO que a RLS — esconde uma ação
+   (ex.: botão de excluir) de um `admin_igreja`/`admin_filial` que a
+   policy deixaria passar. Pra qualquer ação de UI gateada por uma
+   policy `has_role(admin) AND ...`, usar um helper que espelhe esse
+   MESMO conjunto de roles (`isAdminOrScopedAdmin` em
+   `usePermissions.ts`), não o `isAdmin` genérico. Achado por review
+   (Codex + Cursor, independentemente) depois que o fix do item 1
+   corrigiu `only_admins_can_delete_suppliers` pra `FOR DELETE`
+   explícito — o gate de UI recém-adicionado usava `isAdmin` sozinho.
+3. **`has_filial_access(_igreja_id, _filial_id)` faz bypass total
+   quando `has_role(uid, 'admin')` já é true**, independente dos
+   argumentos passados. Ou seja, `has_role(admin) AND
+   has_filial_access(igreja_id, filial_id)` — padrão usado em dezenas
+   de policies — na prática significa **"qualquer admin, de qualquer
+   tenant"**, não "admin da filial/igreja efetiva". Não é bug isolado
+   de uma policy nova — é comportamento pré-existente e compartilhado
+   por todas as policies `admins_can_*` que seguem esse padrão. Achado
+   incidental no mesmo review; não corrigido (mudaria comportamento de
+   muitas policies de uma vez, precisa de sessão dedicada) — ver
+   `project-vulnerabilidade-critica-escrita-anonima-has-filial-access`
+   na memória de sessão.
+4. **Ação de exclusão sem checar `count` do retorno mostra sucesso
+   mesmo quando o RLS nega.** Supabase JS retorna `error: null` com 0
+   linhas afetadas quando uma policy nega silenciosamente (comum via
+   PostgREST) — sem `.delete({ count: "exact" })` e checar `count`
+   antes do toast de sucesso, o usuário vê "excluído com sucesso" sem
+   nada ter sido excluído. Achado 2x na mesma sessão (perfis e
+   fornecedores) — checar esse padrão em qualquer outro `handleDelete`
+   que só olha `error`.
+
+Referências: PR #126 (2026-08-21).
+
+---
+
 ## Como usar este documento
 
 - **Antes de escrever uma query nova que filtra por `filial_id`**: seção A.
@@ -1009,6 +1064,9 @@ Referências: §9.119, §9.121.
   clara**: seção K.
 - **Antes de mostrar erro de RPC/Postgres no WhatsApp, ou de criar
   fornecedor a partir de OCR sem CPF/CNPJ**: seção L.
+- **Antes de escrever/revisar QUALQUER `CREATE POLICY`, ou de gatear no
+  frontend uma ação que depende de uma policy `has_role(admin)`**:
+  seção M.
 
 Encontrou um padrão novo numa rodada de review que não está aqui? Adicione
 uma seção (ou um item numa seção existente) citando o `§9.NN`

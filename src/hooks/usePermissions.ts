@@ -26,6 +26,21 @@ export type Permission =
 export function usePermissions() {
   const { roles, isAdmin, loading } = useAuthContext();
 
+  // Espelha EXATAMENTE o conjunto de roles que public.has_role(uid, 'admin')
+  // aceita no backend — admin, admin_igreja, admin_filial (ver função SQL).
+  // Deliberadamente NÃO usa isAdmin genérico (admin/super_admin, calculado em
+  // get_user_auth_context): has_role('admin') não dá tratamento especial a
+  // super_admin, só a admin_igreja/admin_filial — um super_admin sem a role
+  // literal "admin" passaria isAdmin mas falharia a policy (visto em review:
+  // botão apareceria, RLS negaria, count=0). Se algum dia um super_admin
+  // também tiver a role "admin" atribuída, já passa por roles.includes.
+  // Usar pra gates de UI de ações destrutivas atrás de policies
+  // has_role(admin) — ex.: hard-delete de profiles/fornecedores.
+  const isAdminOrScopedAdmin =
+    roles.includes("admin") ||
+    roles.includes("admin_igreja") ||
+    roles.includes("admin_filial");
+
   // Função para verificar uma permissão específica
   const checkPermission = useCallback(
     async (perm: Permission): Promise<boolean> => {
@@ -80,6 +95,7 @@ export function usePermissions() {
   return {
     checkPermission,
     isAdmin,
+    isAdminOrScopedAdmin,
     loading,
   };
 }
