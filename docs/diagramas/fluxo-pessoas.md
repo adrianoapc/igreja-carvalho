@@ -148,3 +148,31 @@ flowchart TD
     G -->|Passa| H[count > 0<br/>toast: Pessoa excluída]
     G -->|Nega| I[count = 0, error = null<br/>toast: Não foi possível excluir]
 ```
+
+## Relacionamentos Familiares (`familias`) e RSVP de Convite (`eventos_convites`) — RLS restaurada (PR #129)
+
+> Achados de sessão de acompanhamento do fix de `FOR` clause (PR #126/#128) —
+> ver `docs/guardrails-financeiro.md` seção M.5/M.6. Um `ALTER POLICY` de
+> jan/2026 tentou trocar o predicado de SELECT de `familias` por uma coluna
+> (`responsavel_id`) que a tabela nunca teve; o `ALTER POLICY` falhou
+> silenciosamente sem derrubar o resto da migration, deixando membro comum
+> sem ver o próprio relacionamento familiar por 7 meses. As policies de
+> convidado de `eventos_convites` (ver/responder o próprio convite) também
+> sumiram de produção sem `DROP` rastreado.
+
+```mermaid
+flowchart TD
+    A([Membro abre MinhaFamilia/Perfil/FamilyWallet]) --> B[SELECT familias]
+    B --> C{RLS: admin OR<br/>pessoa_id/familiar_id = meu profile.id<br/>AND has_filial_access}
+    C -->|Antes da PR #129: só admin passava| D[Membro comum via lista vazia,<br/>sem erro]
+    C -->|Depois da PR #129| E[Membro vê os próprios<br/>relacionamentos familiares]
+
+    F([Convidado abre ConvitesPendentesWidget]) --> G[SELECT eventos_convites<br/>WHERE pessoa_id = profile.id]
+    G --> H{RLS: admin/lider OR<br/>pessoa_id = meu profile.id<br/>AND has_filial_access}
+    H -->|Antes da PR #129: policy de convidado ausente| I[Convidado não via nem<br/>respondia o próprio convite]
+    H -->|Depois da PR #129| J[Convidado vê e responde<br/>o próprio convite]
+    J --> K[UPDATE status/motivo_recusa]
+    K --> L{Trigger BEFORE UPDATE:<br/>quem não é admin não pode<br/>mudar evento_id/pessoa_id/<br/>igreja_id/filial_id}
+    L -->|Tenta mudar campo estrutural| M[Coluna revertida ao valor antigo;<br/>só status/motivo_recusa aplicam]
+    L -->|RSVP normal| N[Atualização aplicada]
+```
