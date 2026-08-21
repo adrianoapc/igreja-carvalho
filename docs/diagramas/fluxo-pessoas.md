@@ -139,7 +139,7 @@ Ver inventário completo de RLS em `docs/01-Arquitetura/04-rls-e-seguranca.MD`.
 
 ```mermaid
 flowchart TD
-    A([Usuário abre Todos.tsx]) --> B{isAdminOrScopedAdmin?<br/>admin OU super_admin OU<br/>admin_igreja OU admin_filial}
+    A([Usuário abre Todos.tsx]) --> B{isAdminOrScopedAdmin?<br/>admin OU admin_igreja OU<br/>admin_filial — espelha has_role uid, admin;<br/>NÃO inclui super_admin}
     B -->|Não| C[Botão Excluir não aparece]
     B -->|Sim| D[Botão Excluir visível]
     D --> E[Confirma exclusão]
