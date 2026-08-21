@@ -70,6 +70,18 @@ próprio arquivo):
   MESMO conjunto de roles que a função (`admin`/`admin_igreja`/
   `admin_filial`, não só o `isAdmin` genérico do frontend). `.delete()`
   sem `{ count: "exact" }` mostra sucesso mesmo quando o RLS nega.
+- **`ALTER POLICY` numa coluna inexistente falha silenciosamente** sem
+  derrubar o resto do arquivo de migration (não roda em transação
+  explícita) — a policy afetada fica órfã na definição anterior (ou
+  simplesmente some, se removida manualmente depois). Só aparece
+  comparando `pg_policies` real (`supabase db dump --linked`) contra a
+  intenção documentada da migration, nunca por `deno check`/`tsc`.
+- **RLS de `UPDATE` por dono da linha não restringe QUAIS colunas
+  mudam** — `USING`/`WITH CHECK` só validam a linha, não o payload. Um
+  PATCH direto via PostgREST pode alterar qualquer coluna (incluindo
+  FKs estruturais) desde que o resultado final ainda passe no mesmo
+  check de dono. Ação legítima que só deveria tocar 1-2 colunas precisa
+  de um trigger `BEFORE UPDATE` (ou RPC dedicada) que trave o resto.
 
 Este arquivo é o resumo. O detalhe (com exemplos de bug real por item) está em
 `docs/guardrails-financeiro.md`, que cresce a cada rodada de review que achar

@@ -1035,8 +1035,43 @@ generalizável pra qualquer tabela, não só financeiro.
    nada ter sido excluído. Achado 2x na mesma sessão (perfis e
    fornecedores) — checar esse padrão em qualquer outro `handleDelete`
    que só olha `error`.
+5. **`ALTER POLICY ... USING (coluna_inexistente ...)` falha
+   silenciosamente SEM derrubar o resto do arquivo de migration.** Uma
+   migration de jan/2026 tentou trocar o predicado de
+   `"Membros podem ver seus próprios relacionamentos"` (`familias`) pra
+   `responsavel_id IN (...)` — coluna que `familias` nunca teve (só
+   `pessoa_id`/`familiar_id`). O `ALTER POLICY` deu erro de coluna
+   inexistente, mas como o arquivo não roda numa transação explícita, o
+   restante das ~40 outras policies do mesmo arquivo aplicou
+   normalmente — a policy afetada só ficou órfã na definição anterior
+   (ou, nesse caso, acabou removida manualmente meses depois sem
+   `DROP` rastreado). Resultado: 3 páginas ativas (`MinhaFamilia.tsx`,
+   `Perfil.tsx`, `FamilyWallet.tsx`) retornavam vazio pra qualquer
+   usuário não-admin por **7 meses**, sem erro visível em lugar nenhum.
+   Mesmo padrão já pego uma vez em `visitante_contatos` (commit
+   `94c03027`) — o `ALTER POLICY`/`CREATE OR REPLACE` que referencia
+   uma coluna errada é um ponto cego que `deno check`/`tsc` nunca vê;
+   só aparece comparando `pg_policies` real (`supabase db dump
+   --linked`) contra a intenção documentada da migration. Corrigido na
+   PR #129.
+6. **RLS de `UPDATE` baseada em dono da linha (`pessoa_id = ...`) não
+   restringe QUAIS colunas podem mudar.** `USING`/`WITH CHECK` só
+   validam que a linha (antes e depois) pertence ao dono — um PATCH
+   direto via PostgREST (fora da tela pensada) pode alterar qualquer
+   outra coluna da mesma linha, incluindo FKs estruturais
+   (`evento_id`, `pessoa_id`, `igreja_id`, `filial_id`), desde que o
+   resultado final ainda passe no mesmo check de dono. Achado por
+   review (Codex) na restauração da policy de RSVP de convite
+   (`eventos_convites`, PR #129): um convidado podia, via PATCH bruto,
+   "mover" o próprio convite pra outro evento. Onde a ação legítima do
+   dono da linha só deveria tocar 1-2 colunas (aqui: `status`/
+   `motivo_recusa`), uma policy de row-ownership sozinha não basta —
+   precisa de um trigger `BEFORE UPDATE` que força de volta ao valor
+   antigo qualquer coluna fora da lista permitida quando quem escreve
+   não é admin (ou, alternativa mais pesada, uma RPC dedicada em vez
+   de UPDATE direto).
 
-Referências: PR #126 (2026-08-21).
+Referências: PR #126 (2026-08-21), PR #129 (2026-08-21).
 
 ---
 

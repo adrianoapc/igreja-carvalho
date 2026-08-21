@@ -10,6 +10,15 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ### Corrigido
 
+#### 🔒 3 achados pós-fix de RLS: família invisível, RSVP de convite quebrado, PUBLIC exposto (21 Ago/2026)
+
+- **Tipo**: fix (segurança + bug de produto)
+- **Resumo**: sessão de acompanhamento da correção anterior (FOR-clause perdido) achou 3 problemas novos. (1) `familias.SELECT` de membro comum estava quebrado desde jan/2026 — uma migration tentou trocar o predicado por `responsavel_id` (coluna que a tabela nunca teve), o `ALTER POLICY` falhou silenciosamente sem derrubar o resto do arquivo, e `MinhaFamilia`/`Perfil`/`FamilyWallet` retornavam vazio pra qualquer não-admin sem erro visível. Restaurado com o predicado certo (`pessoa_id`/`familiar_id`). (2) 6 policies RLS (`profiles`, `familias`, `visitante_contatos`) ainda coexistiam como PUBLIC ao lado de uma versão `authenticated`, disparando `multiple_permissive_policies` no advisor de performance — confirmado que nenhum caller anônimo dependia do acesso PUBLIC, estreitadas e mescladas na policy irmã. (3) `ConvitesPendentesWidget` (RSVP de convite de evento) estava completamente quebrado pra não-admin: o filtro comparava `pessoa_id` contra o `auth.uid()` direto (nunca batia) e as policies de convidado em `eventos_convites` tinham sumido de produção sem `DROP` rastreado — restauradas, e o filtro de filial compartilhada corrigido (`.eq()` puro não enxergava convites de evento sem filial própria). Review do Codex ainda achou que a policy de RSVP restaurada não travava QUAIS colunas um convidado podia alterar (um PATCH bruto podia mover o próprio convite pra outro evento) — fechado com um trigger que força de volta ao valor antigo qualquer coluna estrutural quando quem escreve não é admin.
+- **Módulos afetados**: Família, Perfil, Eventos (convites/RSVP), Contatos de visitante
+- **Impacto no usuário**: "Minha Família", "Perfil" e a carteira de família voltam a mostrar os relacionamentos familiares pra qualquer membro (antes só admin via). O card de convite pendente no dashboard volta a aparecer e o RSVP (confirmar/recusar presença) volta a funcionar pra qualquer convidado, não só admin/líder.
+
+---
+
 #### 🔒 RLS perdeu FOR em 26 policies de 7 tabelas (self-delete de perfil e mais) (21 Ago/2026)
 
 - **Tipo**: fix (segurança)
