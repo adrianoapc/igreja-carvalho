@@ -37,11 +37,26 @@
 -- fix de segurança (pós-review) + Fase 1 (pós-review) já aplicados.
 --
 -- Validado no mesmo harness: 0 policies permissivas duplicadas
--- remanescentes, 0 auth.uid()/is_time_leader(auth.uid(),...) sem wrap;
--- exploit de self-delete em profiles + delete por admin (Todos.tsx) +
--- criação de convite por líder (EnviarConvitesDialog) re-testados;
--- líder de time escala seu time (não-líder bloqueado); membro cria
--- próprio vínculo familiar (usuário não-relacionado bloqueado).
+-- remanescentes DENTRO DO MESMO escopo TO, 0 auth.uid()/
+-- is_time_leader(auth.uid(),...) sem wrap; exploit de self-delete em
+-- profiles + delete por admin (Todos.tsx) + criação de convite por
+-- líder (EnviarConvitesDialog) re-testados; líder de time escala seu
+-- time (não-líder bloqueado); membro cria próprio vínculo familiar
+-- (usuário não-relacionado bloqueado).
+--
+-- Ressalva (achado de review, mesma limitação não-documentada na PR
+-- #125): PUBLIC também cobre `authenticated`, então o Performance
+-- Advisor ainda conta multiple_permissive_policies pro role
+-- authenticated onde uma policy PUBLIC coexiste com um perf_merge_*_auth
+-- na mesma ação — profiles INSERT/SELECT/UPDATE (members_can_create_
+-- dependents/members_can_view_family_members/members_can_update_
+-- dependents, todas PUBLIC), familias INSERT
+-- (members_can_create_family_relationships, PUBLIC) e visitante_contatos
+-- SELECT/UPDATE ("Church staff podem ver/gerenciar contatos agendados
+-- da filial", PUBLIC). Não mesclado aqui de propósito: estreitar essas
+-- policies PUBLIC pra TO authenticated exigiria confirmar que nenhum
+-- caller anon/role interno do Supabase depende delas — fora do escopo
+-- desta PR (mesmo motivo do "Follow-up" na migration 20260820020000).
 
 -- ==================== profiles ====================
 DROP POLICY IF EXISTS "Tecnico ver perfis da mesma igreja" ON profiles;
