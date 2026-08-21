@@ -103,7 +103,7 @@ export default function TodosPessoas() {
     isAllFiliais,
     loading: authLoading,
   } = useAuthContext();
-  const { isAdmin } = usePermissions();
+  const { isAdminOrScopedAdmin } = usePermissions();
 
   const atualizarQueryParams = (
     updates: {
@@ -342,19 +342,27 @@ export default function TodosPessoas() {
   };
 
   const handleDeletePessoa = async (pessoa: Pessoa) => {
-    if (!isAdmin) return;
+    if (!isAdminOrScopedAdmin) return;
     const confirmDelete = window.confirm(
       `Excluir ${pessoa.nome}? Esta ação não pode ser desfeita.`,
     );
     if (!confirmDelete) return;
 
     try {
-      const { error } = await supabase
+      const { error, count } = await supabase
         .from("profiles")
-        .delete()
+        .delete({ count: "exact" })
         .eq("id", pessoa.id);
 
       if (error) throw error;
+      if (!count) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível excluir a pessoa.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       toast({
         title: "Pessoa excluída",
@@ -564,7 +572,7 @@ export default function TodosPessoas() {
                       >
                         Agendar
                       </Button>
-                      {isAdmin && (
+                      {isAdminOrScopedAdmin && (
                         <Button
                           variant="destructive"
                           size="sm"
@@ -700,7 +708,7 @@ export default function TodosPessoas() {
                   >
                     Agendar
                   </Button>
-                  {isAdmin && (
+                  {isAdminOrScopedAdmin && (
                     <Button
                       variant="destructive"
                       className="flex-1 min-h-[44px]"

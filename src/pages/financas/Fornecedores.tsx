@@ -35,7 +35,7 @@ interface Props {
 
 export default function Fornecedores({ onBack }: Props) {
   const navigate = useNavigate();
-  const { isAdmin } = usePermissions();
+  const { isAdminOrScopedAdmin } = usePermissions();
   const handleBack = onBack ?? (() => navigate('/financas'));
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,7 +119,7 @@ export default function Fornecedores({ onBack }: Props) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!isAdmin) return;
+    if (!isAdminOrScopedAdmin) return;
     if (!confirm("Deseja excluir este fornecedor?")) return;
 
     try {
@@ -242,7 +242,7 @@ export default function Fornecedores({ onBack }: Props) {
                         <Button variant="ghost" size="icon" onClick={() => openEdit(fornecedor)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        {isAdmin && (
+                        {isAdminOrScopedAdmin && (
                           <Button variant="ghost" size="icon" onClick={() => handleDelete(fornecedor.id)}>
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -308,7 +308,7 @@ export default function Fornecedores({ onBack }: Props) {
                     <Pencil className="h-4 w-4 mr-2" />
                     Editar
                   </Button>
-                  {isAdmin && (
+                  {isAdminOrScopedAdmin && (
                     <Button
                       variant="outline"
                       size="sm"
