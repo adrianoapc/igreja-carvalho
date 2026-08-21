@@ -361,8 +361,8 @@ function formatarValor(valor: number): string {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-const MSG_ERRO_COMPROVANTE_GENERICA =
-  "Não foi possível registrar este comprovante. Contate o financeiro.";
+const MSG_ERRO_GENERICA =
+  "Não foi possível concluir esta operação. Contate o financeiro.";
 
 const MSG_POR_CODIGO_FIN: Record<string, string> = {
   FIN_VALIDACAO:
@@ -377,6 +377,10 @@ const MSG_POR_CODIGO_FIN: Record<string, string> = {
     "Não foi possível registrar: cadastro incompleto. Contate o financeiro.",
   FIN_CONCILIADO:
     "Não foi possível alterar um lançamento já conciliado.",
+  FIN_BOT:
+    "Você não tem permissão para esta operação pelo WhatsApp. Contate o financeiro.",
+  FIN_CONTEXTO:
+    "Não foi possível identificar seu contexto de acesso. Contate o financeiro.",
 };
 
 function pareceDetalheSeguroParaUsuario(detalhe: string): boolean {
@@ -386,10 +390,23 @@ function pareceDetalheSeguroParaUsuario(detalhe: string): boolean {
   );
 }
 
+// Código curto e opaco para o operador citar ao suporte, sem expor o erro
+// raw na conversa — o dev grepa esse código nos logs do Edge Function pra
+// achar a mensagem original, sem depender do operador relatar jargão técnico.
+function registrarErroSemMapeamento(mensagemOriginal: string): string {
+  const codigo = crypto.randomUUID().slice(0, 8).toUpperCase();
+  console.error(`[ErroSemMapeamento] ref=${codigo} raw="${mensagemOriginal}"`);
+  return codigo;
+}
+
 // Converte erro de RPC/Postgres em texto curto para o WhatsApp.
 // O raw fica só no log do servidor — constraint, RLS e schema não vazam.
 function mensagemErroParaUsuario(mensagem: string): string {
-  const semRpc = mensagem.replace(/^(?:fin_[a-z0-9_]+:\s*)+/i, "").trim();
+  // Sem /i: nomes de função fin_* são minúsculos por convenção, códigos de
+  // erro FIN_* são maiúsculos — com /i o regex também engolia o código
+  // (ex.: "fin_criar_transferencia: FIN_TENANT: ..." virava só o detalhe,
+  // e o código nunca batia no dicionário de mensagens abaixo).
+  const semRpc = mensagem.replace(/^(?:fin_[a-z0-9_]+:\s*)+/, "").trim();
   const m = semRpc.match(/^(FIN_[A-Z_]+)(?::\s*(.*))?$/);
   if (m) {
     const [, codigo, detalhe] = m;
@@ -400,9 +417,10 @@ function mensagemErroParaUsuario(mensagem: string): string {
     ) {
       return detalhe;
     }
-    return MSG_POR_CODIGO_FIN[codigo] ?? MSG_ERRO_COMPROVANTE_GENERICA;
+    const msg = MSG_POR_CODIGO_FIN[codigo];
+    if (msg) return msg;
   }
-  return MSG_ERRO_COMPROVANTE_GENERICA;
+  return `${MSG_ERRO_GENERICA} (ref: ${registrarErroSemMapeamento(mensagem)})`;
 }
 
 // Baixa, persiste no Storage e roda o OCR de um comprovante recebido,
@@ -2577,9 +2595,13 @@ serve(async (req) => {
             entrada: resultado.transacao_entrada_id as string | undefined,
           };
         } catch (transfErr) {
-          console.error("[Transferencia] Erro ao criar:", transfErr);
+          const motivo =
+            transfErr instanceof Error ? transfErr.message : String(transfErr);
+          console.error("[Transferencia] Erro ao criar:", motivo);
           return new Response(
-            JSON.stringify({ text: "❌ Erro ao criar transferência. Tente novamente." }),
+            JSON.stringify({
+              text: `❌ Não foi possível criar a transferência: ${mensagemErroParaUsuario(motivo)}`,
+            }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
