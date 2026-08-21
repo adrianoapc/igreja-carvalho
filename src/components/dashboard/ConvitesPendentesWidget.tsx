@@ -54,7 +54,7 @@ interface ConviteComEvento {
 }
 
 export default function ConvitesPendentesWidget() {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [motivoRecusa, setMotivoRecusa] = useState("");
@@ -69,13 +69,13 @@ export default function ConvitesPendentesWidget() {
   const { data: convites = [], isLoading } = useQuery({
     queryKey: [
       "convites-pendentes",
-      user?.id,
+      profile?.id,
       igrejaId,
       filialId,
       isAllFiliais,
     ],
     queryFn: async () => {
-      if (!user?.id || !igrejaId) return [];
+      if (!profile?.id || !igrejaId) return [];
 
       const now = new Date().toISOString();
 
@@ -95,7 +95,7 @@ export default function ConvitesPendentesWidget() {
           )
         `
         )
-        .eq("pessoa_id", user?.id)
+        .eq("pessoa_id", profile?.id)
         .eq("status", "pendente")
         .order("enviado_em", { ascending: false });
 
@@ -126,7 +126,7 @@ export default function ConvitesPendentesWidget() {
 
       return convitesFiltrados as ConvitePendente[];
     },
-    enabled: !!user?.id && !!igrejaId && !authLoading,
+    enabled: !!profile?.id && !!igrejaId && !authLoading,
   });
 
   const updateConviteMutation = useMutation({
@@ -147,12 +147,14 @@ export default function ConvitesPendentesWidget() {
         payload.motivo_recusa = motivo;
       }
 
-      const { error } = await supabase
+      const { error, count } = await supabase
         .from("eventos_convites")
-        .update(payload)
-        .eq("id", conviteId);
+        .update(payload, { count: "exact" })
+        .eq("id", conviteId)
+        .eq("pessoa_id", profile?.id);
 
       if (error) throw error;
+      if (!count) throw new Error("Não foi possível atualizar o convite.");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["convites-pendentes"] });
