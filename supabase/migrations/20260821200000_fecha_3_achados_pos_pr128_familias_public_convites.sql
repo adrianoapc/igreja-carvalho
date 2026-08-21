@@ -215,3 +215,36 @@ ALTER POLICY "Admin e convidado podem atualizar convites" ON public.eventos_conv
       AND has_filial_access(igreja_id, filial_id)
     )
   );
+
+-- Trava colunas estruturais no RSVP do convidado (achado Codex, review
+-- PR #129): o WITH CHECK acima só valida linha/tenant, não QUAIS
+-- colunas mudaram — sem isso, um PATCH direto via PostgREST (fora do
+-- ConvitesPendentesWidget) poderia mover o convite pra outro evento
+-- (evento_id), reatribuir pessoa_id, ou trocar igreja_id/filial_id,
+-- desde que a linha resultante ainda passasse no check. O trigger
+-- força de volta ao valor antigo qualquer coluna estrutural quando
+-- quem está escrevendo não é admin — RSVP legítimo só muda
+-- status/motivo_recusa/visualizado_em.
+CREATE OR REPLACE FUNCTION public.trg_convite_rsvp_restringe_campos()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF has_role(auth.uid(), 'admin'::app_role) THEN
+    RETURN NEW;
+  END IF;
+
+  NEW.evento_id := OLD.evento_id;
+  NEW.pessoa_id := OLD.pessoa_id;
+  NEW.igreja_id := OLD.igreja_id;
+  NEW.filial_id := OLD.filial_id;
+  NEW.enviado_em := OLD.enviado_em;
+  NEW.created_at := OLD.created_at;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+DROP TRIGGER IF EXISTS trigger_convite_rsvp_restringe_campos ON public.eventos_convites;
+CREATE TRIGGER trigger_convite_rsvp_restringe_campos
+  BEFORE UPDATE ON public.eventos_convites
+  FOR EACH ROW
+  EXECUTE FUNCTION public.trg_convite_rsvp_restringe_campos();
