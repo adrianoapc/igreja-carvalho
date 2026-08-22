@@ -24,6 +24,26 @@ próprio arquivo):
   canal bot** — no JWT, tesoureiro sem o flag de `profiles` ainda passa.
   Escrita que exige o flag no web precisa checar `autorizado_lancar_*`
   no JWT (ou não expor a ação).
+- **`has_filial_access()`**: o shortcut de "`igreja_id` ausente no JWT =
+  backwards compat" só dispara com `auth.uid() IS NOT NULL` (sessão
+  autenticada de verdade) OU `role=service_role` (canal bot/edge
+  functions, mesma detecção que `fin_resolver_contexto` já usa) — sem
+  isso, `anon` sem NENHUM JWT também batia no shortcut e ganhava acesso
+  irrestrito (corrigido 2026-08-22). **Cuidado ao endurecer esse tipo de
+  shortcut**: a 1ª versão só checava `auth.uid()`, sem o branch de
+  `service_role` — como o bot conecta com a service role key (`auth.uid()`
+  também NULL nesse canal), quebrava toda RPC `fin_*` que rechecka
+  `has_filial_access()` sem gate de `canal='web'` depois de
+  `fin_resolver_contexto` já ter validado o contexto do bot; achado no
+  `/code-review` local antes do commit. Qualquer policy `PUBLIC`/sem `TO
+  authenticated` que usa a função como único gate ainda depende só dela —
+  não confiar em `TO authenticated` como a defesa primária. **Pro
+  `service_role`, a função não faz scoping de filial nenhum** (quem
+  chama sempre bate no shortcut legado, já que `auth.uid()` NULL nunca
+  acha row em `user_filial_access`) — quem trava isso é só
+  `fin_resolver_contexto` validando `p_contexto` ANTES da RPC chamar
+  `has_filial_access()`; RPC nova que pular essa validação vira
+  fallback que libera tudo pro bot.
 - **`origem_registro`**: literal novo numa RPC precisa da CHECK
   constraint na mesma PR (`manual`/`api`/`getnet_antecipacao_desagio`).
 - **Ação de escrita nova** num card que já gateia irmãs por filial

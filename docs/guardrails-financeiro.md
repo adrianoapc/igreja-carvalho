@@ -1070,6 +1070,76 @@ generalizável pra qualquer tabela, não só financeiro.
    antigo qualquer coluna fora da lista permitida quando quem escreve
    não é admin (ou, alternativa mais pesada, uma RPC dedicada em vez
    de UPDATE direto).
+7. **`has_filial_access()` tratava "sem JWT nenhum" igual a "autenticado
+   com token legado sem o claim `igreja_id`" — os dois casos batem em
+   `get_jwt_igreja_id() IS NULL`.** Achado original 2026-08-19 (auditoria
+   de performance RLS): `SET role anon` sem NENHUM `request.jwt.claims`
+   setado (não `{}` — GUC genuinamente ausente) fazia o shortcut
+   "backwards compatibility" liberar acesso irrestrito. A mitigação da
+   PR #124 (2026-08-20) fechou só as policies pontuais achadas até então
+   (`FOR SELECT TO authenticated`), deixando a causa raiz na função — toda
+   policy `PUBLIC` que usa `has_filial_access()` como gate único (achadas
+   ~9 no review da própria PR #124: `liturgias`, `liturgia_recursos`,
+   `aulas`, `comunicados`, `liturgia_templates`, `membro_funcoes`,
+   `projetos`, `tags_midias`) continuava exposta. Fix (2026-08-22): o
+   shortcut só dispara com `auth.uid() IS NOT NULL` (sessão autenticada de
+   verdade — `sub` está presente em qualquer token emitido pelo GoTrue,
+   mesmo sem o claim custom `igreja_id`) **OU** `COALESCE(auth.jwt() ->>
+   'role', '') = 'service_role'` (canal bot/edge functions), distinguindo
+   os dois de "anon sem JWT nenhum" sem quebrar o caso legado que o
+   shortcut original pretendia cobrir.
+   **Achado no `/code-review` local desta própria migration, antes do
+   commit**: a 1ª versão do fix só tinha o branch `auth.uid() IS NOT
+   NULL`, sem o de `service_role` — como `chatbot-financeiro` conecta com
+   `SUPABASE_SERVICE_ROLE_KEY` (`auth.uid()` também `NULL` nesse canal, só
+   o role claim distingue), toda RPC `fin_*` que rechecka
+   `has_filial_access()` **sem** gate de `canal='web'` depois de
+   `fin_resolver_contexto` já ter validado o `p_contexto` do bot ia
+   rejeitar com `FIN_TENANT` toda transferência/exclusão/edição/vínculo de
+   lote iniciada pelo bot: `fin_criar_transferencia`,
+   `fin_alterar_competencia_grupo`, `fin_atualizar_lancamento`,
+   `fin_excluir_lancamento`, `fin_vincular_lote_*`,
+   `fin_security_review_filial_access` (`20260731340000`,
+   `20260731400000`, `20260731300000`, `20260731390000`) — nenhuma delas
+   gateia o check em `canal='web'` como `fin_core_lancamentos.sql:329`
+   faz. Fechado antes do commit, com o mesmo padrão de detecção de
+   `service_role` que `fin_resolver_contexto` já usa
+   (`20260710120000_fin_core_lancamentos.sql:93`) — para o bot,
+   `auth.uid()` continua `NULL`, então o shortcut legado de "sem
+   restrição configurada" (nenhuma row bate `user_id = NULL`) segue
+   liberando como sempre liberou, agora só dentro do branch de igreja_id
+   correto/service_role em vez de qualquer requisição.
+   Validado em harness Postgres 17 (réplica mínima da função +
+   dependências, cada cenário numa conexão nova pra `SET LOCAL`/GUC
+   ausente ficar fiel ao request real — reusar sessão faz um GUC já
+   tocado voltar pra `''` no `RESET`, não `NULL`): 11 cenários — 3 de anon
+   indo de `true` (bug) pra `false`, 2 de bot/`service_role` continuando
+   `true` (valida o fix da regressão achada no code-review), 5 de usuário
+   autenticado legítimo idênticos ao comportamento anterior, e 1 (sugerido
+   em review da PR #132) pinando a comparação de igualdade: JWT formato
+   anon-key (`role=anon`) mas com claim `igreja_id` de OUTRO tenant —
+   continua `false` via `_igreja_id = get_jwt_igreja_id()` explícito (o
+   shortcut nem dispara, já que o claim está presente), garantindo que um
+   refactor futuro não derrube essa comparação sem quebrar teste.
+   **Caveat apontado no mesmo review, não é regressão (comportamento
+   sempre foi assim)**: pra `service_role`, `auth.uid()` é sempre `NULL`,
+   então o `NOT EXISTS` do shortcut legado nunca acha nenhuma row — o
+   shortcut dispara SEMPRE pro canal bot, pra QUALQUER `_filial_id`, uma
+   vez que a cláusula de `igreja_id` já deixou a sessão entrar.
+   `has_filial_access()` não faz scoping de filial nenhum pro
+   `service_role`; quem trava isso hoje é só `fin_resolver_contexto`
+   validando o `p_contexto` explícito ANTES de qualquer RPC chamar
+   `has_filial_access()` — uma RPC nova que pule essa validação encontra
+   um fallback que libera tudo silenciosamente. Comentário de alerta
+   adicionado no código da função; tightening de verdade (exigir
+   `p_contexto` validado em vez de confiar cegamente no canal) fica pra
+   sessão dedicada.
+   Não fecha `midias`/`midia_tags`: a policy mesclada da Fase 2 de
+   performance (`20260820020000`) tem um `OR (true)` literal que não
+   passa por `has_filial_access()` nenhuma — fix separado, fora do
+   escopo desta migration. Ver
+   `project-vulnerabilidade-critica-escrita-anonima-has-filial-access` na
+   memória de sessão.
 
 Referências: PR #126 (2026-08-21), PR #129 (2026-08-21).
 
