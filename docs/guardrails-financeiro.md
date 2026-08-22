@@ -1070,6 +1070,33 @@ generalizável pra qualquer tabela, não só financeiro.
    antigo qualquer coluna fora da lista permitida quando quem escreve
    não é admin (ou, alternativa mais pesada, uma RPC dedicada em vez
    de UPDATE direto).
+7. **`has_filial_access()` tratava "sem JWT nenhum" igual a "autenticado
+   com token legado sem o claim `igreja_id`" — os dois casos batem em
+   `get_jwt_igreja_id() IS NULL`.** Achado original 2026-08-19 (auditoria
+   de performance RLS): `SET role anon` sem NENHUM `request.jwt.claims`
+   setado (não `{}` — GUC genuinamente ausente) fazia o shortcut
+   "backwards compatibility" liberar acesso irrestrito. A mitigação da
+   PR #124 (2026-08-20) fechou só as policies pontuais achadas até então
+   (`FOR SELECT TO authenticated`), deixando a causa raiz na função — toda
+   policy `PUBLIC` que usa `has_filial_access()` como gate único (achadas
+   ~9 no review da própria PR #124: `liturgias`, `liturgia_recursos`,
+   `aulas`, `comunicados`, `liturgia_templates`, `membro_funcoes`,
+   `projetos`, `tags_midias`) continuava exposta. Fix (2026-08-22): o
+   shortcut só dispara com `auth.uid() IS NOT NULL` — `sub` está presente
+   em qualquer token emitido pelo GoTrue, mesmo sem o claim custom
+   `igreja_id`, então distingue "autenticado sem o claim" de "anon sem
+   JWT nenhum" sem quebrar o caso legado que o shortcut original
+   pretendia cobrir. Validado em harness Postgres 17 (réplica mínima da
+   função + dependências, cada cenário numa conexão nova pra `SET LOCAL`/
+   GUC ausente ficar fiel ao request real — reusar sessão faz um GUC já
+   tocado voltar pra `''` no `RESET`, não `NULL`): 3 cenários de anon indo
+   de `true` (bug) pra `false`, 5 cenários de usuário autenticado legítimo
+   idênticos ao comportamento anterior. Não fecha `midias`/`midia_tags`:
+   a policy mesclada da Fase 2 de performance (`20260820020000`) tem um
+   `OR (true)` literal que não passa por `has_filial_access()` nenhuma —
+   fix separado, fora do escopo desta migration. Ver
+   `project-vulnerabilidade-critica-escrita-anonima-has-filial-access` na
+   memória de sessão.
 
 Referências: PR #126 (2026-08-21), PR #129 (2026-08-21).
 

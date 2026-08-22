@@ -24,6 +24,13 @@ próprio arquivo):
   canal bot** — no JWT, tesoureiro sem o flag de `profiles` ainda passa.
   Escrita que exige o flag no web precisa checar `autorizado_lancar_*`
   no JWT (ou não expor a ação).
+- **`has_filial_access()`**: o shortcut de "`igreja_id` ausente no JWT =
+  backwards compat" só dispara com `auth.uid() IS NOT NULL` (sessão
+  autenticada de verdade) — sem isso, `anon` sem NENHUM JWT também batia
+  no shortcut e ganhava acesso irrestrito (corrigido 2026-08-22). Qualquer
+  policy `PUBLIC`/sem `TO authenticated` que usa a função como único gate
+  ainda depende só dela — não confiar em `TO authenticated` como a defesa
+  primária.
 - **`origem_registro`**: literal novo numa RPC precisa da CHECK
   constraint na mesma PR (`manual`/`api`/`getnet_antecipacao_desagio`).
 - **Ação de escrita nova** num card que já gateia irmãs por filial
