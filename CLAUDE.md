@@ -37,7 +37,13 @@ próprio arquivo):
   `fin_resolver_contexto` já ter validado o contexto do bot; achado no
   `/code-review` local antes do commit. Qualquer policy `PUBLIC`/sem `TO
   authenticated` que usa a função como único gate ainda depende só dela —
-  não confiar em `TO authenticated` como a defesa primária.
+  não confiar em `TO authenticated` como a defesa primária. **Pro
+  `service_role`, a função não faz scoping de filial nenhum** (quem
+  chama sempre bate no shortcut legado, já que `auth.uid()` NULL nunca
+  acha row em `user_filial_access`) — quem trava isso é só
+  `fin_resolver_contexto` validando `p_contexto` ANTES da RPC chamar
+  `has_filial_access()`; RPC nova que pular essa validação vira
+  fallback que libera tudo pro bot.
 - **`origem_registro`**: literal novo numa RPC precisa da CHECK
   constraint na mesma PR (`manual`/`api`/`getnet_antecipacao_desagio`).
 - **Ação de escrita nova** num card que já gateia irmãs por filial

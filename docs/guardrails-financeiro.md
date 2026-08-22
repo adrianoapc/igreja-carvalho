@@ -1112,10 +1112,28 @@ generalizável pra qualquer tabela, não só financeiro.
    Validado em harness Postgres 17 (réplica mínima da função +
    dependências, cada cenário numa conexão nova pra `SET LOCAL`/GUC
    ausente ficar fiel ao request real — reusar sessão faz um GUC já
-   tocado voltar pra `''` no `RESET`, não `NULL`): 10 cenários — 3 de anon
+   tocado voltar pra `''` no `RESET`, não `NULL`): 11 cenários — 3 de anon
    indo de `true` (bug) pra `false`, 2 de bot/`service_role` continuando
    `true` (valida o fix da regressão achada no code-review), 5 de usuário
-   autenticado legítimo idênticos ao comportamento anterior.
+   autenticado legítimo idênticos ao comportamento anterior, e 1 (sugerido
+   em review da PR #132) pinando a comparação de igualdade: JWT formato
+   anon-key (`role=anon`) mas com claim `igreja_id` de OUTRO tenant —
+   continua `false` via `_igreja_id = get_jwt_igreja_id()` explícito (o
+   shortcut nem dispara, já que o claim está presente), garantindo que um
+   refactor futuro não derrube essa comparação sem quebrar teste.
+   **Caveat apontado no mesmo review, não é regressão (comportamento
+   sempre foi assim)**: pra `service_role`, `auth.uid()` é sempre `NULL`,
+   então o `NOT EXISTS` do shortcut legado nunca acha nenhuma row — o
+   shortcut dispara SEMPRE pro canal bot, pra QUALQUER `_filial_id`, uma
+   vez que a cláusula de `igreja_id` já deixou a sessão entrar.
+   `has_filial_access()` não faz scoping de filial nenhum pro
+   `service_role`; quem trava isso hoje é só `fin_resolver_contexto`
+   validando o `p_contexto` explícito ANTES de qualquer RPC chamar
+   `has_filial_access()` — uma RPC nova que pule essa validação encontra
+   um fallback que libera tudo silenciosamente. Comentário de alerta
+   adicionado no código da função; tightening de verdade (exigir
+   `p_contexto` validado em vez de confiar cegamente no canal) fica pra
+   sessão dedicada.
    Não fecha `midias`/`midia_tags`: a policy mesclada da Fase 2 de
    performance (`20260820020000`) tem um `OR (true)` literal que não
    passa por `has_filial_access()` nenhuma — fix separado, fora do

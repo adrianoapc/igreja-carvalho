@@ -41,14 +41,20 @@
 --
 -- Validado em harness Postgres 17 (réplica mínima: app_role, has_role,
 -- get_jwt_igreja_id/get_jwt_filial_id, user_filial_access, copiados
--- literalmente das migrations): 10 cenários, 3 reproduzindo o bug original
+-- literalmente das migrations): 11 cenários, 3 reproduzindo o bug original
 -- (anon sem claims, anon com o JWT da própria anon key, anon pedindo outro
 -- tenant — todos true no comportamento antigo, false no novo), 2 cobrindo
 -- o canal service_role/bot (com e sem contexto de igreja no claim — ambos
--- devem continuar true, valida o fix do achado do code-review acima), e 5
+-- devem continuar true, valida o fix do achado do code-review acima), 5
 -- de usuário autenticado legítimo (token legado sem igreja_id, grant
--- explícito, allowlist negando, igreja_id correto/errado no claim) —
--- todos idênticos ao comportamento anterior.
+-- explícito, allowlist negando, igreja_id correto/errado no claim), e 1
+-- (sugerido em review da PR #132) pinando a comparação de igualdade: JWT
+-- no formato da anon key (role=anon) mas com claim igreja_id de OUTRO
+-- tenant — continua false via o `_igreja_id = get_jwt_igreja_id()`
+-- explícito, não pelo shortcut (que nem dispara, já que o claim está
+-- presente) — garante que um refactor futuro não derrube essa comparação
+-- sem quebrar teste. Todos idênticos ao comportamento anterior, exceto os
+-- 3 casos de anon fechados.
 --
 -- Não fecha sozinho: liturgias/liturgia_recursos/aulas/comunicados/
 -- liturgia_templates/membro_funcoes/projetos/tags_midias ainda são gate
@@ -114,6 +120,25 @@ AS $$
           -- acesso total. Só entra em jogo se a cláusula de igreja_id
           -- acima já decidiu que a sessão é elegível (match direto ou
           -- autenticado sem o claim).
+          --
+          -- CAVEAT service_role (apontado em review da PR #132): pra
+          -- essa sessão auth.uid() é sempre NULL, então o NOT EXISTS
+          -- abaixo nunca acha nenhuma row (user_id = NULL não bate nada)
+          -- — o shortcut dispara SEMPRE, pra QUALQUER _filial_id, uma vez
+          -- que a cláusula de igreja_id já deixou o service_role entrar.
+          -- Isso reproduz o comportamento de sempre da função pro bot
+          -- (não é regressão desta migration), mas quer dizer que
+          -- has_filial_access() não faz scoping de filial nenhum pro
+          -- canal service_role — quem trava isso hoje é só
+          -- fin_resolver_contexto validando o p_contexto explícito ANTES
+          -- de qualquer RPC chamar has_filial_access(). Se uma RPC nova
+          -- chamar has_filial_access() sem passar por
+          -- fin_resolver_contexto primeiro, este vira um fallback que
+          -- libera tudo silenciosamente pro service_role. Tightening
+          -- (ex.: exigir p_contexto validado explícito em vez de confiar
+          -- cegamente no canal) fica pra sessão dedicada — ver
+          -- project-vulnerabilidade-critica-escrita-anonima-has-filial-access
+          -- na memória de sessão.
           OR (
             public.get_jwt_filial_id() IS NULL
             AND NOT EXISTS (
