@@ -16,19 +16,39 @@
 -- Fix: o shortcut "igreja_id não definida no JWT = backwards compat" só
 -- vale quando existe uma sessão autenticada de verdade (auth.uid() IS NOT
 -- NULL — resolve do claim `sub`, presente em qualquer token emitido pelo
--- GoTrue mesmo sem o claim custom igreja_id). Pra anon (sem sub nenhum),
--- o shortcut nunca mais dispara, então a cláusula inteira de igreja_id só
--- casa por igualdade explícita — e sem admin bypass (has_role(NULL,...) é
--- sempre false), o resultado geral vira false.
+-- GoTrue mesmo sem o claim custom igreja_id) OU uma sessão service_role
+-- (canal bot/edge functions — mesma detecção de
+-- `COALESCE(auth.jwt() ->> 'role', '') = 'service_role'` que
+-- fin_resolver_contexto já usa em 20260710120000_fin_core_lancamentos.sql:93
+-- pra distinguir o canal service do usuário anônimo). Pra anon de verdade
+-- (sem sub, sem role=service_role), o shortcut nunca mais dispara, então
+-- a cláusula inteira de igreja_id só casa por igualdade explícita — e sem
+-- admin bypass (has_role(NULL,...) é sempre false), o resultado geral vira
+-- false.
+--
+-- ACHADO NO /code-review LOCAL DESTA PRÓPRIA MIGRATION: a 1ª versão do fix
+-- só checava auth.uid() IS NOT NULL, sem o branch de service_role — como
+-- chatbot-financeiro (supabase/functions/chatbot-financeiro/index.ts:601-602)
+-- conecta com SUPABASE_SERVICE_ROLE_KEY (auth.uid() também NULL nesse
+-- canal), toda RPC fin_* que rechecka has_filial_access() sem gate de
+-- `canal='web'` DEPOIS de fin_resolver_contexto já ter validado o contexto
+-- do bot (fin_criar_transferencia, fin_alterar_competencia_grupo,
+-- fin_atualizar_lancamento, fin_excluir_lancamento, fin_vincular_lote_*,
+-- fin_security_review_filial_access — supabase/migrations/20260731340000,
+-- 20260731400000, 20260731300000, 20260731390000) passaria a rejeitar
+-- toda transferência/exclusão/edição/vínculo de lote iniciada pelo bot com
+-- FIN_TENANT, mesmo pra ator autorizado dentro do próprio tenant.
 --
 -- Validado em harness Postgres 17 (réplica mínima: app_role, has_role,
 -- get_jwt_igreja_id/get_jwt_filial_id, user_filial_access, copiados
--- literalmente das migrations): 8 cenários, 3 deles reproduzindo o bug
--- (anon sem claims, anon com o JWT da própria anon key, anon pedindo
--- outro tenant) — todos true no comportamento antigo, false no novo; os 5
--- cenários de usuário autenticado legítimo (token legado sem igreja_id,
--- grant explícito, allowlist negando, igreja_id correto/errado no claim)
--- permanecem idênticos ao comportamento anterior.
+-- literalmente das migrations): 10 cenários, 3 reproduzindo o bug original
+-- (anon sem claims, anon com o JWT da própria anon key, anon pedindo outro
+-- tenant — todos true no comportamento antigo, false no novo), 2 cobrindo
+-- o canal service_role/bot (com e sem contexto de igreja no claim — ambos
+-- devem continuar true, valida o fix do achado do code-review acima), e 5
+-- de usuário autenticado legítimo (token legado sem igreja_id, grant
+-- explícito, allowlist negando, igreja_id correto/errado no claim) —
+-- todos idênticos ao comportamento anterior.
 --
 -- Não fecha sozinho: liturgias/liturgia_recursos/aulas/comunicados/
 -- liturgia_templates/membro_funcoes/projetos/tags_midias ainda são gate
@@ -56,12 +76,21 @@ AS $$
     OR (
       -- Mesmo igreja_id, OU igreja_id não definida no JWT mas a sessão é
       -- de um usuário autenticado de verdade (token legado sem o claim
-      -- custom igreja_id — o caso real de backwards compatibility). Sem
-      -- o auth.uid() IS NOT NULL, uma sessão anon (sem NENHUM JWT, logo
-      -- sem claim `sub`) também batia aqui e ganhava acesso irrestrito.
+      -- custom igreja_id — o caso real de backwards compatibility) OU do
+      -- canal service_role (bot/edge functions — fin_resolver_contexto já
+      -- validou o p_contexto explícito antes de chegar aqui). Sem essas
+      -- duas condições, uma sessão anon (sem NENHUM JWT, logo sem claim
+      -- `sub` nem role=service_role) também batia aqui e ganhava acesso
+      -- irrestrito.
       (
         _igreja_id = public.get_jwt_igreja_id()
-        OR (public.get_jwt_igreja_id() IS NULL AND auth.uid() IS NOT NULL)
+        OR (
+          public.get_jwt_igreja_id() IS NULL
+          AND (
+            auth.uid() IS NOT NULL
+            OR COALESCE(auth.jwt() ->> 'role', '') = 'service_role'
+          )
+        )
       )
       AND (
         -- Admin da igreja tem acesso total na igreja
@@ -104,10 +133,15 @@ COMMENT ON FUNCTION public.has_filial_access(UUID, UUID) IS
   'Verifica acesso de um usuário a uma filial. Admin global/de igreja têm
    acesso total. Caso contrário: igreja_id do claim tem que bater, ou o
    claim estar ausente NUMA SESSÃO AUTENTICADA (token legado sem
-   igreja_id — auth.uid() IS NOT NULL distingue isso de uma sessão anon
-   sem JWT nenhum, achado 2026-08-19/corrigido 2026-08-22). Dentro da
-   igreja: filial_id NULL (compartilhada) ou igual à filial primária do
-   JWT libera; senão, uma row explícita em user_filial_access (igreja_id +
-   filial_id + can_view=true) decide; o shortcut de "sem filial primária =
-   acesso total" só vale quando o usuário não tem NENHUMA row em
-   user_filial_access NESTA igreja (comportamento legado).';
+   igreja_id) OU NUMA SESSÃO SERVICE_ROLE (canal bot/edge functions,
+   mesma detecção que fin_resolver_contexto usa) — auth.uid() IS NOT NULL
+   OR role=service_role distingue os dois de uma sessão anon sem JWT
+   nenhum (achado 2026-08-19/corrigido 2026-08-22, regressão do canal bot
+   pega no /code-review local da própria correção e corrigida antes do
+   commit). Dentro da igreja: filial_id NULL (compartilhada) ou igual à
+   filial primária do JWT libera; senão, uma row explícita em
+   user_filial_access (igreja_id + filial_id + can_view=true) decide; o
+   shortcut de "sem filial primária = acesso total" só vale quando o
+   usuário não tem NENHUMA row em user_filial_access NESTA igreja
+   (comportamento legado — pra service_role, auth.uid() NULL nunca bate
+   nenhuma row, então esse shortcut sempre libera, como sempre liberou).';

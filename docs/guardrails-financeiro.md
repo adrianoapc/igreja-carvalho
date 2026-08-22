@@ -1082,19 +1082,44 @@ generalizável pra qualquer tabela, não só financeiro.
    ~9 no review da própria PR #124: `liturgias`, `liturgia_recursos`,
    `aulas`, `comunicados`, `liturgia_templates`, `membro_funcoes`,
    `projetos`, `tags_midias`) continuava exposta. Fix (2026-08-22): o
-   shortcut só dispara com `auth.uid() IS NOT NULL` — `sub` está presente
-   em qualquer token emitido pelo GoTrue, mesmo sem o claim custom
-   `igreja_id`, então distingue "autenticado sem o claim" de "anon sem
-   JWT nenhum" sem quebrar o caso legado que o shortcut original
-   pretendia cobrir. Validado em harness Postgres 17 (réplica mínima da
-   função + dependências, cada cenário numa conexão nova pra `SET LOCAL`/
-   GUC ausente ficar fiel ao request real — reusar sessão faz um GUC já
-   tocado voltar pra `''` no `RESET`, não `NULL`): 3 cenários de anon indo
-   de `true` (bug) pra `false`, 5 cenários de usuário autenticado legítimo
-   idênticos ao comportamento anterior. Não fecha `midias`/`midia_tags`:
-   a policy mesclada da Fase 2 de performance (`20260820020000`) tem um
-   `OR (true)` literal que não passa por `has_filial_access()` nenhuma —
-   fix separado, fora do escopo desta migration. Ver
+   shortcut só dispara com `auth.uid() IS NOT NULL` (sessão autenticada de
+   verdade — `sub` está presente em qualquer token emitido pelo GoTrue,
+   mesmo sem o claim custom `igreja_id`) **OU** `COALESCE(auth.jwt() ->>
+   'role', '') = 'service_role'` (canal bot/edge functions), distinguindo
+   os dois de "anon sem JWT nenhum" sem quebrar o caso legado que o
+   shortcut original pretendia cobrir.
+   **Achado no `/code-review` local desta própria migration, antes do
+   commit**: a 1ª versão do fix só tinha o branch `auth.uid() IS NOT
+   NULL`, sem o de `service_role` — como `chatbot-financeiro` conecta com
+   `SUPABASE_SERVICE_ROLE_KEY` (`auth.uid()` também `NULL` nesse canal, só
+   o role claim distingue), toda RPC `fin_*` que rechecka
+   `has_filial_access()` **sem** gate de `canal='web'` depois de
+   `fin_resolver_contexto` já ter validado o `p_contexto` do bot ia
+   rejeitar com `FIN_TENANT` toda transferência/exclusão/edição/vínculo de
+   lote iniciada pelo bot: `fin_criar_transferencia`,
+   `fin_alterar_competencia_grupo`, `fin_atualizar_lancamento`,
+   `fin_excluir_lancamento`, `fin_vincular_lote_*`,
+   `fin_security_review_filial_access` (`20260731340000`,
+   `20260731400000`, `20260731300000`, `20260731390000`) — nenhuma delas
+   gateia o check em `canal='web'` como `fin_core_lancamentos.sql:329`
+   faz. Fechado antes do commit, com o mesmo padrão de detecção de
+   `service_role` que `fin_resolver_contexto` já usa
+   (`20260710120000_fin_core_lancamentos.sql:93`) — para o bot,
+   `auth.uid()` continua `NULL`, então o shortcut legado de "sem
+   restrição configurada" (nenhuma row bate `user_id = NULL`) segue
+   liberando como sempre liberou, agora só dentro do branch de igreja_id
+   correto/service_role em vez de qualquer requisição.
+   Validado em harness Postgres 17 (réplica mínima da função +
+   dependências, cada cenário numa conexão nova pra `SET LOCAL`/GUC
+   ausente ficar fiel ao request real — reusar sessão faz um GUC já
+   tocado voltar pra `''` no `RESET`, não `NULL`): 10 cenários — 3 de anon
+   indo de `true` (bug) pra `false`, 2 de bot/`service_role` continuando
+   `true` (valida o fix da regressão achada no code-review), 5 de usuário
+   autenticado legítimo idênticos ao comportamento anterior.
+   Não fecha `midias`/`midia_tags`: a policy mesclada da Fase 2 de
+   performance (`20260820020000`) tem um `OR (true)` literal que não
+   passa por `has_filial_access()` nenhuma — fix separado, fora do
+   escopo desta migration. Ver
    `project-vulnerabilidade-critica-escrita-anonima-has-filial-access` na
    memória de sessão.
 
