@@ -109,15 +109,34 @@ confirmação explícita de que o bot de review realmente rodou (não só
 
 ### Branch protection (main)
 
-Ver commit/PR que ativou — checklist do que foi configurado:
-- PR obrigatória antes de merge em `main` (sem push direto)
-- Status checks obrigatórios: `docs_guard`, `pattern_guardrails`,
-  `migration_harness` (quando aplicável)
-- Sem force-push, sem deleção da branch
+Ativada em 2026-08-26 via `gh api .../branches/main/protection`. Configurado:
+- PR obrigatória antes de merge em `main` (sem push direto), inclusive
+  pra admin/dono do repo (`enforce_admins: true`) — a falha achada na
+  auditoria era exatamente "nada bloqueia ninguém, nem quem está
+  mergeando", então isolar o dono da regra reproduziria o mesmo buraco.
+- Status checks obrigatórios: **`docs_guard`, `pattern_guardrails`**.
+  `migration_harness` fica de FORA da lista de obrigatórios de propósito:
+  o trigger dele tem `paths: supabase/migrations/**`, então o job
+  simplesmente não roda em PR que não toca migration — se ele fosse
+  "required", o GitHub trava esperando um status que nunca chega,
+  bloqueando toda PR sem migration pra sempre. `migration_harness`
+  continua rodando e reportando normalmente quando aplicável, só não é
+  um requisito de merge.
+- Conversas de review precisam estar resolvidas antes de merge
+  (`required_conversation_resolution`).
+- Sem force-push, sem deleção da branch.
+- `strict: true` nos status checks — a branch precisa estar atualizada
+  com `main` antes de mergear (evita merge de um estado já obsoleto).
 
 Deliberadamente **não** exige aprovação humana (≥1 reviewer) — projeto é
 mantido por 1 dev; exigir isso bloquearia todo merge. O gate real é
 status check verde, não aprovação de terceiro.
+
+**Se `migration_harness` precisar virar obrigatório no futuro**: só dá
+pra fazer com segurança removendo o `paths:` filter do trigger e movendo
+o filtro pra dentro do job (um `if:` que faz o job reportar sucesso
+imediato quando nenhuma migration mudou) — só então o check sempre
+reporta status e pode entrar em `required_status_checks`.
 
 ## Fora de escopo (não fechado nesta rodada)
 
