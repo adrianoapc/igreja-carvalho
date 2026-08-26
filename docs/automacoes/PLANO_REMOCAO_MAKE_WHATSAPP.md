@@ -458,8 +458,17 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   fica como está (defesa em profundidade adicional), mas não é
   suficiente sozinho pros motivos acima.
 - [ ] Envia a resposta via Graph API copiando o padrão de
-  `send-otp/index.ts` (`WHATSAPP_TOKEN` + `phone_number_id` via
-  `whatsapp_numeros`).
+  `send-otp/index.ts` (`WHATSAPP_TOKEN`), **mas NÃO o lookup de
+  `phone_number_id`** (achado real de `@codex review`, P1, 21ª rodada
+  — `send-otp/index.ts:97-116` usa `.limit(1)` e pega um número
+  qualquer habilitado da igreja em `whatsapp_numeros`; copiar isso faz
+  mensagem financeira poder ser respondida pelo número de triagem ou
+  vice-versa, numa igreja com os 2 números documentados). A resposta
+  tem que sair pelo MESMO `phone_number_id` já extraído da mensagem de
+  entrada (`value.metadata.phone_number_id`, item de normalização do
+  Passo 1) — nunca um novo lookup "primeiro número habilitado".
+- [ ] Registra a execução via `log_edge_function_with_metrics` (RPC já
+  existente) e responde 200 rápido pra Meta.
 - [ ] Registra a execução via `log_edge_function_with_metrics` (RPC já
   existente) e responde 200 rápido pra Meta.
 
