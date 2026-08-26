@@ -118,10 +118,19 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
       `whatsapp-webhook` precisa resolver o `media_id` → URL via Graph
       API ela mesma, ANTES de chamar `chatbot-financeiro`, e mandar o
       resultado como `url_anexo` — não repassar o `id` cru.
-  - **Filtra eventos que não são mensagem** — a Meta também manda
-    webhooks de status (`statuses[]`: sent/delivered/read), sem
-    `messages[]` nenhum. Detectar e responder 200 sem rotear pra
-    nenhuma function, senão a extração acima falha silenciosamente.
+  - **Filtra eventos que não são mensagem, E tipos de mensagem sem
+    suporte** (achado real de `@codex review`, P2, 14ª rodada — o
+    filtro original só cobria `statuses[]`; a Meta também entrega
+    `messages[].type` como `interactive`/`button`/`reaction`/
+    `location`/`contacts`/`sticker`, nenhum coberto pela extração de
+    `text.body`/mídia acima. Sem allowlist, esses tipos passam com
+    `mensagem=""` e são roteados mesmo assim — `chatbot-triagem`
+    processa string vazia contra a sessão ativa,
+    `index.ts:987-994`, gerando resposta sem sentido ou avançando
+    histórico com "mensagem" vazia do usuário). Allowlist explícita de
+    tipos suportados (`text`, `audio`, `image`, `document`); qualquer
+    outro tipo responde 200 sem rotear, igual ao tratamento de
+    `statuses[]`.
 - [ ] Resolve `igreja_id`/`filial_id` e destino via `phone_number_id` já
   extraído — **não** por palavra-chave (roteamento real do Make é por
   número, confirmado no export; não existe lógica de keyword).
@@ -420,14 +429,18 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
 - [ ] Acompanhar `edge_function_logs` por alguns dias de uso real: taxa de
   erro, duplicidade, latência.
 - [ ] Só então desativar de fato o scenario no Make — **e antes de
-  revogar qualquer token, confirmar que não é o mesmo `WHATSAPP_TOKEN`
-  que a `whatsapp-webhook` está usando pra responder** (achado real de
-  `@codex review`, P2: a Decisão 5 da ADR-033 reaproveita de propósito
-  o token global já existente — se for o MESMO token que o Make usa
-  hoje, revogar quebra as respostas da função nova também, não só o
-  Make). Se for compartilhado, ou mantém como está (não revoga nada), ou
-  primeiro rotaciona a `whatsapp-webhook` pra um token distinto e só
-  depois revoga o antigo.
+  revogar qualquer token, confirmar que não é o mesmo que ALGUMA
+  function ainda usa — são 2 nomes de token diferentes, não 1**
+  (achado real de `@codex review`, P1, 14ª rodada, ampliando o achado
+  P2 anterior): `WHATSAPP_TOKEN` (respostas de texto da
+  `whatsapp-webhook`, Decisão 5 da ADR-033) é um; separadamente,
+  `WHATSAPP_API_TOKEN` autentica a transcrição de áudio em
+  `chatbot-triagem` (`index.ts:61,388-395`) e o download de
+  comprovante/documento em `chatbot-financeiro` (`index.ts:605,170-175`)
+  — revogar só verificando `WHATSAPP_TOKEN` pode deixar resposta de
+  texto funcionando enquanto quebra silenciosamente áudio e anexo, se
+  o token antigo do Make coincidir com o `WHATSAPP_API_TOKEN`. Checar/
+  rotacionar OS DOIS nomes antes de revogar qualquer credencial do Make.
 
 **Rollback não é "1 clique" — documentar o procedimento real** (achado de
 `@codex review`, P2): depois que a URL do callback é trocada no Meta
