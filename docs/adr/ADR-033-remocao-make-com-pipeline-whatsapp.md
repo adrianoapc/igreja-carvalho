@@ -201,7 +201,18 @@ de qualquer decisão — Fase 3, ver plano.
    verdade impede a Meta de reentregar se o dono original cair), e
    idempotência própria dentro de `chatbot-triagem`/`chatbot-financeiro`
    por `wamid` (o orquestrador sozinho não fecha o caso de resposta do
-   chatbot perdida em trânsito).
+   chatbot perdida em trânsito). **Eixo separado, não coberto por
+   `wamid`**: lock por conversa (`igreja_id`+`filial_id`+
+   `phone_number_id`+`telefone`) pra serializar mensagens DIFERENTES da
+   mesma conversa entregues em paralelo — sem isso, duas mensagens reais
+   do mesmo usuário podem invocar o chatbot concorrentemente e
+   corromper `atendimentos_bot` (sem lock hoje). Tabela de dedupe/
+   entrega é acesso `service_role`-only, sem SELECT via PostgREST pra
+   ninguém (mesmo risco de vazamento cross-tenant do Passo 3, numa
+   tabela nova). Reconciliação de entrega incerta (`"enviando"` com
+   lease expirado) vira alerta manual na Fase 1, não reenvio automático
+   — falta webhook de status de entrega da Meta pra fazer isso com
+   segurança, fica como fast-follow.
    Ver plano de execução §Passo 1 pro desenho completo.
 ⚠️ Escopo real (6+ cenários Make, não 1) é maior que o assumido
    originalmente — plano precisa ser fatiado em fases já reconhecendo isso
@@ -269,7 +280,20 @@ Ver plano de execução detalhado em
 7. ⬜ Isolamento multi-número (mensagem no número financeiro não vaza pra
    triagem e vice-versa)
 8. ⬜ Reenvio do mesmo `wamid` (Meta redelivery simulado) → processado só
-   uma vez, segunda entrega recebe 200 sem rotear de novo
+   uma vez, segunda entrega recebe 200 sem rotear de novo. **Com 2
+   sessões reais concorrentes de verdade** (achado real de `@codex
+   review`, P1, 8ª rodada — rodar a 2ª entrega só depois da 1ª terminar
+   é simulação sequencial, não testa a claim atômica/fencing sob
+   colisão de verdade; já é guardrail existente do projeto — CLAUDE.md
+   §Testing de SQL: "concorrência exige 2 sessões psql de verdade, não
+   simulação sequencial" — este cenário só não seguia isso ainda), com
+   sub-casos: disputa simultânea pela claim original, takeover de lease
+   expirado, e entrega parcial com 2 destinatários (membro OK, pastor
+   falha) sob concorrência.
+9. ⬜ Duas mensagens (`wamid` diferentes) da MESMA conversa entregues em
+   paralelo → processadas em série, não concorrentemente (valida o
+   lock por conversa, achado de `@codex review`, 8ª rodada — eixo de
+   concorrência diferente do item 8)
 
 ### Bake period
 

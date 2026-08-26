@@ -155,6 +155,22 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   ver ADR-033 §Inventário) via endpoint de template message da Graph
   API, com os parâmetros que o template espera. Hoje isso não acontece
   em produção — é bug conhecido, ver ADR-033 §Bugs conhecidos.
+- [ ] **Serializa por CONVERSA, não só por mensagem — eixo de
+  concorrência diferente do dedup de `wamid`** (achado real de `@codex
+  review`, P1, 8ª rodada). Dois `wamid` diferentes da MESMA conversa
+  (usuário manda 2 mensagens rápido, ou a própria Meta entrega em
+  paralelo) passam pelo dedup de `wamid` sem problema — são mensagens
+  diferentes de verdade — mas invocam o MESMO chatbot concorrentemente,
+  e `chatbot-financeiro`/`chatbot-triagem` leem `atendimentos_bot` e
+  escrevem de volta sem lock nenhum
+  (`chatbot-financeiro/index.ts:804-818,1080-1091`) — uma pode ler
+  estado velho, sobrescrever histórico, ou interpretar resposta no
+  passo financeiro errado. Precisa de uma chave de ordenação/lease
+  adicional por CONVERSA (`igreja_id`+`filial_id`+`phone_number_id`+
+  `telefone`, não `wamid`) — a `whatsapp-webhook` só invoca o chatbot
+  depois de conseguir esse lock de conversa (mesmo padrão de fencing:
+  se já tem alguém processando essa conversa, espera ou enfileira,
+  nunca despacha em paralelo pro mesmo par número+telefone).
 - [ ] **Deduplica por `wamid` (`value.messages[].id`) antes de chamar
   qualquer chatbot — máquina de estado com fencing, não claim binário**
   (achado real de `@codex review`, P1 — promovido de "fora de escopo"
@@ -165,7 +181,17 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   mesma lógica — o desenho abaixo é o que sobrou depois de fechar
   todos**. Tabela dedicada por `wamid`: `status`, `owner_token` (UUID
   gerado por tentativa), `lease_until`, `chatbot_result` (JSONB,
-  nullable).
+  nullable). **Sem SELECT nenhum via PostgREST — nem pra admin, nem pra
+  super_admin** (achado real de `@codex review`, P1, 8ª rodada: essa
+  tabela guarda telefone + conteúdo completo de mensagem/resposta; se
+  for criada em `public` sem RLS ou sem revogar o `EXECUTE`/`SELECT` de
+  `PUBLIC`, é o MESMO vazamento cross-tenant que o Passo 3 corrige em
+  `edge_function_logs`, só que numa tabela nova que ninguém tinha
+  pensado em proteger ainda). É estado interno só do orquestrador,
+  ninguém precisa navegar por ela via UI — RLS sem nenhuma policy de
+  SELECT (ou `REVOKE ALL ... FROM PUBLIC`, lembrando que `REVOKE ...
+  FROM anon` sozinho não fecha nada, ver CLAUDE.md), acesso só via
+  `service_role` de dentro da própria function.
 
   **Estados**: `processing` → `chatbot_done` → `completed` (ou
   `processing` reclamado de novo se o lease expirar sem progresso).
@@ -219,6 +245,21 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
        lease válido é pulado por qualquer outra tentativa concorrente).
        Marca cada item `"enviado"` conforme confirma; só marca o `wamid`
        inteiro `completed` quando a lista estiver toda `"enviado"`.
+       **Lease de `"enviando"` expirado NÃO reenvia automaticamente**
+       (achado real de `@codex review`, P1, 8ª rodada — se o Graph
+       aceitou o envio mas a resposta HTTP se perdeu, ou o runtime
+       morreu logo depois do Graph confirmar, o item fica `"enviando"`
+       mesmo tendo sido entregue de verdade; reenviar às cegas duplica
+       a mensagem pro destinatário final, e o repo hoje **não tem**
+       nenhum webhook de status de entrega da Meta pra reconciliar
+       contra isso). Pra Fase 1: item `"enviando"` com lease expirado
+       vira alerta/log pra revisão manual, não retry automático —
+       aceitável porque duplicar/perder uma notificação de WhatsApp é
+       bem menos grave que duplicar uma operação financeira (que já
+       está protegida pela idempotência dentro do próprio chatbot, item
+       acima). Construir o webhook de status de entrega da Meta
+       (`statuses[]`) pra reconciliar automaticamente fica como
+       fast-follow — ver §Fora de escopo da Fase 1.
      - `processing` com lease válido e dono diferente do meu → **não
        responde 200** (achado real de `@codex review`, P1, 5ª rodada —
        devolver 200 aqui e o dono original travar/cair depois deixa a
@@ -339,6 +380,11 @@ bake period terminou).
   fast-follow). Fica fora de escopo só o refinamento de infra (TTL de
   limpeza da tabela de dedupe, métricas de taxa de duplicidade) — a
   claim atômica básica entra na Fase 1.
+- **Webhook de status de entrega da Meta** (`statuses[]`: sent/
+  delivered/read) pra reconciliar item `"enviando"` travado sem
+  reenviar às cegas (achado de `@codex review`, 8ª rodada) — Fase 1
+  trata isso como alerta manual, não reenvio automático; ver Passo 1
+  item de dedup.
 - Mover roteamento (hoje array fixo por `phone_number_id`) pra tabela
   configurável — só se precisar ajustar sem deploy.
 
