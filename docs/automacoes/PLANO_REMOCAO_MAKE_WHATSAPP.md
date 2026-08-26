@@ -360,9 +360,18 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
        RPCs canônicas `fin_*` chamadas por `criarLancamento`/
        `criarTransferencia` (despesa/conta única/transferência) — mesmo
        padrão de conflito-de-unicidade = já processado, retorna
-       resultado anterior. Pra `chatbot-triagem`: checar/gravar `wamid`
-       na sessão (`atendimentos_bot`) antes do branch de gravação por
-       intenção; conflito = já processado. Não fecha 100% (upload de
+       resultado anterior. Pra `chatbot-triagem`: **registro append-only
+       por `wamid`, não campo na sessão mutável** (achado real de
+       `@codex review`, P1, 16ª rodada — `atendimentos_bot` é a MESMA
+       row reusada por toda mensagem da conversa; gravar `wamid` nela
+       significa que a mensagem B sobrescreve o marcador da mensagem A,
+       e um retry atrasado de A — ex.: resposta do chatbot pra A se
+       perdeu — não encontra mais conflito nenhum depois que B já
+       rodou, podendo duplicar o pedido de oração/testemunho/pastoral
+       de A de novo). Tabela/registro separado, chave única em `wamid`
+       (guardando o resultado anterior junto), checado ANTES do branch
+       de gravação por intenção — não reaproveitar coluna nenhuma de
+       `atendimentos_bot` pra isso. Não fecha 100% (upload de
        Storage isolado ainda pode duplicar em teoria), mas fecha os 3
        piores casos financeiros + o registro pastoral com mudança
        aditiva, sem reescrever o motor `fin_*` existente.
