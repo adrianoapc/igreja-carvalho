@@ -195,7 +195,21 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   passo financeiro errado. Precisa de uma chave de ordenação/lease
   adicional por CONVERSA (`igreja_id`+`filial_id`+`phone_number_id`+
   `telefone`, não `wamid`) — a `whatsapp-webhook` só invoca o chatbot
-  depois de conseguir esse lock de conversa. **Exclusão mútua sozinha
+  depois de conseguir esse lock de conversa. **`filial_id` nullable
+  quebra a unicidade da chave — NULL não é igual a NULL num constraint
+  padrão** (achado real de `@codex review`, P1, 22ª rodada:
+  `whatsapp_numeros.filial_id` é nullable de verdade, e o número
+  financeiro seedado em produção tem `filial_id=NULL`; um constraint
+  único comum trata cada NULL como distinto dos outros, então duas
+  mensagens da MESMA conversa num número sem filial [caso real, não
+  hipotético] criariam 2 rows de lock "únicas" e entrariam no chatbot
+  concorrentemente — exatamente o buraco que esse lock existe pra
+  fechar, mas só pro caso de número compartilhado entre filiais). Usar
+  `UNIQUE NULLS NOT DISTINCT` nessa constraint (Postgres 15+), ou
+  substituir o componente nullable por um sentinela não-nulo
+  (`COALESCE(filial_id, '00000000-...')`) na chave calculada — nunca
+  deixar a comparação de unicidade depender de semântica de NULL.
+  **Exclusão mútua sozinha
   não basta — precisa ser FIFO pela ordem real de chegada** (achado
   real de `@codex review`, P1, 9ª rodada: um lock/lease simples só
   garante "um de cada vez", não "na ordem certa" — se as mensagens A
@@ -274,7 +288,20 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      `WHERE wamid=... AND owner_token=$meu_token` (fencing — só quem
      é dono corrente da vez consegue avançar o estado; um dono antigo
      que "acordou" depois de perder o lease não consegue mais gravar
-     nada por cima de quem já reclamou).
+     nada por cima de quem já reclamou). **Essa regra de transferência
+     de dono (só reclama se `processing` E lease expirado) vale só pro
+     estado `processing`** (achado real de `@codex review`, P1, 22ª
+     rodada — corrigindo o item 4 abaixo: como essa regra nunca deixa
+     alguém virar dono de uma row em `chatbot_done`, NENHUMA escrita
+     condicionada a `owner_token` novo consegue afetar a row depois que
+     o `processing` original terminou — o mecanismo de claim por item
+     de entrega ficaria inalcançável na prática). Pra `chatbot_done`,
+     a segurança real já vem do claim atômico POR ITEM de entrega (item
+     4 abaixo) — o `owner_token` da row nesse estado é só decorativo,
+     não precisa de gate condicional: qualquer tentativa pode atualizar
+     `owner_token` da row livremente quando `status=chatbot_done`, e a
+     transição final pra `completed` é um simples check "lista inteira
+     `enviado`/`falhou`", sem exigir dono específico.
   2. **Lease renovado durante o processamento — fixo não é seguro
      mesmo em 120s** (achado real de `@codex review`, P1, 4ª e 11ª
      rodadas: `chatbot-financeiro` sozinha já faz lookup/download de
