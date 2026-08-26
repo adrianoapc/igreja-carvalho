@@ -190,10 +190,13 @@ de qualquer decisão — Fase 3, ver plano.
    nativo do Make, precisam ser implementados e testados do zero
 ⚠️ Dedupe hoje é uma janela de 5s por conteúdo em `chatbot-triagem`, não
    por `message_id` (wamid) da Meta — a Meta reentrega o evento se a
-   resposta 200 demorar (esperado aqui, processamento envolve IA/Graph),
-   então a `whatsapp-webhook` precisa reclamar o `wamid` atomicamente
-   ANTES de chamar qualquer chatbot (obrigatório na Fase 1, achado de
-   `@codex review` — não é mais risco a só monitorar)
+   resposta 200 demorar (esperado aqui, processamento envolve IA/Graph).
+   Obrigatório na Fase 1 (achado de `@codex review`, 3 rodadas): claim
+   atômico do `wamid` ANTES de chamar qualquer chatbot, resultado do
+   chatbot persistido separado do envio de saída (retry re-envia sem
+   invocar o chatbot de novo — evita duplicar efeito colateral), e lease
+   pra reclamar claim `processing` abandonado por crash/timeout do
+   runtime. Ver plano de execução §Passo 1 pro desenho completo.
 ⚠️ Escopo real (6+ cenários Make, não 1) é maior que o assumido
    originalmente — plano precisa ser fatiado em fases já reconhecendo isso
 

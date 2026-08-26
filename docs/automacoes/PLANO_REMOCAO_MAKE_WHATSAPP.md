@@ -75,6 +75,14 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
     aplicar roteamento + dedupe (item abaixo) em cada mensagem,
     independente.
   - `phone_number_id` ← `value.metadata.phone_number_id`
+  - `whatsapp_number`/`display_phone_number` ← `value.metadata.display_phone_number`
+    (achado real de `@codex review`, P1 — **obrigatório pro número
+    financeiro**: `chatbot-financeiro` deriva `filialIdFromWhatsApp`
+    exclusivamente de `body.whatsapp_number`/`body.display_phone_number`,
+    `index.ts:613-635` — não aceita `filial_id` já resolvido. Sem
+    repassar esse campo, toda operação financeira grava com filial nula,
+    mesmo a `whatsapp-webhook` já tendo achado a rota certa por
+    `phone_number_id`)
   - `telefone` ← `value.messages[].from`
   - `nome_perfil` ← `value.contacts[].profile.name`
   - `tipo_mensagem` ← `value.messages[].type`
@@ -109,7 +117,13 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   extraído — **não** por palavra-chave (roteamento real do Make é por
   número, confirmado no export; não existe lógica de keyword).
 - [ ] Roteia pros dois números reais: `1031291743394274` →
-  `chatbot-financeiro`, `745419461981790` → `chatbot-triagem`.
+  `chatbot-financeiro`, `745419461981790` → `chatbot-triagem`,
+  **mandando o header `x-webhook-secret: MAKE_WEBHOOK_SECRET`** (achado
+  real de `@codex review`, P1 — inconsistência entre este passo e o
+  Passo 2: fechar os dois endpoints com fail-closed sem a
+  `whatsapp-webhook` enviar o segredo faz as duas chamadas voltarem 401
+  logo depois do corte). Cobrir isso explicitamente nos testes do
+  Passo 4.
 - [ ] Normaliza a resposta na camada de orquestração: `chatbot-financeiro`
   retorna `.data.text`, `chatbot-triagem` retorna `.data.reply_message` —
   os dois formatos precisam virar uma única forma antes de montar a
@@ -133,25 +147,44 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   API, com os parâmetros que o template espera. Hoje isso não acontece
   em produção — é bug conhecido, ver ADR-033 §Bugs conhecidos.
 - [ ] **Deduplica por `wamid` (`value.messages[].id`) antes de chamar
-  qualquer chatbot, com claim liberável em falha** (achado real de
-  `@codex review`, P1 — promovido de "fora de escopo" pra obrigatório:
-  a Meta reentrega o evento se a resposta 200 demorar, o que é esperado
-  aqui já que o processamento síncrono envolve IA/Graph; sem isso a
-  mesma mensagem pode rodar 2x em paralelo). Claim atômico do `wamid`
-  (ex.: `INSERT ... ON CONFLICT DO NOTHING` numa tabela/chave dedicada,
-  status inicial `processing`) ANTES de invocar `chatbot-triagem`/
-  `chatbot-financeiro` — se já existe row `completed` pro mesmo `wamid`,
-  responde 200 e não roteia de novo. **Não basta reclamar e nunca
-  liberar** (achado real de `@codex review`, P1, 2ª rodada): se o
-  chatbot ou o envio de saída via Graph falhar DEPOIS do claim, marcar
-  `failed`/liberar o claim (não `completed`) — senão o retry legítimo da
-  Meta encontra o wamid "já processado", responde 200, e a mensagem do
-  usuário se perde silenciosamente pra sempre. Só marcar `completed`
-  depois do envio de resposta confirmado. O dedupe de 5s por conteúdo
-  que já existe dentro de `chatbot-triagem` fica como está (defesa em
-  profundidade), mas não é suficiente sozinho: roda DEPOIS de ler
-  histórico de sessão mutável e pode ser furado por entregas
-  concorrentes; `chatbot-financeiro` não tem dedupe nenhum hoje.
+  qualquer chatbot — máquina de estado de 2 fases, não claim binário**
+  (achado real de `@codex review`, P1 — promovido de "fora de escopo"
+  pra obrigatório: a Meta reentrega o evento se a resposta 200 demorar,
+  o que é esperado aqui já que o processamento síncrono envolve
+  IA/Graph; sem isso a mesma mensagem pode rodar 2x em paralelo). Uma
+  tabela/chave dedicada por `wamid`, com pelo menos os estados abaixo —
+  **3 rodadas de review acharam 3 formas diferentes de essa lógica sair
+  errada, então o desenho final já precisa cobrir as 3 juntas**:
+  1. Claim atômico (`INSERT ... ON CONFLICT DO NOTHING`) ANTES de
+     invocar `chatbot-triagem`/`chatbot-financeiro`, status inicial
+     `processing` + timestamp/lease. Se já existe row `chatbot_done` ou
+     `completed` pro mesmo `wamid`, responde 200 sem rotear de novo.
+  2. **Persistir o resultado do chatbot separado do envio de saída**
+     (achado real de `@codex review`, P1, 3ª rodada — a versão anterior
+     dizia "libera o claim se falhar", mas se o CHATBOT já rodou com
+     sucesso (comprometeu operação financeira, avançou sessão) e só o
+     ENVIO via Graph falhou depois, liberar o claim inteiro faz um
+     retry da Meta invocar o chatbot de novo com o mesmo input — duplica
+     o efeito colateral ou lê a sessão já avançada). Depois que o
+     chatbot responde, marcar `chatbot_done` com o resultado persistido
+     ANTES de tentar o envio. Se só o envio falhar, retry (da Meta ou
+     de um cron interno) reenvia usando o resultado já persistido —
+     **não invoca o chatbot de novo**. Só falha total antes do chatbot
+     responder libera o claim pra reprocessar do zero.
+  3. **Lease pra reclamar claim abandonado** (achado real de `@codex
+     review`, P1, 3ª rodada — se o runtime for encerrado/der timeout
+     com a row ainda em `processing`, nenhum catch/finally roda pra
+     marcar `failed`; sem isso a row fica travada pra sempre e a
+     mensagem nunca mais é processada). Guardar timestamp/tentativa no
+     claim; uma entrega nova pro mesmo `wamid` pode reclamar uma row
+     `processing` cujo lease expirou (ex.: > 30s) como se estivesse
+     livre, em vez de ficar bloqueada por ela indefinidamente.
+
+  O dedupe de 5s por conteúdo que já existe dentro de `chatbot-triagem`
+  fica como está (defesa em profundidade), mas não é suficiente sozinho:
+  roda DEPOIS de ler histórico de sessão mutável e pode ser furado por
+  entregas concorrentes; `chatbot-financeiro` não tem dedupe nenhum
+  hoje.
 - [ ] Envia a resposta via Graph API copiando o padrão de
   `send-otp/index.ts` (`WHATSAPP_TOKEN` + `phone_number_id` via
   `whatsapp_numeros`).
