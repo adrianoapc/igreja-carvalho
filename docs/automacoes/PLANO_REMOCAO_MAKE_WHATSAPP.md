@@ -84,7 +84,16 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
     mesmo a `whatsapp-webhook` já tendo achado a rota certa por
     `phone_number_id`)
   - `telefone` ← `value.messages[].from`
-  - `nome_perfil` ← `value.contacts[].profile.name`
+  - `nome_perfil` ← **contato cujo `wa_id` bate com o `from` DESSA
+    mensagem específica, não `contacts[]` posicional/arbitrário**
+    (achado real de `@codex review`, P2, 23ª rodada — quando um
+    `value` batchado tem mensagens de VÁRIOS remetentes diferentes,
+    pegar `contacts[]` sem correlacionar por índice/posição pode
+    associar o nome de uma pessoa ao número de outra;
+    `MAKE_WHATSAPP_PHONE_NUMBER_ID.md:65-73` documenta que a chave de
+    correlação certa é `contacts[].wa_id === messages[].from`, e os
+    dois chatbots persistem/usam `nome_perfil` em registro financeiro/
+    pastoral — o mismatch contamina esses registros)
   - **`origem_canal: "whatsapp_financeiro"` fixo pro número financeiro**
     (achado real de `@codex review`, P1, 17ª rodada — o Make hoje já
     manda esse valor, `MAKE_WHATSAPP_PHONE_NUMBER_ID.md:195-205`, e
@@ -152,6 +161,24 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
 - [ ] Resolve `igreja_id`/`filial_id` e destino via `phone_number_id` já
   extraído — **não** por palavra-chave (roteamento real do Make é por
   número, confirmado no export; não existe lógica de keyword).
+  ⚠️ **BLOQUEIO — investigar antes de implementar, não é suposição
+  segura** (achado real de `@codex review`, P1, 23ª rodada): o número
+  financeiro real `1031291743394274` foi seedado com `igreja_id = NULL`
+  em `20260129170838_733fcf96-461c-4a44-986f-c35c3d520f6e.sql`.
+  `resolverIgrejaEFilialWhatsApp` (`financeiro-core.ts:421-456`) acha a
+  row em `whatsapp_numeros` por `display_phone_number` e devolve
+  `rota.igreja_id` direto se nenhum `igreja_id` explícito vier no body
+  — com a row tendo `NULL`, isso volta `NULL`, e `chatbot-financeiro`
+  rejeita com 400 "igreja_id é obrigatório" (`index.ts:631-650`). O
+  mapper do blueprint real "Waba Chatbot - OakOS" pra essa rota
+  **também não manda** `igreja_id` no body. Ou (a) a row de produção
+  hoje é diferente do seed da migration (precisa confirmar contra o
+  banco real, não só a migration), ou (b) esse número já está quebrado
+  hoje e ninguém notou, ou (c) existe outro mecanismo de resolução não
+  capturado nesta investigação. **Não implementar o roteamento pra
+  esse número sem antes confirmar qual dos 3 é o caso** — se for (a),
+  só documentar o valor real; se for (b), é bug pré-existente separado
+  desta migração; se for (c), achar o mecanismo antes de replicar.
 - [ ] Roteia pros dois números reais: `1031291743394274` →
   `chatbot-financeiro`, `745419461981790` → `chatbot-triagem`,
   **mandando o header `x-webhook-secret: MAKE_WEBHOOK_SECRET`** (achado
@@ -321,7 +348,19 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      (`await`) — um timer em paralelo que renova `lease_until` a cada
      ~30-40s enquanto a chamada ao Graph/chatbot ainda está em voo,
      cancelado assim que a chamada retorna — não só nas fronteiras
-     entre etapas.
+     entre etapas. **O heartbeat também precisa cobrir o tempo de
+     ESPERA na fila FIFO de conversa, não só a execução** (achado real
+     de `@codex review`, P1, 23ª rodada — se um item ficar atrás de uma
+     mensagem lenta na fila por mais que os 120s do lease do `wamid`,
+     esse lease expira ainda na fila [antes de qualquer heartbeat de
+     execução começar], a Meta pode reentregar e reclamar o mesmo
+     `wamid`, e o worker antigo ainda na fila pode eventualmente pegar
+     sua vez e invocar o chatbot mesmo assim — o fencing só é checado
+     nas escritas de estado, não imediatamente antes de invocar).
+     Reclamar o claim de `processing` só no momento de DESENFILEIRAR
+     (não antes, ao entrar na fila) e revalidar posse (`owner_token`
+     ainda válido) imediatamente antes de chamar o chatbot — não deixar
+     um claim "vivo" contando tempo enquanto só está esperando.
   3. Depois que o chatbot responde: grava `chatbot_result` e
      `status=chatbot_done` (condicionado ao `owner_token`) ANTES de
      tentar qualquer envio via Graph. **`chatbot_result` guarda uma
