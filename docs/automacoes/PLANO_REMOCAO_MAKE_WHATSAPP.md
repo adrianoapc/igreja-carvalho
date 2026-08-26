@@ -85,6 +85,14 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
     `phone_number_id`)
   - `telefone` ← `value.messages[].from`
   - `nome_perfil` ← `value.contacts[].profile.name`
+  - **`origem_canal: "whatsapp_financeiro"` fixo pro número financeiro**
+    (achado real de `@codex review`, P1, 17ª rodada — o Make hoje já
+    manda esse valor, `MAKE_WHATSAPP_PHONE_NUMBER_ID.md:195-205`, e
+    `chatbot-financeiro` usa ele pra achar a sessão ativa,
+    `index.ts:804-818`; sem mandar, o handler cai no default
+    `"whatsapp"`, `index.ts:665-666`, e TODA conversa financeira em
+    andamento no momento do corte fica invisível — vira sessão nova do
+    zero em vez de continuar de onde parou)
   - `tipo_mensagem` ← `value.messages[].type` **E também `tipo`** ←
     mesmo valor (achado real de `@codex review`, P1, 6ª rodada — mesmo
     padrão do achado do campo de texto: `chatbot-triagem` lê
@@ -211,7 +219,18 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   protocolo de watermark completo), mas é proporcional ao volume real
   esperado — fica documentado como limite conhecido, não fast-follow,
   já que fechar isso por completo é desproporcional ao risco pra um
-  chatbot de baixo volume.
+  chatbot de baixo volume. **O lease da CONVERSA precisa do mesmo
+  heartbeat que o lease do `wamid`, não só um dos dois** (achado real
+  de `@codex review`, P1, 17ª rodada — o heartbeat especificado mais
+  abaixo (item de dedup) só renova o lease de processamento por
+  `wamid`; se a mensagem A ficar presa numa chamada lenta ao chatbot
+  além do tempo do lease de CONVERSA, a mensagem B — outro `wamid`,
+  mesma conversa — pode adquirir esse lock já expirado e entrar no
+  mesmo chatbot concorrentemente mesmo com A ainda saudável, recriando
+  a corrupção de sessão que esse lock existe pra evitar). Renovar e
+  fazer fencing do lease de conversa durante TODA a operação a jusante,
+  no mesmo heartbeat que renova o lease do `wamid` — não são dois
+  mecanismos independentes, é o mesmo heartbeat renovando os dois.
 - [ ] **Deduplica por `wamid` (`value.messages[].id`) antes de chamar
   qualquer chatbot — máquina de estado com fencing, não claim binário**
   (achado real de `@codex review`, P1 — promovido de "fora de escopo"
