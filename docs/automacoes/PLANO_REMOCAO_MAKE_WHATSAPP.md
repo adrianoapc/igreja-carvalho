@@ -331,7 +331,22 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
        e o item nunca chega no caminho de lease expirado/reconciliação
        manual — fica preso pra sempre). Marca cada item `"enviado"`
        conforme confirma; só marca o `wamid` inteiro `completed` e
-       responde 200 quando a lista estiver toda `"enviado"`.
+       responde 200 quando a lista estiver toda `"enviado"` ou `"falhou"`
+       (ver estado novo abaixo). **Rejeição definitiva do Graph precisa
+       de estado terminal próprio, não só `pendente`/`enviando`/
+       `enviado`** (achado real de `@codex review`, P2, 19ª rodada — um
+       400 de verdade do Graph, ex.: parâmetro de template inválido ou
+       destinatário inválido, nunca vai ter sucesso não importa quantas
+       vezes reenviar; sem um estado terminal de falha, o item fica
+       preso em `"enviando"` indo pra reconciliação manual pra sempre, o
+       `wamid` NUNCA satisfaz "lista inteira enviado", e o webhook nunca
+       consegue confirmar 200 o evento original — a Meta reentrega pra
+       sempre). Adicionar `"falhou"` como 4º estado: resposta do Graph
+       classificada como definitivamente não-retryable (4xx de
+       parâmetro/destinatário inválido, não rate-limit/5xx) marca o item
+       `"falhou"` direto, sem reconciliação manual — esse item conta
+       como "resolvido" (não vai ter sucesso nunca, alertar mas seguir),
+       não bloqueia o `wamid` de fechar `completed`.
        **Lease de `"enviando"` expirado NÃO reenvia automaticamente**
        (achado real de `@codex review`, P1, 8ª rodada — se o Graph
        aceitou o envio mas a resposta HTTP se perdeu, ou o runtime
@@ -409,9 +424,20 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
        perdeu — não encontra mais conflito nenhum depois que B já
        rodou, podendo duplicar o pedido de oração/testemunho/pastoral
        de A de novo). Tabela/registro separado, chave única em `wamid`
-       (guardando o resultado anterior junto), checado ANTES do branch
-       de gravação por intenção — não reaproveitar coluna nenhuma de
-       `atendimentos_bot` pra isso. Não fecha 100% (upload de
+       (guardando o resultado anterior junto). **Claim no INÍCIO da
+       function, não só antes do branch de gravação por intenção**
+       (achado real de `@codex review`, P1, 19ª rodada — `chatbot-
+       triagem` já faz trabalho com efeito antes desse ponto: cria/loga
+       sessão, `index.ts:1042-1142`; tem handlers de "fluxo direto" que
+       retornam a partir de `:1148`, sem NUNCA chegar no branch de
+       gravação por intenção que a guarda protegia; e o caminho
+       `completed` fecha/reescreve a sessão em `:1376-1387`. Guardar só
+       antes da gravação por intenção não protege nenhum desses —
+       replay do mesmo `wamid` pode recriar/avançar sessão ou repetir
+       um fluxo direto de novo). Reclamar/cachear o `wamid` logo na
+       ENTRADA da function; se já existe registro, devolver a resposta
+       já armazenada sem executar nada de novo — não só proteger os
+       inserts finais por intenção. Não fecha 100% (upload de
        Storage isolado ainda pode duplicar em teoria), mas fecha os 3
        piores casos financeiros + o registro pastoral com mudança
        aditiva, sem reescrever o motor `fin_*` existente.
