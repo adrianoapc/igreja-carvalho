@@ -61,8 +61,29 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   (health check).
 - [ ] `POST` — valida `X-Hub-Signature-256` com `META_APP_SECRET` **antes**
   de fazer parse do corpo (validação nova — o Make não faz isso hoje).
-- [ ] Resolve `igreja_id`/`filial_id` e destino via `phone_number_id` do
-  payload — **não** por palavra-chave (roteamento real do Make é por
+- [ ] **Normaliza o envelope bruto da Meta antes de rotear** (achado real
+  de `@codex review`, P1 — sem isso mensagem comum chega sem telefone/
+  conteúdo e falha ou cria sessão inválida). O `POST` da Meta chega como
+  `entry[].changes[].value.{messages[],contacts[],metadata}` — hoje o
+  conector nativo do Make já achata isso pro Make por baixo dos panos;
+  a nova função precisa fazer essa extração explicitamente:
+  - `phone_number_id` ← `value.metadata.phone_number_id`
+  - `telefone` ← `value.messages[0].from`
+  - `nome_perfil` ← `value.contacts[0].profile.name`
+  - `tipo_mensagem` ← `value.messages[0].type`
+  - `media_id` ← campo correspondente ao tipo (`image.id`/`video.id`/
+    `audio.id`/`document.url`, conforme `tipo_mensagem` — ver mapeamento
+    real no blueprint "Waba Chatbot - OakOS")
+  - `mensagem`/`tipo` (pro `chatbot-financeiro`, que espera nomes de
+    campo ligeiramente diferentes — conferir contrato exato de
+    `supabase/functions/chatbot-financeiro/index.ts:659-674` antes de
+    implementar)
+  - **Filtra eventos que não são mensagem** — a Meta também manda
+    webhooks de status (`statuses[]`: sent/delivered/read), sem
+    `messages[]` nenhum. Detectar e responder 200 sem rotear pra
+    nenhuma function, senão a extração acima falha silenciosamente.
+- [ ] Resolve `igreja_id`/`filial_id` e destino via `phone_number_id` já
+  extraído — **não** por palavra-chave (roteamento real do Make é por
   número, confirmado no export; não existe lógica de keyword).
 - [ ] Roteia pros dois números reais: `1031291743394274` →
   `chatbot-financeiro`, `745419461981790` → `chatbot-triagem`.
@@ -70,9 +91,13 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   retorna `.data.text`, `chatbot-triagem` retorna `.data.reply_message` —
   os dois formatos precisam virar uma única forma antes de montar a
   mensagem de saída.
-- [ ] Replica a detecção de substring `"QR code"` na resposta de
-  `chatbot-triagem` pra decidir entre mensagem de texto e imagem
-  (`image.link` a partir de `qr_image` no payload de retorno).
+- [ ] Decide texto vs. imagem pela **presença do campo `qr_image`** no
+  payload de retorno de `chatbot-triagem`, não por substring na mensagem
+  (achado real de `@codex review`, P2 — o texto real sempre usa
+  `"QR Code"` com C maiúsculo; um match `"QR code"` case-sensitive nunca
+  dispara, e toda resposta de inscrição sairia como texto em vez de
+  imagem). Se `qr_image` existir no retorno, manda imagem
+  (`image.link = qr_image`); senão, texto.
 - [ ] **Corrige** (não replica) o `notificar_admin`: quando
   `chatbot-triagem` retornar `notificar_admin: true`, dispara de fato a
   segunda mensagem ao telefone do pastor responsável. Hoje isso não
@@ -96,9 +121,20 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
 
 - [ ] Sem tabela nova — `edge_function_logs` já cobre; `EdgeFunctionMonitoring.tsx`
   já lista com filtro por função/período.
-- [ ] Estender `EdgeFunctionMonitoring.tsx` com dialog de detalhe por
-  linha (reaproveitar padrão `<details><pre>` de `IntegracaoLogsDialog.tsx`)
-  pra ver `request_payload`/`response_payload` sem sair da tela.
+- [ ] **Cuidado de tenant antes de expor payload** (achado real de
+  `@codex review`, P1 — vazamento cross-tenant confirmado, não
+  hipotético): `edge_function_logs` não tem `igreja_id` nenhuma, e a
+  policy de SELECT (`20260820010000_perf_auth_rls_initplan_wrap_select.sql:336`)
+  é só `has_role(auth.uid(), 'admin')` — qualquer admin de QUALQUER
+  igreja vê logs de TODAS as igrejas hoje. `request_payload`/
+  `response_payload` do WhatsApp incluem telefone e conteúdo de mensagem
+  pastoral. Antes de estender `EdgeFunctionMonitoring.tsx` com dialog de
+  detalhe (reaproveitando `<details><pre>` de `IntegracaoLogsDialog.tsx`):
+  restringir o dialog de detalhe a `super_admin` (não `admin` de igreja),
+  ou redigir `telefone`/conteúdo de mensagem no payload renderizado. Dar
+  `edge_function_logs` uma coluna `igreja_id` real com RLS por tenant é
+  fix maior, fora do escopo desta fase — tratar como fast-follow, não
+  bloqueia o Passo 3 se a restrição a super-admin for aplicada primeiro.
 
 ### Passo 4 — Corte (cutover)
 
@@ -108,11 +144,24 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   função.
 - [ ] Trocar a URL do webhook no Meta Business Manager (de Make pra
   Supabase) — **sem apagar** o scenario "Waba Chatbot - OakOS" no Make,
-  só desligar (rollback de 1 clique).
+  só desligar.
 - [ ] Acompanhar `edge_function_logs` por alguns dias de uso real: taxa de
   erro, duplicidade, latência.
 - [ ] Só então desativar de fato o scenario no Make e revogar token, se
   aplicável.
+
+**Rollback não é "1 clique" — documentar o procedimento real** (achado de
+`@codex review`, P2): depois que a URL do callback é trocada no Meta
+Business Manager pra apontar pra `whatsapp-webhook`, a Meta passa a
+entregar TODO evento pra lá. Reativar o scenario no Make sozinho não
+restaura tráfego nenhum — o scenario ficaria ligado e ocioso, sem receber
+nada, enquanto a Supabase (agora com problema) continua sendo o único
+destino. Rollback de verdade exige, nessa ordem: (1) reativar o scenario
+no Make, (2) trocar a URL do callback de volta pro endpoint do Make no
+Meta Business Manager, (3) confirmar o handshake de verificação do Make
+ainda passa (token/segredo do Make precisam continuar válidos — não
+revogar nada do lado do Make até ter certeza que o corte deu certo e o
+bake period terminou).
 - [ ] Marcar "Waba Chatbot - OakOS" como desativado em
   `docs/automacoes/catalogo-automacoes.md`.
 - [ ] Substituir ou marcar como histórico `docs/automacoes/
