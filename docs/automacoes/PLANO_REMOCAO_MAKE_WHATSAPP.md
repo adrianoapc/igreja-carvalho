@@ -180,7 +180,16 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   timestamp/sequência real de chegada (`value.messages[].timestamp` da
   Meta, não hora de processamento) — quem chega primeiro na fila
   processa primeiro, mesmo que outra mensagem da mesma conversa
-  consiga o lock técnico antes.
+  consiga o lock técnico antes. **`timestamp` da Meta sozinho não
+  desempata** (achado real de `@codex review`, P1, 11ª rodada —
+  `docs/automacoes/MAKE_WHATSAPP_PHONE_NUMBER_ID.md:75` mostra esse
+  campo como epoch de 10 dígitos, granularidade de segundo; duas
+  mensagens rápidas do mesmo usuário podem cair no mesmo segundo e a
+  ordem entre elas fica indefinida). Usar uma sequência própria,
+  atribuída de forma durável no momento em que a mensagem entra na fila
+  (ex.: coluna serial/autoincrement na tabela da fila) como critério de
+  desempate — `timestamp` da Meta ordena primeiro, a sequência de
+  chegada decide entre iguais.
 - [ ] **Deduplica por `wamid` (`value.messages[].id`) antes de chamar
   qualquer chatbot — máquina de estado com fencing, não claim binário**
   (achado real de `@codex review`, P1 — promovido de "fora de escopo"
@@ -215,15 +224,22 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      é dono corrente da vez consegue avançar o estado; um dono antigo
      que "acordou" depois de perder o lease não consegue mais gravar
      nada por cima de quem já reclamou).
-  2. **Lease generoso o bastante pra cobrir o pior caso, não 30s**
-     (achado real de `@codex review`, P1, 4ª rodada: `chatbot-triagem`
-     sozinha já permite até 30s só na chamada de IA, fora sessão/DB e o
-     envio Graph depois — um lease de 30s deixa uma entrega concorrente
-     reclamar uma row que ainda está sendo processada de verdade,
-     recriando a duplicidade que o lease deveria evitar). Usar
-     `lease_until=now()+120s` como piso da Fase 1; ajustar com dado real
-     de latência no bake period. Renovação periódica do lease durante
-     processamento longo fica como fast-follow.
+  2. **Lease renovado durante o processamento — fixo não é seguro
+     mesmo em 120s** (achado real de `@codex review`, P1, 4ª e 11ª
+     rodadas: `chatbot-financeiro` sozinha já faz lookup/download de
+     mídia via Graph — `index.ts:125,175` — mais trabalho de DB/Storage
+     depois; nenhum número fixo de lease cobre com garantia o pior caso
+     de rede lenta, e um lease expirado durante processamento real
+     permite takeover enquanto a invocação original ainda está rodando
+     — o fencing por `owner_token` só protege a ROW de orquestração,
+     não cancela nem desfaz o que a invocação original já executou rio
+     abaixo). Renovação passa de fast-follow pra **obrigatória na Fase
+     1**: renovar `lease_until` (`+120s` a partir de agora) em cada
+     fronteira de etapa relevante dentro da `whatsapp-webhook` — depois
+     de resolver mídia, depois do chatbot responder, antes do envio
+     Graph — não um único lease fixo pro fluxo inteiro. `120s` vira o
+     tamanho de CADA renovação, não um teto único pro processamento
+     inteiro.
   3. Depois que o chatbot responde: grava `chatbot_result` e
      `status=chatbot_done` (condicionado ao `owner_token`) ANTES de
      tentar qualquer envio via Graph. **`chatbot_result` guarda uma

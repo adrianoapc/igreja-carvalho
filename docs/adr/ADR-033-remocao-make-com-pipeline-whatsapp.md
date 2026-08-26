@@ -286,14 +286,17 @@ Ver plano de execução detalhado em
 7. ⬜ Isolamento multi-número (mensagem no número financeiro não vaza pra
    triagem e vice-versa)
 8. ⬜ Reenvio do mesmo `wamid` (Meta redelivery simulado) → processado só
-   uma vez, segunda entrega recebe 200 sem rotear de novo. **Com 2
-   sessões reais concorrentes de verdade** (achado real de `@codex
-   review`, P1, 8ª rodada — rodar a 2ª entrega só depois da 1ª terminar
-   é simulação sequencial, não testa a claim atômica/fencing sob
-   colisão de verdade; já é guardrail existente do projeto — CLAUDE.md
-   §Testing de SQL: "concorrência exige 2 sessões psql de verdade, não
-   simulação sequencial" — este cenário só não seguia isso ainda), com
-   sub-casos: disputa simultânea pela claim original, takeover de lease
+   uma vez. **Com 2 sessões reais concorrentes de verdade** (achado
+   real de `@codex review`, P1, 8ª rodada — rodar a 2ª entrega só depois
+   da 1ª terminar é simulação sequencial, não testa a claim atômica/
+   fencing sob colisão de verdade; já é guardrail existente do projeto
+   — CLAUDE.md §Testing de SQL: "concorrência exige 2 sessões psql de
+   verdade, não simulação sequencial"), com sub-casos: **disputa
+   simultânea pela claim original → a 2ª entrega recebe 5xx, NÃO 200**
+   (achado real de `@codex review`, P1, 11ª rodada — corrigindo o
+   próprio texto deste cenário, que ainda pedia 200 depois do desenho
+   ter mudado pra 5xx nesse caso exato na 5ª rodada; só devolve 200
+   quando o `wamid` já está `completed` de verdade), takeover de lease
    expirado, e entrega parcial com 2 destinatários (membro OK, pastor
    falha) sob concorrência.
 9. ⬜ Duas mensagens (`wamid` diferentes, com conteúdo distinguível que
@@ -304,7 +307,10 @@ Ver plano de execução detalhado em
    mútua** (achado real de `@codex review`, P1, 10ª rodada — um mutex
    simples passaria um teste que só checasse "rodou em série", mesmo
    processando B antes de A; o teste precisa afirmar a ordem final do
-   estado, não só ausência de concorrência)
+   estado, não só ausência de concorrência), **incluindo o caso de
+   timestamp igual da Meta** (achado real de `@codex review`, P1, 11ª
+   rodada — granularidade de segundo permite empate; valida que a
+   sequência de chegada, não só o `timestamp`, decide a ordem)
 
 ### Bake period
 
