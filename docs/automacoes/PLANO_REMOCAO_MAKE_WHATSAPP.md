@@ -285,9 +285,15 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
        e só quem ganha a transição atômica pra `"enviando"` — igual ao
        padrão de fencing do claim original, aplicado por item, não só
        pela row — manda pro Graph de fato; item já `"enviando"` com
-       lease válido é pulado por qualquer outra tentativa concorrente).
-       Marca cada item `"enviado"` conforme confirma; só marca o `wamid`
-       inteiro `completed` quando a lista estiver toda `"enviado"`.
+       lease válido é pulado por qualquer outra tentativa concorrente,
+       **que responde 5xx, não 200** (achado real de `@codex review`,
+       P1, 13ª rodada — mesma lógica do branch `processing`: se a
+       tentativa concorrente pular o item ocupado e devolver 200, e o
+       dono da entrega ativa cair logo depois, a Meta para de reentregar
+       e o item nunca chega no caminho de lease expirado/reconciliação
+       manual — fica preso pra sempre). Marca cada item `"enviado"`
+       conforme confirma; só marca o `wamid` inteiro `completed` e
+       responde 200 quando a lista estiver toda `"enviado"`.
        **Lease de `"enviando"` expirado NÃO reenvia automaticamente**
        (achado real de `@codex review`, P1, 8ª rodada — se o Graph
        aceitou o envio mas a resposta HTTP se perdeu, ou o runtime
@@ -330,18 +336,27 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      única envolvendo Storage + múltiplos inserts) é reescrita de
      lógica de negócio de verdade — fora do escopo desta fase, vira
      fast-follow (ver §Fora de escopo).
-     - **Mitigação mínima da Fase 1, escopo aditivo (não reescrita)**:
-       guarda de idempotência só no PRIMEIRO write de cada fluxo — o
-       ponto onde o efeito colateral mais caro (duplicar uma
-       solicitação de reembolso, duplicar registro pastoral) se torna
-       visível. Adicionar coluna `wamid` + constraint de unicidade em
-       `solicitacoes_reembolso` (ponto de entrada do fluxo financeiro)
-       e checar/gravar `wamid` na sessão (`atendimentos_bot`) antes do
-       branch de gravação por intenção em `chatbot-triagem`; conflito
-       de unicidade = já processado, retorna resultado anterior em vez
-       de duplicar. Não fecha 100% (upload de Storage isolado ainda
-       pode duplicar em teoria), mas fecha o pior caso (duplicar
-       registro financeiro/pastoral) com mudança pequena e localizada.
+     - **Mitigação mínima da Fase 1, escopo aditivo (não reescrita) —
+       precisa cobrir TODOS os fluxos que comprometem dinheiro, não só
+       reembolso** (achado real de `@codex review`, P1, 13ª rodada,
+       corrigindo uma afirmação errada da rodada anterior: `chatbot-
+       financeiro` também comete DESPESA/CONTA_ÚNICA via
+       `criarLancamento`, `index.ts:1713-1720`, e transferência via
+       `criarTransferencia`, `index.ts:2562-2567` — nenhum dos dois
+       passa por `solicitacoes_reembolso`; a guarda de unicidade só ali
+       não fecha "o pior caso", fecha só 1 de 3 fluxos que duplicam
+       lançamento financeiro). Guarda de idempotência no PRIMEIRO write
+       de CADA um dos 3 fluxos: `wamid` + constraint de unicidade em
+       `solicitacoes_reembolso` (reembolso), e propagar `wamid` até as
+       RPCs canônicas `fin_*` chamadas por `criarLancamento`/
+       `criarTransferencia` (despesa/conta única/transferência) — mesmo
+       padrão de conflito-de-unicidade = já processado, retorna
+       resultado anterior. Pra `chatbot-triagem`: checar/gravar `wamid`
+       na sessão (`atendimentos_bot`) antes do branch de gravação por
+       intenção; conflito = já processado. Não fecha 100% (upload de
+       Storage isolado ainda pode duplicar em teoria), mas fecha os 3
+       piores casos financeiros + o registro pastoral com mudança
+       aditiva, sem reescrever o motor `fin_*` existente.
 
   O dedupe de 5s por conteúdo que já existe dentro de `chatbot-triagem`
   fica como está (defesa em profundidade adicional), mas não é
@@ -395,9 +410,10 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
 
 - [ ] Deployar e testar isoladamente handshake `GET` + POST sintético,
   antes de tocar em qualquer configuração do Meta.
-- [ ] Rodar os 9 cenários de teste da ADR-033 (§Validação — inclui
-  reenvio de `wamid` simulado com 2 sessões reais e lock por conversa,
-  achados de `@codex review`) contra a nova função.
+- [ ] Rodar os 10 cenários de teste da ADR-033 (§Validação — inclui
+  reenvio de `wamid` simulado com 2 sessões reais, lock por conversa e
+  payload real de mídia, achados de `@codex review`) contra a nova
+  função.
 - [ ] Trocar a URL do webhook no Meta Business Manager (de Make pra
   Supabase) — **sem apagar** o scenario "Waba Chatbot - OakOS" no Make,
   só desligar.

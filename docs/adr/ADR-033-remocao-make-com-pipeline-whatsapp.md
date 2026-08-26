@@ -311,6 +311,15 @@ Ver plano de execução detalhado em
    timestamp igual da Meta** (achado real de `@codex review`, P1, 11ª
    rodada — granularidade de segundo permite empate; valida que a
    sequência de chegada, não só o `timestamp`, decide a ordem)
+10. ⬜ Payload de imagem/documento (pro número financeiro) e áudio (pro
+    número de triagem) no formato bruto real da Meta (só `id` do
+    anexo, sem URL) → resolução de mídia via Graph, `url_anexo`
+    repassado certo pra `chatbot-financeiro`, transcrição funcionando
+    em `chatbot-triagem` (achado real de `@codex review`, P2, 13ª
+    rodada — nenhum dos 9 cenários anteriores exercita mídia; a lógica
+    de resolução de media ID é implementação nova, hoje feita pelo
+    conector do Make, e só seria testada de verdade em produção sem
+    este cenário)
 
 ### Bake period
 
