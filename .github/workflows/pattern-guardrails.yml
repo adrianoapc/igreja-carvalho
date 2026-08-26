@@ -1,0 +1,118 @@
+name: Pattern Guardrails
+
+# Bloqueia, por regex, os padrões que já causaram bug real e recorrente em
+# produção (achados numa auditoria de ~64 PRs revisadas, 2026-08-26):
+#   - filial_id.eq() escondendo recurso compartilhado (filial_id IS NULL)
+#     — mesmo bug 3x nas PRs #82/#92/#95/#97/#103
+#   - delete()/update() sem { count: "exact" } — RLS nega e a UI mostra
+#     sucesso mesmo assim (PR #126, Todos.tsx/Fornecedores.tsx)
+#   - STATUS_COLOR usado como `color` de texto em vez de fundo de pill —
+#     falha WCAG 3:1 (PR #114)
+# Isso é grep puro, sem custo de LLM — não substitui /code-review nem
+# /security-review, só pega o que já se repetiu e é detectável por regex.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  pattern_guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get changed files
+        id: changed
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            src/**/*.ts
+            src/**/*.tsx
+            supabase/functions/**/*.ts
+
+      - name: Scan for known-bug patterns
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          FAIL=0
+          changed="${{ steps.changed.outputs.all_changed_files }}"
+
+          if [ -z "$changed" ]; then
+            echo "Nenhum arquivo relevante mudou."
+            exit 0
+          fi
+
+          echo "Arquivos em checagem:"
+          echo "$changed" | tr ' ' '\n'
+          echo ""
+
+          for f in $changed; do
+            [ -f "$f" ] || continue
+
+            # ------------------------------------------------------------
+            # 1) .eq("filial_id" sem .or(...is.null) por perto — esconde
+            #    recurso compartilhado (filial_id IS NULL). PRs #82/#92/
+            #    #95/#97/#103.
+            # ------------------------------------------------------------
+            while IFS=: read -r lineno _; do
+              [ -z "$lineno" ] && continue
+              start=$(( lineno > 5 ? lineno - 5 : 1 ))
+              end=$(( lineno + 5 ))
+              window=$(sed -n "${start},${end}p" "$f")
+              if ! echo "$window" | grep -q '\.or(.*is\.null\|filial_id.*IS NULL\|// filial-global-ok'; then
+                echo "::error file=$f,line=$lineno::.eq(\"filial_id\"...) sem .or(...is.null) nem comentário // filial-global-ok por perto — pode esconder recurso compartilhado (filial_id IS NULL). Ver CLAUDE.md §Filial compartilhada. Se for intencional, adicione o comentário // filial-global-ok na mesma linha ou até 5 linhas acima."
+                FAIL=1
+              fi
+            done < <(grep -n '\.eq(["'"'"']filial_id["'"'"']' "$f" || true)
+
+            # ------------------------------------------------------------
+            # 2) .delete()/.update() do supabase sem { count: "exact" } —
+            #    sucesso falso quando RLS nega silenciosamente. PR #126.
+            # ------------------------------------------------------------
+            while IFS=: read -r lineno _; do
+              [ -z "$lineno" ] && continue
+              start=$(( lineno > 3 ? lineno - 3 : 1 ))
+              end=$(( lineno + 8 ))
+              window=$(sed -n "${start},${end}p" "$f")
+              if ! echo "$window" | grep -q 'count:\s*["'"'"']exact["'"'"']\|// count-exact-ok'; then
+                echo "::error file=$f,line=$lineno::.delete()/.update() do Supabase sem { count: \"exact\" } por perto — se o RLS negar, a call retorna error:null/0 linhas e o código pode reportar sucesso falso (achado real: PR #126, Todos.tsx/Fornecedores.tsx). Adicione { count: \"exact\" } e cheque o count, ou // count-exact-ok se a call já é auto-limitada por PK/id único."
+                FAIL=1
+              fi
+            done < <(grep -nE '\.(delete|update)\(' "$f" | grep -iE 'supabase|from\(' || true)
+
+            # ------------------------------------------------------------
+            # 3) STATUS_COLOR usado como `color` de texto (não fundo de
+            #    pill) — falha WCAG 3:1 em card claro. PR #114.
+            # ------------------------------------------------------------
+            if grep -nE 'color:\s*STATUS_COLOR' "$f" >/dev/null 2>&1; then
+              grep -nE 'color:\s*STATUS_COLOR' "$f" | while IFS=: read -r lineno _; do
+                echo "::error file=$f,line=$lineno::STATUS_COLOR é cor de FUNDO de pill, não tinta de texto — usar como \`color:\` falha contraste WCAG 3:1 em card claro (achado real: PR #114). Use pillStyle(tone) de statusPalette.ts."
+              done
+              FAIL=1
+            fi
+          done
+
+          # ------------------------------------------------------------
+          # 4) Aviso (não bloqueia): hex fixo em array de cores de gráfico,
+          #    em vez de chartPalette.ts. Heurística ruidosa de propósito —
+          #    só avisa, não falha o job.
+          # ------------------------------------------------------------
+          for f in $changed; do
+            [ -f "$f" ] || continue
+            case "$f" in
+              *dashboard*|*Dashboard*|*chart*|*Chart*)
+                if grep -nE '#[0-9A-Fa-f]{6}' "$f" | grep -qE 'COLORS|colors\s*='; then
+                  echo "::warning file=$f::Array de cores hex hardcoded num componente de dashboard/chart — considere usar src/lib/chartPalette.ts (CHART_SERIES_COLORS/chartColor) em vez de hex fixo, pra herdar dark mode automaticamente."
+                fi
+                ;;
+            esac
+          done
+
+          if [ "$FAIL" -eq 1 ]; then
+            echo ""
+            echo "::error::Padrões de bug conhecido encontrados. Corrija ou adicione o comentário de escape explícito se for falso positivo."
+            exit 1
+          fi
+
+          echo "Nenhum padrão de bug conhecido encontrado."

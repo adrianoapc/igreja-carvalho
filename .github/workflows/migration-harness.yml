@@ -1,0 +1,67 @@
+name: Migration Harness
+
+# Aplica TODAS as migrations do zero contra um Supabase local (Docker) antes
+# do merge — hoje isso só acontece em `supabase-deploy.yml`, DEPOIS do
+# merge, direto contra o projeto real. Falha silenciosa de deploy (colisão
+# de timestamp, ALTER POLICY em coluna inexistente) só era descoberta por
+# auditoria manual pós-fato (PRs #85, #116, #119, #128). Este gate move
+# essa checagem pra antes do merge.
+#
+# Não substitui o harness manual com cenários específicos (ex: os 8
+# cenários de anon/service_role/autenticado do fix de has_filial_access) —
+# isso continua sendo responsabilidade de quem escreve a migration, ver
+# CLAUDE.md §Testing de SQL. Este gate só garante que TODAS as migrations
+# aplicam limpo em sequência e aponta policies suspeitas de TO ausente.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "supabase/migrations/**"
+
+jobs:
+  migration_harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          # Mesma versão pinada de supabase-deploy.yml — ver o comentário
+          # lá sobre `latest` ter quebrado `supabase link` em 2026-08-07.
+          version: 2.111.0
+
+      - name: Start local Supabase stack (aplica migrations do zero)
+        run: supabase start
+        timeout-minutes: 10
+
+      - name: Reset explícito — reaplica todas as migrations em ordem
+        run: supabase db reset
+        timeout-minutes: 10
+
+      - name: Auditar policies sem TO explícito (suspeita de FOR sem TO)
+        run: |
+          set -uo pipefail
+          DB_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+
+          echo "=== Policies com roles={public} (TO ausente na criação) ==="
+          SUSPECT=$(psql "$DB_URL" -tA -c "
+            SELECT schemaname || '.' || tablename || ' — ' || policyname || ' (cmd=' || cmd || ')'
+            FROM pg_policies
+            WHERE roles::text = '{public}'
+            ORDER BY 1;
+          ")
+
+          if [ -n "$SUSPECT" ]; then
+            echo "::warning::Policies com roles={public} encontradas — confirme se é 'CREATE POLICY sem TO' acidental (vira PUBLIC, ver CLAUDE.md §CREATE POLICY sem FOR) ou se é intencional (dado público de verdade):"
+            echo "$SUSPECT" | while IFS= read -r line; do
+              echo "::warning::  $line"
+            done
+          else
+            echo "Nenhuma policy com roles={public} encontrada."
+          fi
+
+      - name: Stop Supabase stack
+        if: always()
+        run: supabase stop --no-backup

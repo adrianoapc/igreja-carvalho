@@ -1,0 +1,22 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/pre-commit-checks.sh",
+            "timeout": 300,
+            "statusMessage": "Rodando lint/typecheck/testes antes do commit..."
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/pr-review-reminder.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

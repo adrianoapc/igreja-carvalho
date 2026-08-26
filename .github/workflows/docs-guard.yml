@@ -16,6 +16,8 @@ jobs:
 
       - name: Enforce documentation discipline
         shell: bash
+        env:
+          FIX_MODE_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'doc:fix') }}
         run: |
           set -euo pipefail
 
@@ -30,8 +32,15 @@ jobs:
           # --------------------------------
           # Detect PR labels
           # --------------------------------
-          PR_LABELS="${{ github.event.pull_request.labels.*.name }}"
-          FIX_MODE=$(echo "$PR_LABELS" | tr ' ' '\n' | grep -E '^doc:fix$' || true)
+          # Bug histórico: "${{ github.event.pull_request.labels.*.name }}"
+          # serializa como a string literal "Array" nesse contexto, então o
+          # grep nunca batia e FIX MODE nunca ativava. Fix: resolver via
+          # contains() (expressão do próprio GitHub Actions, roda no
+          # runner antes do shell) e passar já avaliado por env var.
+          FIX_MODE=""
+          if [ "$FIX_MODE_LABEL" = "true" ]; then
+            FIX_MODE="doc:fix"
+          fi
 
           if [ -n "$FIX_MODE" ]; then
             echo "PR label detected: doc:fix → FIX MODE enabled"

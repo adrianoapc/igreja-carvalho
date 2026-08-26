@@ -1,3 +1,38 @@
+# Guardrails de processo (review, CI, dataviz)
+
+Antes de commitar ou abrir PR, leia
+[`docs/guardrails-processo.md`](docs/guardrails-processo.md) (nasceu de
+auditoria de 98 PRs desde maio/2026 — detalhe completo com PRs de origem
+de cada padrão no próprio arquivo). Resumo:
+
+- **`/code-review` e `/security-review` não são opcionais na prática**: uma
+  auditoria (2026-08-26) achou que 53% das PRs revisadas só receberam
+  "usage limit reached" do Cursor Bugbot — nenhuma revisão real. As PRs
+  #57–#64 (bug real de sinal financeiro) não tiveram revisão nenhuma.
+  Rode as duas skills local antes de `gh pr create`; o hook
+  `pr-review-reminder.sh` lembra, mas não bloqueia (não dá pra verificar
+  que a skill rodou de fato).
+- **Hook de commit já roda lint+typecheck+testes automaticamente**
+  (`.claude/hooks/pre-commit-checks.sh`, via `PreToolUse` em
+  `.claude/settings.json`) — bloqueia `git commit` se falhar. Só vale
+  dentro de sessão Claude Code com esse settings.json carregado; não
+  substitui CI.
+- **CI (`pattern-guardrails.yml`, `migration-harness.yml`) é o gate real**,
+  independente de ferramenta: grep bloqueando padrões de bug já
+  recorrentes (`.eq("filial_id"` sem `.or(...is.null)`,
+  `.delete()`/`.update()` sem `{count:"exact"}`, `STATUS_COLOR` como
+  `color:`) e harness de Postgres aplicando toda migration do zero antes
+  do merge, não só depois via `supabase-deploy.yml`.
+- **Gráfico novo**: usar `src/lib/chartPalette.ts` (série categórica) ou
+  `statusPalette.ts` (pill/status) — nunca hex hardcoded. Consultar a
+  skill `dataviz` pra paleta sequencial/divergente ou forma de gráfico.
+  8+ paletas hex divergentes já foram achadas espalhadas por dashboards
+  antes desse guardrail existir.
+- **`main` tem branch protection**: sem push direto, PR obrigatória,
+  status checks (`docs_guard`, `pattern_guardrails`, `migration_harness`)
+  precisam passar. Não exige aprovação humana (projeto mantido por 1
+  dev) — o gate é CI verde, não review de terceiro.
+
 # Guardrails — módulo financeiro
 
 Antes de escrever ou revisar qualquer RPC `fin_*`, trigger, migration ou tela
