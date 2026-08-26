@@ -46,23 +46,30 @@ de série de gráfico.
   (`PR_LABELS` via `.*.name` serializava como a string `"Array"`; agora
   resolvido via `contains()` do próprio GitHub Actions, passado por env
   var já avaliada).
-- **`pattern-guardrails.yml`** (novo): grep só nas **linhas adicionadas**
-  pelo diff da PR (não o arquivo inteiro — a 1ª versão escaneava o
-  arquivo completo, achado real de `@codex review` na própria PR #134:
-  já existem 88 arquivos com `.eq("filial_id"...)` sem anotação, então
-  escanear o arquivo inteiro bloquearia qualquer edição futura neles
-  mesmo sem tocar a linha problemática), bloqueando os 3 padrões da
-  tabela acima — `.eq("filial_id"` sem `.or(...is.null)`, `.delete()`/
-  `.update()` sem `{count:"exact"}` (cobre chain multi-linha, ex.
-  `.from("x")` numa linha e `.delete(...)` na próxima — achado real na
-  mesma review), `STATUS_COLOR` usado como `color:`. Escapes explícitos
-  via comentário (`// filial-global-ok`, `// count-exact-ok`) pra falso
+- **`pattern-guardrails.yml`** (novo): grep numa **janela em torno de
+  cada hunk do diff** da PR, não o arquivo inteiro (a 1ª versão escaneava
+  o arquivo completo — achado real de `@codex review`: já existem 88
+  arquivos com `.eq("filial_id"...)` sem anotação, escanear tudo
+  bloquearia qualquer edição futura neles). A janela cobre linhas
+  adicionadas **e** margem em torno de hunks só-de-remoção — 2ª rodada de
+  review achou que remover só a linha `{ count: "exact" }` de um
+  `.delete()` multi-linha é uma regressão real que não aparece como linha
+  "adicionada" nenhuma; testado localmente que a janela agora cobre esse
+  caso. Bloqueia os 3 padrões da tabela acima — `.eq("filial_id"` sem
+  `.or(...filial_id.is.null)` (regex exige `filial_id` especificamente
+  antes de `.is.null`, não qualquer `.or()` com `is.null` de outro campo
+  — achado real: `.eq("filial_id",...)` perto de `.or("data_fim.is.null,
+  ...")` passava antes), `.delete()`/`.update()` sem `{count:"exact"}`
+  (cobre chain multi-linha, ex. `.from("x")` numa linha e `.delete(...)`
+  na próxima), `STATUS_COLOR` usado como `color:`. Escapes explícitos via
+  comentário (`// filial-global-ok`, `// count-exact-ok`) pra falso
   positivo legítimo. Também avisa (não bloqueia) sobre hex hardcoded em
   componente de dashboard/chart.
   **Limite conhecido, não fechado**: o check de `{count:"exact"}` só
   confirma que a opção existe por perto, não que o código realmente lê e
   rejeita `count===0` — um call site que passa a opção mas ignora o
-  valor retornado passa no guardrail com o bug original ainda vivo.
+  valor retornado passa no guardrail com o bug original ainda vivo (não
+  dá pra fechar isso com confiança via regex, precisaria de parser real).
 
 **`migration-harness.yml` foi retirado desta rodada.** A ideia (subir
 Supabase local via Docker e aplicar todas as migrations do zero antes do

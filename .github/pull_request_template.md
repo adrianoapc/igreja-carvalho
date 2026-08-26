@@ -22,7 +22,7 @@
 ## Review (obrigatório) — ver `docs/guardrails-processo.md`
 - [ ] Rodei `/code-review` local e resolvi os achados (ou justifiquei os que ficaram)
 - [ ] Se toquei RLS, auth, secrets ou dado cross-tenant: rodei `/security-review`
-- [ ] Se a PR tocou migration: `supabase db reset` local aplicou tudo limpo (o harness de CI confirma de novo, mas testar local primeiro é mais rápido)
+- [ ] Se a PR tocou migration: testei num harness Postgres real isolado (Docker), não só `deno check`/`tsc` — **não** use `supabase db reset`/`supabase start` full-history, a história de migrations tem drift conhecido e o reset sempre falha do zero (ver `docs/guardrails-processo.md` §Fora de escopo e `AGENTS.md`)
 - [ ] Se criei/alterei gráfico ou dashboard: usei `src/lib/chartPalette.ts` (ou a skill `dataviz` para paleta sequencial/divergente), não hex hardcoded
 - [ ] Conferi que `@codex review`/Cursor Bugbot realmente rodou (não só "usage limit reached") antes de mergear
 

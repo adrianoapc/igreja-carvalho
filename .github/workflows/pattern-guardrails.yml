@@ -11,11 +11,16 @@ name: Pattern Guardrails
 # Isso é grep puro, sem custo de LLM — não substitui /code-review nem
 # /security-review, só pega o que já se repetiu e é detectável por regex.
 #
-# Só escaneia LINHAS ADICIONADAS pelo diff da PR, não o arquivo inteiro —
-# achado real de @codex review na própria PR que introduziu este workflow
-# (#134): já existem ~88 arquivos com .eq("filial_id"...) sem anotação;
-# escanear o arquivo inteiro bloquearia qualquer edição futura neles, até
-# uma que não toque a linha problemática.
+# Só escaneia uma JANELA em torno de cada hunk do diff da PR (não o
+# arquivo inteiro) — achado real de @codex review na própria PR que
+# introduziu este workflow (#134): já existem ~88 arquivos com
+# .eq("filial_id"...) sem anotação; escanear o arquivo inteiro bloquearia
+# qualquer edição futura neles, até uma que não toque a linha
+# problemática. A janela cobre linhas ADICIONADAS *e* uma margem em torno
+# de hunks só-de-remoção (achado real de 2ª rodada: remover só a linha
+# `{ count: "exact" }` de um `.delete()` multi-linha é uma regressão real
+# — reintroduz o bug de sucesso falso — mas não aparece como linha
+# adicionada nenhuma; sem a margem, o arquivo inteiro seria pulado).
 
 on:
   pull_request:
@@ -60,14 +65,23 @@ jobs:
           for f in $changed; do
             [ -f "$f" ] || continue
 
-            # Linhas que a PR realmente ADICIONOU neste arquivo (número na
-            # versão nova). Padrão pré-existente no arquivo nunca aparece
-            # aqui, então nunca bloqueia uma PR que não o tocou.
-            ADDED_LINES=$(git diff -U0 "$BASE_SHA"...HEAD -- "$f" 2>/dev/null \
+            # Linhas em escopo: as que a PR ADICIONOU (número na versão
+            # nova) MAIS uma margem de 10 linhas em torno do ponto de
+            # cada hunk — cobre hunks só-de-remoção (ex.: apagar só a
+            # linha `{ count: "exact" }` de um .delete() multi-linha,
+            # que não conta como "adicionada" mas é uma regressão real).
+            # Padrão pré-existente fora de qualquer hunk nunca entra
+            # aqui, então nunca bloqueia uma PR que não tocou perto dele.
+            SCOPE_LINES=$(git diff -U0 "$BASE_SHA"...HEAD -- "$f" 2>/dev/null \
               | grep -oP '^@@ -[0-9]+(,[0-9]+)? \+\K[0-9]+(,[0-9]+)?(?= @@)' \
-              | awk -F, '{start=$1; count=($2==""?1:$2); for(i=0;i<count;i++) print start+i}')
+              | awk -F, '{
+                  start=$1; count=($2==""?1:$2);
+                  lo=start-10; if (lo<1) lo=1;
+                  hi=start+(count>0?count:1)+10;
+                  for(i=lo;i<=hi;i++) print i
+                }' | sort -nu)
 
-            if [ -z "$ADDED_LINES" ]; then
+            if [ -z "$SCOPE_LINES" ]; then
               continue
             fi
 
@@ -78,12 +92,12 @@ jobs:
             # ------------------------------------------------------------
             while IFS=: read -r lineno _; do
               [ -z "$lineno" ] && continue
-              echo "$ADDED_LINES" | grep -qx "$lineno" || continue
+              echo "$SCOPE_LINES" | grep -qx "$lineno" || continue
               start=$(( lineno > 5 ? lineno - 5 : 1 ))
               end=$(( lineno + 5 ))
               window=$(sed -n "${start},${end}p" "$f")
-              if ! echo "$window" | grep -q '\.or(.*is\.null\|filial_id.*IS NULL\|// filial-global-ok'; then
-                echo "::error file=$f,line=$lineno::.eq(\"filial_id\"...) sem .or(...is.null) nem comentário // filial-global-ok por perto — pode esconder recurso compartilhado (filial_id IS NULL). Ver CLAUDE.md §Filial compartilhada. Se for intencional, adicione o comentário // filial-global-ok na mesma linha ou até 5 linhas acima."
+              if ! echo "$window" | grep -q 'filial_id\.is\.null\|filial_id.*IS NULL\|// filial-global-ok'; then
+                echo "::error file=$f,line=$lineno::.eq(\"filial_id\"...) sem .or(...filial_id.is.null) nem comentário // filial-global-ok por perto — pode esconder recurso compartilhado (filial_id IS NULL). Ver CLAUDE.md §Filial compartilhada. Se for intencional, adicione o comentário // filial-global-ok na mesma linha ou até 5 linhas acima."
                 FAIL=1
               fi
             done < <(grep -n '\.eq(["'"'"']filial_id["'"'"']' "$f" || true)
@@ -98,7 +112,7 @@ jobs:
             # ------------------------------------------------------------
             while IFS=: read -r lineno _; do
               [ -z "$lineno" ] && continue
-              echo "$ADDED_LINES" | grep -qx "$lineno" || continue
+              echo "$SCOPE_LINES" | grep -qx "$lineno" || continue
               ctx_start=$(( lineno > 10 ? lineno - 10 : 1 ))
               ctx_end=$(( lineno + 3 ))
               ctx=$(sed -n "${ctx_start},${ctx_end}p" "$f")
@@ -118,7 +132,7 @@ jobs:
             # ------------------------------------------------------------
             while IFS=: read -r lineno _; do
               [ -z "$lineno" ] && continue
-              echo "$ADDED_LINES" | grep -qx "$lineno" || continue
+              echo "$SCOPE_LINES" | grep -qx "$lineno" || continue
               echo "::error file=$f,line=$lineno::STATUS_COLOR é cor de FUNDO de pill, não tinta de texto — usar como \`color:\` falha contraste WCAG 3:1 em card claro (achado real: PR #114). Use pillStyle(tone) de statusPalette.ts."
               FAIL=1
             done < <(grep -nE 'color:\s*STATUS_COLOR' "$f" || true)
