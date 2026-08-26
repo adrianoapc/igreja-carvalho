@@ -181,21 +181,38 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      processamento longo fica como fast-follow.
   3. Depois que o chatbot responde: grava `chatbot_result` e
      `status=chatbot_done` (condicionado ao `owner_token`) ANTES de
-     tentar o envio via Graph.
+     tentar qualquer envio via Graph. **`chatbot_result` guarda uma
+     lista de entregas, não um resultado único** (achado real de
+     `@codex review`, P1, 5ª rodada — quando `notificar_admin` é
+     verdadeiro existem 2 envios Graph independentes por `wamid`, resposta
+     ao membro E template ao pastor; um estado único não permite retry
+     parcial sem duplicar a que já foi enviada ou perder a que falhou):
+     `[{alvo: "membro", payload, status: "pendente"|"enviado"}, {alvo:
+     "pastor", payload, status: "pendente"|"enviado", opcional}]`. Cada
+     entrega tem seu próprio status; o `wamid` só vira `completed`
+     quando TODAS as entregas da lista estiverem `"enviado"`.
   4. **Toda entrada nova reclamando um `wamid` existente precisa agir
-     conforme o status encontrado** (achado real de `@codex review`, P1,
-     4ª rodada — a versão anterior tratava `chatbot_done` igual a
-     `completed`, respondendo 200 sem fazer nada; como a Meta para de
-     reentregar depois de um 200, isso perde a mensagem pra sempre se o
-     envio original tinha falhado):
+     conforme o status encontrado**:
      - `completed` → responde 200, não faz nada (já entregue de verdade).
-     - `chatbot_done` (lease ainda válido ou expirado, tanto faz) →
-       **retenta só o envio Graph** usando `chatbot_result` já
-       persistido — não invoca o chatbot de novo — depois marca
-       `completed`.
-     - `processing` com lease válido e dono diferente do meu →
-       responde 200, não faz nada (outra entrega concorrente já está
-       cuidando).
+     - `chatbot_done` → **primeiro reclama a entrega com um `owner_token`
+       novo** (achado real de `@codex review`, P1, 5ª rodada — sem isso a
+       condição `WHERE owner_token=$meu_token` do passo de marcar
+       `completed` nunca bate, porque o dono ainda registrado é o da
+       claim de `processing` original, não desta tentativa de retry; toda
+       retentativa reenviaria pro Graph de novo sem NUNCA conseguir
+       marcar `completed`). Só reenvia as entregas com `status:
+       "pendente"` na lista (usando `chatbot_result` já persistido, sem
+       invocar o chatbot de novo); marca cada uma `"enviado"` conforme
+       confirma; só marca `completed` quando a lista inteira estiver
+       `"enviado"`.
+     - `processing` com lease válido e dono diferente do meu → **não
+       responde 200** (achado real de `@codex review`, P1, 5ª rodada —
+       devolver 200 aqui e o dono original travar/cair depois deixa a
+       mensagem presa em `processing` pra sempre, porque a Meta já
+       considerou entregue e não reentrega de novo). Responde erro
+       5xx/timeout — deixa a própria Meta reentregar mais tarde; quando
+       reentregar, ou acha `completed` (deu certo, responde 200 à toa
+       mas sem efeito) ou acha o lease expirado e reclama pra valer.
   5. **Idempotência não pode viver só no orquestrador** (achado real de
      `@codex review`, P1, 4ª rodada: se a resposta HTTP do chatbot se
      perder na rede, ou a `whatsapp-webhook` cair entre receber a
@@ -339,9 +356,17 @@ Pontos que a Fase 2 precisa decidir, já identificados:
 confirmar que a function é código morto.** Passos:
 
 1. [ ] Confirmar se `receber-pedido-make` e `receber-testemunho-make`
-   ainda recebem tráfego real (checar `edge_function_logs` por
-   invocações recentes). Se zero invocações nos últimos ~60 dias,
-   remover como código morto — `chatbot-triagem` já cobre o caso de uso.
+   ainda recebem tráfego real. **`receber-pedido-make` NÃO pode ser
+   avaliada só por `edge_function_logs`** (achado real de `@codex
+   review`, P1 — checagem ingênua de 60 dias sem invocação teria
+   mandado remover um endpoint vivo): `src/pages/public/PublicOracao.tsx:87`
+   chama `receber-pedido-make` direto do site público
+   (`supabase.functions.invoke`), fora do fluxo Make inteiramente, e
+   essa function não grava em `edge_function_logs`. Auditar TODOS os
+   callers no repo (`grep -rn "receber-pedido-make" src/
+   supabase/functions/`) antes de checar invocação, não só o lado Make.
+   `receber-testemunho-make` não tem caller nenhum no frontend (só o
+   Make) — pode seguir com a checagem de `edge_function_logs` original.
 2. [ ] Confirmar estado de `notificar-liturgia-make` — ainda dispara
    notificações reais de escala de liturgia, ou já morreu sem
    substituto? Se ativo, exportar blueprint antes de qualquer mudança.

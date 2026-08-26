@@ -191,14 +191,17 @@ de qualquer decisão — Fase 3, ver plano.
 ⚠️ Dedupe hoje é uma janela de 5s por conteúdo em `chatbot-triagem`, não
    por `message_id` (wamid) da Meta — a Meta reentrega o evento se a
    resposta 200 demorar (esperado aqui, processamento envolve IA/Graph).
-   Obrigatório na Fase 1 (achado de `@codex review`, 4 rodadas até
-   convergir): claim com fencing por `owner_token` ANTES de chamar
-   qualquer chatbot, lease de 120s (não 30s — a IA sozinha já pode levar
-   isso), resultado do chatbot persistido separado do envio de saída
-   (retry de um `wamid` em `chatbot_done` reenvia só a saída, não
-   invoca o chatbot de novo), e idempotência própria dentro de
-   `chatbot-triagem`/`chatbot-financeiro` por `wamid` (o orquestrador
-   sozinho não fecha o caso de resposta do chatbot perdida em trânsito).
+   Obrigatório na Fase 1 (achado de `@codex review`, 5 rodadas até
+   convergir): claim com fencing por `owner_token` (reclamado de novo a
+   cada tentativa de entrega, não só na claim original) ANTES de chamar
+   qualquer chatbot, lease de 120s (não 30s), lista de entregas Graph
+   independentes por `wamid` (não um resultado único — `notificar_admin`
+   manda 2 mensagens separadas), concorrência que encontra `processing`
+   ainda válido responde erro (não 200 — 200 pra quem não processou de
+   verdade impede a Meta de reentregar se o dono original cair), e
+   idempotência própria dentro de `chatbot-triagem`/`chatbot-financeiro`
+   por `wamid` (o orquestrador sozinho não fecha o caso de resposta do
+   chatbot perdida em trânsito).
    Ver plano de execução §Passo 1 pro desenho completo.
 ⚠️ Escopo real (6+ cenários Make, não 1) é maior que o assumido
    originalmente — plano precisa ser fatiado em fases já reconhecendo isso
