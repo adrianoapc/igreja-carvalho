@@ -189,7 +189,20 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   atribuída de forma durável no momento em que a mensagem entra na fila
   (ex.: coluna serial/autoincrement na tabela da fila) como critério de
   desempate — `timestamp` da Meta ordena primeiro, a sequência de
-  chegada decide entre iguais.
+  chegada decide entre iguais. **Ordenar a fila não basta se o worker
+  já começou a processar B antes de A ser inserida** (achado real de
+  `@codex review`, P1, 12ª rodada — corrida de rede pode fazer a
+  requisição HTTP da mensagem A [mais antiga pelo timestamp] ainda
+  estar em trânsito/sendo parseada enquanto B já foi inserida,
+  desenfileirada e começou a processar; nesse ponto reordenar a fila
+  não desfaz o que já começou). Pequena janela de espera/debounce antes
+  de desenfileirar o próximo item de uma conversa (ex.: alguns segundos)
+  — dá tempo de mensagens quase simultâneas convergirem na fila antes
+  do worker pegar a próxima. Não é garantia formal (não substitui um
+  protocolo de watermark completo), mas é proporcional ao volume real
+  esperado — fica documentado como limite conhecido, não fast-follow,
+  já que fechar isso por completo é desproporcional ao risco pra um
+  chatbot de baixo volume.
 - [ ] **Deduplica por `wamid` (`value.messages[].id`) antes de chamar
   qualquer chatbot — máquina de estado com fencing, não claim binário**
   (achado real de `@codex review`, P1 — promovido de "fora de escopo"
@@ -234,12 +247,16 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      — o fencing por `owner_token` só protege a ROW de orquestração,
      não cancela nem desfaz o que a invocação original já executou rio
      abaixo). Renovação passa de fast-follow pra **obrigatória na Fase
-     1**: renovar `lease_until` (`+120s` a partir de agora) em cada
-     fronteira de etapa relevante dentro da `whatsapp-webhook` — depois
-     de resolver mídia, depois do chatbot responder, antes do envio
-     Graph — não um único lease fixo pro fluxo inteiro. `120s` vira o
-     tamanho de CADA renovação, não um teto único pro processamento
-     inteiro.
+     1**. **Renovar só entre etapas não basta** (achado real de
+     `@codex review`, P1, 12ª rodada — se a PRÓPRIA chamada ao chatbot
+     (um único `await`) passar de 120s, o lease expira NO MEIO dessa
+     chamada, antes de qualquer chance de renovar entre etapas — a
+     renovação "depois que o chatbot responder" já chega tarde demais).
+     Precisa de heartbeat periódico DURANTE cada operação longa
+     (`await`) — um timer em paralelo que renova `lease_until` a cada
+     ~30-40s enquanto a chamada ao Graph/chatbot ainda está em voo,
+     cancelado assim que a chamada retorna — não só nas fronteiras
+     entre etapas.
   3. Depois que o chatbot responde: grava `chatbot_result` e
      `status=chatbot_done` (condicionado ao `owner_token`) ANTES de
      tentar qualquer envio via Graph. **`chatbot_result` guarda uma
