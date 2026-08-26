@@ -435,9 +435,21 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
        antes da gravação por intenção não protege nenhum desses —
        replay do mesmo `wamid` pode recriar/avançar sessão ou repetir
        um fluxo direto de novo). Reclamar/cachear o `wamid` logo na
-       ENTRADA da function; se já existe registro, devolver a resposta
-       já armazenada sem executar nada de novo — não só proteger os
-       inserts finais por intenção. Não fecha 100% (upload de
+       ENTRADA da function. **O registro interno precisa do MESMO
+       fencing do claim externo, não "existe = já processado"**
+       (achado real de `@codex review`, P1, 20ª rodada — se a 1ª
+       invocação criar o registro e depois cair/der timeout ANTES de
+       gravar a resposta, essa regra faz o retry (via lease externo de
+       `processing`) achar o registro já existente e devolver
+       resultado nulo/incompleto SEM NUNCA executar a mensagem de
+       verdade — perde a mensagem pra sempre, o oposto do problema de
+       duplicação que a guarda tentava resolver). Registro interno tem
+       o mesmo padrão do claim externo: estado `processing` próprio com
+       `owner_token`/lease que expira, só devolve resposta cacheada
+       quando o registro está `completed` — se achar `processing` com
+       lease expirado, reclama e executa de novo; não trata "registro
+       existe" como sinônimo de "já processado com sucesso". Não fecha
+       100% (upload de
        Storage isolado ainda pode duplicar em teoria), mas fecha os 3
        piores casos financeiros + o registro pastoral com mudança
        aditiva, sem reescrever o motor `fin_*` existente.
