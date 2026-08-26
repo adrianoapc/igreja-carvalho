@@ -378,12 +378,28 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
 
 ### Passo 2 — Fechar os endpoints hoje abertos
 
-- [ ] `chatbot-triagem`: adicionar validação `x-webhook-secret`
-  fail-closed contra `MAKE_WEBHOOK_SECRET` (hoje não valida nada).
-- [ ] `chatbot-financeiro`: trocar de fail-open pra fail-closed no mesmo
-  segredo (hoje só loga aviso se a env var estiver ausente).
-- [ ] Confirmar que só a nova `whatsapp-webhook` vai chamar essas duas
-  depois do corte — nenhum outro caller externo.
+**Ordem importa — fail-closed antes da hora derruba o Make que ainda
+está em produção** (achado real de `@codex review`, P1, 15ª rodada):
+`supabase-deploy.yml` deploya TODAS as functions juntas a cada push em
+`main`; o blueprint real do Make hoje **não manda** `x-webhook-secret`
+(confirmado em `docs/automacoes/MAKE_WHATSAPP_PHONE_NUMBER_ID.md:175-180`).
+Se o fail-closed for deployado ANTES da URL do callback ser trocada no
+Meta Business Manager, toda mensagem real que ainda está passando pelo
+Make (produção, tráfego de verdade) recebe 401 na hora do deploy —
+mesmo sem qualquer mudança na Meta ainda. Ordem correta:
+1. [ ] Atualizar o blueprint do Make **primeiro** (mudança só no Make,
+   sem deploy no Supabase) pra mandar `x-webhook-secret:
+   MAKE_WEBHOOK_SECRET` nas chamadas pra `chatbot-triagem`/
+   `chatbot-financeiro`. Confirmar que está mandando de verdade antes
+   de seguir.
+2. [ ] Só então deployar `chatbot-triagem`: adicionar validação
+   `x-webhook-secret` fail-closed contra `MAKE_WEBHOOK_SECRET` (hoje
+   não valida nada).
+3. [ ] `chatbot-financeiro`: trocar de fail-open pra fail-closed no
+   mesmo segredo (hoje só loga aviso se a env var estiver ausente).
+4. [ ] Confirmar que só a nova `whatsapp-webhook` (que também precisa
+   mandar o header, ver Passo 1) e o Make atualizado vão chamar essas
+   duas — nenhum outro caller externo.
 
 ### Passo 3 — Visibilidade de execução
 
@@ -522,8 +538,20 @@ confirmar que a function é código morto.** Passos:
    essa function não grava em `edge_function_logs`. Auditar TODOS os
    callers no repo (`grep -rn "receber-pedido-make" src/
    supabase/functions/`) antes de checar invocação, não só o lado Make.
-   `receber-testemunho-make` não tem caller nenhum no frontend (só o
-   Make) — pode seguir com a checagem de `edge_function_logs` original.
+   **`receber-testemunho-make` tem o MESMO problema de instrumentação,
+   não menos** (achado real de `@codex review`, P1, 15ª rodada,
+   corrigindo uma afirmação errada da checklist anterior — a diferença
+   é só não ter caller no frontend, não ter log): ela também nunca
+   grava em `edge_function_logs` nem chama
+   `log_edge_function_with_metrics`. Um fluxo de testemunho ainda ativo
+   só pelo Make (sem frontend nenhum, exatamente como se espera de um
+   webhook Make→app) continuaria parecendo "sem invocação" pra sempre,
+   mesmo recebendo testemunhos reais — a checagem por
+   `edge_function_logs` teria mandado apagar um endpoint vivo e perder
+   testemunhos futuros. Antes de remover: auditar histórico de execução
+   do próprio scenario no Make (não do lado Supabase) ou instrumentar
+   a function com `log_edge_function_with_metrics` primeiro e observar
+   por um período, em vez de usar ausência de log como evidência.
 2. [ ] Confirmar estado de `notificar-liturgia-make` — ainda dispara
    notificações reais de escala de liturgia, ou já morreu sem
    substituto? Se ativo, exportar blueprint antes de qualquer mudança.
