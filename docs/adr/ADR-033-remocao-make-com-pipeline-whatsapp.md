@@ -296,10 +296,15 @@ Ver plano de execução detalhado em
    sub-casos: disputa simultânea pela claim original, takeover de lease
    expirado, e entrega parcial com 2 destinatários (membro OK, pastor
    falha) sob concorrência.
-9. ⬜ Duas mensagens (`wamid` diferentes) da MESMA conversa entregues em
-   paralelo → processadas em série, não concorrentemente (valida o
-   lock por conversa, achado de `@codex review`, 8ª rodada — eixo de
-   concorrência diferente do item 8)
+9. ⬜ Duas mensagens (`wamid` diferentes, com conteúdo distinguível que
+   muda estado, ex.: dois passos sequenciais de um fluxo financeiro)
+   da MESMA conversa entregues em paralelo, a mais antiga pelo
+   timestamp da Meta chegando por último na corrida de rede →
+   **valida ordem real (A processada antes de B), não só exclusão
+   mútua** (achado real de `@codex review`, P1, 10ª rodada — um mutex
+   simples passaria um teste que só checasse "rodou em série", mesmo
+   processando B antes de A; o teste precisa afirmar a ordem final do
+   estado, não só ausência de concorrência)
 
 ### Bake period
 
