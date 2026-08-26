@@ -136,7 +136,11 @@ substring `"QR code"` na resposta de `chatbot-triagem`) nunca dispararia
 robusto e não depende de capitalização de mensagem. Já o
 `notificar_admin` também não é replicado como está (quebrado); a Fase 1
 entrega o disparo real da segunda mensagem ao pastor quando
-`notificar_admin: true`.
+`notificar_admin: true` — **via template aprovado `igreja_alerta_lider`**
+(achado no blueprint "Waba Feelings OakOS"), não mensagem free-form:
+a Meta rejeita mensagem business-initiated fora da janela de 24h da
+conversa, e o pastor não necessariamente conversou com esse número
+recentemente (achado real de `@codex review`, 2ª rodada).
 
 ### 5. Token via Graph API — paridade primeiro, segredo por igreja depois
 
@@ -172,8 +176,9 @@ de qualquer decisão — Fase 3, ver plano.
 ✅ Elimina mensalidade e ponto de falha externo sem visibilidade nativa
 ✅ Reaproveita `edge_function_logs` + `EdgeFunctionMonitoring.tsx` já
    existentes — visibilidade de execução sem tabela nova
-✅ Corrige 2 problemas de segurança/correção reais encontrados durante a
-   validação (`notificar_admin` não wired, `chatbot-triagem` sem gate)
+✅ Corrige 3 problemas de segurança/correção reais encontrados durante a
+   validação (`notificar_admin` não wired, `chatbot-triagem` sem gate,
+   vazamento cross-tenant em `edge_function_logs` achado em review)
 ✅ Scenario do Make mantido (só desligado, não apagado) durante o período
    de convivência — mas rollback exige trocar a URL do callback de volta
    no Meta Business Manager, não é 1 clique (ver plano de execução §Fase
@@ -223,9 +228,15 @@ Ver plano de execução detalhado em
 
 ### Escopo desta primeira fase
 
-- Nova function `supabase/functions/whatsapp-webhook/index.ts`
+- Nova function `supabase/functions/whatsapp-webhook/index.ts`, com
+  dedupe por `wamid` (claim liberável em falha) e resolução de mídia
+  via Graph API antes de repassar pro `chatbot-financeiro`
 - Fechamento de `chatbot-triagem` e `chatbot-financeiro` (secret fail-closed)
-- Fix do `notificar_admin` (segunda mensagem ao pastor)
+- Fix do `notificar_admin` via template `igreja_alerta_lider` (segunda
+  mensagem ao pastor)
+- Migration restringindo a policy de SELECT de `edge_function_logs` a
+  `super_admin` + projeção sem payload na query de lista de
+  `EdgeFunctionMonitoring.tsx` (fecha vazamento cross-tenant confirmado)
 - Atualização de `docs/automacoes/catalogo-automacoes.md` marcando o
   scenario "Waba Chatbot - OakOS" como desativado (não apagado) após corte
 

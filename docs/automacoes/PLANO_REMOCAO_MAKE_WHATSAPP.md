@@ -67,10 +67,22 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   `entry[].changes[].value.{messages[],contacts[],metadata}` — hoje o
   conector nativo do Make já achata isso pro Make por baixo dos panos;
   a nova função precisa fazer essa extração explicitamente:
+  - **Itera TODOS os itens, não só o primeiro** (achado real de `@codex
+    review`, P2): a Meta pode entregar mais de um `entry`/`change`/
+    `message` numa única notificação (batch). Extrair só `messages[0]`
+    e responder 200 pro payload inteiro descarta o resto
+    silenciosamente. Iterar `entry[].changes[].value.messages[]` e
+    aplicar roteamento + dedupe (item abaixo) em cada mensagem,
+    independente.
   - `phone_number_id` ← `value.metadata.phone_number_id`
-  - `telefone` ← `value.messages[0].from`
-  - `nome_perfil` ← `value.contacts[0].profile.name`
-  - `tipo_mensagem` ← `value.messages[0].type`
+  - `telefone` ← `value.messages[].from`
+  - `nome_perfil` ← `value.contacts[].profile.name`
+  - `tipo_mensagem` ← `value.messages[].type`
+  - `mensagem`/`conteudo_texto` ← `value.messages[].text.body` (achado
+    real de `@codex review`, P1 — a checklist original enumerava os
+    outros campos flat mas esquecia este; sem ele o texto nunca chega,
+    os dois chatbots recebem mensagem vazia e podem criar/avançar sessão
+    incorretamente com conteúdo em branco)
   - **Anexo é tratado diferente em cada function — não existe campo
     único "media_id" que sirva pros dois** (achado real de `@codex
     review`, P1). O envelope bruto da Meta **nunca** tem uma URL de
@@ -109,23 +121,37 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   dispara, e toda resposta de inscrição sairia como texto em vez de
   imagem). Se `qr_image` existir no retorno, manda imagem
   (`image.link = qr_image`); senão, texto.
-- [ ] **Corrige** (não replica) o `notificar_admin`: quando
-  `chatbot-triagem` retornar `notificar_admin: true`, dispara de fato a
-  segunda mensagem ao telefone do pastor responsável. Hoje isso não
-  acontece em produção — é bug conhecido, ver ADR-033 §Bugs conhecidos.
-- [ ] **Deduplica por `wamid` (`value.messages[0].id`) antes de chamar
-  qualquer chatbot** (achado real de `@codex review`, P1 — promovido de
-  "fora de escopo" pra obrigatório: a Meta reentrega o evento se a
-  resposta 200 demorar, o que é esperado aqui já que o processamento
-  síncrono envolve IA/Graph; sem isso a mesma mensagem pode rodar 2x em
-  paralelo). Claim atômico do `wamid` (ex.: `INSERT ... ON CONFLICT DO
-  NOTHING` numa tabela/chave dedicada) ANTES de invocar
-  `chatbot-triagem`/`chatbot-financeiro` — se já foi reclamado, responde
-  200 e não roteia de novo. O dedupe de 5s por conteúdo que já existe
-  dentro de `chatbot-triagem` fica como está (defesa em profundidade),
-  mas não é suficiente sozinho: roda DEPOIS de ler histórico de sessão
-  mutável e pode ser furado por entregas concorrentes; `chatbot-financeiro`
-  não tem dedupe nenhum hoje.
+- [ ] **Corrige** (não replica) o `notificar_admin` **usando template
+  aprovado, não mensagem livre** (achado real de `@codex review`, P1 —
+  a 1ª correção assumia mensagem free-form, que a Meta REJEITA se o
+  pastor não tiver mandado mensagem pro número nas últimas 24h — a
+  janela de sessão é por conversa, não abre pro pastor só porque o
+  membro mandou mensagem pra outro número). Quando `chatbot-triagem`
+  retornar `notificar_admin: true`, disparar o template já aprovado
+  `igreja_alerta_lider` (achado no blueprint "Waba Feelings OakOS" —
+  ver ADR-033 §Inventário) via endpoint de template message da Graph
+  API, com os parâmetros que o template espera. Hoje isso não acontece
+  em produção — é bug conhecido, ver ADR-033 §Bugs conhecidos.
+- [ ] **Deduplica por `wamid` (`value.messages[].id`) antes de chamar
+  qualquer chatbot, com claim liberável em falha** (achado real de
+  `@codex review`, P1 — promovido de "fora de escopo" pra obrigatório:
+  a Meta reentrega o evento se a resposta 200 demorar, o que é esperado
+  aqui já que o processamento síncrono envolve IA/Graph; sem isso a
+  mesma mensagem pode rodar 2x em paralelo). Claim atômico do `wamid`
+  (ex.: `INSERT ... ON CONFLICT DO NOTHING` numa tabela/chave dedicada,
+  status inicial `processing`) ANTES de invocar `chatbot-triagem`/
+  `chatbot-financeiro` — se já existe row `completed` pro mesmo `wamid`,
+  responde 200 e não roteia de novo. **Não basta reclamar e nunca
+  liberar** (achado real de `@codex review`, P1, 2ª rodada): se o
+  chatbot ou o envio de saída via Graph falhar DEPOIS do claim, marcar
+  `failed`/liberar o claim (não `completed`) — senão o retry legítimo da
+  Meta encontra o wamid "já processado", responde 200, e a mensagem do
+  usuário se perde silenciosamente pra sempre. Só marcar `completed`
+  depois do envio de resposta confirmado. O dedupe de 5s por conteúdo
+  que já existe dentro de `chatbot-triagem` fica como está (defesa em
+  profundidade), mas não é suficiente sozinho: roda DEPOIS de ler
+  histórico de sessão mutável e pode ser furado por entregas
+  concorrentes; `chatbot-financeiro` não tem dedupe nenhum hoje.
 - [ ] Envia a resposta via Graph API copiando o padrão de
   `send-otp/index.ts` (`WHATSAPP_TOKEN` + `phone_number_id` via
   `whatsapp_numeros`).
@@ -145,26 +171,38 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
 
 - [ ] Sem tabela nova — `edge_function_logs` já cobre; `EdgeFunctionMonitoring.tsx`
   já lista com filtro por função/período.
-- [ ] **Cuidado de tenant antes de expor payload** (achado real de
-  `@codex review`, P1 — vazamento cross-tenant confirmado, não
-  hipotético): `edge_function_logs` não tem `igreja_id` nenhuma, e a
-  policy de SELECT (`20260820010000_perf_auth_rls_initplan_wrap_select.sql:336`)
-  é só `has_role(auth.uid(), 'admin')` — qualquer admin de QUALQUER
-  igreja vê logs de TODAS as igrejas hoje. `request_payload`/
-  `response_payload` do WhatsApp incluem telefone e conteúdo de mensagem
-  pastoral. Antes de estender `EdgeFunctionMonitoring.tsx` com dialog de
-  detalhe (reaproveitando `<details><pre>` de `IntegracaoLogsDialog.tsx`):
-  restringir o dialog de detalhe a `super_admin` (não `admin` de igreja),
-  ou redigir `telefone`/conteúdo de mensagem no payload renderizado. Dar
-  `edge_function_logs` uma coluna `igreja_id` real com RLS por tenant é
-  fix maior, fora do escopo desta fase — tratar como fast-follow, não
-  bloqueia o Passo 3 se a restrição a super-admin for aplicada primeiro.
+- [ ] **Fechar o vazamento na policy/query, não só na UI** (achado real
+  de `@codex review`, P1, **2ª rodada corrige a 1ª**: restringir só o
+  dialog de detalhe no client não fecha nada — `EdgeFunctionMonitoring.tsx`
+  já faz `.select("*")` na query da LISTA hoje, então `request_payload`/
+  `response_payload` de TODAS as igrejas já chegam no browser do admin
+  antes mesmo de abrir qualquer dialog; e a policy de SELECT continua
+  permitindo `admin` de qualquer igreja ler a tabela direto via
+  PostgREST, gate de UI nenhum impede isso). `edge_function_logs` não
+  tem `igreja_id`, e a policy de SELECT
+  (`20260820010000_perf_auth_rls_initplan_wrap_select.sql:336`) é só
+  `has_role(auth.uid(), 'admin')` — vazamento cross-tenant confirmado,
+  não hipotético. Fix de verdade, dentro do escopo desta fase (é troca
+  de predicado de policy existente, não schema/dado novo):
+  1. Migration alterando a policy de SELECT de `edge_function_logs` pra
+     exigir `has_role(auth.uid(), 'super_admin')` em vez de `'admin'`
+     genérico — fecha o acesso direto via PostgREST também, não só a UI.
+  2. `EdgeFunctionMonitoring.tsx`: trocar `.select("*")` da query de
+     lista por uma projeção sem `request_payload`/`response_payload`;
+     essas duas colunas só entram numa query separada, disparada ao
+     abrir o dialog de detalhe (que já está atrás do gate de
+     `super_admin` do passo 1).
+  Dar `edge_function_logs` uma coluna `igreja_id` real com RLS por
+  tenant (pra liberar `admin` de igreja de novo, escopado à própria
+  igreja) é fix maior, fora do escopo desta fase — tratar como
+  fast-follow; até lá, só `super_admin` vê a tabela, ponto.
 
 ### Passo 4 — Corte (cutover)
 
 - [ ] Deployar e testar isoladamente handshake `GET` + POST sintético,
   antes de tocar em qualquer configuração do Meta.
-- [ ] Rodar os 7 cenários de teste da ADR-033 (§Validação) contra a nova
+- [ ] Rodar os 8 cenários de teste da ADR-033 (§Validação — inclui o
+  reenvio de `wamid` simulado, achado de `@codex review`) contra a nova
   função.
 - [ ] Trocar a URL do webhook no Meta Business Manager (de Make pra
   Supabase) — **sem apagar** o scenario "Waba Chatbot - OakOS" no Make,
