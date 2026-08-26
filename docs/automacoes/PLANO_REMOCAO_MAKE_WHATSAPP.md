@@ -71,13 +71,24 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   - `telefone` ← `value.messages[0].from`
   - `nome_perfil` ← `value.contacts[0].profile.name`
   - `tipo_mensagem` ← `value.messages[0].type`
-  - `media_id` ← campo correspondente ao tipo (`image.id`/`video.id`/
-    `audio.id`/`document.url`, conforme `tipo_mensagem` — ver mapeamento
-    real no blueprint "Waba Chatbot - OakOS")
-  - `mensagem`/`tipo` (pro `chatbot-financeiro`, que espera nomes de
-    campo ligeiramente diferentes — conferir contrato exato de
-    `supabase/functions/chatbot-financeiro/index.ts:659-674` antes de
-    implementar)
+  - **Anexo é tratado diferente em cada function — não existe campo
+    único "media_id" que sirva pros dois** (achado real de `@codex
+    review`, P1). O envelope bruto da Meta **nunca** tem uma URL de
+    anexo, só um `id` opaco por tipo (`image.id`/`video.id`/`audio.id`/
+    `document.id`) — resolver pra URL exige uma chamada própria à Graph
+    API (`GET /v21.0/{media-id}` com o token) que hoje o conector nativo
+    do Make faz por baixo dos panos (por isso o blueprint real mostra
+    `document.url` — é o Make já resolvido, não o payload cru da Meta):
+    - `chatbot-triagem` (`index.ts:1034-1035`) só usa mídia pra
+      `tipo_mensagem === "audio"`, e já resolve sozinha via Graph API
+      dado um `media_id` bruto (`processarAudio`, `index.ts:388`) — pra
+      esse caso, repassar `media_id` cru, sem resolver antes.
+    - `chatbot-financeiro` (`index.ts:676-685`) **não lê `media_id`
+      nenhum** — só aceita `url_anexo` (ou aliases) já como URL
+      resolvida. Pra imagem/documento indo pro número financeiro, a
+      `whatsapp-webhook` precisa resolver o `media_id` → URL via Graph
+      API ela mesma, ANTES de chamar `chatbot-financeiro`, e mandar o
+      resultado como `url_anexo` — não repassar o `id` cru.
   - **Filtra eventos que não são mensagem** — a Meta também manda
     webhooks de status (`statuses[]`: sent/delivered/read), sem
     `messages[]` nenhum. Detectar e responder 200 sem rotear pra
@@ -102,6 +113,19 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   `chatbot-triagem` retornar `notificar_admin: true`, dispara de fato a
   segunda mensagem ao telefone do pastor responsável. Hoje isso não
   acontece em produção — é bug conhecido, ver ADR-033 §Bugs conhecidos.
+- [ ] **Deduplica por `wamid` (`value.messages[0].id`) antes de chamar
+  qualquer chatbot** (achado real de `@codex review`, P1 — promovido de
+  "fora de escopo" pra obrigatório: a Meta reentrega o evento se a
+  resposta 200 demorar, o que é esperado aqui já que o processamento
+  síncrono envolve IA/Graph; sem isso a mesma mensagem pode rodar 2x em
+  paralelo). Claim atômico do `wamid` (ex.: `INSERT ... ON CONFLICT DO
+  NOTHING` numa tabela/chave dedicada) ANTES de invocar
+  `chatbot-triagem`/`chatbot-financeiro` — se já foi reclamado, responde
+  200 e não roteia de novo. O dedupe de 5s por conteúdo que já existe
+  dentro de `chatbot-triagem` fica como está (defesa em profundidade),
+  mas não é suficiente sozinho: roda DEPOIS de ler histórico de sessão
+  mutável e pode ser furado por entregas concorrentes; `chatbot-financeiro`
+  não tem dedupe nenhum hoje.
 - [ ] Envia a resposta via Graph API copiando o padrão de
   `send-otp/index.ts` (`WHATSAPP_TOKEN` + `phone_number_id` via
   `whatsapp_numeros`).
@@ -173,9 +197,11 @@ bake period terminou).
   (variável `config` indefinida) — fluxo diferente, PR própria.
 - Migrar `WHATSAPP_TOKEN` global pra segredo criptografado por igreja —
   só necessário com múltiplas contas WhatsApp Business reais.
-- Tabela de dedupe por `message_id` (wamid) — só se duplicidade for
-  observada de fato no bake period; dedupe atual (5s por conteúdo) segue
-  como está.
+- ~~Tabela de dedupe por `message_id` (wamid)~~ — **promovido a
+  obrigatório no Passo 1** (achado de `@codex review`, não é mais
+  fast-follow). Fica fora de escopo só o refinamento de infra (TTL de
+  limpeza da tabela de dedupe, métricas de taxa de duplicidade) — a
+  claim atômica básica entra na Fase 1.
 - Mover roteamento (hoje array fixo por `phone_number_id`) pra tabela
   configurável — só se precisar ajustar sem deploy.
 

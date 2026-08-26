@@ -94,8 +94,12 @@ Substituir o relay do Make por uma Edge Function própria
 (`whatsapp-webhook`) que fala diretamente com a Meta Graph API, replicando
 o comportamento validado dos blueprints reais (não o assumido pela
 documentação antiga) — em fases, por cenário, com o Make de cada fase
-mantido desligado (não apagado) como rollback de 1 clique até confirmação
-em produção.
+mantido desligado (não apagado) até confirmação em produção. Rollback
+**não é 1 clique** (achado real de `@codex review`, ver plano de
+execução §Fase 1 Passo 4): depois do corte, a Meta entrega tudo pro
+endpoint novo; reativar o scenario no Make sozinho não redireciona
+tráfego nenhum — é preciso também trocar a URL do callback de volta no
+Meta Business Manager.
 
 ### 1. Roteamento por `phone_number_id`, não por palavra-chave
 
@@ -122,13 +126,17 @@ em `.data.reply_message`. A `whatsapp-webhook` normaliza os dois formatos
 antes de montar a mensagem de saída — paridade com o que o Router do Make
 já faz hoje via `if(exists(...))` encadeado.
 
-### 4. Replicar a regra "QR code" e corrigir o `notificar_admin`
+### 4. Decidir texto vs. imagem pela presença de `qr_image`, e corrigir o `notificar_admin`
 
-A detecção de substring `"QR code"` na resposta de `chatbot-triagem` (pra
-decidir entre mensagem de texto e imagem) migra como está — é lógica pura
-de apresentação, sem risco de negócio. Já o `notificar_admin` não é
-replicado como está (quebrado); a Fase 1 entrega o disparo real da segunda
-mensagem ao pastor quando `notificar_admin: true`.
+Não replicar a regra do Make como está: a versão original (detecção de
+substring `"QR code"` na resposta de `chatbot-triagem`) nunca dispararia
+— o texto real sempre usa `"QR Code"` com C maiúsculo (achado real de
+`@codex review`). A `whatsapp-webhook` decide pela **presença do campo
+`qr_image`** no payload de retorno, não por substring de texto — mais
+robusto e não depende de capitalização de mensagem. Já o
+`notificar_admin` também não é replicado como está (quebrado); a Fase 1
+entrega o disparo real da segunda mensagem ao pastor quando
+`notificar_admin: true`.
 
 ### 5. Token via Graph API — paridade primeiro, segredo por igreja depois
 
@@ -166,16 +174,21 @@ de qualquer decisão — Fase 3, ver plano.
    existentes — visibilidade de execução sem tabela nova
 ✅ Corrige 2 problemas de segurança/correção reais encontrados durante a
    validação (`notificar_admin` não wired, `chatbot-triagem` sem gate)
-✅ Rollback de 1 clique durante o período de convivência (scenario do Make
-   mantido, só desligado)
+✅ Scenario do Make mantido (só desligado, não apagado) durante o período
+   de convivência — mas rollback exige trocar a URL do callback de volta
+   no Meta Business Manager, não é 1 clique (ver plano de execução §Fase
+   1 Passo 4)
 
 ### Negativas
 
 ⚠️ Handshake e validação de assinatura da Meta, hoje de graça via conector
    nativo do Make, precisam ser implementados e testados do zero
 ⚠️ Dedupe hoje é uma janela de 5s por conteúdo em `chatbot-triagem`, não
-   por `message_id` (wamid) da Meta — risco a monitorar, não a resolver
-   antes do corte
+   por `message_id` (wamid) da Meta — a Meta reentrega o evento se a
+   resposta 200 demorar (esperado aqui, processamento envolve IA/Graph),
+   então a `whatsapp-webhook` precisa reclamar o `wamid` atomicamente
+   ANTES de chamar qualquer chatbot (obrigatório na Fase 1, achado de
+   `@codex review` — não é mais risco a só monitorar)
 ⚠️ Escopo real (6+ cenários Make, não 1) é maior que o assumido
    originalmente — plano precisa ser fatiado em fases já reconhecendo isso
 
@@ -223,12 +236,15 @@ Ver plano de execução detalhado em
 1. ⬜ Handshake `GET` de verificação isolado
 2. ⬜ POST sintético com assinatura válida/inválida (`X-Hub-Signature-256`)
 3. ⬜ Roteamento pelos dois `phone_number_id` reais (financeiro / triagem)
-4. ⬜ Resposta com `"QR code"` na mensagem → envia imagem, não texto
+4. ⬜ Resposta de `chatbot-triagem` com `qr_image` no payload → envia
+   imagem, não texto
 5. ⬜ `SOLICITACAO_PASTORAL` → confirma segunda mensagem chega ao pastor
    (valida o fix do bug, não só a paridade)
 6. ⬜ Continuidade de sessão/contexto entre mensagens
 7. ⬜ Isolamento multi-número (mensagem no número financeiro não vaza pra
    triagem e vice-versa)
+8. ⬜ Reenvio do mesmo `wamid` (Meta redelivery simulado) → processado só
+   uma vez, segunda entrega recebe 200 sem rotear de novo
 
 ### Bake period
 
