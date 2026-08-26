@@ -85,7 +85,16 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
     `phone_number_id`)
   - `telefone` ← `value.messages[].from`
   - `nome_perfil` ← `value.contacts[].profile.name`
-  - `tipo_mensagem` ← `value.messages[].type`
+  - `tipo_mensagem` ← `value.messages[].type` **E também `tipo`** ←
+    mesmo valor (achado real de `@codex review`, P1, 6ª rodada — mesmo
+    padrão do achado do campo de texto: `chatbot-triagem` lê
+    `tipo_mensagem`, mas `chatbot-financeiro` lê especificamente `tipo`
+    — `body.tipo`/`index.ts:656-674` — e os 3 branches de anexo dela
+    testam `tipo === "image" || tipo === "document"`,
+    `index.ts:1113-1116,1300-1304,2193-2195`. Mandar só `tipo_mensagem`
+    faz `chatbot-financeiro` pular processamento de anexo mesmo com
+    `url_anexo` presente). Mandar os dois campos com o mesmo valor pros
+    dois chatbots, não um campo por function.
   - `mensagem`/`conteudo_texto` ← `value.messages[].text.body` (achado
     real de `@codex review`, P1 — a checklist original enumerava os
     outros campos flat mas esquecia este; sem ele o texto nunca chega,
@@ -194,17 +203,22 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   4. **Toda entrada nova reclamando um `wamid` existente precisa agir
      conforme o status encontrado**:
      - `completed` → responde 200, não faz nada (já entregue de verdade).
-     - `chatbot_done` → **primeiro reclama a entrega com um `owner_token`
-       novo** (achado real de `@codex review`, P1, 5ª rodada — sem isso a
-       condição `WHERE owner_token=$meu_token` do passo de marcar
-       `completed` nunca bate, porque o dono ainda registrado é o da
-       claim de `processing` original, não desta tentativa de retry; toda
-       retentativa reenviaria pro Graph de novo sem NUNCA conseguir
-       marcar `completed`). Só reenvia as entregas com `status:
-       "pendente"` na lista (usando `chatbot_result` já persistido, sem
-       invocar o chatbot de novo); marca cada uma `"enviado"` conforme
-       confirma; só marca `completed` quando a lista inteira estiver
-       `"enviado"`.
+     - `chatbot_done` → reenvia (usando `chatbot_result` já persistido,
+       sem invocar o chatbot de novo) só as entregas `"pendente"` da
+       lista. **Cada entrega individual precisa do próprio claim atômico
+       antes de mandar pro Graph, não só trocar o `owner_token` da row**
+       (achado real de `@codex review`, P1, 7ª rodada — trocar
+       `owner_token` da row inteira não é exclusivo: duas retentativas
+       chegando perto uma da outra podem cada uma trocar o token e ler
+       o mesmo item `"pendente"`, mandando a mesma mensagem 2x. Cada
+       item da lista de entregas precisa de um estado intermediário
+       (ex.: `"pendente"` → `"enviando"` com lease próprio → `"enviado"`)
+       e só quem ganha a transição atômica pra `"enviando"` — igual ao
+       padrão de fencing do claim original, aplicado por item, não só
+       pela row — manda pro Graph de fato; item já `"enviando"` com
+       lease válido é pulado por qualquer outra tentativa concorrente).
+       Marca cada item `"enviado"` conforme confirma; só marca o `wamid`
+       inteiro `completed` quando a lista estiver toda `"enviado"`.
      - `processing` com lease válido e dono diferente do meu → **não
        responde 200** (achado real de `@codex review`, P1, 5ª rodada —
        devolver 200 aqui e o dono original travar/cair depois deixa a
