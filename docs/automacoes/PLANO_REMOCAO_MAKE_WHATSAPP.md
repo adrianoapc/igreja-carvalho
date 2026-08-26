@@ -147,44 +147,72 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   API, com os parâmetros que o template espera. Hoje isso não acontece
   em produção — é bug conhecido, ver ADR-033 §Bugs conhecidos.
 - [ ] **Deduplica por `wamid` (`value.messages[].id`) antes de chamar
-  qualquer chatbot — máquina de estado de 2 fases, não claim binário**
+  qualquer chatbot — máquina de estado com fencing, não claim binário**
   (achado real de `@codex review`, P1 — promovido de "fora de escopo"
   pra obrigatório: a Meta reentrega o evento se a resposta 200 demorar,
   o que é esperado aqui já que o processamento síncrono envolve
-  IA/Graph; sem isso a mesma mensagem pode rodar 2x em paralelo). Uma
-  tabela/chave dedicada por `wamid`, com pelo menos os estados abaixo —
-  **3 rodadas de review acharam 3 formas diferentes de essa lógica sair
-  errada, então o desenho final já precisa cobrir as 3 juntas**:
-  1. Claim atômico (`INSERT ... ON CONFLICT DO NOTHING`) ANTES de
-     invocar `chatbot-triagem`/`chatbot-financeiro`, status inicial
-     `processing` + timestamp/lease. Se já existe row `chatbot_done` ou
-     `completed` pro mesmo `wamid`, responde 200 sem rotear de novo.
-  2. **Persistir o resultado do chatbot separado do envio de saída**
-     (achado real de `@codex review`, P1, 3ª rodada — a versão anterior
-     dizia "libera o claim se falhar", mas se o CHATBOT já rodou com
-     sucesso (comprometeu operação financeira, avançou sessão) e só o
-     ENVIO via Graph falhou depois, liberar o claim inteiro faz um
-     retry da Meta invocar o chatbot de novo com o mesmo input — duplica
-     o efeito colateral ou lê a sessão já avançada). Depois que o
-     chatbot responde, marcar `chatbot_done` com o resultado persistido
-     ANTES de tentar o envio. Se só o envio falhar, retry (da Meta ou
-     de um cron interno) reenvia usando o resultado já persistido —
-     **não invoca o chatbot de novo**. Só falha total antes do chatbot
-     responder libera o claim pra reprocessar do zero.
-  3. **Lease pra reclamar claim abandonado** (achado real de `@codex
-     review`, P1, 3ª rodada — se o runtime for encerrado/der timeout
-     com a row ainda em `processing`, nenhum catch/finally roda pra
-     marcar `failed`; sem isso a row fica travada pra sempre e a
-     mensagem nunca mais é processada). Guardar timestamp/tentativa no
-     claim; uma entrega nova pro mesmo `wamid` pode reclamar uma row
-     `processing` cujo lease expirou (ex.: > 30s) como se estivesse
-     livre, em vez de ficar bloqueada por ela indefinidamente.
+  IA/Graph; sem isso a mesma mensagem pode rodar 2x em paralelo).
+  **4 rodadas de review acharam problema numa versão anterior desta
+  mesma lógica — o desenho abaixo é o que sobrou depois de fechar
+  todos**. Tabela dedicada por `wamid`: `status`, `owner_token` (UUID
+  gerado por tentativa), `lease_until`, `chatbot_result` (JSONB,
+  nullable).
+
+  **Estados**: `processing` → `chatbot_done` → `completed` (ou
+  `processing` reclamado de novo se o lease expirar sem progresso).
+
+  1. Claim: `INSERT` do `wamid` com `status=processing`,
+     `owner_token=<novo uuid>`, `lease_until=now()+120s`. Em conflito
+     (row já existe), só atualiza pra reclamar se `status=processing`
+     E `lease_until < now()` (lease expirado) — vira dono novo com
+     `owner_token` novo. Toda escrita subsequente de estado exige
+     `WHERE wamid=... AND owner_token=$meu_token` (fencing — só quem
+     é dono corrente da vez consegue avançar o estado; um dono antigo
+     que "acordou" depois de perder o lease não consegue mais gravar
+     nada por cima de quem já reclamou).
+  2. **Lease generoso o bastante pra cobrir o pior caso, não 30s**
+     (achado real de `@codex review`, P1, 4ª rodada: `chatbot-triagem`
+     sozinha já permite até 30s só na chamada de IA, fora sessão/DB e o
+     envio Graph depois — um lease de 30s deixa uma entrega concorrente
+     reclamar uma row que ainda está sendo processada de verdade,
+     recriando a duplicidade que o lease deveria evitar). Usar
+     `lease_until=now()+120s` como piso da Fase 1; ajustar com dado real
+     de latência no bake period. Renovação periódica do lease durante
+     processamento longo fica como fast-follow.
+  3. Depois que o chatbot responde: grava `chatbot_result` e
+     `status=chatbot_done` (condicionado ao `owner_token`) ANTES de
+     tentar o envio via Graph.
+  4. **Toda entrada nova reclamando um `wamid` existente precisa agir
+     conforme o status encontrado** (achado real de `@codex review`, P1,
+     4ª rodada — a versão anterior tratava `chatbot_done` igual a
+     `completed`, respondendo 200 sem fazer nada; como a Meta para de
+     reentregar depois de um 200, isso perde a mensagem pra sempre se o
+     envio original tinha falhado):
+     - `completed` → responde 200, não faz nada (já entregue de verdade).
+     - `chatbot_done` (lease ainda válido ou expirado, tanto faz) →
+       **retenta só o envio Graph** usando `chatbot_result` já
+       persistido — não invoca o chatbot de novo — depois marca
+       `completed`.
+     - `processing` com lease válido e dono diferente do meu →
+       responde 200, não faz nada (outra entrega concorrente já está
+       cuidando).
+  5. **Idempotência não pode viver só no orquestrador** (achado real de
+     `@codex review`, P1, 4ª rodada: se a resposta HTTP do chatbot se
+     perder na rede, ou a `whatsapp-webhook` cair entre receber a
+     resposta e gravar `chatbot_done`, o lease depois reclama
+     `processing` e invoca o chatbot de novo — mas ele já pode ter
+     comprometido a operação financeira/sessão na 1ª tentativa cuja
+     resposta se perdeu; o orquestrador sozinho não tem como saber
+     disso). Propagar `wamid` como campo de entrada pra
+     `chatbot-triagem`/`chatbot-financeiro`, e cada uma delas checar
+     (de forma leve, atômica, junto do próprio commit do efeito
+     colateral) se já processou esse `wamid` antes de repetir a
+     operação — pequena mudança de contrato de entrada + 1 check de
+     idempotência interno, não reescrita de lógica de negócio.
 
   O dedupe de 5s por conteúdo que já existe dentro de `chatbot-triagem`
-  fica como está (defesa em profundidade), mas não é suficiente sozinho:
-  roda DEPOIS de ler histórico de sessão mutável e pode ser furado por
-  entregas concorrentes; `chatbot-financeiro` não tem dedupe nenhum
-  hoje.
+  fica como está (defesa em profundidade adicional), mas não é
+  suficiente sozinho pros motivos acima.
 - [ ] Envia a resposta via Graph API copiando o padrão de
   `send-otp/index.ts` (`WHATSAPP_TOKEN` + `phone_number_id` via
   `whatsapp_numeros`).
@@ -242,8 +270,15 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   só desligar.
 - [ ] Acompanhar `edge_function_logs` por alguns dias de uso real: taxa de
   erro, duplicidade, latência.
-- [ ] Só então desativar de fato o scenario no Make e revogar token, se
-  aplicável.
+- [ ] Só então desativar de fato o scenario no Make — **e antes de
+  revogar qualquer token, confirmar que não é o mesmo `WHATSAPP_TOKEN`
+  que a `whatsapp-webhook` está usando pra responder** (achado real de
+  `@codex review`, P2: a Decisão 5 da ADR-033 reaproveita de propósito
+  o token global já existente — se for o MESMO token que o Make usa
+  hoje, revogar quebra as respostas da função nova também, não só o
+  Make). Se for compartilhado, ou mantém como está (não revoga nada), ou
+  primeiro rotaciona a `whatsapp-webhook` pra um token distinto e só
+  depois revoga o antigo.
 
 **Rollback não é "1 clique" — documentar o procedimento real** (achado de
 `@codex review`, P2): depois que a URL do callback é trocada no Meta
@@ -328,8 +363,17 @@ O plano só é considerado concluído quando:
 - Todas as fases 1-3 estiverem executadas ou explicitamente descartadas
   (com motivo registrado nesta doc ou na ADR-033).
 - Nenhuma edge function do inventário acima depender de
-  `MAKE_WEBHOOK_URL`/`MAKE_WEBHOOK_SECRET`/`WEBHOOK_MAKE_ALERTA_EMOCIONAL`
-  nem de linhas `tipo LIKE 'make_%'`/`'whatsapp_make'` na tabela
-  `webhooks`, a menos que explicitamente mantidas por decisão registrada.
+  `MAKE_WEBHOOK_URL`/`WEBHOOK_MAKE_ALERTA_EMOCIONAL` nem de linhas
+  `tipo LIKE 'make_%'`/`'whatsapp_make'` na tabela `webhooks`, a menos
+  que explicitamente mantidas por decisão registrada. **Exceção
+  deliberada, não pendência**: `MAKE_WEBHOOK_SECRET` continua em uso
+  (achado real de `@codex review`, P2 — a Fase 1 torna
+  `chatbot-triagem`/`chatbot-financeiro` fail-closed nesse segredo E
+  exige que a `whatsapp-webhook` o envie; "eliminar toda dependência
+  dele" contradiz o próprio fix de segurança desta fase). O nome pode
+  ser trocado por algo menos amarrado ao Make (ex.:
+  `INTERNAL_WEBHOOK_SECRET`) num fast-follow de rotação coordenada
+  (caller + callees no mesmo commit), mas o segredo em si — como
+  mecanismo de auth interna entre orquestrador e chatbots — fica.
 - `docs/automacoes/catalogo-automacoes.md` refletir o estado final (o que
   foi migrado, o que foi removido, o que foi mantido e por quê).

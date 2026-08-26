@@ -191,12 +191,15 @@ de qualquer decisão — Fase 3, ver plano.
 ⚠️ Dedupe hoje é uma janela de 5s por conteúdo em `chatbot-triagem`, não
    por `message_id` (wamid) da Meta — a Meta reentrega o evento se a
    resposta 200 demorar (esperado aqui, processamento envolve IA/Graph).
-   Obrigatório na Fase 1 (achado de `@codex review`, 3 rodadas): claim
-   atômico do `wamid` ANTES de chamar qualquer chatbot, resultado do
-   chatbot persistido separado do envio de saída (retry re-envia sem
-   invocar o chatbot de novo — evita duplicar efeito colateral), e lease
-   pra reclamar claim `processing` abandonado por crash/timeout do
-   runtime. Ver plano de execução §Passo 1 pro desenho completo.
+   Obrigatório na Fase 1 (achado de `@codex review`, 4 rodadas até
+   convergir): claim com fencing por `owner_token` ANTES de chamar
+   qualquer chatbot, lease de 120s (não 30s — a IA sozinha já pode levar
+   isso), resultado do chatbot persistido separado do envio de saída
+   (retry de um `wamid` em `chatbot_done` reenvia só a saída, não
+   invoca o chatbot de novo), e idempotência própria dentro de
+   `chatbot-triagem`/`chatbot-financeiro` por `wamid` (o orquestrador
+   sozinho não fecha o caso de resposta do chatbot perdida em trânsito).
+   Ver plano de execução §Passo 1 pro desenho completo.
 ⚠️ Escopo real (6+ cenários Make, não 1) é maior que o assumido
    originalmente — plano precisa ser fatiado em fases já reconhecendo isso
 
@@ -232,8 +235,13 @@ Ver plano de execução detalhado em
 ### Escopo desta primeira fase
 
 - Nova function `supabase/functions/whatsapp-webhook/index.ts`, com
-  dedupe por `wamid` (claim liberável em falha) e resolução de mídia
-  via Graph API antes de repassar pro `chatbot-financeiro`
+  dedupe por `wamid` (fencing por `owner_token`, lease de 120s,
+  retry-de-envio sem reinvocar chatbot) e resolução de mídia via Graph
+  API antes de repassar pro `chatbot-financeiro`
+- `chatbot-triagem`/`chatbot-financeiro` recebem `wamid` como campo de
+  entrada novo e checam idempotência própria antes de comprometer
+  efeito colateral (único ponto onde a Fase 1 toca lógica de negócio
+  existente, e só o mínimo necessário)
 - Fechamento de `chatbot-triagem` e `chatbot-financeiro` (secret fail-closed)
 - Fix do `notificar_admin` via template `igreja_alerta_lider` (segunda
   mensagem ao pastor)
