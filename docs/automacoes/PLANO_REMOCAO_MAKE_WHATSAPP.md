@@ -136,9 +136,19 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
     processa string vazia contra a sessão ativa,
     `index.ts:987-994`, gerando resposta sem sentido ou avançando
     histórico com "mensagem" vazia do usuário). Allowlist explícita de
-    tipos suportados (`text`, `audio`, `image`, `document`); qualquer
-    outro tipo responde 200 sem rotear, igual ao tratamento de
-    `statuses[]`.
+    tipos suportados (`text`, `audio`, `image`, `document`) globalmente;
+    qualquer outro tipo responde 200 sem rotear, igual ao tratamento de
+    `statuses[]`. **A allowlist certa é POR ROTA, não uma lista global
+    única** (achado real de `@codex review`, P2, 18ª rodada —
+    `chatbot-triagem` só processa mídia de `audio`, `index.ts:1033-1040`;
+    `chatbot-financeiro` só processa `image`/`document`; a lista global
+    deixaria imagem passar pro número de triagem, ou áudio pro
+    financeiro, chegando no handler errado sem texto nem mídia
+    utilizável — mesmo efeito de sessão avançando com entrada vazia que
+    o filtro pretende evitar). Aplicar o filtro de tipo DEPOIS de
+    resolver o destino (`phone_number_id` → chatbot), com a allowlist
+    certa pra cada um: `{text, audio}` pra `chatbot-triagem`,
+    `{text, image, document}` pra `chatbot-financeiro`.
 - [ ] Resolve `igreja_id`/`filial_id` e destino via `phone_number_id` já
   extraído — **não** por palavra-chave (roteamento real do Make é por
   número, confirmado no export; não existe lógica de keyword).
@@ -379,7 +389,18 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
        RPCs canônicas `fin_*` chamadas por `criarLancamento`/
        `criarTransferencia` (despesa/conta única/transferência) — mesmo
        padrão de conflito-de-unicidade = já processado, retorna
-       resultado anterior. Pra `chatbot-triagem`: **registro append-only
+       resultado anterior. **`criarLancamento` roda em LOOP, um `wamid`
+       cru não serve de chave** (achado real de `@codex review`, P1,
+       18ª rodada — uma confirmação de DESPESA/CONTA_ÚNICA com vários
+       comprovantes itera `metaDados.itens` chamando `criarLancamento`
+       uma vez por item, `index.ts:1676-1714`; passar o MESMO `wamid`
+       pra cada chamada do loop rejeita todo item depois do 1º [se a
+       unicidade for estrita] ou permite duplicar itens já criados numa
+       retentativa no meio do loop [se for frouxa]). Chave composta
+       `wamid + item_id/índice` por item, não `wamid` sozinho — cada
+       item do lote tem sua própria idempotência, todos os N itens
+       pretendidos são criados uma vez, e uma retentativa reproduz só
+       os que faltaram. Pra `chatbot-triagem`: **registro append-only
        por `wamid`, não campo na sessão mutável** (achado real de
        `@codex review`, P1, 16ª rodada — `atendimentos_bot` é a MESMA
        row reusada por toda mensagem da conversa; gravar `wamid` nela
