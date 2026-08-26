@@ -168,9 +168,19 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   passo financeiro errado. Precisa de uma chave de ordenação/lease
   adicional por CONVERSA (`igreja_id`+`filial_id`+`phone_number_id`+
   `telefone`, não `wamid`) — a `whatsapp-webhook` só invoca o chatbot
-  depois de conseguir esse lock de conversa (mesmo padrão de fencing:
-  se já tem alguém processando essa conversa, espera ou enfileira,
-  nunca despacha em paralelo pro mesmo par número+telefone).
+  depois de conseguir esse lock de conversa. **Exclusão mútua sozinha
+  não basta — precisa ser FIFO pela ordem real de chegada** (achado
+  real de `@codex review`, P1, 9ª rodada: um lock/lease simples só
+  garante "um de cada vez", não "na ordem certa" — se as mensagens A
+  (mandada primeiro) e B (mandada depois) chegam concorrentes, quem
+  ganha o lease primeiro processa primeiro, então B pode avançar a
+  sessão financeira antes de A mesmo tendo chegado depois; "espera ou
+  enfileira" sem fila ordenada deixa até um retry ultrapassar trabalho
+  mais antigo). Usar uma fila durável por conversa, ordenada pelo
+  timestamp/sequência real de chegada (`value.messages[].timestamp` da
+  Meta, não hora de processamento) — quem chega primeiro na fila
+  processa primeiro, mesmo que outra mensagem da mesma conversa
+  consiga o lock técnico antes.
 - [ ] **Deduplica por `wamid` (`value.messages[].id`) antes de chamar
   qualquer chatbot — máquina de estado com fencing, não claim binário**
   (achado real de `@codex review`, P1 — promovido de "fora de escopo"
@@ -268,19 +278,37 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
        5xx/timeout — deixa a própria Meta reentregar mais tarde; quando
        reentregar, ou acha `completed` (deu certo, responde 200 à toa
        mas sem efeito) ou acha o lease expirado e reclama pra valer.
-  5. **Idempotência não pode viver só no orquestrador** (achado real de
-     `@codex review`, P1, 4ª rodada: se a resposta HTTP do chatbot se
-     perder na rede, ou a `whatsapp-webhook` cair entre receber a
-     resposta e gravar `chatbot_done`, o lease depois reclama
-     `processing` e invoca o chatbot de novo — mas ele já pode ter
-     comprometido a operação financeira/sessão na 1ª tentativa cuja
-     resposta se perdeu; o orquestrador sozinho não tem como saber
-     disso). Propagar `wamid` como campo de entrada pra
-     `chatbot-triagem`/`chatbot-financeiro`, e cada uma delas checar
-     (de forma leve, atômica, junto do próprio commit do efeito
-     colateral) se já processou esse `wamid` antes de repetir a
-     operação — pequena mudança de contrato de entrada + 1 check de
-     idempotência interno, não reescrita de lógica de negócio.
+  5. **Idempotência não pode viver só no orquestrador — mas cobertura
+     100% de todo efeito colateral é maior que o escopo da Fase 1**
+     (achado real de `@codex review`, P1, 4ª e 9ª rodadas). Se a
+     resposta HTTP do chatbot se perder, ou a `whatsapp-webhook` cair
+     entre receber a resposta e gravar `chatbot_done`, o lease depois
+     reclama `processing` e invoca o chatbot de novo — mas ele já pode
+     ter comprometido efeito colateral na 1ª tentativa cuja resposta se
+     perdeu. **Decisão de escopo explícita**: nem `chatbot-financeiro`
+     nem `chatbot-triagem` têm hoje um único commit transacional que
+     cubra todo o fluxo — `chatbot-financeiro` faz upload no Storage
+     (`index.ts:216`) e depois inserts separados em
+     `solicitacoes_reembolso`/`itens_reembolso` (`index.ts:1984,2028`);
+     `chatbot-triagem` grava em `pedidos_oracao`/`testemunhos`/
+     `atendimentos_pastorais` conforme a intenção classificada
+     (`index.ts:1438-1505`) e só depois atualiza a sessão. Cobrir
+     idempotência de TODO efeito individual (outbox pattern ou RPC
+     única envolvendo Storage + múltiplos inserts) é reescrita de
+     lógica de negócio de verdade — fora do escopo desta fase, vira
+     fast-follow (ver §Fora de escopo).
+     - **Mitigação mínima da Fase 1, escopo aditivo (não reescrita)**:
+       guarda de idempotência só no PRIMEIRO write de cada fluxo — o
+       ponto onde o efeito colateral mais caro (duplicar uma
+       solicitação de reembolso, duplicar registro pastoral) se torna
+       visível. Adicionar coluna `wamid` + constraint de unicidade em
+       `solicitacoes_reembolso` (ponto de entrada do fluxo financeiro)
+       e checar/gravar `wamid` na sessão (`atendimentos_bot`) antes do
+       branch de gravação por intenção em `chatbot-triagem`; conflito
+       de unicidade = já processado, retorna resultado anterior em vez
+       de duplicar. Não fecha 100% (upload de Storage isolado ainda
+       pode duplicar em teoria), mas fecha o pior caso (duplicar
+       registro financeiro/pastoral) com mudança pequena e localizada.
 
   O dedupe de 5s por conteúdo que já existe dentro de `chatbot-triagem`
   fica como está (defesa em profundidade adicional), mas não é
@@ -334,9 +362,9 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
 
 - [ ] Deployar e testar isoladamente handshake `GET` + POST sintético,
   antes de tocar em qualquer configuração do Meta.
-- [ ] Rodar os 8 cenários de teste da ADR-033 (§Validação — inclui o
-  reenvio de `wamid` simulado, achado de `@codex review`) contra a nova
-  função.
+- [ ] Rodar os 9 cenários de teste da ADR-033 (§Validação — inclui
+  reenvio de `wamid` simulado com 2 sessões reais e lock por conversa,
+  achados de `@codex review`) contra a nova função.
 - [ ] Trocar a URL do webhook no Meta Business Manager (de Make pra
   Supabase) — **sem apagar** o scenario "Waba Chatbot - OakOS" no Make,
   só desligar.
@@ -385,6 +413,13 @@ bake period terminou).
   reenviar às cegas (achado de `@codex review`, 8ª rodada) — Fase 1
   trata isso como alerta manual, não reenvio automático; ver Passo 1
   item de dedup.
+- **Idempotência transacional completa em `chatbot-financeiro`/
+  `chatbot-triagem`** (outbox pattern, ou RPC única cobrindo Storage +
+  todos os inserts do fluxo) — achado real de `@codex review`, 9ª
+  rodada. Fase 1 entra só com a mitigação mínima (guarda de unicidade
+  no primeiro write de cada fluxo, ver Passo 1 item 5); cobertura de
+  100% dos efeitos colaterais individuais é reescrita de lógica de
+  negócio de verdade, fora do escopo desta fase.
 - Mover roteamento (hoje array fixo por `phone_number_id`) pra tabela
   configurável — só se precisar ajustar sem deploy.
 

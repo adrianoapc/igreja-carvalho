@@ -206,7 +206,13 @@ de qualquer decisão — Fase 3, ver plano.
    `phone_number_id`+`telefone`) pra serializar mensagens DIFERENTES da
    mesma conversa entregues em paralelo — sem isso, duas mensagens reais
    do mesmo usuário podem invocar o chatbot concorrentemente e
-   corromper `atendimentos_bot` (sem lock hoje). Tabela de dedupe/
+   corromper `atendimentos_bot` (sem lock hoje) — precisa ser FIFO pela
+   ordem real de chegada, não só exclusão mútua (senão uma mensagem
+   mais nova processa antes de uma mais velha da mesma conversa).
+   Idempotência transacional 100% (Storage + múltiplos inserts em cada
+   chatbot) é maior que o escopo desta fase — Fase 1 entra só com
+   guarda de unicidade no primeiro write de cada fluxo, cobertura
+   completa fica fast-follow. Tabela de dedupe/
    entrega é acesso `service_role`-only, sem SELECT via PostgREST pra
    ninguém (mesmo risco de vazamento cross-tenant do Passo 3, numa
    tabela nova). Reconciliação de entrega incerta (`"enviando"` com
