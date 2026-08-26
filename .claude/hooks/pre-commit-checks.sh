@@ -34,11 +34,33 @@ if ! npx tsc --noEmit; then
   FAIL_MSGS+=("npx tsc --noEmit falhou")
 fi
 
-STAGED_TESTS=$(git diff --cached --name-only --diff-filter=ACMR -- '*.test.ts' 2>/dev/null | grep '^supabase/functions/' || true)
-if [ -n "$STAGED_TESTS" ]; then
-  echo "[pre-commit-checks] Testes deno staged: $STAGED_TESTS" >&2
-  if ! deno test $STAGED_TESTS; then
-    FAIL_MSGS+=("deno test falhou em: $STAGED_TESTS")
+# Roda o teste existente também quando o MÓDULO de produção muda, não só
+# quando o próprio arquivo .test.ts está staged (achado real de @codex
+# review: mudar só getnetExtratoParser.ts sem tocar
+# getnetExtratoParser.test.ts deixava STAGED_TESTS vazio e nenhum teste
+# rodava, mesmo com cobertura existente pra esse módulo exato).
+STAGED_FN_TS=$(git diff --cached --name-only --diff-filter=ACMR -- 'supabase/functions/*.ts' 'supabase/functions/**/*.ts' 2>/dev/null || true)
+TESTS_TO_RUN=""
+while IFS= read -r file; do
+  [ -z "$file" ] && continue
+  case "$file" in
+    *.test.ts)
+      TESTS_TO_RUN="$TESTS_TO_RUN
+$file"
+      ;;
+    *.ts)
+      candidate="${file%.ts}.test.ts"
+      [ -f "$candidate" ] && TESTS_TO_RUN="$TESTS_TO_RUN
+$candidate"
+      ;;
+  esac
+done <<< "$STAGED_FN_TS"
+TESTS_TO_RUN=$(printf '%s\n' "$TESTS_TO_RUN" | grep -v '^$' | sort -u)
+
+if [ -n "$TESTS_TO_RUN" ]; then
+  echo "[pre-commit-checks] Testes deno a rodar: $TESTS_TO_RUN" >&2
+  if ! deno test $TESTS_TO_RUN; then
+    FAIL_MSGS+=("deno test falhou em: $TESTS_TO_RUN")
   fi
 fi
 

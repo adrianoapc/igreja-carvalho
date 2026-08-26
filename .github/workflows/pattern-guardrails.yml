@@ -116,7 +116,11 @@ jobs:
               ctx_start=$(( lineno > 10 ? lineno - 10 : 1 ))
               ctx_end=$(( lineno + 3 ))
               ctx=$(sed -n "${ctx_start},${ctx_end}p" "$f")
-              echo "$ctx" | grep -qE '\.from\(|supabase[A-Za-z]*\.' || continue
+              # .from\(["'] exige aspas logo após o parêntese — bate em
+              # .from("tabela") do Supabase, não em Array.from(x) (achado
+              # real de @codex review: Array.from(selectedChildren) perto
+              # de um Set.delete() qualquer disparava falso positivo).
+              echo "$ctx" | grep -qE '\.from\(["'"'"']|supabase[A-Za-z]*\.' || continue
               start=$(( lineno > 3 ? lineno - 3 : 1 ))
               end=$(( lineno + 8 ))
               window=$(sed -n "${start},${end}p" "$f")
