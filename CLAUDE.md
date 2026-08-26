@@ -17,21 +17,25 @@ de cada padrão no próprio arquivo). Resumo:
   `.claude/settings.json`) — bloqueia `git commit` se falhar. Só vale
   dentro de sessão Claude Code com esse settings.json carregado; não
   substitui CI.
-- **CI (`pattern-guardrails.yml`, `migration-harness.yml`) é o gate real**,
-  independente de ferramenta: grep bloqueando padrões de bug já
-  recorrentes (`.eq("filial_id"` sem `.or(...is.null)`,
+- **CI (`pattern-guardrails.yml`) é o gate real**, independente de
+  ferramenta: grep só nas linhas adicionadas pelo diff, bloqueando
+  padrões de bug já recorrentes (`.eq("filial_id"` sem `.or(...is.null)`,
   `.delete()`/`.update()` sem `{count:"exact"}`, `STATUS_COLOR` como
-  `color:`) e harness de Postgres aplicando toda migration do zero antes
-  do merge, não só depois via `supabase-deploy.yml`.
+  `color:`). `migration-harness.yml` (harness de Postgres aplicando toda
+  migration do zero antes do merge) foi desenhado mas **retirado** — a
+  história de migrations tem drift conhecido (`itens_reembolso` nunca
+  criada, `times_culto` referenciada após removida) que faz `supabase db
+  reset` falhar sempre; corrigir isso é sessão dedicada, nunca resetando/
+  dropando/truncando prod.
 - **Gráfico novo**: usar `src/lib/chartPalette.ts` (série categórica) ou
   `statusPalette.ts` (pill/status) — nunca hex hardcoded. Consultar a
   skill `dataviz` pra paleta sequencial/divergente ou forma de gráfico.
   8+ paletas hex divergentes já foram achadas espalhadas por dashboards
   antes desse guardrail existir.
 - **`main` tem branch protection**: sem push direto, PR obrigatória,
-  status checks (`docs_guard`, `pattern_guardrails`, `migration_harness`)
-  precisam passar. Não exige aprovação humana (projeto mantido por 1
-  dev) — o gate é CI verde, não review de terceiro.
+  status checks (`docs_guard`, `pattern_guardrails`) precisam passar. Não
+  exige aprovação humana (projeto mantido por 1 dev) — o gate é CI verde,
+  não review de terceiro.
 
 # Guardrails — módulo financeiro
 

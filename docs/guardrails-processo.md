@@ -25,11 +25,11 @@ hipotético:
 
 | Padrão | PRs onde apareceu | Guardrail que fecha |
 |---|---|---|
-| `has_filial_access()`/RLS sem `FOR`/`TO`, 3 "fixes finais" separados em 12 dias | #97, #98, #118, #124-132 (15+) | `migration-harness.yml` |
+| `has_filial_access()`/RLS sem `FOR`/`TO`, 3 "fixes finais" separados em 12 dias | #97, #98, #118, #124-132 (15+) | Não fechado ainda — harness bloqueado, ver §Fora de escopo |
 | `.eq("filial_id")` escondendo recurso compartilhado, mesmo bug 3x | #82, #92, #95, #97, #103 | `pattern-guardrails.yml` |
 | Delete/update com sucesso falso quando RLS nega (`error:null`) | #126 | `pattern-guardrails.yml` |
 | `STATUS_COLOR` usado como `color:` (falha WCAG) | #114 | `pattern-guardrails.yml` + `chartPalette.ts` |
-| Migration/deploy falha silenciosa (timestamp, `ALTER POLICY` em coluna inexistente) | #85, #116, #119, #128 | `migration-harness.yml` |
+| Migration/deploy falha silenciosa (timestamp, `ALTER POLICY` em coluna inexistente) | #85, #116, #119, #128 | Não fechado ainda — harness bloqueado, ver §Fora de escopo |
 | Integração inteira quebrada só achada em produção (PIX, cron) | #101, #106-109 | Não automatizado ainda — ver §Fora de escopo |
 | `docs-guard.yml` FIX MODE nunca ativa (`PR_LABELS` via `.*.name` vira `"Array"`) | achado em memória de sessão, confirmado 2026-08-26 | Corrigido direto no workflow |
 
@@ -46,20 +46,39 @@ de série de gráfico.
   (`PR_LABELS` via `.*.name` serializava como a string `"Array"`; agora
   resolvido via `contains()` do próprio GitHub Actions, passado por env
   var já avaliada).
-- **`pattern-guardrails.yml`** (novo): grep puro nos arquivos mudados de
-  cada PR, bloqueando os 3 padrões da tabela acima que são detectáveis
-  por regex — `.eq("filial_id"` sem `.or(...is.null)`, `.delete()`/
-  `.update()` sem `{count:"exact"}`, `STATUS_COLOR` usado como `color:`.
-  Escapes explícitos via comentário (`// filial-global-ok`,
-  `// count-exact-ok`) pra falso positivo legítimo. Também avisa
-  (não bloqueia) sobre hex hardcoded em componente de dashboard/chart.
-- **`migration-harness.yml`** (novo): em toda PR que toca
-  `supabase/migrations/**`, sobe um Supabase local (Docker,
-  `supabase start` + `supabase db reset`) e aplica TODAS as migrations do
-  zero — hoje isso só acontecia em `supabase-deploy.yml`, DEPOIS do
-  merge, direto contra o projeto real. Também audita (aviso, não bloqueio
-  — muitas policies `{public}` são legítimas) policies com
-  `roles={public}`, sinal de `CREATE POLICY` sem `TO` explícito.
+- **`pattern-guardrails.yml`** (novo): grep só nas **linhas adicionadas**
+  pelo diff da PR (não o arquivo inteiro — a 1ª versão escaneava o
+  arquivo completo, achado real de `@codex review` na própria PR #134:
+  já existem 88 arquivos com `.eq("filial_id"...)` sem anotação, então
+  escanear o arquivo inteiro bloquearia qualquer edição futura neles
+  mesmo sem tocar a linha problemática), bloqueando os 3 padrões da
+  tabela acima — `.eq("filial_id"` sem `.or(...is.null)`, `.delete()`/
+  `.update()` sem `{count:"exact"}` (cobre chain multi-linha, ex.
+  `.from("x")` numa linha e `.delete(...)` na próxima — achado real na
+  mesma review), `STATUS_COLOR` usado como `color:`. Escapes explícitos
+  via comentário (`// filial-global-ok`, `// count-exact-ok`) pra falso
+  positivo legítimo. Também avisa (não bloqueia) sobre hex hardcoded em
+  componente de dashboard/chart.
+  **Limite conhecido, não fechado**: o check de `{count:"exact"}` só
+  confirma que a opção existe por perto, não que o código realmente lê e
+  rejeita `count===0` — um call site que passa a opção mas ignora o
+  valor retornado passa no guardrail com o bug original ainda vivo.
+
+**`migration-harness.yml` foi retirado desta rodada.** A ideia (subir
+Supabase local via Docker e aplicar todas as migrations do zero antes do
+merge) segue válida, mas a própria `@codex review` da PR #134 achou que
+a história de migrations do repo já está com drift documentado (`AGENTS.md`
+§"Local Supabase is NOT reproducible from committed migrations": `public.
+itens_reembolso` nunca foi criada por nenhuma migration — só existe em
+produção — e `public.times_culto` é referenciada por uma migration
+posterior à que a removeu). Isso faz `supabase db reset` falhar sempre,
+em ~166 das 421 migrations, independente do que a PR mude — um workflow
+assim ficaria vermelho pra sempre e treinaria a ignorar CI vermelho,
+o oposto do objetivo. Corrigir isso exige puxar o schema real de produção
+com cuidado antes de escrever qualquer migration de cauda — **nunca**
+resetar/dropar/truncar tabela de produção; se precisar recriar algo,
+o caminho é renomear a atual, criar a nova e reinserir os dados. Fica pra
+sessão dedicada — ver §Fora de escopo.
 
 Nenhum desses substitui `/code-review` ou `/security-review` — são grep e
 harness determinístico, sem julgamento. Continuam pegando só o que já se
@@ -90,14 +109,23 @@ sequencial/divergente ou heurística de forma de gráfico.
   confiável que `/code-review`/`/security-review` rodaram, então isso é
   aviso (`systemMessage`), não gate artificial.
 
-**Limite importante**: hooks do Claude Code só disparam dentro de uma
-sessão Claude Code com este `.claude/settings.json` carregado — não
-protegem contra um `git commit`/`gh pr create` direto no terminal, nem
-contra outra ferramenta. Por isso o gate real e definitivo continua sendo
-o CI (`pattern-guardrails.yml`, `migration-harness.yml`) + branch
-protection, não os hooks. Os hooks são a primeira linha (feedback mais
-rápido, antes até de existir commit), o CI é a linha que não depende de
-qual ferramenta foi usada pra escrever o código.
+**Limites conhecidos, não fechados** (achados de `@codex review` na
+própria PR #134):
+- Hooks do Claude Code só disparam dentro de uma sessão Claude Code com
+  este `.claude/settings.json` carregado — não protegem contra um
+  `git commit`/`gh pr create` direto no terminal, nem contra outra
+  ferramenta. Por isso o gate real e definitivo continua sendo o CI
+  (`pattern-guardrails.yml`) + branch protection, não os hooks. Os hooks
+  são a primeira linha (feedback mais rápido, antes até de existir
+  commit), o CI é a linha que não depende de qual ferramenta foi usada.
+- `pre-commit-checks.sh` roda eslint/tsc contra o **working tree**, não
+  contra o snapshot exato que está staged — com staging parcial (`git add
+  -p`), uma correção não-staged pode fazer o check passar enquanto o
+  commit registra a versão staged ainda quebrada.
+- Se o comando for `git -C <outro-dir> commit`, o matcher dispara mas
+  `git diff --cached`/eslint/tsc continuam rodando no cwd original, não
+  em `<outro-dir>` — o hook pode aprovar um commit em outro checkout
+  (ex: `.claude/worktrees/`) usando o índice/arquivos do repo raiz.
 
 ### PR template — `.github/pull_request_template.md`
 
@@ -114,14 +142,8 @@ Ativada em 2026-08-26 via `gh api .../branches/main/protection`. Configurado:
   pra admin/dono do repo (`enforce_admins: true`) — a falha achada na
   auditoria era exatamente "nada bloqueia ninguém, nem quem está
   mergeando", então isolar o dono da regra reproduziria o mesmo buraco.
-- Status checks obrigatórios: **`docs_guard`, `pattern_guardrails`**.
-  `migration_harness` fica de FORA da lista de obrigatórios de propósito:
-  o trigger dele tem `paths: supabase/migrations/**`, então o job
-  simplesmente não roda em PR que não toca migration — se ele fosse
-  "required", o GitHub trava esperando um status que nunca chega,
-  bloqueando toda PR sem migration pra sempre. `migration_harness`
-  continua rodando e reportando normalmente quando aplicável, só não é
-  um requisito de merge.
+- Status checks obrigatórios: **`docs_guard`, `pattern_guardrails`**. Não
+  há `migration_harness` — foi retirado desta rodada (ver acima).
 - Conversas de review precisam estar resolvidas antes de merge
   (`required_conversation_resolution`).
 - Sem force-push, sem deleção da branch.
@@ -132,14 +154,28 @@ Deliberadamente **não** exige aprovação humana (≥1 reviewer) — projeto é
 mantido por 1 dev; exigir isso bloquearia todo merge. O gate real é
 status check verde, não aprovação de terceiro.
 
-**Se `migration_harness` precisar virar obrigatório no futuro**: só dá
-pra fazer com segurança removendo o `paths:` filter do trigger e movendo
-o filtro pra dentro do job (um `if:` que faz o job reportar sucesso
-imediato quando nenhuma migration mudou) — só então o check sempre
-reporta status e pode entrar em `required_status_checks`.
+**Quando `migration-harness.yml` voltar** (depois da sessão dedicada que
+corrigir o drift de migrations): reintroduzir sem `paths:` filter no
+trigger, com o filtro movido pra dentro do job (um `if:` que reporta
+sucesso imediato quando nenhuma migration mudou) — só assim o check
+sempre reporta status e pode entrar em `required_status_checks` com
+segurança.
 
 ## Fora de escopo (não fechado nesta rodada)
 
+- **Drift de migrations impedindo `supabase db reset` do zero** (bloqueia
+  `migration-harness.yml`) — `public.itens_reembolso` nunca foi criada
+  por nenhuma migration (só existe em produção) e `public.times_culto` é
+  referenciada por uma migration posterior à que a removeu, ver `AGENTS.md`
+  §"Local Supabase is NOT reproducible from committed migrations".
+  Corrigir exige puxar o schema real de produção com cuidado antes de
+  escrever a migration de cauda (provavelmente `CREATE TABLE IF NOT
+  EXISTS itens_reembolso ...` + tornar o `ALTER TABLE ... times_culto`
+  condicional). **Regra explícita do usuário pra essa correção: nunca
+  resetar, dropar ou truncar tabela de produção — se precisar recriar
+  algo, o caminho é renomear a tabela atual, criar a nova e reinserir os
+  dados.** Fica pra sessão dedicada, com leitura read-only do schema real
+  antes de qualquer escrita.
 - **Smoke-test sintético agendado** pra integrações externas (PIX, cron,
   WhatsApp) — os incidentes #101/#106-109 ("nunca funcionou", só
   descoberto em produção) não são pegos por nenhum guardrail acima, que

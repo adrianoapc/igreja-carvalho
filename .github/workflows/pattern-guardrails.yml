@@ -10,6 +10,12 @@ name: Pattern Guardrails
 #     falha WCAG 3:1 (PR #114)
 # Isso é grep puro, sem custo de LLM — não substitui /code-review nem
 # /security-review, só pega o que já se repetiu e é detectável por regex.
+#
+# Só escaneia LINHAS ADICIONADAS pelo diff da PR, não o arquivo inteiro —
+# achado real de @codex review na própria PR que introduziu este workflow
+# (#134): já existem ~88 arquivos com .eq("filial_id"...) sem anotação;
+# escanear o arquivo inteiro bloquearia qualquer edição futura neles, até
+# uma que não toque a linha problemática.
 
 on:
   pull_request:
@@ -20,6 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Get changed files
         id: changed
@@ -30,8 +38,10 @@ jobs:
             src/**/*.tsx
             supabase/functions/**/*.ts
 
-      - name: Scan for known-bug patterns
+      - name: Scan added lines for known-bug patterns
         shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -uo pipefail
 
@@ -50,6 +60,17 @@ jobs:
           for f in $changed; do
             [ -f "$f" ] || continue
 
+            # Linhas que a PR realmente ADICIONOU neste arquivo (número na
+            # versão nova). Padrão pré-existente no arquivo nunca aparece
+            # aqui, então nunca bloqueia uma PR que não o tocou.
+            ADDED_LINES=$(git diff -U0 "$BASE_SHA"...HEAD -- "$f" 2>/dev/null \
+              | grep -oP '^@@ -[0-9]+(,[0-9]+)? \+\K[0-9]+(,[0-9]+)?(?= @@)' \
+              | awk -F, '{start=$1; count=($2==""?1:$2); for(i=0;i<count;i++) print start+i}')
+
+            if [ -z "$ADDED_LINES" ]; then
+              continue
+            fi
+
             # ------------------------------------------------------------
             # 1) .eq("filial_id" sem .or(...is.null) por perto — esconde
             #    recurso compartilhado (filial_id IS NULL). PRs #82/#92/
@@ -57,6 +78,7 @@ jobs:
             # ------------------------------------------------------------
             while IFS=: read -r lineno _; do
               [ -z "$lineno" ] && continue
+              echo "$ADDED_LINES" | grep -qx "$lineno" || continue
               start=$(( lineno > 5 ? lineno - 5 : 1 ))
               end=$(( lineno + 5 ))
               window=$(sed -n "${start},${end}p" "$f")
@@ -67,36 +89,46 @@ jobs:
             done < <(grep -n '\.eq(["'"'"']filial_id["'"'"']' "$f" || true)
 
             # ------------------------------------------------------------
-            # 2) .delete()/.update() do supabase sem { count: "exact" } —
+            # 2) .delete()/.update() do Supabase sem { count: "exact" } —
             #    sucesso falso quando RLS nega silenciosamente. PR #126.
+            #    Contexto amplo (10 linhas antes) detecta chain multi-linha
+            #    tipo .from("x") numa linha e .delete(...) na próxima —
+            #    achado real de @codex review, a 1ª versão só olhava a
+            #    mesma linha e perdia esse formato (o mais comum no repo).
             # ------------------------------------------------------------
             while IFS=: read -r lineno _; do
               [ -z "$lineno" ] && continue
+              echo "$ADDED_LINES" | grep -qx "$lineno" || continue
+              ctx_start=$(( lineno > 10 ? lineno - 10 : 1 ))
+              ctx_end=$(( lineno + 3 ))
+              ctx=$(sed -n "${ctx_start},${ctx_end}p" "$f")
+              echo "$ctx" | grep -qE '\.from\(|supabase[A-Za-z]*\.' || continue
               start=$(( lineno > 3 ? lineno - 3 : 1 ))
               end=$(( lineno + 8 ))
               window=$(sed -n "${start},${end}p" "$f")
               if ! echo "$window" | grep -q 'count:\s*["'"'"']exact["'"'"']\|// count-exact-ok'; then
-                echo "::error file=$f,line=$lineno::.delete()/.update() do Supabase sem { count: \"exact\" } por perto — se o RLS negar, a call retorna error:null/0 linhas e o código pode reportar sucesso falso (achado real: PR #126, Todos.tsx/Fornecedores.tsx). Adicione { count: \"exact\" } e cheque o count, ou // count-exact-ok se a call já é auto-limitada por PK/id único."
+                echo "::error file=$f,line=$lineno::.delete()/.update() do Supabase sem { count: \"exact\" } por perto — se o RLS negar, a call retorna error:null/0 linhas e o código pode reportar sucesso falso (achado real: PR #126, Todos.tsx/Fornecedores.tsx). Adicione { count: \"exact\" } e cheque o count (não só error), ou // count-exact-ok se a call já é auto-limitada por PK/id único."
                 FAIL=1
               fi
-            done < <(grep -nE '\.(delete|update)\(' "$f" | grep -iE 'supabase|from\(' || true)
+            done < <(grep -nE '\.(delete|update)\(' "$f" || true)
 
             # ------------------------------------------------------------
             # 3) STATUS_COLOR usado como `color` de texto (não fundo de
             #    pill) — falha WCAG 3:1 em card claro. PR #114.
             # ------------------------------------------------------------
-            if grep -nE 'color:\s*STATUS_COLOR' "$f" >/dev/null 2>&1; then
-              grep -nE 'color:\s*STATUS_COLOR' "$f" | while IFS=: read -r lineno _; do
-                echo "::error file=$f,line=$lineno::STATUS_COLOR é cor de FUNDO de pill, não tinta de texto — usar como \`color:\` falha contraste WCAG 3:1 em card claro (achado real: PR #114). Use pillStyle(tone) de statusPalette.ts."
-              done
+            while IFS=: read -r lineno _; do
+              [ -z "$lineno" ] && continue
+              echo "$ADDED_LINES" | grep -qx "$lineno" || continue
+              echo "::error file=$f,line=$lineno::STATUS_COLOR é cor de FUNDO de pill, não tinta de texto — usar como \`color:\` falha contraste WCAG 3:1 em card claro (achado real: PR #114). Use pillStyle(tone) de statusPalette.ts."
               FAIL=1
-            fi
+            done < <(grep -nE 'color:\s*STATUS_COLOR' "$f" || true)
           done
 
           # ------------------------------------------------------------
           # 4) Aviso (não bloqueia): hex fixo em array de cores de gráfico,
           #    em vez de chartPalette.ts. Heurística ruidosa de propósito —
-          #    só avisa, não falha o job.
+          #    só avisa, não falha o job. Não restrito a linha adicionada
+          #    (é aviso, não bloqueio — não há custo de falso positivo).
           # ------------------------------------------------------------
           for f in $changed; do
             [ -f "$f" ] || continue
@@ -111,8 +143,8 @@ jobs:
 
           if [ "$FAIL" -eq 1 ]; then
             echo ""
-            echo "::error::Padrões de bug conhecido encontrados. Corrija ou adicione o comentário de escape explícito se for falso positivo."
+            echo "::error::Padrões de bug conhecido encontrados (nas linhas adicionadas por esta PR). Corrija ou adicione o comentário de escape explícito se for falso positivo."
             exit 1
           fi
 
-          echo "Nenhum padrão de bug conhecido encontrado."
+          echo "Nenhum padrão de bug conhecido encontrado nas linhas adicionadas."
