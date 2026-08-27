@@ -220,7 +220,7 @@ de qualquer decisão — Fase 3, ver plano.
    — falta webhook de status de entrega da Meta pra fazer isso com
    segurança, fica como fast-follow.
    Ver plano de execução §Passo 1 pro desenho completo.
-⚠️ Escopo real (6+ cenários Make, não 1) é maior que o assumido
+⚠️ Escopo real (8 cenários Make, não 1) é maior que o assumido
    originalmente — plano precisa ser fatiado em fases já reconhecendo isso
 
 ### Neutras
@@ -234,7 +234,7 @@ de qualquer decisão — Fase 3, ver plano.
 ❌ **Rejeitada**: não resolve custo nem ponto de falha externo; toda a
 lógica de negócio já está no Supabase, o Make não agrega nada.
 
-### 2. Migrar tudo de uma vez (todos os 6+ cenários numa PR)
+### 2. Migrar tudo de uma vez (todos os 8 cenários numa PR)
 ❌ **Rejeitada**: viola o guardrail de "1 fase = 1 PR"; o escopo real só
 foi descoberto validando blueprint por blueprint — cenários ainda não
 exportados (Liturgia, check-in geo) não podem entrar numa PR sem

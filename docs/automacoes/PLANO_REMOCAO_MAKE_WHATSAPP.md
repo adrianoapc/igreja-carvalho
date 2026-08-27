@@ -14,7 +14,7 @@ como ponto de entrada/saída entre a Meta WhatsApp Cloud API e as Edge
 Functions do Supabase, sem reescrever a lógica de negócio já validada
 (sessão, triagem por IA, financeiro).
 
-Este plano cobre **6+ cenários Make diferentes**, descobertos validando
+Este plano cobre **8 cenários Make diferentes**, descobertos validando
 blueprint real por blueprint contra o código nesta sessão — não é 1 fluxo
 único. Por isso está fatiado em fases, cada uma = 1 PR, seguindo o
 guardrail do projeto.
@@ -90,10 +90,12 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
     `value` batchado tem mensagens de VÁRIOS remetentes diferentes,
     pegar `contacts[]` sem correlacionar por índice/posição pode
     associar o nome de uma pessoa ao número de outra;
-    `MAKE_WHATSAPP_PHONE_NUMBER_ID.md:65-73` documenta que a chave de
-    correlação certa é `contacts[].wa_id === messages[].from`, e os
-    dois chatbots persistem/usam `nome_perfil` em registro financeiro/
-    pastoral — o mismatch contamina esses registros)
+    `MAKE_WHATSAPP_PHONE_NUMBER_ID.md:65-73` mostra um exemplo de payload
+    da Meta com `contacts[]` e `messages[]` lado a lado — não é uma regra
+    em prosa, mas o próprio formato do envelope já deixa claro que a
+    correlação certa é por `contacts[].wa_id === messages[].from`, não
+    posição no array; os dois chatbots persistem/usam `nome_perfil` em
+    registro financeiro/pastoral — o mismatch contamina esses registros)
   - **`origem_canal: "whatsapp_financeiro"` fixo pro número financeiro**
     (achado real de `@codex review`, P1, 17ª rodada — o Make hoje já
     manda esse valor, `MAKE_WHATSAPP_PHONE_NUMBER_ID.md:195-205`, e
@@ -223,16 +225,35 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   passo financeiro errado. Precisa de uma chave de ordenação/lease
   adicional por CONVERSA (`igreja_id`+`filial_id`+`phone_number_id`+
   `telefone`, não `wamid`) — a `whatsapp-webhook` só invoca o chatbot
-  depois de conseguir esse lock de conversa. **`filial_id` nullable
+  depois de conseguir esse lock de conversa. **Mesma exigência de acesso
+  da tabela de dedup por `wamid` (item abaixo) se aplica aqui: sem
+  SELECT nenhum via PostgREST, nem pra admin, nem pra super_admin** —
+  essa tabela também carrega telefone (e indiretamente correlaciona com
+  conteúdo de conversa via o `wamid` que está sendo processado no
+  momento); é estado interno só do orquestrador, RLS sem nenhuma policy
+  de SELECT (ou `REVOKE ALL ... FROM PUBLIC`, nunca só `FROM anon`, ver
+  CLAUDE.md), acesso só via `service_role` de dentro da própria
+  function — mesmo raciocínio do vazamento cross-tenant que o Passo 3
+  corrige em `edge_function_logs`. **`filial_id` nullable
   quebra a unicidade da chave — NULL não é igual a NULL num constraint
   padrão** (achado real de `@codex review`, P1, 22ª rodada:
-  `whatsapp_numeros.filial_id` é nullable de verdade, e o número
-  financeiro seedado em produção tem `filial_id=NULL`; um constraint
-  único comum trata cada NULL como distinto dos outros, então duas
-  mensagens da MESMA conversa num número sem filial [caso real, não
-  hipotético] criariam 2 rows de lock "únicas" e entrariam no chatbot
-  concorrentemente — exatamente o buraco que esse lock existe pra
-  fechar, mas só pro caso de número compartilhado entre filiais). Usar
+  `whatsapp_numeros.filial_id` é nullable de verdade — coluna aceita
+  `NULL` no schema. **Correção** [achado real de `/code-review` local]:
+  a 22ª rodada citou o número financeiro seedado com `filial_id=NULL`
+  como "caso real, não hipotético", mas a checagem contra o banco real
+  na 23ª rodada mostrou esse MESMO número com `filial_id` preenchido
+  (`86134a25-1dea-44df-9ccb-3350032ee8ab`) hoje — o seed nulo também
+  ficou desatualizado, igual ao `igreja_id`. O ponto arquitetural segue
+  válido (a coluna É nullable, algum outro número pode legitimamente
+  ter `filial_id=NULL` pra representar recurso compartilhado entre
+  filiais — mesmo padrão do resto do sistema, ver CLAUDE.md §Filial
+  compartilhada), só a alegação "é o caso real deste número específico
+  hoje" estava errada. Um constraint único comum trata cada `NULL` como
+  distinto dos outros, então duas mensagens da MESMA conversa num
+  número com filial nula (real ou futuro) criariam 2 rows de lock
+  "únicas" e entrariam no chatbot concorrentemente — o fix continua
+  necessário como defesa arquitetural, independente de qual número
+  específico está nulo hoje. Usar
   `UNIQUE NULLS NOT DISTINCT` nessa constraint (Postgres 15+), ou
   substituir o componente nullable por um sentinela não-nulo
   (`COALESCE(filial_id, '00000000-...')`) na chave calculada — nunca
@@ -312,14 +333,16 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      `owner_token=<novo uuid>`, `lease_until=now()+120s`. Em conflito
      (row já existe), só atualiza pra reclamar se `status=processing`
      E `lease_until < now()` (lease expirado) — vira dono novo com
-     `owner_token` novo. Toda escrita subsequente de estado exige
-     `WHERE wamid=... AND owner_token=$meu_token` (fencing — só quem
-     é dono corrente da vez consegue avançar o estado; um dono antigo
-     que "acordou" depois de perder o lease não consegue mais gravar
-     nada por cima de quem já reclamou). **Essa regra de transferência
-     de dono (só reclama se `processing` E lease expirado) vale só pro
-     estado `processing`** (achado real de `@codex review`, P1, 22ª
-     rodada — corrigindo o item 4 abaixo: como essa regra nunca deixa
+     `owner_token` novo. **Enquanto a row está em `processing`**, toda
+     escrita subsequente de estado exige `WHERE wamid=... AND
+     owner_token=$meu_token` (fencing — só quem é dono corrente da vez
+     consegue avançar o estado; um dono antigo que "acordou" depois de
+     perder o lease não consegue mais gravar nada por cima de quem já
+     reclamou) — **essa regra de fencing por `owner_token`, e a de
+     transferência de dono que a acompanha (só reclama se
+     `status=processing` E lease expirado), vale só pro estado
+     `processing`, não pros estados seguintes** (achado real de `@codex
+     review`, P1, 22ª rodada — corrigindo o item 4 abaixo: como essa regra nunca deixa
      alguém virar dono de uma row em `chatbot_done`, NENHUMA escrita
      condicionada a `owner_token` novo consegue afetar a row depois que
      o `processing` original terminou — o mecanismo de claim por item
@@ -449,9 +472,18 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      cubra todo o fluxo — `chatbot-financeiro` faz upload no Storage
      (`index.ts:216`) e depois inserts separados em
      `solicitacoes_reembolso`/`itens_reembolso` (`index.ts:1984,2028`);
-     `chatbot-triagem` grava em `pedidos_oracao`/`testemunhos`/
-     `atendimentos_pastorais` conforme a intenção classificada
-     (`index.ts:1438-1505`) e só depois atualiza a sessão. Cobrir
+     `chatbot-triagem` fecha a sessão pra `CONCLUIDO` PRIMEIRO
+     (`index.ts:1376-1387`) e só DEPOIS grava em `pedidos_oracao`/
+     `testemunhos`/`atendimentos_pastorais` conforme a intenção
+     classificada (`index.ts:1453-1517`) — achado real de `/code-review`
+     local corrigindo a ordem que uma rodada anterior tinha invertido.
+     Essa ordem real importa pro desenho de idempotência: um crash entre
+     o fechamento da sessão e o insert pastoral deixaria a sessão com
+     `status=CONCLUIDO` sem o registro pastoral ter sido gravado — por
+     isso o registro append-only de idempotência (item acima) não pode
+     inferir "já processado" a partir do status da sessão; só marca
+     `completed` depois que TODA a sequência (fechamento + insert)
+     terminar de verdade. Cobrir
      idempotência de TODO efeito individual (outbox pattern ou RPC
      única envolvendo Storage + múltiplos inserts) é reescrita de
      lógica de negócio de verdade — fora do escopo desta fase, vira
@@ -534,8 +566,6 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   tem que sair pelo MESMO `phone_number_id` já extraído da mensagem de
   entrada (`value.metadata.phone_number_id`, item de normalização do
   Passo 1) — nunca um novo lookup "primeiro número habilitado".
-- [ ] Registra a execução via `log_edge_function_with_metrics` (RPC já
-  existente) e responde 200 rápido pra Meta.
 - [ ] Registra a execução via `log_edge_function_with_metrics` (RPC já
   existente) e responde 200 rápido pra Meta.
 
