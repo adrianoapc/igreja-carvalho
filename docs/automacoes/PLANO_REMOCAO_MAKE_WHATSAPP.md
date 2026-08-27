@@ -497,10 +497,23 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      concorrentes no mesmo `atendimentos_bot` — exatamente o que o
      lock de conversa existe pra evitar). Fase 1 fecha isso de verdade:
      1. Passar `owner_token` do lock de conversa (e do claim de `wamid`)
-        no body dos dois chatbots.
+        no body dos dois chatbots **quando o caller é a
+        `whatsapp-webhook`**. **Ausente = caminho Make, não é erro**
+        (achado real de `/code-review` local, 27ª rodada — o Passo 2
+        atualiza o Make só pra `x-webhook-secret` + `wamid`; o Make
+        nunca vai ter lock de conversa nem esse token. Se o chatbot
+        exigir `owner_token` no mesmo deploy que fecha os endpoints,
+        toda chamada real ainda passando pelo Make leva 409 e o
+        tráfego de produção cai na janela pré-cutover — o mesmo
+        padrão do `wamid` ausente, 25ª rodada). Fencing do lock só
+        quando o campo vem preenchido; sem ele, pular a revalidação
+        (paridade com o Make de hoje, que também não serializa por
+        conversa). Depois do corte, a `whatsapp-webhook` **sempre**
+        manda o token.
      2. Antes de CADA write em `atendimentos_bot`, o chatbot revalida
         o lock (`UPDATE ... WHERE owner_token=$token AND lease_until >
-        now()`); 0 linhas → aborta sem mutar, responde 409.
+        now()`); 0 linhas → aborta sem mutar, responde 409. **Só
+        aplica se `owner_token` veio no body** (item 1).
      3. Orquestrador trata 409 como perda de posse: não grava
         `chatbot_result`, não envia Graph, responde 5xx pra Meta.
      4. Defesa extra no orquestrador: `AbortSignal.timeout` no `fetch`
@@ -543,8 +556,14 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      tentar qualquer envio via Graph. **`chatbot_result` guarda uma
      lista de entregas, não um resultado único** (achado real de
      `@codex review`, P1, 5ª rodada — quando `notificar_admin` é
-     verdadeiro existem 2 envios Graph independentes por `wamid`, resposta
-     ao membro E template ao pastor; um estado único não permite retry
+     verdadeiro **E `erro_ia` está ausente/`false`** existem 2 envios
+     Graph independentes por `wamid`, resposta ao membro E template ao
+     pastor; `notificar_admin: true` com `erro_ia: true` é só a
+     resposta ao membro — **não** entra item `pastor` na lista
+     (achado real de `/code-review` local, 27ª rodada, alinhando este
+     parágrafo com o gate de `erro_ia` do Passo 1; senão o
+     orquestrador enfileira `igreja_alerta_lider` em toda falha de IA
+     mesmo depois daquele gate). Um estado único não permite retry
      parcial sem duplicar a que já foi enviada ou perder a que falhou):
      `[{alvo: "membro", payload, status: "pendente"|"enviado"}, {alvo:
      "pastor", payload, status: "pendente"|"enviado", opcional}]`. Cada
@@ -553,6 +572,14 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   4. **Toda entrada nova reclamando um `wamid` existente precisa agir
      conforme o status encontrado**:
      - `completed` → responde 200, não faz nada (já entregue de verdade).
+     - `queued` com lease válido → **5xx, não 200** (outro worker ainda
+       está na FIFO; 200 aqui faz a Meta parar de reentregar se esse
+       worker morrer ainda `queued`). `queued` com lease expirado →
+       rouba `owner_token`, continua `queued` (já especificado no
+       enqueue acima) — achado real de `/code-review` local, 27ª
+       rodada: o switch de status da 5ª rodada nunca ganhou o estado
+       `queued` da 26ª, então uma redelivery caía num fall-through
+       indefinido.
      - `chatbot_done` → reenvia (usando `chatbot_result` já persistido,
        sem invocar o chatbot de novo) só as entregas `"pendente"` da
        lista. **Cada entrega individual precisa do próprio claim atômico
@@ -735,7 +762,20 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   entrada (`value.metadata.phone_number_id`, item de normalização do
   Passo 1) — nunca um novo lookup "primeiro número habilitado".
 - [ ] Registra a execução via `log_edge_function_with_metrics` (RPC já
-  existente) e responde 200 rápido pra Meta.
+  existente). **200 pra Meta só quando o `wamid` está `completed`
+  (ou a lista toda `"enviado"`/`"falhou"`); 5xx enquanto
+  `queued`/`processing`/`enviando`** — não é "200 rápido" no sentido
+  de responder antes de processar (achado real de `/code-review`
+  local, 27ª rodada: o repo não usa `EdgeRuntime.waitUntil` em lugar
+  nenhum, então não há worker pra drenar a FIFO depois que a
+  resposta HTTP saiu; o processamento é síncrono no próprio
+  request. 200 cedo enquanto o isolate ainda vai chamar o chatbot
+  mata o resto do trabalho no return, e 200 em `processing` já foi
+  rejeitado na 5ª/13ª rodada). A FIFO durável serve pra **outras
+  requisições HTTP concorrentes** (outro `wamid` da mesma conversa,
+  ou redelivery do mesmo): elas encostam na unique/`queued` e levam
+  5xx, a Meta reentrega, quem ganha o dequeue processa até o fim
+  **nessa** request e só então 200.
 
 ### Passo 2 — Fechar os endpoints hoje abertos
 

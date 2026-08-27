@@ -274,12 +274,15 @@ Ver plano de execução detalhado em
   dedupe por `wamid` (fencing por `owner_token`, lease de 120s,
   retry-de-envio sem reinvocar chatbot) e resolução de mídia via Graph
   API antes de repassar pro `chatbot-financeiro`
-- `chatbot-triagem`/`chatbot-financeiro` recebem `wamid` **e
-  `owner_token` do lock de conversa** como campos de entrada novos:
-  claim de idempotência na **entrada** das duas functions (não só no
-  write de ledger/`fin_*`) e revalidação do lock antes de cada write
-  em `atendimentos_bot` (único ponto onde a Fase 1 toca lógica de
-  negócio existente, e só o mínimo necessário)
+- `chatbot-triagem`/`chatbot-financeiro` recebem `wamid` **e, quando
+  o caller é a `whatsapp-webhook`, `owner_token` do lock de
+  conversa** como campos de entrada novos: claim de idempotência na
+  **entrada** das duas functions (não só no write de ledger/`fin_*`)
+  e revalidação do lock antes de cada write em `atendimentos_bot`
+  **só se `owner_token` veio no body** (Make na janela pré-cutover
+  não manda esse campo — exigir quebraria produção; ver plano
+  §Passo 1). Único ponto onde a Fase 1 toca lógica de negócio
+  existente, e só o mínimo necessário.
 - Fechamento de `chatbot-triagem` e `chatbot-financeiro` (secret fail-closed)
 - Confirmação (ou seed) da row de `whatsapp_numeros` do número de
   triagem `745419461981790` com `igreja_id` preenchido — bloqueio de
@@ -404,5 +407,5 @@ validado). Substituir ou marcar como histórico na Fase 1.
 
 ---
 
-**Última Atualização**: 2026-08-27 (26ª rodada — `/code-review` local completo)
+**Última Atualização**: 2026-08-27 (27ª rodada — `/code-review` do merge)
 **Próxima Revisão**: Depois da Fase 1 em produção, antes de iniciar a Fase 2
