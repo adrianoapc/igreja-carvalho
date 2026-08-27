@@ -136,7 +136,23 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
       resolvida. Pra imagem/documento indo pro número financeiro, a
       `whatsapp-webhook` precisa resolver o `media_id` → URL via Graph
       API ela mesma, ANTES de chamar `chatbot-financeiro`, e mandar o
-      resultado como `url_anexo` — não repassar o `id` cru.
+      resultado como `url_anexo` — não repassar o `id` cru. **Esse
+      lookup novo tem que usar `WHATSAPP_API_TOKEN`, não `WHATSAPP_TOKEN`**
+      (achado real de `@codex review`, P1, 24ª rodada — a ADR (Decisão 5)
+      define `WHATSAPP_TOKEN` só pra resposta de saída da
+      `whatsapp-webhook`; o caminho de mídia que já funciona hoje nos
+      dois chatbots autentica com `WHATSAPP_API_TOKEN`
+      [`chatbot-financeiro/index.ts:605,170-175`,
+      `chatbot-triagem/index.ts:61,388-395`] — os dois tokens **podem
+      divergir de verdade**, é por isso que o passo de revogação em
+      Fase 1 checa os 2 nomes separadamente (ver item de revogação mais
+      abaixo). Se o lookup novo usar `WHATSAPP_TOKEN` por padrão, texto
+      sai funcionando mas imagem/documento financeiro falha silenciosamente
+      sempre que os tokens não coincidirem). Usar `WHATSAPP_API_TOKEN`
+      pro lookup/download de mídia, igual ao que já funciona hoje —
+      manter `WHATSAPP_TOKEN` só pra envio de resposta — e cobrir esse
+      caminho explicitamente no cenário de teste que exercita mídia
+      (ADR-033 §Validação).
   - **Filtra eventos que não são mensagem, E tipos de mensagem sem
     suporte** (achado real de `@codex review`, P2, 14ª rodada — o
     filtro original só cobria `statuses[]`; a Meta também entrega
@@ -372,7 +388,29 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      (`await`) — um timer em paralelo que renova `lease_until` a cada
      ~30-40s enquanto a chamada ao Graph/chatbot ainda está em voo,
      cancelado assim que a chamada retorna — não só nas fronteiras
-     entre etapas. **O heartbeat também precisa cobrir o tempo de
+     entre etapas. **Falha de renovação (0 rows afetadas) é perda de
+     posse, não erro transiente pra ignorar** (achado real de `@codex
+     review`, P1, 24ª rodada — o heartbeat como descrito renova
+     periodicamente e cancela quando o `await` retorna, mas não diz o
+     que fazer se uma renovação FALHAR no meio — ou seja, o `UPDATE ...
+     WHERE wamid=... AND owner_token=$meu_token AND lease_until > now()`
+     afeta 0 linhas porque outro worker já reclamou o lease expirado.
+     Nesse caso a invocação original continua rodando e mutando sessão/
+     `atendimentos_bot` mesmo sem ser mais dona — o fencing por
+     `owner_token` só protege a ROW de orquestração no próximo write de
+     ESTADO, não desfaz mutação que já aconteceu rio abaixo nem cancela
+     a chamada ao Graph/chatbot em voo). Tratar renovação com 0 linhas
+     afetadas como sinal de perda de posse: setar uma flag local
+     `perdeuPosse=true` checada antes de CADA escrita subsequente
+     (sessão, `atendimentos_bot`, envio Graph) pra abortar essas escritas
+     mesmo que o `await` em voo não possa ser literalmente cancelado —
+     **não existe cancelamento real de uma chamada HTTP já em trânsito
+     pro Graph/chatbot; o objetivo é impedir que o resultado dela seja
+     persistido depois que a posse já foi perdida, não impedir a chamada
+     em si**. Documentar esse comportamento como limite conhecido (não
+     cancela a requisição de rede em voo) e cobrir o cenário "renovação
+     falha no meio do processamento" nos testes da ADR-033 §Validação.
+     **O heartbeat também precisa cobrir o tempo de
      ESPERA na fila FIFO de conversa, não só a execução** (achado real
      de `@codex review`, P1, 23ª rodada — se um item ficar atrás de uma
      mensagem lenta na fila por mais que os 120s do lease do `wamid`,
@@ -628,7 +666,7 @@ mesmo sem qualquer mudança na Meta ainda. Ordem correta:
 
 - [ ] Deployar e testar isoladamente handshake `GET` + POST sintético,
   antes de tocar em qualquer configuração do Meta.
-- [ ] Rodar os 10 cenários de teste da ADR-033 (§Validação — inclui
+- [ ] Rodar os 11 cenários de teste da ADR-033 (§Validação — inclui
   reenvio de `wamid` simulado com 2 sessões reais, lock por conversa e
   payload real de mídia, achados de `@codex review`) contra a nova
   função.

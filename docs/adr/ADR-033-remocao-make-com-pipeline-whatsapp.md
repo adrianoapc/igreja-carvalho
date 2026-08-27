@@ -319,7 +319,20 @@ Ver plano de execução detalhado em
     rodada — nenhum dos 9 cenários anteriores exercita mídia; a lógica
     de resolução de media ID é implementação nova, hoje feita pelo
     conector do Make, e só seria testada de verdade em produção sem
-    este cenário)
+    este cenário). **Exercitar com `WHATSAPP_TOKEN` e
+    `WHATSAPP_API_TOKEN` configurados como valores DIFERENTES**
+    (achado real de `@codex review`, P1, 24ª rodada — se os dois
+    tokens coincidirem em ambiente de teste por acaso, o bug de usar o
+    token errado no lookup de mídia [ver Decisão 5] passa despercebido;
+    o teste só prova algo se os valores divergirem de propósito)
+11. ⬜ Renovação de heartbeat falha durante processamento (`UPDATE` do
+    lease afeta 0 linhas porque outro worker já reclamou) → invocação
+    original NÃO persiste mais nenhum estado (sessão, `atendimentos_bot`,
+    envio Graph) depois de detectar a perda de posse, mesmo com a
+    chamada ao chatbot/Graph ainda em voo (achado real de `@codex
+    review`, P1, 24ª rodada — sem esse teste, a lógica de heartbeat só
+    prova que renova no caminho feliz, nunca que reage à perda de posse
+    no meio de uma chamada lenta)
 
 ### Bake period
 
@@ -352,5 +365,5 @@ validado). Substituir ou marcar como histórico na Fase 1.
 
 ---
 
-**Última Atualização**: 2026-08-26
+**Última Atualização**: 2026-08-27
 **Próxima Revisão**: Depois da Fase 1 em produção, antes de iniciar a Fase 2
