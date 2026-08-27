@@ -107,6 +107,11 @@ A `whatsapp-webhook` resolve `igreja_id`/`filial_id`/destino via
 `phone_number_id` do payload da Meta — espelhando o Router real do Make
 ("Waba Chatbot - OakOS"), não um roteamento por palavra-chave (que não
 existe no cenário real; era suposição da versão anterior deste plano).
+Lookup em `whatsapp_numeros` **pelo `phone_number_id`** (índice único),
+não só por `display_phone_number`. Sem row com `igreja_id NOT NULL`,
+não roteia (5xx) — `chatbot-triagem` hoje insere sessão com tenant
+nulo em vez de falhar, e o número `745419461981790` não tem seed
+commitado (bloqueio de cutover; ver plano §Passo 1).
 
 ### 2. Handshake e assinatura da Meta, hoje delegados ao conector nativo do Make
 
@@ -140,7 +145,9 @@ entrega o disparo real da segunda mensagem ao pastor quando
 (achado no blueprint "Waba Feelings OakOS"), não mensagem free-form:
 a Meta rejeita mensagem business-initiated fora da janela de 24h da
 conversa, e o pastor não necessariamente conversou com esse número
-recentemente (achado real de `@codex review`, 2ª rodada). **Mas
+recentemente (achado real de `@codex review`, 2ª rodada). O `to` do
+template é `telefone_admin_destino` já devolvido por `chatbot-triagem`
+(`resolverTelefonePlantaoPastoral`), não um número fixo. **Mas
 `notificar_admin: true` tem 2 produtores, só 1 deve virar template**
 (achado real de `/code-review` local): além do branch
 `SOLICITACAO_PASTORAL` (`index.ts:1502`), `responderComFalhaIA`
@@ -267,13 +274,18 @@ Ver plano de execução detalhado em
   dedupe por `wamid` (fencing por `owner_token`, lease de 120s,
   retry-de-envio sem reinvocar chatbot) e resolução de mídia via Graph
   API antes de repassar pro `chatbot-financeiro`
-- `chatbot-triagem`/`chatbot-financeiro` recebem `wamid` como campo de
-  entrada novo e checam idempotência própria antes de comprometer
-  efeito colateral (único ponto onde a Fase 1 toca lógica de negócio
-  existente, e só o mínimo necessário)
+- `chatbot-triagem`/`chatbot-financeiro` recebem `wamid` **e
+  `owner_token` do lock de conversa** como campos de entrada novos:
+  claim de idempotência na **entrada** das duas functions (não só no
+  write de ledger/`fin_*`) e revalidação do lock antes de cada write
+  em `atendimentos_bot` (único ponto onde a Fase 1 toca lógica de
+  negócio existente, e só o mínimo necessário)
 - Fechamento de `chatbot-triagem` e `chatbot-financeiro` (secret fail-closed)
+- Confirmação (ou seed) da row de `whatsapp_numeros` do número de
+  triagem `745419461981790` com `igreja_id` preenchido — bloqueio de
+  cutover; lookup por `phone_number_id` e fail-closed se faltar tenant
 - Fix do `notificar_admin` via template `igreja_alerta_lider` (segunda
-  mensagem ao pastor)
+  mensagem ao pastor, `to` = `telefone_admin_destino`)
 - Migration restringindo a policy de SELECT de `edge_function_logs` a
   `super_admin` + projeção sem payload na query de lista de
   `EdgeFunctionMonitoring.tsx` (fecha vazamento cross-tenant confirmado)
@@ -340,13 +352,26 @@ Ver plano de execução detalhado em
     token errado no lookup de mídia [ver Decisão 5] passa despercebido;
     o teste só prova algo se os valores divergirem de propósito)
 11. ⬜ Renovação de heartbeat falha durante processamento (`UPDATE` do
-    lease afeta 0 linhas porque outro worker já reclamou) → invocação
-    original NÃO persiste mais nenhum estado (sessão, `atendimentos_bot`,
-    envio Graph) depois de detectar a perda de posse, mesmo com a
-    chamada ao chatbot/Graph ainda em voo (achado real de `@codex
-    review`, P1, 24ª rodada — sem esse teste, a lógica de heartbeat só
-    prova que renova no caminho feliz, nunca que reage à perda de posse
-    no meio de uma chamada lenta)
+    lease afeta 0 linhas porque outro worker já reclamou) → a invocação
+    **do chatbot** aborta sem persistir sessão/`atendimentos_bot` (409
+    após fencing interno com `owner_token`), e o orquestrador não envia
+    Graph. Não basta o orquestrador pular o envio: as mutações de sessão
+    acontecem noutro isolate HTTP (achado real de `@codex review`, P1,
+    24ª rodada, reaberto no `/code-review` local da 26ª).
+12. ⬜ Replay do mesmo `wamid` num turno financeiro que SÓ muta sessão
+    (ex.: `"1"` em `TRANSFERENCIA_AGUARDANDO_CONTA_ORIGEM` →
+    `TRANSFERENCIA_AGUARDANDO_CONFIRMACAO`, `chatbot-financeiro/index.ts:
+    2349-2360`) → a 2ª entrega devolve o cache da 1ª e **não** avança
+    pra seleção de destino (`:2416-2432`). Sem claim na entrada, a
+    unicidade de ledger não cobre esse passo (achado real de `@codex
+    review`, P1, 26ª rodada).
+13. ⬜ Payload no `phone_number_id` de triagem `745419461981790` resolve
+    `igreja_id` concreto (row em `whatsapp_numeros` com tenant
+    preenchido) e grava sessão/pedido **com** esse tenant. Payload no
+    mesmo formato com `phone_number_id` desconhecido **não** cria
+    sessão com `igreja_id = NULL` — 5xx, sem insert (achado real de
+    `@codex review`, P1, 26ª rodada). Confirmar a row de produção
+    antes do cutover; ver plano §Passo 1.
 
 ### Bake period
 
@@ -379,5 +404,5 @@ validado). Substituir ou marcar como histórico na Fase 1.
 
 ---
 
-**Última Atualização**: 2026-08-27
+**Última Atualização**: 2026-08-27 (26ª rodada — `/code-review` local completo)
 **Próxima Revisão**: Depois da Fase 1 em produção, antes de iniciar a Fase 2

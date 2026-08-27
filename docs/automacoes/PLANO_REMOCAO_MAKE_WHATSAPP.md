@@ -198,6 +198,44 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   **Lição pro resto do plano**: qualquer achado baseado só no seed de
   uma migration precisa ser confirmado contra o banco real antes de
   virar bloqueio — a migration é o estado inicial, não o estado atual.
+  **O número de triagem `745419461981790` NÃO teve a mesma confirmação
+  — é bloqueio de cutover, não o mesmo caso** (achado real de `@codex
+  review`, P1, 26ª rodada): busca no repo por esse `phone_number_id`
+  só acha estes documentos novos; **não existe** seed em
+  `whatsapp_numeros` (o financeiro pelo menos tinha um `INSERT`, ainda
+  que com `igreja_id` NULL). `chatbot-triagem` **não** rejeita com 400
+  quando o tenant falta — omite o predicado de `igreja_id` da query de
+  sessão (`index.ts:1053-1055`) e **insere sessão com `igreja_id =
+  NULL`** (`:1114-1127`). Pedidos/testemunhos/pastorais saem sem
+  tenant; sessões de igrejas diferentes no mesmo número colapsam.
+  Os dois chatbots hoje buscam tenant só por `display_phone_number`
+  (`financeiro-core.ts:430-435`, `chatbot-triagem/index.ts:1014-1019`),
+  não por `phone_number_id` — se o metadata da Meta não bater com o
+  valor gravado, o lookup falha mesmo com a row existindo.
+  **Antes de trocar a URL no Meta**, confirmar contra o banco real
+  (mesmo método da 23ª rodada):
+  `SELECT igreja_id, filial_id, display_phone_number, enabled FROM
+  whatsapp_numeros WHERE phone_number_id = '745419461981790'`.
+  - Row com `igreja_id` preenchido e `enabled=true`: registrar o valor
+    nesta doc (igual ao financeiro) e seguir.
+  - Row ausente, `igreja_id IS NULL` ou `enabled=false`: **não cortar**.
+    Inserir/corrigir a row de produção **e** uma migration de seed na
+    PR de implementação da Fase 1, com o tenant do número financeiro
+    (`d5be1965-b3dc-4b65-b847-b6d395543533` /
+    `86134a25-1dea-44df-9ccb-3350032ee8ab`) a menos que o time confirme
+    outro.
+  A `whatsapp-webhook` resolve tenant por `phone_number_id` (índice
+  único `whatsapp_numeros_phone_number_id_key`) e **repassa
+  `igreja_id` já resolvido no body** (os dois chatbots já aceitam
+  `body.igreja_id`) **e `filial_id` pra triagem** (`body.filial_id` em
+  `chatbot-triagem/index.ts:1007`). `chatbot-financeiro` **ignora**
+  `body.filial_id` — continua derivando filial só via
+  `resolverIgrejaEFilialWhatsApp` por `display_phone_number`
+  (`index.ts:613-635`), então o campo `display_phone_number` do
+  metadata da Meta continua obrigatório no body financeiro. Se o
+  lookup por `phone_number_id` não achar row com `igreja_id NOT NULL`,
+  **não rotear**: 5xx + log, nunca invocar o chatbot com tenant nulo —
+  senão a triagem recria o buraco mesmo com a row certa no banco.
 - [ ] Roteia pros dois números reais: `1031291743394274` →
   `chatbot-financeiro`, `745419461981790` → `chatbot-triagem`,
   **mandando o header `x-webhook-secret: MAKE_WEBHOOK_SECRET`** (achado
@@ -226,8 +264,15 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   retornar `notificar_admin: true`, disparar o template já aprovado
   `igreja_alerta_lider` (achado no blueprint "Waba Feelings OakOS" —
   ver ADR-033 §Inventário) via endpoint de template message da Graph
-  API, com os parâmetros que o template espera. Hoje isso não acontece
-  em produção — é bug conhecido, ver ADR-033 §Bugs conhecidos.
+  API, com os parâmetros que o template espera. **`to` do template é
+  `telefone_admin_destino` do retorno de `chatbot-triagem`**, não um
+  número hardcoded (achado real de `/code-review` local, 26ª rodada —
+  a function já resolve o plantão via
+  `resolverTelefonePlantaoPastoral`, `index.ts:1567-1575`, e devolve
+  esse campo; o blueprint placeholder antigo usava
+  `telefone_admin_destino` com fallback `5517988216456`,
+  `MAKE_WHATSAPP_PHONE_NUMBER_ID.md:271`. Sem ler o campo, o alerta
+  pastoral sai pro número errado ou pra ninguém).
   **`notificar_admin: true` tem um SEGUNDO produtor que os dois
   documentos não distinguiam — falha técnica de IA, não só
   `SOLICITACAO_PASTORAL`** (achado real de `/code-review` local, P1):
@@ -243,16 +288,19 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   retornar `notificar_admin: true`, disparar o template") não diz qual
   dos dois vira mensagem pro pastor — aplicada como está, dispararia o
   template aprovado toda vez que a IA cair, preenchendo os parâmetros
-  do template com um texto técnico ("Falha técnica: IA indisponível
-  (timeout)") em vez de um resumo pastoral de verdade. Checar
-  `erro_ia` no payload de retorno: se `true`, **não** disparar
-  `igreja_alerta_lider` (é falha técnica, não pedido pastoral — cai só
-  em `log_edge_function_with_metrics`/log de erro, sem mensagem extra
-  pro pastor); só disparar o template quando `notificar_admin: true` E
+  do template (incluindo o `telefone_admin_destino` acima) com um
+  texto técnico ("Falha técnica: IA indisponível (timeout)") em vez de
+  um resumo pastoral de verdade. Checar `erro_ia` no payload de
+  retorno: se `true`, **não** disparar `igreja_alerta_lider` (é falha
+  técnica, não pedido pastoral — cai só em
+  `log_edge_function_with_metrics`/log de erro, sem mensagem extra pro
+  pastor); só disparar o template quando `notificar_admin: true` E
   `erro_ia` ausente/`false` (o caminho `SOLICITACAO_PASTORAL` de
   verdade). Cobrir os dois casos (falha de IA NÃO dispara template;
-  `SOLICITACAO_PASTORAL` dispara) no cenário de teste 5 da ADR-033
-  §Validação, que hoje só exercita o caminho pastoral.
+  `SOLICITACAO_PASTORAL` dispara, com `telefone_admin_destino` correto)
+  no cenário de teste 5 da ADR-033 §Validação, que hoje só exercita o
+  caminho pastoral. Hoje isso não acontece em produção — é bug
+  conhecido, ver ADR-033 §Bugs conhecidos.
 - [ ] **Serializa por CONVERSA, não só por mensagem — eixo de
   concorrência diferente do dedup de `wamid`** (achado real de `@codex
   review`, P1, 8ª rodada). Dois `wamid` diferentes da MESMA conversa
@@ -296,9 +344,17 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   necessário como defesa arquitetural, independente de qual número
   específico está nulo hoje. Usar
   `UNIQUE NULLS NOT DISTINCT` nessa constraint (Postgres 15+), ou
-  substituir o componente nullable por um sentinela não-nulo
-  (`COALESCE(filial_id, '00000000-...')`) na chave calculada — nunca
+  substituir **cada** componente nullable por um sentinela não-nulo
+  (`COALESCE(filial_id, '00000000-...')` **e**
+  `COALESCE(igreja_id, '00000000-...')`) na chave calculada — nunca
   deixar a comparação de unicidade depender de semântica de NULL.
+  **`igreja_id` é nullable na mesma tabela** (`whatsapp_numeros.igreja_id`
+  foi `DROP NOT NULL` em `20260129153358`; o comentário da tabela
+  documenta `NULL` = config global). `NULLS NOT DISTINCT` na
+  constraint composta cobre os dois de uma vez; o sentinela
+  `COALESCE` tem que se aplicar aos dois, não só a `filial_id`
+  (achado real de `/code-review` local, 26ª rodada — o texto da 22ª
+  rodada falava em "componente nullable" no singular).
   **Exclusão mútua sozinha
   não basta — precisa ser FIFO pela ordem real de chegada** (achado
   real de `@codex review`, P1, 9ª rodada: um lock/lease simples só
@@ -367,11 +423,15 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   FROM anon` sozinho não fecha nada, ver CLAUDE.md), acesso só via
   `service_role` de dentro da própria function.
 
-  **Estados**: `processing` → `chatbot_done` → `completed` (ou
-  `processing` reclamado de novo se o lease expirar sem progresso).
+  **Estados**: `queued` → `processing` → `chatbot_done` → `completed`
+  (ou `processing` reclamado de novo se o lease expirar sem progresso;
+  `queued` com lease de espera expirado também é roubável — ver item
+  de enqueue abaixo).
 
-  1. Claim: `INSERT` do `wamid` com `status=processing`,
-     `owner_token=<novo uuid>`, `lease_until=now()+120s`. Em conflito
+  1. Enqueue: `INSERT` do `wamid` com `status=queued` (unique; lease
+     longo de espera, ver item 2). Claim de `processing`: no dequeue,
+     `queued` → `processing` com `owner_token=<novo uuid>`,
+     `lease_until=now()+120s`. Em conflito
      (row já existe), só atualiza pra reclamar se `status=processing`
      E `lease_until < now()` (lease expirado) — vira dono novo com
      `owner_token` novo. **Enquanto a row está em `processing`**, toda
@@ -425,16 +485,32 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      `owner_token` só protege a ROW de orquestração no próximo write de
      ESTADO, não desfaz mutação que já aconteceu rio abaixo nem cancela
      a chamada ao Graph/chatbot em voo). Tratar renovação com 0 linhas
-     afetadas como sinal de perda de posse: setar uma flag local
-     `perdeuPosse=true` checada antes de CADA escrita subsequente
-     (sessão, `atendimentos_bot`, envio Graph) pra abortar essas escritas
-     mesmo que o `await` em voo não possa ser literalmente cancelado —
-     **não existe cancelamento real de uma chamada HTTP já em trânsito
-     pro Graph/chatbot; o objetivo é impedir que o resultado dela seja
-     persistido depois que a posse já foi perdida, não impedir a chamada
-     em si**. Documentar esse comportamento como limite conhecido (não
-     cancela a requisição de rede em voo) e cobrir o cenário "renovação
-     falha no meio do processamento" nos testes da ADR-033 §Validação.
+     afetadas como sinal de perda de posse. **A flag local no
+     orquestrador NÃO fecha o buraco** (achado real de `@codex review`,
+     P1, 24ª rodada, **ainda aberto no `/code-review` local da 26ª** —
+     `atendimentos_bot` é escrito DENTRO de `chatbot-financeiro`/
+     `chatbot-triagem`, que são outro isolate HTTP; a flag
+     `perdeuPosse` só vive no `whatsapp-webhook` e só consegue pular
+     `chatbot_result`/Graph DEPOIS que o `await fetch` retorna. Enquanto
+     o chatbot está em voo, ele muta sessão à vontade; um takeover do
+     lease de conversa por outro `wamid` gera duas invocações
+     concorrentes no mesmo `atendimentos_bot` — exatamente o que o
+     lock de conversa existe pra evitar). Fase 1 fecha isso de verdade:
+     1. Passar `owner_token` do lock de conversa (e do claim de `wamid`)
+        no body dos dois chatbots.
+     2. Antes de CADA write em `atendimentos_bot`, o chatbot revalida
+        o lock (`UPDATE ... WHERE owner_token=$token AND lease_until >
+        now()`); 0 linhas → aborta sem mutar, responde 409.
+     3. Orquestrador trata 409 como perda de posse: não grava
+        `chatbot_result`, não envia Graph, responde 5xx pra Meta.
+     4. Defesa extra no orquestrador: `AbortSignal.timeout` no `fetch`
+        do chatbot limitado ao tempo restante do lease (ex.: 90s dum
+        lease de 120s) — cobre o caso "isolate vivo mas lento", não o
+        isolate congelado (aí só o fencing interno do passo 2 segura).
+     Cobrir o cenário "renovação falha no meio do processamento" nos
+     testes da ADR-033 §Validação **exercitando o abort DENTRO do
+     chatbot** (sessão inalterada), não só o skip de Graph no
+     orquestrador.
      **O heartbeat também precisa cobrir o tempo de
      ESPERA na fila FIFO de conversa, não só a execução** (achado real
      de `@codex review`, P1, 23ª rodada — se um item ficar atrás de uma
@@ -447,7 +523,21 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      Reclamar o claim de `processing` só no momento de DESENFILEIRAR
      (não antes, ao entrar na fila) e revalidar posse (`owner_token`
      ainda válido) imediatamente antes de chamar o chatbot — não deixar
-     um claim "vivo" contando tempo enquanto só está esperando.
+     um claim "vivo" de 120s contando tempo enquanto só está esperando.
+     **Mas a row de `wamid` TEM que nascer no enqueue, senão a
+     redelivery entra na fila duas vezes** (achado real de `/code-review`
+     local, 26ª rodada — "claim só no dequeue" sem unique no enqueue
+     deixa duas entregas Meta do mesmo `wamid` virarem dois itens FIFO;
+     o segundo só descobriria `completed` depois de esperar a conversa
+     inteira, e se o primeiro worker morrer ainda `queued` a unique
+     nenhuma impede o duplicado). Estados: `queued` → `processing` →
+     `chatbot_done` → `completed`. `INSERT` no enqueue com
+     `status=queued`, `owner_token`, `lease_until=now()+15min`
+     (heartbeat longo só de "ainda estou esperando na FIFO", não o
+     lease de 120s de processamento) e unique em `wamid`. Conflito:
+     `queued` com lease válido → 5xx (Meta reentrega); `queued` com
+     lease expirado → rouba `owner_token`, continua `queued`. No
+     dequeue: `queued` → `processing` com lease de 120s e token novo.
   3. Depois que o chatbot responde: grava `chatbot_result` e
      `status=chatbot_done` (condicionado ao `owner_token`) ANTES de
      tentar qualquer envio via Graph. **`chatbot_result` guarda uma
@@ -597,7 +687,21 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
        antes da gravação por intenção não protege nenhum desses —
        replay do mesmo `wamid` pode recriar/avançar sessão ou repetir
        um fluxo direto de novo). Reclamar/cachear o `wamid` logo na
-       ENTRADA da function. **O registro interno precisa do MESMO
+       ENTRADA da function. **O mesmo claim na ENTRADA vale pra
+       `chatbot-financeiro`, não só pra triagem** (achado real de
+       `@codex review`, P1, 26ª rodada — a mitigação das 3 unicidades
+       no write de ledger só protege o commit final de reembolso/
+       `fin_*`; os turnos comuns mutam `atendimentos_bot` ANTES. Ex.:
+       um `"1"` atualiza a sessão de seleção de conta pra
+       `TRANSFERENCIA_AGUARDANDO_CONFIRMACAO` em `index.ts:2349-2360`;
+       se a resposta HTTP se perde, o retry do mesmo `wamid` processa
+       `"1"` de novo em `:2416-2432` e escolhe o destino sem nova
+       mensagem do usuário). Reclamar/cachear o `wamid` na entrada de
+       `chatbot-financeiro` com o mesmo padrão (estado `processing` +
+       `owner_token`/lease, só devolve cache quando `completed`). As
+       unicidades no ledger continuam como defesa em profundidade do
+       commit financeiro, não substituem o claim de sessão. **O
+       registro interno precisa do MESMO
        fencing do claim externo, não "existe = já processado"**
        (achado real de `@codex review`, P1, 20ª rodada — se a 1ª
        invocação criar o registro e depois cair/der timeout ANTES de
@@ -613,8 +717,9 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
        existe" como sinônimo de "já processado com sucesso". Não fecha
        100% (upload de
        Storage isolado ainda pode duplicar em teoria), mas fecha os 3
-       piores casos financeiros + o registro pastoral com mudança
-       aditiva, sem reescrever o motor `fin_*` existente.
+       piores casos financeiros, o avanço de sessão no meio do fluxo
+       financeiro, e o registro pastoral, com mudança aditiva, sem
+       reescrever o motor `fin_*` existente.
 
   O dedupe de 5s por conteúdo que já existe dentro de `chatbot-triagem`
   fica como está (defesa em profundidade adicional), mas não é
@@ -699,6 +804,12 @@ mesmo sem qualquer mudança na Meta ainda. Ordem correta:
      essas duas colunas só entram numa query separada, disparada ao
      abrir o dialog de detalhe (que já está atrás do gate de
      `super_admin` do passo 1).
+  3. Esconder a aba `monitoring` de `/admin` (`Admin.tsx:1155-1157`)
+     pra quem não é `super_admin` — a página é de admin de igreja, não
+     de super_admin; com a policy nova o `.select` volta vazio/erro pra
+     `admin` comum e a aba fica quebrada (achado real de `/code-review`
+     local, 26ª rodada). `has_role(..., 'super_admin')` já existe e é
+     o mesmo predicado da policy.
   Dar `edge_function_logs` uma coluna `igreja_id` real com RLS por
   tenant (pra liberar `admin` de igreja de novo, escopado à própria
   igreja) é fix maior, fora do escopo desta fase — tratar como
@@ -726,9 +837,10 @@ mesmo sem qualquer mudança na Meta ainda. Ordem correta:
 
 - [ ] Deployar e testar isoladamente handshake `GET` + POST sintético,
   antes de tocar em qualquer configuração do Meta.
-- [ ] Rodar os 11 cenários de teste da ADR-033 (§Validação — inclui
-  reenvio de `wamid` simulado com 2 sessões reais, lock por conversa e
-  payload real de mídia, achados de `@codex review`) contra a nova
+- [ ] Rodar os 13 cenários de teste da ADR-033 (§Validação — inclui
+  reenvio de `wamid` simulado com 2 sessões reais, lock por conversa,
+  payload real de mídia, retry de turno financeiro no meio do fluxo e
+  tenant do número de triagem, achados de `@codex review`) contra a nova
   função.
 - [ ] Trocar a URL do webhook no Meta Business Manager (de Make pra
   Supabase) — **sem apagar** o scenario "Waba Chatbot - OakOS" no Make,
