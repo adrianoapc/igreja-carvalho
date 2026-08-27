@@ -161,24 +161,25 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
 - [ ] Resolve `igreja_id`/`filial_id` e destino via `phone_number_id` já
   extraído — **não** por palavra-chave (roteamento real do Make é por
   número, confirmado no export; não existe lógica de keyword).
-  ⚠️ **BLOQUEIO — investigar antes de implementar, não é suposição
-  segura** (achado real de `@codex review`, P1, 23ª rodada): o número
-  financeiro real `1031291743394274` foi seedado com `igreja_id = NULL`
-  em `20260129170838_733fcf96-461c-4a44-986f-c35c3d520f6e.sql`.
-  `resolverIgrejaEFilialWhatsApp` (`financeiro-core.ts:421-456`) acha a
-  row em `whatsapp_numeros` por `display_phone_number` e devolve
-  `rota.igreja_id` direto se nenhum `igreja_id` explícito vier no body
-  — com a row tendo `NULL`, isso volta `NULL`, e `chatbot-financeiro`
-  rejeita com 400 "igreja_id é obrigatório" (`index.ts:631-650`). O
-  mapper do blueprint real "Waba Chatbot - OakOS" pra essa rota
-  **também não manda** `igreja_id` no body. Ou (a) a row de produção
-  hoje é diferente do seed da migration (precisa confirmar contra o
-  banco real, não só a migration), ou (b) esse número já está quebrado
-  hoje e ninguém notou, ou (c) existe outro mecanismo de resolução não
-  capturado nesta investigação. **Não implementar o roteamento pra
-  esse número sem antes confirmar qual dos 3 é o caso** — se for (a),
-  só documentar o valor real; se for (b), é bug pré-existente separado
-  desta migração; se for (c), achar o mecanismo antes de replicar.
+  **Achado de `@codex review` (P1, 23ª rodada) investigado e
+  resolvido**: o número financeiro real `1031291743394274` foi
+  seedado com `igreja_id = NULL` em
+  `20260129170838_733fcf96-461c-4a44-986f-c35c3d520f6e.sql` — a
+  migration sozinha sugeria que `resolverIgrejaEFilialWhatsApp`
+  (`financeiro-core.ts:421-456`) devolveria `NULL` e `chatbot-financeiro`
+  rejeitaria com 400 (`index.ts:631-650`). **Confirmado contra o banco
+  real (SQL Editor, 2026-08-27)**: a row de produção tem
+  `igreja_id=d5be1965-b3dc-4b65-b847-b6d395543533`,
+  `filial_id=86134a25-1dea-44df-9ccb-3350032ee8ab`, `enabled=true` — o
+  seed `NULL` da migration ficou desatualizado (corrigido depois,
+  fora do controle de migration rastreado). Nenhum bloqueio real:
+  `resolverIgrejaEFilialWhatsApp` acha a row por `display_phone_number`
+  e resolve `igreja_id`/`filial_id` normalmente, sem precisar de
+  `igreja_id` explícito no body — a `whatsapp-webhook` pode confiar
+  nesse mesmo lookup sem replicar nada especial pra esse número.
+  **Lição pro resto do plano**: qualquer achado baseado só no seed de
+  uma migration precisa ser confirmado contra o banco real antes de
+  virar bloqueio — a migration é o estado inicial, não o estado atual.
 - [ ] Roteia pros dois números reais: `1031291743394274` →
   `chatbot-financeiro`, `745419461981790` → `chatbot-triagem`,
   **mandando o header `x-webhook-secret: MAKE_WEBHOOK_SECRET`** (achado
