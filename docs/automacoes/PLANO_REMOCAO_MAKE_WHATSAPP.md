@@ -620,9 +620,26 @@ Make (produção, tráfego de verdade) recebe 401 na hora do deploy —
 mesmo sem qualquer mudança na Meta ainda. Ordem correta:
 1. [ ] Atualizar o blueprint do Make **primeiro** (mudança só no Make,
    sem deploy no Supabase) pra mandar `x-webhook-secret:
-   MAKE_WEBHOOK_SECRET` nas chamadas pra `chatbot-triagem`/
-   `chatbot-financeiro`. Confirmar que está mandando de verdade antes
-   de seguir.
+   MAKE_WEBHOOK_SECRET` **E `wamid`** nas chamadas pra `chatbot-triagem`/
+   `chatbot-financeiro`. Confirmar que está mandando os dois de verdade
+   antes de seguir. **`wamid` no payload é pré-requisito, não
+   opcional** (achado real de `@codex review`, P1, 25ª rodada): o Passo
+   1 exige que os dois chatbots reclamem/cachear o `wamid` **na entrada
+   da própria function** (ver §Idempotência acima, achado da 19ª
+   rodada) como parte do MESMO deploy que fecha esses endpoints — mas
+   os bodies reais hoje configurados no Make
+   (`MAKE_WHATSAPP_PHONE_NUMBER_ID.md:182-205`, módulos 3a/3b) não
+   mandam `messages[].id` nenhum, só `telefone`/`nome_perfil`/
+   `conteudo_texto` ou `mensagem`/`tipo`/`origem_canal`/
+   `phone_number_id`/`display_phone_number`. Deployar a exigência de
+   `wamid` sem atualizar o blueprint primeiro faz toda chamada
+   vinda do Make (que ainda carrega tráfego real nessa janela) chegar
+   sem `wamid`, ou compartilhar uma chave de idempotência nula/inválida
+   — quebrando validação ou furando a proteção até o corte (Passo 4).
+   Adicionar `"wamid":
+   "{{1.entry[].changes[].value.messages[].id}}"` aos 2 bodies (módulos
+   3a e 3b) junto com o header do secret, na mesma atualização de
+   blueprint deste passo.
 2. [ ] Só então deployar `chatbot-triagem`: adicionar validação
    `x-webhook-secret` fail-closed contra `MAKE_WEBHOOK_SECRET` (hoje
    não valida nada).
