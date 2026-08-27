@@ -140,7 +140,16 @@ entrega o disparo real da segunda mensagem ao pastor quando
 (achado no blueprint "Waba Feelings OakOS"), não mensagem free-form:
 a Meta rejeita mensagem business-initiated fora da janela de 24h da
 conversa, e o pastor não necessariamente conversou com esse número
-recentemente (achado real de `@codex review`, 2ª rodada).
+recentemente (achado real de `@codex review`, 2ª rodada). **Mas
+`notificar_admin: true` tem 2 produtores, só 1 deve virar template**
+(achado real de `/code-review` local): além do branch
+`SOLICITACAO_PASTORAL` (`index.ts:1502`), `responderComFalhaIA`
+(`index.ts:1279-1288`) também retorna `notificar_admin: true` em
+QUALQUER falha técnica de IA (timeout, erro HTTP do provedor, conteúdo
+vazio) — distinguível pelo campo `erro_ia: true`, presente só nesse
+caminho. Disparar o template só quando `erro_ia` estiver ausente; falha
+técnica de IA não deve virar mensagem template pro pastor com um texto
+técnico nos parâmetros (ver plano §Passo 1 pro detalhe completo).
 
 ### 5. Token via Graph API — paridade primeiro, segredo por igreja depois
 
@@ -281,7 +290,12 @@ Ver plano de execução detalhado em
 4. ⬜ Resposta de `chatbot-triagem` com `qr_image` no payload → envia
    imagem, não texto
 5. ⬜ `SOLICITACAO_PASTORAL` → confirma segunda mensagem chega ao pastor
-   (valida o fix do bug, não só a paridade)
+   (valida o fix do bug, não só a paridade). **Cobrir também o 2º
+   produtor de `notificar_admin: true`** (achado real de `/code-review`
+   local, P1, 25ª rodada): forçar falha técnica de IA (timeout/erro
+   HTTP do provedor) e confirmar que `erro_ia: true` NÃO dispara o
+   template `igreja_alerta_lider` — só o branch `SOLICITACAO_PASTORAL`
+   (sem `erro_ia`) dispara
 6. ⬜ Continuidade de sessão/contexto entre mensagens
 7. ⬜ Isolamento multi-número (mensagem no número financeiro não vaza pra
    triagem e vice-versa)

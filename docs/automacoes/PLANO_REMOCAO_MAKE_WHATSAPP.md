@@ -228,6 +228,31 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   ver ADR-033 §Inventário) via endpoint de template message da Graph
   API, com os parâmetros que o template espera. Hoje isso não acontece
   em produção — é bug conhecido, ver ADR-033 §Bugs conhecidos.
+  **`notificar_admin: true` tem um SEGUNDO produtor que os dois
+  documentos não distinguiam — falha técnica de IA, não só
+  `SOLICITACAO_PASTORAL`** (achado real de `/code-review` local, P1):
+  `responderComFalhaIA` (`index.ts:1279-1288`) retorna `HTTP 200` (sem
+  status explícito em `respostaJson`, default 200) com
+  `notificar_admin: true` e `dados_contato.motivo = "Falha técnica:
+  ${motivo}"` em TODO timeout/erro HTTP/conteúdo vazio da IA
+  (`:1310,1327,1332,1335` — gateway Lovable falhou, OpenAI falhou,
+  exceção/timeout de 30s, ou resposta vazia), não só no branch
+  `SOLICITACAO_PASTORAL` (`:1502`). Os dois produtores são
+  distinguíveis (`erro_ia: true` só existe no payload de
+  `responderComFalhaIA`, `:1280`), mas a especificação acima ("quando
+  retornar `notificar_admin: true`, disparar o template") não diz qual
+  dos dois vira mensagem pro pastor — aplicada como está, dispararia o
+  template aprovado toda vez que a IA cair, preenchendo os parâmetros
+  do template com um texto técnico ("Falha técnica: IA indisponível
+  (timeout)") em vez de um resumo pastoral de verdade. Checar
+  `erro_ia` no payload de retorno: se `true`, **não** disparar
+  `igreja_alerta_lider` (é falha técnica, não pedido pastoral — cai só
+  em `log_edge_function_with_metrics`/log de erro, sem mensagem extra
+  pro pastor); só disparar o template quando `notificar_admin: true` E
+  `erro_ia` ausente/`false` (o caminho `SOLICITACAO_PASTORAL` de
+  verdade). Cobrir os dois casos (falha de IA NÃO dispara template;
+  `SOLICITACAO_PASTORAL` dispara) no cenário de teste 5 da ADR-033
+  §Validação, que hoje só exercita o caminho pastoral.
 - [ ] **Serializa por CONVERSA, não só por mensagem — eixo de
   concorrência diferente do dedup de `wamid`** (achado real de `@codex
   review`, P1, 8ª rodada). Dois `wamid` diferentes da MESMA conversa
@@ -678,6 +703,24 @@ mesmo sem qualquer mudança na Meta ainda. Ordem correta:
   tenant (pra liberar `admin` de igreja de novo, escopado à própria
   igreja) é fix maior, fora do escopo desta fase — tratar como
   fast-follow; até lá, só `super_admin` vê a tabela, ponto.
+  **O raio de impacto é maior que só a lista — restringir a policy
+  base apaga os cards de estatística e o gráfico diário pra QUALQUER
+  `admin` comum, não só o dialog/lista de logs** (achado real de
+  `/code-review` local, P1): `EdgeFunctionMonitoring.tsx` lê 4 fontes,
+  não 1 — além de `edge_function_logs` (`:150-152`, a lista que este
+  passo mira), também `view_edge_function_stats` (`:121-123`, cards de
+  estatística) e `view_edge_function_daily_stats` (`:130-132`, gráfico
+  diário). As duas views são `WITH (security_invoker = true)`
+  (`20251219151025...sql:6-7,23-24`) sobre `edge_function_logs` — ou
+  seja, herdam a policy da tabela base pro USUÁRIO que consulta, não
+  do dono da view. Depois deste fix, um `admin` comum (não
+  `super_admin`) some com os cards e o gráfico também, não só perde a
+  lista de logs — o dashboard inteiro fica em branco pra ele, não só a
+  tabela. Confirmar esse comportamento esperado com o time antes de
+  deployar (é o trade-off aceito do fix, não um bug do fix em si), e
+  ajustar o texto/loading state do dashboard pra `admin` não-
+  `super_admin` em vez de deixar os cards quebrarem silenciosamente
+  (query vazia sem erro, já que RLS nega linhas, não a query).
 
 ### Passo 4 — Corte (cutover)
 
