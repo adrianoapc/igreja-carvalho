@@ -43,7 +43,22 @@ próprio arquivo):
   acha row em `user_filial_access`) — quem trava isso é só
   `fin_resolver_contexto` validando `p_contexto` ANTES da RPC chamar
   `has_filial_access()`; RPC nova que pular essa validação vira
-  fallback que libera tudo pro bot.
+  fallback que libera tudo pro bot. **O shortcut `auth.uid() IS NOT
+  NULL` sozinho (acima) ainda era exploitável**: cadastro público sem
+  convite cria usuário sem `igreja_id` no profile/JWT, e o shortcut
+  aceitava esse `auth.uid()` como prova de "legado" pra QUALQUER
+  `_igreja_id` alvo — bastava se autocadastrar pra ganhar acesso a
+  qualquer tenant. Corrigido (2026-08-27) comparando contra o
+  `igreja_id` REAL do profile em vez de aceitar qualquer alvo.
+  Separadamente, `get_jwt_igreja_id()`/`get_jwt_filial_id()` liam
+  `user_metadata` como fallback — gravável pelo próprio cliente via
+  `supabase.auth.updateUser({data:{...}})`, permitindo forjar o claim
+  de tenant direto; fallback removido. **Nenhum código legítimo grava
+  `user_metadata.igreja_id`/`filial_id`** — só `app_metadata`,
+  server-side; não reintroduzir esse fallback achando que "cobre mais
+  casos". Ver `docs/guardrails-financeiro.md` item M.8 pro trace
+  completo e os 10 cenários de harness (Postgres 17 efêmero) que
+  provam o fix sem regressão.
 - **`origem_registro`**: literal novo numa RPC precisa da CHECK
   constraint na mesma PR (`manual`/`api`/`getnet_antecipacao_desagio`).
 - **Ação de escrita nova** num card que já gateia irmãs por filial
