@@ -41,7 +41,7 @@ mutation_call_args() {
 
 in_scope() {
   local lineno="$1"
-  printf '%s\n' "$SCOPE_LINES" | grep -qx "$lineno"
+  printf '%s\n' "$SCOPE_LINES" | command grep -qx "$lineno"
 }
 
 window() {
@@ -74,7 +74,7 @@ check_filial_eq() {
     # apertar não quebra nada legítimo, só fecha o vazamento entre
     # calls vizinhas).
     win=$(window "$f" "$lineno" 0 0)
-    if echo "$win" | grep -q '// filial-global-ok'; then
+    if echo "$win" | command grep -q '// filial-global-ok'; then
       continue
     fi
     echo "::error file=${REPORT_FILE:-$f},line=$lineno::.eq(\"filial_id\"...) exclui filial_id IS NULL mesmo se houver .or(...) no mesmo chain (PostgREST ANDa os filtros). Substitua o .eq por .or(\"filial_id.eq.X,filial_id.is.null\"), ou // filial-global-ok se a exclusão de globais for intencional. Ver CLAUDE.md §Filial compartilhada."
@@ -85,7 +85,7 @@ check_filial_eq() {
 
 is_supabase_mutation_ctx() {
   local ctx="$1"
-  echo "$ctx" | grep -qE '\.from\(["'"'"']|supabase[A-Za-z]*\.'
+  echo "$ctx" | command grep -qE '\.from\(["'"'"']|supabase[A-Za-z]*\.'
 }
 
 # Apaga um `// ...` no fim da linha (// com whitespace na frente, pra
@@ -132,7 +132,7 @@ mutation_line_segment() {
   local -a segs
   read -ra segs <<< "$line"
   for seg in "${segs[@]}"; do
-    n_in_seg=$(printf '%s\n' "$seg" | grep -oE '\.(delete|update)\(' | wc -l | tr -d ' ')
+    n_in_seg=$(printf '%s\n' "$seg" | command grep -oE '\.(delete|update)\(' | wc -l | tr -d ' ')
     if [ "$((running + n_in_seg))" -ge "$idx" ]; then
       printf '%s' "$seg"
       return 0
@@ -199,7 +199,7 @@ check_mutations() {
     [ -z "$idx" ] && continue
     in_scope "$lineno" || continue
     line=$(sed -n "${lineno}p" "$f")
-    nmatches=$(printf '%s\n' "$line" | grep -oE '\.(delete|update)\(' | wc -l | tr -d ' ')
+    nmatches=$(printf '%s\n' "$line" | command grep -oE '\.(delete|update)\(' | wc -l | tr -d ' ')
     [ "${nmatches:-0}" -eq 0 ] && continue
     # Escape checado POR MATCH via mutation_match_escaped, não na
     # linha inteira (achado real de @codex review, PR #134: um
@@ -220,7 +220,7 @@ check_mutations() {
     # trecho do statement ATÉ este match específico.
     if mutation_belongs_to_chain "$f" "$lineno" "$idx"; then
       args=$(mutation_call_args "$f" "$lineno" "$idx" 2>/dev/null || true)
-      if ! printf '%s' "$args" | grep -qE 'count:[[:space:]]*["'"'"']exact["'"'"']'; then
+      if ! printf '%s' "$args" | command grep -qE 'count:[[:space:]]*["'"'"']exact["'"'"']'; then
         echo "::error file=${REPORT_FILE:-$f},line=$lineno::.delete()/.update() do Supabase sem { count: \"exact\" } NESTA call (match $idx de $nmatches nesta linha) — se o RLS negar, retorna error:null/0 linhas e o código pode reportar sucesso falso (PR #126). Adicione { count: \"exact\" } no argumento desta call (não numa irmã) e cheque o count retornado, ou // count-exact-ok se a call já é auto-limitada por PK/id único."
         fail=1
       fi
@@ -249,7 +249,7 @@ check_chart_hex_warning() {
   # aviso nunca disparar nos 5 arquivos que chartPalette.ts cita
   # (Insights.tsx tem array multi-linha; Candidatos.tsx nem tem
   # "dashboard"/"chart" no path).
-  hex_count=$(grep -oE '#[0-9A-Fa-f]{6}' "$f" 2>/dev/null | wc -l | tr -d ' ')
+  hex_count=$(command grep -oE '#[0-9A-Fa-f]{6}' "$f" 2>/dev/null | wc -l | tr -d ' ')
   if [ "${hex_count:-0}" -ge 3 ]; then
     echo "::warning file=$f::${hex_count} cores hex hardcoded — considere usar src/lib/chartPalette.ts (CHART_SERIES_COLORS/chartColor) em vez de hex fixo, pra herdar dark mode automaticamente."
   fi
@@ -282,7 +282,7 @@ scope_lines_for_file() {
   # Y (lado velho) > 0 é o sinal real de "este hunk removeu algo",
   # independente de quantas linhas o lado novo também adicionou.
   git diff -U0 "$base_sha"...HEAD -- "$f" 2>/dev/null \
-    | grep -oP '^@@ -[0-9]+(,[0-9]+)? \+[0-9]+(,[0-9]+)?(?= @@)' \
+    | command grep -oP '^@@ -[0-9]+(,[0-9]+)? \+[0-9]+(,[0-9]+)?(?= @@)' \
     | while IFS= read -r hdr; do
         old_part="${hdr%% +*}"
         new_part="${hdr#*+}"

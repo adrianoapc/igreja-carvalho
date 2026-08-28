@@ -91,10 +91,18 @@ sys.stdout.write("".join(out))
 # Também aceita opções globais entre `git` e `commit` (`-c key=val`,
 # `-C` repetido) e prefixo `VAR=val` — senão `git -c commit.gpgsign=false
 # commit -am ...` e `FOO=1 git commit` saíam do hook sem check nenhum
-# (achado real de @cursoragent review, PR #134).
+# (achado real de @cursoragent review, PR #134). CUIDADO: `[A-Za-Z_]`
+# (Z maiúsculo em vez de z minúsculo, achado nesta sessão) quebra a
+# regex INTEIRA em tempo de COMPILAÇÃO no BSD grep do macOS
+# (sub-range `a-Z` é descendente/inválida) — TODO `git commit`,
+# não só os com prefixo `VAR=`, saía sem check nenhum (grep -qE
+# retorna erro, `! grep` vira sucesso, hook inteiro dá exit 0 cedo).
+# `bash -n`/self-test do pattern-guardrails.sh NÃO pegam isso (self-
+# test cobre outro arquivo); só pipe-test real contra ESTE hook, no
+# BSD grep de verdade, expõe o typo — GNU grep pode não reproduzir.
 GIT_GLOBAL='( -C ("[^"]*"|'"'"'[^'"'"']*'"'"'|[^ ]+)| -c [^ ]+)*'
-GIT_COMMIT_AT='(^|[;&|]) *([A-Za-Z_][A-Za-Z0-9_]*=[^ ;&|]* )*git'"$GIT_GLOBAL"' commit($|[^a-zA-Z-])'
-if ! printf '%s' "$CMD_STRIPPED" | grep -qE "$GIT_COMMIT_AT"; then
+GIT_COMMIT_AT='(^|[;&|]) *([A-Za-z_][A-Za-z0-9_]*=[^ ;&|]* )*git'"$GIT_GLOBAL"' commit($|[^a-zA-Z-])'
+if ! printf '%s' "$CMD_STRIPPED" | command grep -qE "$GIT_COMMIT_AT"; then
   exit 0
 fi
 
@@ -166,9 +174,9 @@ fi
 # @cursoragent review, PR #134). Flags são procuradas no comando
 # STRIPPED inteiro (não só coladas em `git commit`) pra `git -c x=y
 # commit -am` não escapar do deny.
-if printf '%s' "$CMD_STRIPPED" | grep -qE '(^|[[:space:]])(--all|--include|--only|--patch|--interactive)($|[[:space:]=])' \
-  || printf '%s' "$CMD_STRIPPED" | grep -qE '[[:space:]]-[a-zA-Z]*[ap][a-zA-Z]*($|[[:space:]])' \
-  || printf '%s' "$CMD_STRIPPED" | grep -qE 'commit($|[^a-zA-Z-])([^;&|]*)[[:space:]]--[[:space:]]+[^[:space:]]'; then
+if printf '%s' "$CMD_STRIPPED" | command grep -qE '(^|[[:space:]])(--all|--include|--only|--patch|--interactive)($|[[:space:]=])' \
+  || printf '%s' "$CMD_STRIPPED" | command grep -qE '[[:space:]]-[a-zA-Z]*[ap][a-zA-Z]*($|[[:space:]])' \
+  || printf '%s' "$CMD_STRIPPED" | command grep -qE 'commit($|[^a-zA-Z-])([^;&|]*)[[:space:]]--[[:space:]]+[^[:space:]]'; then
   deny "Commit bloqueado — 'git commit -a/--all/--include/--only/--patch/-p/--interactive' (ou pathspec depois de --) grava mais do que o índice atual, e este hook só valida o snapshot já staged. Rode 'git add' explícito nos arquivos e um 'git commit' simples (sem essas flags)."
   exit 0
 fi
@@ -185,8 +193,8 @@ fi
 # num hook Pre); nega e pede pra rodar em 2 chamadas separadas — a
 # 2ª chamada (só `git commit`) faz este hook rodar de novo, agora com
 # o índice já staged de verdade.
-if printf '%s' "$CMD_STRIPPED" | grep -qE '(^|[;&|])[[:space:]]*git[[:space:]]+(add|rm|reset|stage)\b' \
-  && printf '%s' "$CMD_STRIPPED" | grep -qE "$GIT_COMMIT_AT"; then
+if printf '%s' "$CMD_STRIPPED" | command grep -qE '(^|[;&|])[[:space:]]*git[[:space:]]+(add|rm|reset|stage)\b' \
+  && printf '%s' "$CMD_STRIPPED" | command grep -qE "$GIT_COMMIT_AT"; then
   deny "Commit bloqueado — este comando mistura 'git add/rm/reset/stage' com 'git commit' numa chamada só. Este hook roda ANTES do comando executar, então o índice validado seria o de ANTES do add/rm/reset — não o que será commitado de verdade. Rode o add/rm/reset numa chamada separada, depois um 'git commit' simples numa segunda chamada."
   exit 0
 fi
@@ -228,7 +236,7 @@ STAGED_TS=()
 while IFS= read -r f; do
   [ -z "$f" ] && continue
   STAGED_TS+=("$f")
-done < <(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' '*.tsx' 2>/dev/null | grep -v '^\.claude/worktrees/' || true)
+done < <(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' '*.tsx' 2>/dev/null | command grep -v '^\.claude/worktrees/' || true)
 
 if [ ${#STAGED_TS[@]} -gt 0 ]; then
   if [ ! -x "$BIN/eslint" ]; then
@@ -267,7 +275,7 @@ fi
 # endurecer pra `tsc -p tsconfig.app.json` hoje falha em dezenas de
 # erros pré-existentes — mesmo raciocínio do eslint full-repo. Ver
 # docs/guardrails-processo.md.
-TS_DELETED=$(git diff --cached --name-only --diff-filter=D -- '*.ts' '*.tsx' 2>/dev/null | grep -v '^\.claude/worktrees/' || true)
+TS_DELETED=$(git diff --cached --name-only --diff-filter=D -- '*.ts' '*.tsx' 2>/dev/null | command grep -v '^\.claude/worktrees/' || true)
 if [ ${#STAGED_TS[@]} -gt 0 ] || [ -n "$TS_DELETED" ]; then
   if [ ! -x "$BIN/tsc" ]; then
     FAIL_MSGS+=("typescript não encontrado em node_modules (rode npm install)")
