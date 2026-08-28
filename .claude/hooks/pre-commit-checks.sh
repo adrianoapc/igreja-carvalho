@@ -53,8 +53,15 @@ fi
 # PR #134: rodando incondicional, todo commit puro de docs/SQL/YAML —
 # comum neste repo, ver CLAUDE.md §Processo de PR — paga o custo total
 # de compilar o projeto inteiro sem NENHUM arquivo TS mudado, zero
-# benefício possível). Reusa o mesmo STAGED_TS do eslint acima.
-if [ ${#STAGED_TS[@]} -gt 0 ]; then
+# benefício possível). **Gate usa ACDMR (inclui Delete), não o ACMR do
+# eslint** (achado real de /code-review ultra local, PR #134: um commit
+# que só DELETA um .ts/.tsx não aparece em STAGED_TS — filtrado por
+# ACMR, que exclui D, correto pro eslint já que não dá pra lintar um
+# arquivo que não existe mais — mas apagar um módulo ainda importado em
+# outro lugar quebra o type-check do resto do projeto, e SEM checar
+# deleção o hook aprovaria esse commit sem rodar tsc nenhuma vez).
+TS_DELETED=$(git diff --cached --name-only --diff-filter=D -- '*.ts' '*.tsx' 2>/dev/null | grep -v '^\.claude/worktrees/' || true)
+if [ ${#STAGED_TS[@]} -gt 0 ] || [ -n "$TS_DELETED" ]; then
   if ! npx tsc --noEmit; then
     FAIL_MSGS+=("npx tsc --noEmit falhou")
   fi
