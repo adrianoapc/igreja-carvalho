@@ -277,6 +277,9 @@ de qualquer decisão — Fase 3, ver plano.
    nessa invocação, e redelivery/reclaim tenta dequeue se o lock
    está livre e o `wamid` é a cabeça. O `owner_token` no body do
    chatbot é **só** o do lock de conversa, não o da row de `wamid`.
+   Batch da Meta: enfileirar todas as mensagens do envelope antes
+   de processar (não paralelo na mesma conversa); 5xx/200 do POST
+   conta só os `wamid` **deste** lote.
    Idempotência transacional 100% (Storage + múltiplos inserts em cada
    chatbot) é maior que o escopo desta fase — Fase 1 entra só com
    guarda de unicidade no primeiro write de cada fluxo, cobertura
@@ -540,6 +543,13 @@ Ver plano de execução detalhado em
     sob paralelismo, mas não o liveness "B anda depois que A solta o
     lock, ainda com lease de `queued` válido"; o 5xx cego da 27ª
     passava no 9 e deixava B 15min parado no caminho feliz.
+    **Mesmo POST da Meta com A e B na mesma conversa**: enfileirar
+    as duas (seq = ordem no `messages[]`) **antes** de processar —
+    não `Promise.all` por item. A processa primeiro; HTTP 5xx até
+    as duas do lote estarem `completed`. Drenar um C de **outro**
+    envelope depois de A `completed` não pode virar 5xx deste POST
+    (achado real de `/code-review` local, 32ª rodada). Dequeue =
+    um transaction (lock de conversa `FOR UPDATE` + reler cabeça).
 
 ### Bake period
 
@@ -572,5 +582,5 @@ validado). Substituir ou marcar como histórico na Fase 1.
 
 ---
 
-**Última Atualização**: 2026-08-28 (31ª rodada — `/code-review` da FIFO)
+**Última Atualização**: 2026-08-28 (32ª rodada — `/code-review` do batch/FIFO)
 **Próxima Revisão**: Depois da Fase 1 em produção, antes de iniciar a Fase 2

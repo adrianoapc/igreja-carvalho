@@ -99,9 +99,19 @@ interna (`{action: "reclaim"}`) tem que viver **no handler**, senão
     review`, P2): a Meta pode entregar mais de um `entry`/`change`/
     `message` numa única notificação (batch). Extrair só `messages[0]`
     e responder 200 pro payload inteiro descarta o resto
-    silenciosamente. Iterar `entry[].changes[].value.messages[]` e
-    aplicar roteamento + dedupe (item abaixo) em cada mensagem,
-    independente.
+    silenciosamente. Iterar `entry[].changes[].value.messages[]`.
+    **`independente` não é `Promise.all`** (achado real de
+    `/code-review` local, 32ª rodada — a 31ª fechou o 5xx cego da
+    FIFO, mas este bullet ainda mandava aplicar roteamento+dedupe
+    "em cada mensagem, independente"; duas mensagens da mesma
+    conversa no mesmo POST processadas em paralelo reabrem a
+    corrida que o lock existe pra evitar, e a seq de chegada do
+    array se perde). Em cada notificação: (1) **enfileirar todas**
+    as mensagens suportadas (allowlist por rota), com `seq` = ordem
+    no array como desempate depois do `timestamp` Meta; (2) **só
+    então** processar a cabeça de cada conversa. Conversas
+    diferentes no mesmo lote podem andar em paralelo; a mesma
+    conversa, não.
   - `phone_number_id` ← `value.metadata.phone_number_id`
   - `whatsapp_number`/`display_phone_number` ← `value.metadata.display_phone_number`
     (achado real de `@codex review`, P1 — **obrigatório pro número
@@ -474,17 +484,21 @@ interna (`{action: "reclaim"}`) tem que viver **no handler**, senão
   continua sendo liberado em `chatbot_done` (os Graph de A não
   precisam dele). **Drenar só depois deste `wamid` estar
   `completed`** — não entre `chatbot_done` e o Graph, senão A
-  nunca fecha nesta request. Aí: `SELECT` a cabeça da FIFO
-  (`queued`, mesma chave de conversa, `ORDER BY timestamp Meta,
-  seq`). Se houver item e restar orçamento de tempo no isolate
-  (ex.: >30s; teto da function ~150s), tenta o claim
-  `queued`→`processing` e processa **nessa** request (chatbot +
-  Graph desse próximo `wamid`) antes de responder. 0 linhas no
-  claim = um retry de B já ganhou o dequeue (lock estava livre
-  desde `chatbot_done`) — no-op. Sem orçamento: deixa `queued`;
-  a regra nova do item 4 (redelivery/reclaim tenta dequeue se o
-  lock está livre e este `wamid` é a cabeça) é a rede de
-  segurança, não o caminho feliz.
+  nunca fecha nesta request. Aí: **re-adquire o lock de conversa**
+  (foi solto em `chatbot_done`) na mesma transaction que o claim
+  `queued`→`processing` da cabeça — não só o UPDATE da row de
+  `wamid`, senão o chatbot de B roda sem fencing de conversa.
+  `SELECT` a cabeça (`queued`, mesma chave, `ORDER BY timestamp
+  Meta, seq`). Se houver item e restar orçamento de tempo no
+  isolate (ex.: >30s; teto da function ~150s), processa **nessa**
+  request (chatbot + Graph desse próximo `wamid`) antes de
+  responder. 0 linhas no claim = um retry de B já ganhou o
+  dequeue — no-op. Sem orçamento: deixa `queued`; a regra do
+  item 4 é a rede de segurança. **O 200/5xx desta request HTTP
+  é só dos `wamid` que vieram NESTE envelope Meta** (32ª
+  rodada): drenar B (outra notificação) é oportunista; falha
+  ao drenar B não vira 5xx do POST de A — a Meta retrataria A
+  (já `completed`) e o status de B continua na notificação de B.
 - [ ] **Deduplica por `wamid` (`value.messages[].id`) antes de chamar
   qualquer chatbot — máquina de estado com fencing, não claim binário**
   (achado real de `@codex review`, P1 — promovido de "fora de escopo"
@@ -522,9 +536,11 @@ interna (`{action: "reclaim"}`) tem que viver **no handler**, senão
   persistido cai no caminho Make (campo ausente = pular fencing,
   cenário 16 da ADR) — exatamente na retomada por reclaim, que é
   quando o fencing mais precisa valer. No dequeue **e** no reclaim:
-  clonar o JSON persistido, injetar o `owner_token` **corrente** do
-  claim (wamid + conversa), aí sim chamar o chatbot. Mesma restrição
-  de acesso do resto da tabela: PII de conversa. **Sem SELECT nenhum via PostgREST — nem pra admin, nem pra
+  clonar o JSON persistido e injetar **só** o `owner_token` do lock
+  de **conversa** (31ª rodada; o UUID da row de `wamid` fica no
+  orquestrador). Uma frase residual da 30ª ("claim (wamid +
+  conversa)") contradizia isso e mandaria o token errado pro
+  chatbot. Mesma restrição de acesso do resto da tabela: PII de conversa. **Sem SELECT nenhum via PostgREST — nem pra admin, nem pra
   super_admin** (achado real de `@codex review`, P1, 8ª rodada: essa
   tabela guarda telefone + conteúdo completo de mensagem/resposta; se
   for criada em `public` sem RLS ou sem revogar o `EXECUTE`/`SELECT` de
@@ -726,10 +742,14 @@ interna (`{action: "reclaim"}`) tem que viver **no handler**, senão
        conversa, não só em crash. O parágrafo do Passo 1 que diz
        "quem ganha o dequeue processa nessa request" contradiz
        esse 5xx cego: ninguém ganhava o dequeue nunca).
-       Regra: esta request tenta o dequeue se **(a)** este `wamid`
-       é a cabeça da FIFO da conversa (`timestamp` Meta + seq de
-       chegada) **e (b)** consegue o lock de conversa. Conseguiu →
-       `queued`→`processing`, processa até o fim nesta request.
+       Regra: dequeue é **um transaction** — `LOCK` da row de
+       conversa `FOR UPDATE`, reler a cabeça da FIFO, só então
+       `queued`→`processing` se esta row **ainda** é a cabeça
+       (achado real de `/code-review` local, 32ª rodada: checar
+       cabeça e adquirir lock em 2 statements deixa uma mensagem
+       mais velha inserida no meio virar não-cabeça depois da
+       checagem; o debounce da 12ª rodada não fecha isso sozinho
+       no retry). Conseguiu → processa até o fim nesta request.
        Lock ocupado por outro `wamid` → **5xx** (a Meta reentrega;
        quem completar o `wamid` corrente drena a FIFO depois de
        `completed`, ver lock de conversa). `queued` com lease expirado → rouba
@@ -1047,13 +1067,15 @@ interna (`{action: "reclaim"}`) tem que viver **no handler**, senão
   dequeue e processa até o fim, só então 200. Quem já completou um
   `wamid` drena o próximo item da conversa nessa request se restar
   tempo (31ª rodada). **Batch da
-  Meta** (`entry[]`/`messages[]` com mais de um item): um único
-  status HTTP pra notificação inteira — 5xx se **qualquer**
-  mensagem do lote não estiver `completed` (enqueue falhou, ainda
-  `queued`/`processing`/`enviando`). 200 só quando todas as do
-  lote estiverem resolvidas. Item já `completed` no retry é
+  Meta** (`entry[]`/`messages[]` com mais de um item): enfileirar
+  **todas** antes de processar (32ª rodada; seq = ordem no array).
+  Um único status HTTP pra notificação inteira — 5xx se **qualquer**
+  mensagem **deste** lote não estiver `completed` (enqueue falhou,
+  ainda `queued`/`processing`/`enviando`). 200 só quando todas as
+  do lote estiverem resolvidas. Item já `completed` no retry é
   no-op (item 4); 200 no lote com um item que falhou o INSERT
-  perde essa mensagem pra sempre (não há row pro sweep).
+  perde essa mensagem pra sempre (não há row pro sweep). Drenar um
+  `wamid` que **não** veio neste envelope não entra nessa conta.
 
 ### Passo 2 — Fechar os endpoints hoje abertos
 
