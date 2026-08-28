@@ -26,6 +26,9 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+
 jobs:
   pattern_guardrails:
     runs-on: ubuntu-latest
@@ -34,35 +37,50 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Pinado por SHA, não pela tag @v45 — tj-actions/changed-files já
+      # sofreu um comprometimento real (tag re-apontada pra commit
+      # malicioso, achado real de /code-review ultra local, PR #134) —
+      # tag mutável não é defesa suficiente pra uma Action de terceiro
+      # que roda em todo PR. SHA = o que a tag v45 apontava em
+      # 2026-08-28; atualizar deliberadamente, nunca voltar pra `@v45`.
       - name: Get changed files
         id: changed
-        uses: tj-actions/changed-files@v45
+        uses: tj-actions/changed-files@48d8f15b2aaa3d255ca5af3eba4870f807ce6b3c # v45
         with:
           files: |
             src/**/*.ts
             src/**/*.tsx
             supabase/functions/**/*.ts
+          json: true
 
       - name: Scan added lines for known-bug patterns
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          # Passado via env, NUNCA interpolado direto no script (achado
+          # real de /code-review ultra local, PR #134, P1 — um nome de
+          # arquivo malicioso na PR quebraria pra fora de uma
+          # substituição ${{ }} direta no bash e executaria comando
+          # arbitrário no runner; isso é literalmente o vetor de
+          # injeção documentado pelo GitHub pra Actions). json:true
+          # também evita a ambiguidade de split por espaço quando um
+          # path tem espaço no nome.
+          CHANGED_FILES_JSON: ${{ steps.changed.outputs.all_changed_files }}
         run: |
           set -uo pipefail
 
           FAIL=0
-          changed="${{ steps.changed.outputs.all_changed_files }}"
 
-          if [ -z "$changed" ]; then
+          if [ "$CHANGED_FILES_JSON" = "[]" ] || [ -z "$CHANGED_FILES_JSON" ]; then
             echo "Nenhum arquivo relevante mudou."
             exit 0
           fi
 
           echo "Arquivos em checagem:"
-          echo "$changed" | tr ' ' '\n'
+          echo "$CHANGED_FILES_JSON" | jq -r '.[]'
           echo ""
 
-          for f in $changed; do
+          while IFS= read -r f; do
             [ -f "$f" ] || continue
 
             # Linhas em escopo: as que a PR ADICIONOU (número na versão
@@ -140,24 +158,36 @@ jobs:
               echo "::error file=$f,line=$lineno::STATUS_COLOR é cor de FUNDO de pill, não tinta de texto — usar como \`color:\` falha contraste WCAG 3:1 em card claro (achado real: PR #114). Use pillStyle(tone) de statusPalette.ts."
               FAIL=1
             done < <(grep -nE 'color:\s*STATUS_COLOR' "$f" || true)
-          done
+          done < <(echo "$CHANGED_FILES_JSON" | jq -r '.[]')
 
           # ------------------------------------------------------------
           # 4) Aviso (não bloqueia): hex fixo em array de cores de gráfico,
           #    em vez de chartPalette.ts. Heurística ruidosa de propósito —
           #    só avisa, não falha o job. Não restrito a linha adicionada
           #    (é aviso, não bloqueio — não há custo de falso positivo).
+          #    **Não exige `COLORS`/`colors=` na MESMA linha do hex, NEM
+          #    restringe por nome de arquivo** (achado real de
+          #    /code-review ultra local, PR #134: a versão anterior
+          #    exigia os dois — hex E `COLORS`/`colors=` na MESMA linha,
+          #    E o path conter "dashboard"/"chart" — e nenhum dos 5
+          #    arquivos que o próprio `chartPalette.ts` cita como alvo
+          #    de migração batia nos dois filtros ao mesmo tempo:
+          #    `Insights.tsx`/`Candidatos.tsx`/`EdgeFunctionMonitoring.tsx`
+          #    nem têm "dashboard"/"chart" no path pra passar no filtro
+          #    externo; `Insights.tsx`/`Dashboard.tsx` têm o array em
+          #    múltiplas linhas, então nunca bateram o grep de linha
+          #    única. 3+ literais hex em QUALQUER arquivo `.ts`/`.tsx`
+          #    tocado já é sinal suficiente de array de cores hardcoded
+          #    — é aviso, não bloqueio, então o custo de rodar em mais
+          #    arquivos é só ruído, nunca PR travada.
           # ------------------------------------------------------------
-          for f in $changed; do
+          while IFS= read -r f; do
             [ -f "$f" ] || continue
-            case "$f" in
-              *dashboard*|*Dashboard*|*chart*|*Chart*)
-                if grep -nE '#[0-9A-Fa-f]{6}' "$f" | grep -qE 'COLORS|colors\s*='; then
-                  echo "::warning file=$f::Array de cores hex hardcoded num componente de dashboard/chart — considere usar src/lib/chartPalette.ts (CHART_SERIES_COLORS/chartColor) em vez de hex fixo, pra herdar dark mode automaticamente."
-                fi
-                ;;
-            esac
-          done
+            hex_count=$(grep -oE '#[0-9A-Fa-f]{6}' "$f" 2>/dev/null | wc -l | tr -d ' ')
+            if [ "${hex_count:-0}" -ge 3 ]; then
+              echo "::warning file=$f::${hex_count} cores hex hardcoded — considere usar src/lib/chartPalette.ts (CHART_SERIES_COLORS/chartColor) em vez de hex fixo, pra herdar dark mode automaticamente."
+            fi
+          done < <(echo "$CHANGED_FILES_JSON" | jq -r '.[]')
 
           if [ "$FAIL" -eq 1 ]; then
             echo ""

@@ -10,7 +10,12 @@ set -uo pipefail
 INPUT=$(cat)
 CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')
 
-if ! printf '%s' "$CMD" | grep -qE '(^|[;&|]) *gh pr create( |$)'; then
+# Achado real de /code-review ultra local (PR #134): mesmo bug do
+# pre-commit-checks.sh — exigir espaço/fim-de-string logo após "create"
+# deixava `gh pr create&&...`/`gh pr create;...` (sem espaço antes do
+# separador) passarem sem o lembrete. Boundary agora é qualquer
+# caractere não-alfabético (ou fim de string).
+if ! printf '%s' "$CMD" | grep -qE '(^|[;&|]) *gh pr create($|[^a-zA-Z])'; then
   exit 0
 fi
 

@@ -4,20 +4,36 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
+permissions:
+  contents: read
+
 jobs:
   docs_guard:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      # Pinado por SHA, não pela tag @v45 — mesma razão do
+      # pattern-guardrails.yml (achado real de /code-review ultra
+      # local, PR #134): tj-actions/changed-files já teve a tag
+      # re-apontada pra commit malicioso num incidente real. SHA = o
+      # que a tag v45 apontava em 2026-08-28.
       - name: Get changed files
         id: changed
-        uses: tj-actions/changed-files@v45
+        uses: tj-actions/changed-files@48d8f15b2aaa3d255ca5af3eba4870f807ce6b3c # v45
+        with:
+          json: true
 
       - name: Enforce documentation discipline
         shell: bash
         env:
           FIX_MODE_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'doc:fix') }}
+          # Passado via env, nunca interpolado direto no script — mesmo
+          # vetor de injeção do pattern-guardrails.yml (achado real de
+          # /code-review ultra local, PR #134): um nome de arquivo
+          # malicioso na PR quebraria pra fora de uma substituição
+          # ${{ }} direta no bash.
+          CHANGED_FILES_JSON: ${{ steps.changed.outputs.all_changed_files }}
         run: |
           set -euo pipefail
 
@@ -25,9 +41,9 @@ jobs:
           echo "Docs Guard — Hard + Fix Mode"
           echo "==============================="
 
-          changed="${{ steps.changed.outputs.all_changed_files }}"
+          changed=$(echo "$CHANGED_FILES_JSON" | jq -r '.[]')
           echo "Changed files:"
-          echo "$changed" | tr ' ' '\n'
+          echo "$changed"
 
           # --------------------------------
           # Detect PR labels
@@ -51,9 +67,9 @@ jobs:
           # --------------------------------
           # Detect documentation changes
           # --------------------------------
-          DOCS_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/' || true)
-          DIAGRAM_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/diagramas/' || true)
-          TEXT_DOC_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/(manual-usuario\.md|funcionalidades\.md|produto/|01-Arquitetura/|adr/|arquitetura-financeiro\.md|guardrails-financeiro\.md)' || true)
+          DOCS_CHANGED=$(echo "$changed" | grep -E '^docs/' || true)
+          DIAGRAM_CHANGED=$(echo "$changed" | grep -E '^docs/diagramas/' || true)
+          TEXT_DOC_CHANGED=$(echo "$changed" | grep -E '^docs/(manual-usuario\.md|funcionalidades\.md|produto/|01-Arquitetura/|adr/|arquitetura-financeiro\.md|guardrails-financeiro\.md)' || true)
 
           # --------------------------------
           # Module path mapping (REAL paths)
@@ -86,7 +102,7 @@ jobs:
 
           touched=()
           for m in "${!MODULES[@]}"; do
-            if echo "$changed" | tr ' ' '\n' | grep -E "${MODULES[$m]}" >/dev/null 2>&1; then
+            if echo "$changed" | grep -E "${MODULES[$m]}" >/dev/null 2>&1; then
               touched+=("$m")
             fi
           done
