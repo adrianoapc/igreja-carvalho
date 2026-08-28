@@ -84,19 +84,59 @@ fi
 # /code-review ultra local, PR #134: `git commit -am "..."` com índice
 # limpo pulava todo check e commitava working-tree TS não validado).
 #
-# **Busca só na CABEÇA do comando, antes de `-m`/`--message`/heredoc**
-# (achado SELF-INFLICTED de verdade — bloqueou esta própria mensagem de
-# commit, que cita "-a/--all/--include/--only" como exemplo de texto: um
-# `grep` sem escopo bate no CONTEÚDO da mensagem também, não só nos
-# flags reais do comando invocado). Trunca em python3 [multi-linha,
-# `sed`/`grep` não cortam heredoc de várias linhas de forma confiável]
-# no primeiro `-m`/`--message`/`<<` — em qualquer commit real, os flags
-# de verdade vêm ANTES da mensagem, nunca depois.
-CMD_HEAD=$(printf '%s' "$CMD" | python3 -c '
+# **Remove o CONTEÚDO de strings/heredoc antes de procurar flags** —
+# não trunca na primeira `-m`/heredoc (achado real de @codex review,
+# rodada seguinte ao fix anterior: `git commit -m "msg" -a` tem a flag
+# DEPOIS da mensagem — git aceita flag em qualquer ordem — e truncar
+# perdia esse `-a`; a própria correção anterior já tinha sido achada
+# SELF-INFLICTED, bloqueando uma mensagem de commit que só CITAVA os
+# nomes das flags como texto). Em vez de assumir uma ordem, apaga o
+# CONTEÚDO de aspas simples/duplas (mantendo as aspas em si, só pra
+# preservar posição) e de corpos de heredoc (`<<'"'"'EOF'"'"'`/`<<EOF`
+# até a linha que é só o delimitador) — sobra só a estrutura real do
+# comando (flags, operadores), nunca texto de mensagem.
+CMD_STRIPPED=$(printf '%s' "$CMD" | python3 -c '
 import re, sys
+
 s = sys.stdin.read()
-m = re.search(r"(--message\b|-m\b|<<)", s)
-sys.stdout.write(s[: m.start()] if m else s)
+out = []
+i, n = 0, len(s)
+while i < n:
+    c = s[i]
+    if c == "\"":
+        j = i + 1
+        while j < n:
+            if s[j] == "\\" and j + 1 < n:
+                j += 2
+                continue
+            if s[j] == "\"":
+                j += 1
+                break
+            j += 1
+        out.append("\"\"")
+        i = j
+        continue
+    if c == "'"'"'":
+        j = i + 1
+        while j < n and s[j] != "'"'"'":
+            j += 1
+        j += 1
+        out.append("'"'"''"'"'")
+        i = j
+        continue
+    if s[i : i + 2] == "<<":
+        m = re.match(r"<<-?\s*([\"'"'"']?)([A-Za-z_][A-Za-z0-9_]*)\1", s[i:])
+        if m:
+            delim = m.group(2)
+            body_start = i + m.end()
+            end_re = re.compile(r"(?m)^[ \t]*" + re.escape(delim) + r"[ \t]*$")
+            em = end_re.search(s, body_start)
+            out.append(s[i:body_start])
+            i = em.end() if em else n
+            continue
+    out.append(c)
+    i += 1
+sys.stdout.write("".join(out))
 ')
 # -C aceita path entre aspas (com espaço) igual à extração acima —
 # achado real de @codex review: `\S+` sozinho parava no primeiro
@@ -104,7 +144,7 @@ sys.stdout.write(s[: m.start()] if m else s)
 # rejeição de -a/--all nunca disparava, mesmo com o -C real levando a
 # um diretório existente (testado: `git -C "dir com espaço" commit
 # -am x` passava sem deny antes deste fix).
-if printf '%s' "$CMD_HEAD" | grep -qE '(^|[;&|])[[:space:]]*git[[:space:]]+(-C[[:space:]]+("[^"]*"|'"'"'[^'"'"']*'"'"'|\S+)[[:space:]]+)?commit\b.*[[:space:]](-[a-zA-Z]*a[a-zA-Z]*\b|--all\b|--include\b|--only\b)'; then
+if printf '%s' "$CMD_STRIPPED" | grep -qE '(^|[;&|])[[:space:]]*git[[:space:]]+(-C[[:space:]]+("[^"]*"|'"'"'[^'"'"']*'"'"'|\S+)[[:space:]]+)?commit\b.*[[:space:]](-[a-zA-Z]*a[a-zA-Z]*\b|--all\b|--include\b|--only\b)'; then
   deny "Commit bloqueado — 'git commit -a/--all/--include/--only' grava mais do que o índice atual, e este hook só valida o snapshot já staged. Rode 'git add' explícito nos arquivos e um 'git commit' simples (sem essas flags)."
   exit 0
 fi
