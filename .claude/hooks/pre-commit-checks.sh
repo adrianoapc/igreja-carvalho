@@ -11,6 +11,131 @@
 # node_modules baixa o pacote errado `tsc@2.0.4` em vez de typescript).
 set -uo pipefail
 
+# Regexes do gate — definidas ANTES de ler stdin pra `--self-test` não
+# bloquear no `cat`. Classe POSIX tem que ser `[A-Za-z]` (z minúsculo).
+# `[A-Z` + `a-Z]` (Z maiúsculo) é range descendente: no BSD grep do
+# macOS a regex INTEIRA recusa compilação (exit 2), e `if ! grep` vira
+# sucesso — TODO `git commit` saía sem check (achado real nesta PR,
+# commit 3e6fc776, corrigido em 9f770c5d). GNU grep no CI NÃO reproduz
+# o erro de compilação; o `--self-test` recusa essa classe em
+# linha de código e trata grep exit ≥2 como deny, não como "não é commit".
+GIT_GLOBAL='( -C ("[^"]*"|'"'"'[^'"'"']*'"'"'|[^ ]+)| -c [^ ]+)*'
+GIT_COMMIT_AT='(^|[;&|]) *([A-Za-z_][A-Za-z0-9_]*=[^ ;&|]* )*git'"$GIT_GLOBAL"' commit($|[^a-zA-Z-])'
+RE_FLAG_LONG='(^|[[:space:]])(--all|--include|--only|--patch|--interactive)($|[[:space:]=])'
+RE_FLAG_SHORT='[[:space:]]-[a-zA-Z]*[ap][a-zA-Z]*($|[[:space:]])'
+RE_FLAG_PATHSPEC='commit($|[^a-zA-Z-])([^;&|]*)[[:space:]]--[[:space:]]+[^[:space:]]'
+RE_INDEX_MUT='(^|[;&|])[[:space:]]*git[[:space:]]+(add|rm|reset|stage)\b'
+
+deny() {
+  jq -n --arg reason "$1" '{
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: $reason
+    }
+  }'
+}
+
+grep_ere() {
+  # stdout silencioso; GREP_RC=0 match, 1 sem match, ≥2 erro de regex.
+  printf '%s' "$2" | command grep -qE "$1"
+  GREP_RC=${PIPESTATUS[1]:-2}
+}
+
+if [ "${1:-}" = "--self-test" ]; then
+  fail=0
+  HOOK_SRC="${BASH_SOURCE[0]}"
+  echo "[pre-commit-checks] self-test" >&2
+  # GNU grep aceita a classe descendente; o check que o CI consegue
+  # reproduzir é o TEXTO da classe com Z maiúsculo em linha que não é
+  # comentário. Concatena pra ESTE arquivo não conter o literal.
+  typo_range=$(printf '%s%s' 'A-Z' 'a-Z')
+  if command grep -nE "^[^#]*${typo_range}" "$HOOK_SRC"; then
+    echo "FAIL: classe POSIX descendente (Z maiúsculo no lugar de z) em linha de código (quebraria o gate no BSD grep)." >&2
+    fail=1
+  else
+    echo "OK  sem classe POSIX descendente em código" >&2
+  fi
+  for name in GIT_COMMIT_AT RE_FLAG_LONG RE_FLAG_SHORT RE_FLAG_PATHSPEC RE_INDEX_MUT; do
+    eval "pat=\$$name"
+    grep_ere "$pat" ""
+    if [ "$GREP_RC" -ge 2 ]; then
+      echo "FAIL: $name não compilou (grep exit $GREP_RC)" >&2
+      fail=1
+    else
+      echo "OK  $name compilou" >&2
+    fi
+  done
+  expect_match() {
+    grep_ere "$GIT_COMMIT_AT" "$1"
+    if [ "$GREP_RC" -eq 0 ]; then
+      echo "OK  match: $2" >&2
+    else
+      echo "FAIL expected match (rc=$GREP_RC): $2" >&2
+      fail=1
+    fi
+  }
+  expect_no_match() {
+    grep_ere "$GIT_COMMIT_AT" "$1"
+    if [ "$GREP_RC" -eq 1 ]; then
+      echo "OK  no-match: $2" >&2
+    else
+      echo "FAIL expected no-match (rc=$GREP_RC): $2" >&2
+      fail=1
+    fi
+  }
+  expect_flag() {
+    local cmd="$1" label="$2"
+    grep_ere "$RE_FLAG_LONG" "$cmd"
+    local long_rc=$GREP_RC
+    grep_ere "$RE_FLAG_SHORT" "$cmd"
+    local short_rc=$GREP_RC
+    grep_ere "$RE_FLAG_PATHSPEC" "$cmd"
+    local path_rc=$GREP_RC
+    if [ "$long_rc" -eq 0 ] || [ "$short_rc" -eq 0 ] || [ "$path_rc" -eq 0 ]; then
+      echo "OK  flag-deny: $label" >&2
+    else
+      echo "FAIL expected flag-deny: $label" >&2
+      fail=1
+    fi
+  }
+  expect_no_flag() {
+    local cmd="$1" label="$2"
+    grep_ere "$RE_FLAG_LONG" "$cmd"
+    local long_rc=$GREP_RC
+    grep_ere "$RE_FLAG_SHORT" "$cmd"
+    local short_rc=$GREP_RC
+    grep_ere "$RE_FLAG_PATHSPEC" "$cmd"
+    local path_rc=$GREP_RC
+    if [ "$long_rc" -eq 1 ] && [ "$short_rc" -eq 1 ] && [ "$path_rc" -eq 1 ]; then
+      echo "OK  no-flag: $label" >&2
+    else
+      echo "FAIL unexpected flag-deny (long=$long_rc short=$short_rc path=$path_rc): $label" >&2
+      fail=1
+    fi
+  }
+  expect_match 'git commit -m foo' 'git commit simples'
+  expect_match 'FOO=1 git commit -m foo' 'prefixo VAR='
+  expect_match 'git -c commit.gpgsign=false commit -m foo' 'git -c … commit'
+  expect_match 'git commit&&echo x' 'commit sem espaço antes de &&'
+  expect_no_match 'git status' 'git status'
+  expect_no_match 'git commit-tree HEAD' 'commit-tree'
+  expect_flag 'git commit --patch -m foo' '--patch'
+  expect_flag 'git commit -p -m foo' '-p'
+  expect_flag 'git commit -pm foo' '-pm'
+  expect_flag 'git commit --interactive' '--interactive'
+  expect_flag 'git commit -am foo' '-am'
+  expect_flag 'git commit -m foo -- src/x.ts' 'pathspec depois de --'
+  expect_no_flag 'git commit -m foo' 'commit simples sem flag perigosa'
+  expect_no_flag 'git commit --amend -m foo' '--amend não é --all'
+  if [ "$fail" -eq 1 ]; then
+    echo "Self-test do hook FALHOU." >&2
+    exit 1
+  fi
+  echo "Self-test do hook OK." >&2
+  exit 0
+fi
+
 INPUT=$(cat)
 CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')
 
@@ -91,30 +216,22 @@ sys.stdout.write("".join(out))
 # Também aceita opções globais entre `git` e `commit` (`-c key=val`,
 # `-C` repetido) e prefixo `VAR=val` — senão `git -c commit.gpgsign=false
 # commit -am ...` e `FOO=1 git commit` saíam do hook sem check nenhum
-# (achado real de @cursoragent review, PR #134). CUIDADO: `[A-Za-Z_]`
-# (Z maiúsculo em vez de z minúsculo, achado nesta sessão) quebra a
-# regex INTEIRA em tempo de COMPILAÇÃO no BSD grep do macOS
-# (sub-range `a-Z` é descendente/inválida) — TODO `git commit`,
-# não só os com prefixo `VAR=`, saía sem check nenhum (grep -qE
-# retorna erro, `! grep` vira sucesso, hook inteiro dá exit 0 cedo).
-# `bash -n`/self-test do pattern-guardrails.sh NÃO pegam isso (self-
-# test cobre outro arquivo); só pipe-test real contra ESTE hook, no
-# BSD grep de verdade, expõe o typo — GNU grep pode não reproduzir.
-GIT_GLOBAL='( -C ("[^"]*"|'"'"'[^'"'"']*'"'"'|[^ ]+)| -c [^ ]+)*'
-GIT_COMMIT_AT='(^|[;&|]) *([A-Za-z_][A-Za-z0-9_]*=[^ ;&|]* )*git'"$GIT_GLOBAL"' commit($|[^a-zA-Z-])'
-if ! printf '%s' "$CMD_STRIPPED" | command grep -qE "$GIT_COMMIT_AT"; then
+# (achado real de @cursoragent review, PR #134). Typo de classe POSIX
+# com Z maiúsculo no lugar de z (range descendente a..Z) quebra a
+# regex INTEIRA em tempo de COMPILAÇÃO no BSD grep do macOS — TODO
+# `git commit`, não só os com prefixo VAR=, saía sem check nenhum
+# (grep -qE retorna erro, `! grep` vira sucesso, hook inteiro dá
+# exit 0 cedo). `bash -n` não pega; GNU grep no CI pode não reproduzir.
+# `if ! grep` com regex inválida (exit 2) vira sucesso e o hook dava
+# exit 0 — fail-OPEN. Agora exit ≥2 recusa o commit.
+grep_ere "$GIT_COMMIT_AT" "$CMD_STRIPPED"
+if [ "$GREP_RC" -ge 2 ]; then
+  deny "Commit bloqueado — a regex que detecta git commit falhou ao compilar (grep exit $GREP_RC). Recusando por segurança em vez de liberar o commit."
   exit 0
 fi
-
-deny() {
-  jq -n --arg reason "$1" '{
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: $reason
-    }
-  }'
-}
+if [ "$GREP_RC" -ne 0 ]; then
+  exit 0
+fi
 
 ORIG_DIR=$(pwd)
 REPO_DIR="$ORIG_DIR"
@@ -174,9 +291,9 @@ fi
 # @cursoragent review, PR #134). Flags são procuradas no comando
 # STRIPPED inteiro (não só coladas em `git commit`) pra `git -c x=y
 # commit -am` não escapar do deny.
-if printf '%s' "$CMD_STRIPPED" | command grep -qE '(^|[[:space:]])(--all|--include|--only|--patch|--interactive)($|[[:space:]=])' \
-  || printf '%s' "$CMD_STRIPPED" | command grep -qE '[[:space:]]-[a-zA-Z]*[ap][a-zA-Z]*($|[[:space:]])' \
-  || printf '%s' "$CMD_STRIPPED" | command grep -qE 'commit($|[^a-zA-Z-])([^;&|]*)[[:space:]]--[[:space:]]+[^[:space:]]'; then
+if printf '%s' "$CMD_STRIPPED" | command grep -qE "$RE_FLAG_LONG" \
+  || printf '%s' "$CMD_STRIPPED" | command grep -qE "$RE_FLAG_SHORT" \
+  || printf '%s' "$CMD_STRIPPED" | command grep -qE "$RE_FLAG_PATHSPEC"; then
   deny "Commit bloqueado — 'git commit -a/--all/--include/--only/--patch/-p/--interactive' (ou pathspec depois de --) grava mais do que o índice atual, e este hook só valida o snapshot já staged. Rode 'git add' explícito nos arquivos e um 'git commit' simples (sem essas flags)."
   exit 0
 fi
@@ -193,7 +310,7 @@ fi
 # num hook Pre); nega e pede pra rodar em 2 chamadas separadas — a
 # 2ª chamada (só `git commit`) faz este hook rodar de novo, agora com
 # o índice já staged de verdade.
-if printf '%s' "$CMD_STRIPPED" | command grep -qE '(^|[;&|])[[:space:]]*git[[:space:]]+(add|rm|reset|stage)\b' \
+if printf '%s' "$CMD_STRIPPED" | command grep -qE "$RE_INDEX_MUT" \
   && printf '%s' "$CMD_STRIPPED" | command grep -qE "$GIT_COMMIT_AT"; then
   deny "Commit bloqueado — este comando mistura 'git add/rm/reset/stage' com 'git commit' numa chamada só. Este hook roda ANTES do comando executar, então o índice validado seria o de ANTES do add/rm/reset — não o que será commitado de verdade. Rode o add/rm/reset numa chamada separada, depois um 'git commit' simples numa segunda chamada."
   exit 0

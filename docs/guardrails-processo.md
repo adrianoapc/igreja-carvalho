@@ -130,7 +130,10 @@ sequencial/divergente ou heurística de forma de gráfico.
   existente). Bloqueia o commit (`permissionDecision: deny`) se qualquer
   um falhar. Recusa `-a`/`--all`/`--include`/`--only`/`--patch`/`-p`/
   `--interactive` e pathspec depois de `--` — essas flags gravariam
-  mais do que o snapshot do índice que o hook valida.
+  mais do que o snapshot do índice que o hook valida. `--self-test`
+  (rodado no job `pattern_guardrails`) recusa a classe POSIX
+  descendente que já derrubou o gate no BSD grep do macOS, e o gate
+  trata grep exit ≥2 como deny (fail-closed) em vez de "não é commit".
 - **`pr-review-reminder.sh`** (`PreToolUse`, matcher `Bash`): lembrete
   não-bloqueante antes de `gh pr create` — não dá pra verificar de forma
   confiável que `/code-review`/`/security-review` rodaram, então isso é

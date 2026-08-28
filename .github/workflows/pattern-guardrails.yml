@@ -54,6 +54,9 @@ jobs:
       - name: Self-test pattern detectors
         run: bash .github/scripts/pattern-guardrails.sh --self-test
 
+      - name: Self-test pre-commit hook regexes
+        run: bash .claude/hooks/pre-commit-checks.sh --self-test
+
       - name: Scan PR diff for known-bug patterns
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
