@@ -270,6 +270,13 @@ de qualquer decisão — Fase 3, ver plano.
    corromper `atendimentos_bot` (sem lock hoje) — precisa ser FIFO pela
    ordem real de chegada, não só exclusão mútua (senão uma mensagem
    mais nova processa antes de uma mais velha da mesma conversa).
+   **`queued`+lease válido não é 5xx cego** (achado real de
+   `/code-review` local, 31ª rodada): sem `waitUntil`, a 2ª mensagem
+   da conversa que encostou na fila enquanto a 1ª rodava ficaria
+   15min parada — a request que completa um `wamid` drena a FIFO
+   nessa invocação, e redelivery/reclaim tenta dequeue se o lock
+   está livre e o `wamid` é a cabeça. O `owner_token` no body do
+   chatbot é **só** o do lock de conversa, não o da row de `wamid`.
    Idempotência transacional 100% (Storage + múltiplos inserts em cada
    chatbot) é maior que o escopo desta fase — Fase 1 entra só com
    guarda de unicidade no primeiro write de cada fluxo, cobertura
@@ -362,7 +369,10 @@ Ver plano de execução detalhado em
   `verify_jwt=false` faz o gateway não checar) + job `pg_cron` pra
   leases `queued`/`processing` expirados; `request_payload` = body
   exato do chatbot persistido no enqueue (`filial_id`/`wamid`
-  inclusos; `owner_token` injetado no dequeue, não gravado).
+  inclusos); no dequeue injeta o `owner_token` **do lock de
+  conversa** (não o da row de `wamid`). FIFO: quem completa um
+  `wamid` drena o próximo da conversa na mesma request; `queued`
+  tenta dequeue se o lock está livre.
 - `chatbot-triagem`/`chatbot-financeiro` recebem `wamid` **e, quando
   o caller é a `whatsapp-webhook`, `owner_token` do lock de
   conversa** como campos de entrada novos: claim de idempotência na
@@ -517,6 +527,19 @@ Ver plano de execução detalhado em
     com o JSON cru de `request_payload` — payload persistido no
     enqueue não tem token; replay cru cairia no caminho Make
     (cenário 16) e pularia o fencing.
+18. ⬜ Duas mensagens da mesma conversa em POSTs HTTP **separados**:
+    A completa (`completed`) e B já está `queued` com lease **válido**
+    (B levou 5xx enquanto A tinha o lock). Sem esperar os 15min do
+    lease de espera: a request de A, **depois** de `completed`, drena
+    B nessa invocação; e/ou uma redelivery/reclaim de B encontra o
+    lock livre, B é cabeça da FIFO, e desenfileira — não 5xx cego.
+    Também: o body do chatbot de B traz o `owner_token` do lock de
+    **conversa**, e o fencing de `atendimentos_bot` afeta >0 linhas
+    (não o UUID da row de `wamid`). Achado real de `/code-review`
+    local, PR #133, 31ª rodada — o cenário 9 testa ordem A-antes-de-B
+    sob paralelismo, mas não o liveness "B anda depois que A solta o
+    lock, ainda com lease de `queued` válido"; o 5xx cego da 27ª
+    passava no 9 e deixava B 15min parado no caminho feliz.
 
 ### Bake period
 
@@ -549,5 +572,5 @@ validado). Substituir ou marcar como histórico na Fase 1.
 
 ---
 
-**Última Atualização**: 2026-08-28 (30ª rodada — `/code-review` do reclaim)
+**Última Atualização**: 2026-08-28 (31ª rodada — `/code-review` da FIFO)
 **Próxima Revisão**: Depois da Fase 1 em produção, antes de iniciar a Fase 2

@@ -68,7 +68,10 @@ interna (`{action: "reclaim"}`) tem que viver **no handler**, senão
 
 - [ ] `GET` — handshake `hub.verify_token`/`hub.challenge` contra novo
   segredo `WHATSAPP_VERIFY_TOKEN`. Sem `hub.mode`, responde 200 simples
-  (health check).
+  (health check). Com `hub.mode=subscribe` e token certo, o body da
+  resposta é o valor **cru** de `hub.challenge` (`text/plain`), não
+  JSON — a Meta rejeita a verificação do callback se não for
+  byte-a-byte o challenge.
 - [ ] `POST` — lê o corpo **cru** (`req.text()`, não `req.json()` —
   `json()` consome o stream e impede HMAC depois). Despacho **não**
   é "HMAC em todo POST" nem "se `action===reclaim` pula HMAC"
@@ -462,6 +465,26 @@ interna (`{action: "reclaim"}`) tem que viver **no handler**, senão
   worker via lease expirado, por exemplo), tratar como no-op — quem
   já roubou o lock não deve ser derrubado por uma liberação tardia da
   invocação anterior.
+  **Quem termina um `wamid` tenta drenar a FIFO na mesma request**
+  (achado real de `/code-review` local, 31ª rodada — sem
+  `waitUntil` não existe worker nenhum olhando a fila depois do
+  `return`. Liberar em `chatbot_done` e encerrar deixa o próximo
+  `wamid` da conversa parado em `queued` até redelivery/sweep, e
+  com lease válido a redelivery levava 5xx; ver item 4). O lock
+  continua sendo liberado em `chatbot_done` (os Graph de A não
+  precisam dele). **Drenar só depois deste `wamid` estar
+  `completed`** — não entre `chatbot_done` e o Graph, senão A
+  nunca fecha nesta request. Aí: `SELECT` a cabeça da FIFO
+  (`queued`, mesma chave de conversa, `ORDER BY timestamp Meta,
+  seq`). Se houver item e restar orçamento de tempo no isolate
+  (ex.: >30s; teto da function ~150s), tenta o claim
+  `queued`→`processing` e processa **nessa** request (chatbot +
+  Graph desse próximo `wamid`) antes de responder. 0 linhas no
+  claim = um retry de B já ganhou o dequeue (lock estava livre
+  desde `chatbot_done`) — no-op. Sem orçamento: deixa `queued`;
+  a regra nova do item 4 (redelivery/reclaim tenta dequeue se o
+  lock está livre e este `wamid` é a cabeça) é a rede de
+  segurança, não o caminho feliz.
 - [ ] **Deduplica por `wamid` (`value.messages[].id`) antes de chamar
   qualquer chatbot — máquina de estado com fencing, não claim binário**
   (achado real de `@codex review`, P1 — promovido de "fora de escopo"
@@ -604,9 +627,18 @@ interna (`{action: "reclaim"}`) tem que viver **no handler**, senão
      lease de conversa por outro `wamid` gera duas invocações
      concorrentes no mesmo `atendimentos_bot` — exatamente o que o
      lock de conversa existe pra evitar). Fase 1 fecha isso de verdade:
-     1. Passar `owner_token` do lock de conversa (e do claim de `wamid`)
-        no body dos dois chatbots **quando o caller é a
-        `whatsapp-webhook`**. **Ausente = caminho Make, não é erro**
+     1. Passar no body dos dois chatbots **só o `owner_token` do
+        lock de CONVERSA** — não o da row de `wamid` (achado real
+        de `/code-review` local, 31ª rodada: o texto anterior
+        ("token do lock de conversa (e do claim de `wamid`)")
+        cabia num campo só; são 2 UUIDs de 2 tabelas. O chatbot
+        revalida `atendimentos_bot` contra a row de conversa,
+        `UPDATE ... WHERE owner_token=$token`; mandar o token da
+        row de `wamid` faz essa query afetar 0 linhas → 409 em
+        todo write depois do corte. O claim interno de
+        idempotência do chatbot (item 5) gera o **próprio** token
+        na tabela append-only dele; o token da row de orquestração
+        nunca sai do `whatsapp-webhook`). **Ausente = caminho Make, não é erro**
         (achado real de `/code-review` local, 27ª rodada — o Passo 2
         atualiza o Make só pra `x-webhook-secret` + `wamid`; o Make
         nunca vai ter lock de conversa nem esse token. Se o chatbot
@@ -655,9 +687,10 @@ interna (`{action: "reclaim"}`) tem que viver **no handler**, senão
      `chatbot_done` → `completed`. `INSERT` no enqueue com
      `status=queued`, `owner_token`, `lease_until=now()+15min`
      (heartbeat longo só de "ainda estou esperando na FIFO", não o
-     lease de 120s de processamento) e unique em `wamid`. Conflito:
-     `queued` com lease válido → 5xx (Meta reentrega); `queued` com
-     lease expirado → rouba `owner_token`, continua `queued`. No
+     lease de 120s de processamento) e unique em `wamid`.     Conflito:
+     `queued` com lease válido **não é 5xx cego** (ver item 4);
+     `queued` com lease expirado → rouba `owner_token` e **tenta o
+     dequeue na mesma request**. No
      dequeue: `queued` → `processing` com lease de 120s e token novo.
   3. Depois que o chatbot responde: grava `chatbot_result` e
      `status=chatbot_done` (condicionado ao `owner_token`) ANTES de
@@ -680,14 +713,30 @@ interna (`{action: "reclaim"}`) tem que viver **no handler**, senão
   4. **Toda entrada nova reclamando um `wamid` existente precisa agir
      conforme o status encontrado**:
      - `completed` → responde 200, não faz nada (já entregue de verdade).
-     - `queued` com lease válido → **5xx, não 200** (outro worker ainda
-       está na FIFO; 200 aqui faz a Meta parar de reentregar se esse
-       worker morrer ainda `queued`). `queued` com lease expirado →
-       rouba `owner_token`, continua `queued` (já especificado no
-       enqueue acima) — achado real de `/code-review` local, 27ª
-       rodada: o switch de status da 5ª rodada nunca ganhou o estado
-       `queued` da 26ª, então uma redelivery caía num fall-through
-       indefinido.
+     - `queued` → **não é 5xx cego só porque o lease ainda vale**
+       (achado real de `/code-review` local, 31ª rodada — o texto
+       da 27ª/5ª rodada mandava 5xx em `queued`+lease válido pra
+       a Meta não parar de reentregar se o worker original morresse
+       ainda na fila. Sem `waitUntil`, esse 5xx **também** é o que
+       a request de B recebe enquanto A segura o lock. Quando A
+       termina e libera a conversa, B continua `queued` com lease
+       de 15min válido: a próxima redelivery de B leva 5xx de
+       novo, o sweep ignora lease válido, e B só anda daqui a
+       15min — no caminho feliz de duas mensagens da mesma
+       conversa, não só em crash. O parágrafo do Passo 1 que diz
+       "quem ganha o dequeue processa nessa request" contradiz
+       esse 5xx cego: ninguém ganhava o dequeue nunca).
+       Regra: esta request tenta o dequeue se **(a)** este `wamid`
+       é a cabeça da FIFO da conversa (`timestamp` Meta + seq de
+       chegada) **e (b)** consegue o lock de conversa. Conseguiu →
+       `queued`→`processing`, processa até o fim nesta request.
+       Lock ocupado por outro `wamid` → **5xx** (a Meta reentrega;
+       quem completar o `wamid` corrente drena a FIFO depois de
+       `completed`, ver lock de conversa). `queued` com lease expirado → rouba
+       `owner_token` e aplica a **mesma** regra de dequeue, não
+       "continua queued" e devolve — steal sem dequeue + lease
+       renovado de 15min prende a mensagem até o próximo expiry,
+       e o cron do reclaim receber 200 acharia que acabou.
      - `chatbot_done` → reenvia (usando `chatbot_result` já persistido,
        sem invocar o chatbot de novo) só as entregas `"pendente"` da
        lista. **Cada entrega individual precisa do próprio claim atômico
@@ -847,10 +896,10 @@ interna (`{action: "reclaim"}`) tem que viver **no handler**, senão
      autoriza. Ver despacho do `POST` no início do Passo 1.
      O POST do cron carrega **só** `{action, wamid}` (não o PII —
      `pg_cron`/`net._http_response` loga body). A function lê
-     `request_payload` da row, injeta o `owner_token` corrente do
-     dequeue (item da tabela acima; o JSON persistido **não** traz
-     token) e entra no MESMO switch de status. Sem a coluna o cron
-     não tem o que reprocessar.
+     `request_payload` da row, injeta o `owner_token` **da conversa**
+     corrente (não o da row de `wamid` — 31ª rodada) e entra no MESMO
+     switch de status, **incluindo a tentativa de dequeue** se o
+     item está `queued`. Sem a coluna o cron não tem o que reprocessar.
      **Escopo do sweep: só `queued`/`processing` com lease expirado.**
      Não tocar `enviando` com lease expirado nem `erro_credencial`
      (401/403) — esses continuam reconciliação manual (8ª rodada:
@@ -993,9 +1042,18 @@ interna (`{action: "reclaim"}`) tem que viver **no handler**, senão
   mata o resto do trabalho no return, e 200 em `processing` já foi
   rejeitado na 5ª/13ª rodada). A FIFO durável serve pra **outras
   requisições HTTP concorrentes** (outro `wamid` da mesma conversa,
-  ou redelivery do mesmo): elas encostam na unique/`queued` e levam
-  5xx, a Meta reentrega, quem ganha o dequeue processa até o fim
-  **nessa** request e só então 200.
+  ou redelivery do mesmo): se o lock está ocupado, 5xx; se o lock
+  está livre e este `wamid` é a cabeça, **esta** request ganha o
+  dequeue e processa até o fim, só então 200. Quem já completou um
+  `wamid` drena o próximo item da conversa nessa request se restar
+  tempo (31ª rodada). **Batch da
+  Meta** (`entry[]`/`messages[]` com mais de um item): um único
+  status HTTP pra notificação inteira — 5xx se **qualquer**
+  mensagem do lote não estiver `completed` (enqueue falhou, ainda
+  `queued`/`processing`/`enviando`). 200 só quando todas as do
+  lote estiverem resolvidas. Item já `completed` no retry é
+  no-op (item 4); 200 no lote com um item que falhou o INSERT
+  perde essa mensagem pra sempre (não há row pro sweep).
 
 ### Passo 2 — Fechar os endpoints hoje abertos
 
@@ -1103,12 +1161,12 @@ mesmo sem qualquer mudança na Meta ainda. Ordem correta:
 
 - [ ] Deployar e testar isoladamente handshake `GET` + POST sintético,
   antes de tocar em qualquer configuração do Meta.
-- [ ] Rodar os 17 cenários de teste da ADR-033 (§Validação — inclui
+- [ ] Rodar os 18 cenários de teste da ADR-033 (§Validação — inclui
   reenvio de `wamid` simulado com 2 sessões reais, lock por conversa,
   payload real de mídia, retry de turno financeiro no meio do fluxo,
-  tenant do número de triagem, reclaim autenticado **e** 401 do
-  reclaim sem Bearer, achados de `@codex review` / `/code-review`
-  local) contra a nova função.
+  tenant do número de triagem, reclaim autenticado, 401 do reclaim
+  sem Bearer, e drenagem da FIFO depois que A completa com B ainda
+  `queued`+lease válido) contra a nova função.
 - [ ] Trocar a URL do webhook no Meta Business Manager (de Make pra
   Supabase) — **sem apagar** o scenario "Waba Chatbot - OakOS" no Make,
   só desligar.
