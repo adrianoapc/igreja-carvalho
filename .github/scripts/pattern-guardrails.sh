@@ -72,9 +72,45 @@ is_supabase_mutation_ctx() {
   echo "$ctx" | grep -qE '\.from\(["'"'"']|supabase[A-Za-z]*\.'
 }
 
+# Confirma que o .delete()/.update() na linha `lineno` de fato pertence a
+# um chain do Supabase, não só que "supabase"/.from( aparece em algum
+# lugar dentro de uma janela de N linhas (achado real de @codex review,
+# PR #134: `await supabase.from("items").select();` seguido, um pouco
+# depois, de `selectedIds.delete(id)` [Set.delete de verdade] classificava
+# o Set.delete como mutation Supabase, só por estar na mesma janela de 13
+# linhas — nenhuma relação de chain real entre os dois). Anda pra trás a
+# partir da linha da call: linha em branco pula; linha terminada em `;`
+# é um statement COMPLETO anterior — não pode ser continuação do chain
+# atual, para a busca; linha com `.from(["']`/`supabase\.` = achou o
+# início do chain. Statements terminados em `;` são o sinal de fronteira
+# real (um chain multi-linha não-terminado nunca tem `;` no meio).
+mutation_belongs_to_chain() {
+  local f="$1" lineno="$2" line prev i trimmed
+  line=$(sed -n "${lineno}p" "$f")
+  is_supabase_mutation_ctx "$line" && return 0
+  i=$((lineno - 1))
+  local floor=$((lineno > 10 ? lineno - 10 : 1))
+  while [ "$i" -ge "$floor" ]; do
+    prev=$(sed -n "${i}p" "$f")
+    trimmed=$(printf '%s' "$prev" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
+    if [ -z "$trimmed" ]; then
+      i=$((i - 1))
+      continue
+    fi
+    if is_supabase_mutation_ctx "$trimmed"; then
+      return 0
+    fi
+    case "$trimmed" in
+      *\;) return 1 ;;  # statement anterior completo — não é meu chain
+    esac
+    i=$((i - 1))
+  done
+  return 1
+}
+
 check_mutations() {
   local f="$1" fail=0
-  local lineno ctx_start ctx args win nmatches idx line
+  local lineno args win nmatches idx line
   # Itera por MATCH, não por linha (achado real de /code-review ultra
   # local, PR #134): `grep -n` reporta uma linha que casa 1x mesmo com
   # 2+ ocorrências (`Promise.all([a.delete(), b.delete({count:"exact"})])`)
@@ -87,12 +123,15 @@ check_mutations() {
     line=$(sed -n "${lineno}p" "$f")
     nmatches=$(printf '%s\n' "$line" | grep -oE '\.(delete|update)\(' | wc -l | tr -d ' ')
     [ "${nmatches:-0}" -eq 0 ] && continue
-    ctx_start=$((lineno > 10 ? lineno - 10 : 1))
-    ctx=$(sed -n "${ctx_start},$((lineno + 3))p" "$f")
     # .from\(["'] exige aspas logo após o parêntese — bate em
     # .from("tabela") do Supabase, não em Array.from(x) (achado real:
     # Array.from(selectedChildren) perto de Set.delete disparava).
-    is_supabase_mutation_ctx "$ctx" || continue
+    # mutation_belongs_to_chain (não uma janela de N linhas) confirma
+    # que ESTA call pertence de fato ao chain Supabase, não só que
+    # "supabase"/.from( aparece em algum lugar perto (achado real de
+    # @codex review, PR #134: supabase.from("items").select(); seguido
+    # de Set.delete() de verdade um pouco depois classificava errado).
+    mutation_belongs_to_chain "$f" "$lineno" || continue
     # Janela MESMA LINHA só, mesma razão do check_filial_eq acima
     # (achado real de /code-review ultra local, PR #134: `//
     # count-exact-ok` de UMA call vazava pra proteger uma call
@@ -282,6 +321,17 @@ newSelected.delete(childId);
 EOF
   expect_pass "Set.delete / Array.from não é supabase" "$tmp/set-delete.ts" check_mutations
 
+  # 10b) Set.delete DEPOIS de uma call supabase real (statement completo,
+  #      terminado em `;`) não pode ser classificado como mutation
+  #      Supabase só por estar na mesma janela (achado real de @codex
+  #      review, PR #134).
+  cat >"$tmp/set-delete-near-supabase.ts" <<'EOF'
+await supabase.from("items").select();
+const selectedIds = new Set([1, 2, 3]);
+selectedIds.delete(id);
+EOF
+  expect_pass "Set.delete perto de supabase.select() não é mutation" "$tmp/set-delete-near-supabase.ts" check_mutations
+
   # 11) chain multi-linha .from + .delete()
   cat >"$tmp/del-multiline.ts" <<'EOF'
 await supabase
@@ -333,7 +383,7 @@ EOF
     return 1
   fi
   echo ""
-  echo "Self-test OK (18 casos)."
+  echo "Self-test OK (19 casos)."
   rm -rf "$tmp"
   return 0
 }

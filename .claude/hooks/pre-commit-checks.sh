@@ -98,7 +98,13 @@ s = sys.stdin.read()
 m = re.search(r"(--message\b|-m\b|<<)", s)
 sys.stdout.write(s[: m.start()] if m else s)
 ')
-if printf '%s' "$CMD_HEAD" | grep -qE '(^|[;&|])[[:space:]]*git[[:space:]]+(-C[[:space:]]+\S+[[:space:]]+)?commit\b.*[[:space:]](-[a-zA-Z]*a[a-zA-Z]*\b|--all\b|--include\b|--only\b)'; then
+# -C aceita path entre aspas (com espaço) igual à extração acima —
+# achado real de @codex review: `\S+` sozinho parava no primeiro
+# espaço de `-C "repo with space"`, então esse caso não batia aqui e a
+# rejeição de -a/--all nunca disparava, mesmo com o -C real levando a
+# um diretório existente (testado: `git -C "dir com espaço" commit
+# -am x` passava sem deny antes deste fix).
+if printf '%s' "$CMD_HEAD" | grep -qE '(^|[;&|])[[:space:]]*git[[:space:]]+(-C[[:space:]]+("[^"]*"|'"'"'[^'"'"']*'"'"'|\S+)[[:space:]]+)?commit\b.*[[:space:]](-[a-zA-Z]*a[a-zA-Z]*\b|--all\b|--include\b|--only\b)'; then
   deny "Commit bloqueado — 'git commit -a/--all/--include/--only' grava mais do que o índice atual, e este hook só valida o snapshot já staged. Rode 'git add' explícito nos arquivos e um 'git commit' simples (sem essas flags)."
   exit 0
 fi
