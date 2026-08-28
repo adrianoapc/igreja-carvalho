@@ -445,9 +445,20 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   IA/Graph; sem isso a mesma mensagem pode rodar 2x em paralelo).
   **4 rodadas de review acharam problema numa versão anterior desta
   mesma lógica — o desenho abaixo é o que sobrou depois de fechar
-  todos**. Tabela dedicada por `wamid`: `status`, `owner_token` (UUID
+  todos**.   Tabela dedicada por `wamid`: `status`, `owner_token` (UUID
   gerado por tentativa), `lease_until`, `chatbot_result` (JSONB,
-  nullable). **Sem SELECT nenhum via PostgREST — nem pra admin, nem pra
+  nullable), **`request_payload` (JSONB, obrigatório no enqueue)**.
+  **Sem o payload persistido o sweep da Decisão 7 não consegue
+  reprocessar nada** (achado real de `/code-review` local, 29ª
+  rodada — as colunas listadas até a 28ª não incluíam o envelope
+  normalizado; "passar o payload já persistido" no item 4.5 não
+  tinha onde persistir. Sem isso o cron só consegue alertar, nunca
+  reinvocar). Gravar no `INSERT` do enqueue o recado já achatado
+  (`telefone`, `mensagem`/`media_id`/`url_anexo`, `phone_number_id`,
+  `display_phone_number`, `nome_perfil`, `tipo`, `origem_canal`,
+  `igreja_id` resolvido) — o mesmo JSON que a `whatsapp-webhook`
+  mandaria ao chatbot. Mesma restrição de acesso do resto da
+  tabela: PII de conversa. **Sem SELECT nenhum via PostgREST — nem pra admin, nem pra
   super_admin** (achado real de `@codex review`, P1, 8ª rodada: essa
   tabela guarda telefone + conteúdo completo de mensagem/resposta; se
   for criada em `public` sem RLS ou sem revogar o `EXECUTE`/`SELECT` de
@@ -465,7 +476,7 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   de enqueue abaixo).
 
   1. Enqueue: `INSERT` do `wamid` com `status=queued` (unique; lease
-     longo de espera, ver item 2). Claim de `processing`: no dequeue,
+     longo de espera, ver item 2) **e `request_payload` já achatado**. Claim de `processing`: no dequeue,
      `queued` → `processing` com `owner_token=<novo uuid>`,
      `lease_until=now()+120s`. Em conflito
      (row já existe), só atualiza pra reclamar se `status=processing`
@@ -762,20 +773,35 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      silenciosamente pra sempre, sem alerta, sem reconciliação — o
      oposto do que essa máquina de estado inteira foi desenhada pra
      evitar). Fase 1 precisa de um sweep independente de tráfego HTTP
-     novo: job agendado (`pg_cron`, já disponível no Supabase Postgres)
-     rodando a cada poucos minutos que (a) encontra `wamid` em `queued`/
-     `processing` com lease expirado E sem nenhuma atividade recente, e
-     (b) reinvoca o processamento via `pg_net.http_post` contra a
-     própria `whatsapp-webhook` (ou uma rota interna dedicada de
-     reconciliação), passando o `wamid`/payload já persistido — não
-     precisa esperar a Meta reentregar pra destravar. Alternativa mais
-     simples, se o volume real justificar adiar o cron: alertar
-     (`log_edge_function_with_metrics` + alerta operacional) sempre que
-     o sweep encontrar uma row assim, mesmo sem reprocessar
-     automaticamente — fecha a parte "silencioso" do problema (alguém
-     fica sabendo) mesmo que não feche "automático" ainda. Qualquer uma
-     das duas é melhor que a garantia atual de zero, que é "só se a
-     Meta reentregar por conta própria".
+     novo: job `pg_cron` a cada poucos minutos. **Não postar na
+     rota pública da `whatsapp-webhook`** (achado real de `/code-review`
+     local, 29ª rodada — essa rota valida `X-Hub-Signature-256` no
+     body cru da Meta ANTES de parsear; um `pg_net.http_post` com
+     `{wamid}` falha a assinatura, e fabricar um envelope Meta
+     assinado com `META_APP_SECRET` de dentro do Postgres é o caminho
+     errado). Rota interna na mesma function (ex.: `POST .../whatsapp-webhook`
+     com `{action: "reclaim", wamid}`), autenticada como os crons que
+     já existem: `Authorization: Bearer` lido de
+     `vault.decrypted_secrets` onde `name = 'cron_service_role_key'`
+     — **nunca** `current_setting('app.settings.service_role_key')`.
+     Essa GUC nunca existiu neste projeto; os jobs
+     `getnet-sync-automatico`/`buscar-pix-automatico` falharam 100%
+     das vezes até a migration
+     `20260813020100_fix_cron_service_role_key_vault.sql` apontar pro
+     Vault. Copiar o padrão dessa migration (URL pública hardcoded,
+     `timeout_milliseconds := 120000` — o default do `net.http_post`
+     é 5s, insuficiente pra chatbot+Graph). O body do reclaim usa o
+     `request_payload` gravado no enqueue (item da tabela acima); sem
+     essa coluna o cron não tem o que reprocessar.
+     **Escopo do sweep: só `queued`/`processing` com lease expirado.**
+     Não tocar `enviando` com lease expirado nem `erro_credencial`
+     (401/403) — esses continuam reconciliação manual (8ª rodada:
+     reenvio cego duplica mensagem; 28ª: token quebrado não é
+     `"falhou"` permanente). O reclaim entra no MESMO switch de
+     status de uma redelivery da Meta (item 4), não num atalho que
+     reinvoca o chatbot às cegas.
+     Alertar via `log_edge_function_with_metrics` em CADA row
+     encontrada é adicional, não substituto do reclaim.
   5. **Idempotência não pode viver só no orquestrador — mas cobertura
      100% de todo efeito colateral é maior que o escopo da Fase 1**
      (achado real de `@codex review`, P1, 4ª e 9ª rodadas). Se a
@@ -946,6 +972,12 @@ mesmo sem qualquer mudança na Meta ainda. Ordem correta:
    "{{1.entry[].changes[].value.messages[].id}}"` aos 2 bodies (módulos
    3a e 3b) junto com o header do secret, na mesma atualização de
    blueprint deste passo.
+   **Não** pedir `owner_token` no body do Make (achado real de
+   `/code-review` local, 27ª rodada; o cenário 16 da ADR cobre o
+   teste): esse campo só existe depois do corte, gerado pela
+   `whatsapp-webhook`. O Make continuar sem ele é o caminho de
+   compatibilidade do Passo 1 — fencing de lock de conversa fica
+   no-op enquanto o caller for o Make.
 2. [ ] Só então deployar `chatbot-triagem`: adicionar validação
    `x-webhook-secret` fail-closed contra `MAKE_WEBHOOK_SECRET` (hoje
    não valida nada).

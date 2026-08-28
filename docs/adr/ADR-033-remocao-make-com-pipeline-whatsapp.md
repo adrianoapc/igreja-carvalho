@@ -197,10 +197,17 @@ ficar presa atrás de outra por mais que o lease de espera, o único jeito
 de reclamar é a Meta reentregar — sem garantia formal disso acontecer
 dentro da janela de lease. Fase 1 adiciona um job `pg_cron` (extensão já
 disponível no Supabase Postgres) que varre periodicamente leases
-expirados sem depender de tráfego HTTP novo, reinvocando via `pg_net`
-ou, no mínimo, alertando — fechando a lacuna entre "a máquina de estado
-foi desenhada pra sobreviver a lease travado" e "na prática só sobrevive
-se a Meta cooperar".
+expirados **sem depender de tráfego HTTP da Meta**. O job **não**
+posta na rota pública (assinatura `X-Hub-Signature-256`); usa uma
+rota interna `{action: "reclaim", wamid}` autenticada com
+`vault.decrypted_secrets` (`cron_service_role_key`), o mesmo padrão
+que consertou os crons `getnet-sync`/`buscar-pix`
+(`20260813020100_fix_cron_service_role_key_vault.sql` — GUC
+`app.settings.*` nunca funcionou neste projeto). O envelope
+normalizado tem que estar persistido no enqueue (`request_payload`);
+sem isso o cron não tem o que reprocessar. Escopo: só
+`queued`/`processing` expirados — não reenvia `enviando` às cegas.
+Timeout do `net.http_post` 120s, não o default de 5s.
 
 ### 8. Escalas e Feelings ficam pra Fase 2; Liturgia/geo/pedido/testemunho pra Fase 3
 
@@ -335,8 +342,13 @@ Ver plano de execução detalhado em
 
 - Nova function `supabase/functions/whatsapp-webhook/index.ts`, com
   dedupe por `wamid` (fencing por `owner_token`, lease de 120s,
-  retry-de-envio sem reinvocar chatbot) e resolução de mídia via Graph
-  API antes de repassar pro `chatbot-financeiro`
+  retry-de-envio sem reinvocar chatbot). **Não** resolve mídia via
+  Graph — repassa `media_id` cru (`url_anexo`/`media_id`); os
+  chatbots já resolvem com `WHATSAPP_API_TOKEN`. Rota interna
+  `{action: "reclaim"}` autenticada via Vault
+  (`cron_service_role_key`) + job `pg_cron` (Decisão 7) pra leases
+  `queued`/`processing` expirados; `request_payload` persistido no
+  enqueue.
 - `chatbot-triagem`/`chatbot-financeiro` recebem `wamid` **e, quando
   o caller é a `whatsapp-webhook`, `owner_token` do lock de
   conversa** como campos de entrada novos: claim de idempotência na
@@ -448,12 +460,16 @@ Ver plano de execução detalhado em
 14. ⬜ `wamid` fica `queued`/`processing` com lease expirado e NENHUMA
     nova requisição HTTP toca esse `wamid` de novo (sem redelivery da
     Meta simulado) → o job `pg_cron` de reclaim (Decisão 7) encontra a
-    row na próxima varredura e reinvoca/alerta, sem depender de
-    nenhuma requisição HTTP nova (achado real de `/code-review ultra`
+    row na próxima varredura e reinvoca pela rota interna de reclaim
+    (Vault `cron_service_role_key`, sem assinatura Meta), usando o
+    `request_payload` persistido no enqueue — sem depender de
+    nenhuma requisição HTTP nova da Meta (achado real de `/code-review ultra`
     local, PR #133 — nenhum cenário anterior exercita reclaim sem
     tráfego HTTP tocando o `wamid`; todos os cenários de lease/
     redelivery acima simulam uma NOVA entrega da Meta como gatilho, o
-    que mascara justamente a lacuna que este cenário fecha).
+    que mascara justamente a lacuna que este cenário fecha). **Também
+    confirmar o negativo**: row `enviando` com lease expirado NÃO é
+    reenviada pelo sweep.
 15. ⬜ POST em `chatbot-triagem`/`chatbot-financeiro` **sem** `x-webhook-
     secret` (ou com valor errado), depois do corte (Passo 2 completo)
     → 401, sem processar (achado real de `/code-review ultra` local,
@@ -504,5 +520,5 @@ validado). Substituir ou marcar como histórico na Fase 1.
 
 ---
 
-**Última Atualização**: 2026-08-28 (28ª rodada — `/code-review ultra` local)
+**Última Atualização**: 2026-08-28 (29ª rodada — `/code-review` do sweep)
 **Próxima Revisão**: Depois da Fase 1 em produção, antes de iniciar a Fase 2
