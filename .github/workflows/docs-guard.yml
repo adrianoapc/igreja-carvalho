@@ -12,28 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      # Pinado por SHA, não pela tag @v45 — mesma razão do
-      # pattern-guardrails.yml (achado real de /code-review ultra
-      # local, PR #134): tj-actions/changed-files já teve a tag
-      # re-apontada pra commit malicioso num incidente real. SHA = o
-      # que a tag v45 apontava em 2026-08-28.
-      - name: Get changed files
-        id: changed
-        uses: tj-actions/changed-files@48d8f15b2aaa3d255ca5af3eba4870f807ce6b3c # v45
         with:
-          json: true
+          fetch-depth: 0
 
       - name: Enforce documentation discipline
         shell: bash
         env:
           FIX_MODE_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'doc:fix') }}
-          # Passado via env, nunca interpolado direto no script — mesmo
-          # vetor de injeção do pattern-guardrails.yml (achado real de
-          # /code-review ultra local, PR #134): um nome de arquivo
-          # malicioso na PR quebraria pra fora de uma substituição
-          # ${{ }} direta no bash.
-          CHANGED_FILES_JSON: ${{ steps.changed.outputs.all_changed_files }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
 
@@ -41,7 +27,18 @@ jobs:
           echo "Docs Guard — Hard + Fix Mode"
           echo "==============================="
 
-          changed=$(echo "$CHANGED_FILES_JSON" | jq -r '.[]')
+          # Lista de arquivos via `git diff --name-only` (não
+          # tj-actions/changed-files) — mesma razão do
+          # pattern-guardrails.yml (achado real de /code-review ultra
+          # local, PR #134, reforçado por um bug real reproduzido nesta
+          # correção: interpolar `json: true` num bloco `env:` faz o
+          # runtime do GitHub Actions re-escapar a string JSON — o array
+          # com aspas vira aspas escapadas de verdade no valor final do
+          # env var, quebrando `jq -r '.[]'` com "Invalid numeric
+          # literal" — fora do risco de supply-chain/injeção que já
+          # motivava tirar a Action de terceiro daqui). `git diff` no
+          # checkout da PR não tem nenhum desses problemas.
+          changed=$(git diff --name-only "$BASE_SHA"...HEAD)
           echo "Changed files:"
           echo "$changed"
 
