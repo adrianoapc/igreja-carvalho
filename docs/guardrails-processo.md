@@ -54,22 +54,30 @@ de série de gráfico.
   adicionadas **e** margem em torno de hunks só-de-remoção — 2ª rodada de
   review achou que remover só a linha `{ count: "exact" }` de um
   `.delete()` multi-linha é uma regressão real que não aparece como linha
-  "adicionada" nenhuma; testado localmente que a janela agora cobre esse
-  caso. Bloqueia os 3 padrões da tabela acima — `.eq("filial_id"` sem
-  `.or(...filial_id.is.null)` (regex exige `filial_id` especificamente
-  antes de `.is.null`, não qualquer `.or()` com `is.null` de outro campo
-  — achado real: `.eq("filial_id",...)` perto de `.or("data_fim.is.null,
-  ...")` passava antes), `.delete()`/`.update()` sem `{count:"exact"}`
-  (cobre chain multi-linha, ex. `.from("x")` numa linha e `.delete(...)`
-  na próxima), `STATUS_COLOR` usado como `color:`. Escapes explícitos via
-  comentário (`// filial-global-ok`, `// count-exact-ok`) pra falso
-  positivo legítimo. Também avisa (não bloqueia) sobre hex hardcoded em
-  componente de dashboard/chart.
-  **Limite conhecido, não fechado**: o check de `{count:"exact"}` só
-  confirma que a opção existe por perto, não que o código realmente lê e
-  rejeita `count===0` — um call site que passa a opção mas ignora o
-  valor retornado passa no guardrail com o bug original ainda vivo (não
-  dá pra fechar isso com confiança via regex, precisaria de parser real).
+  "adicionada" nenhuma. Detectores em
+  `.github/scripts/pattern-guardrails.sh` (o workflow roda `--self-test`
+  antes de escanear a PR). Bloqueia os 3 padrões da tabela acima:
+  - `.eq("filial_id"` **é o bug em si**. Um `.or("filial_id.is.null")` no
+    mesmo chain **não** basta — PostgREST ANDa os filtros, então
+    `.eq("filial_id", id).or("filial_id.eq.id,filial_id.is.null")` continua
+    excluindo as linhas globais. A forma correta **substitui** o `.eq` por
+    `.or("filial_id.eq.X,filial_id.is.null")`. Escape: `// filial-global-ok`
+    (exclusão de globais intencional).
+  - `.delete()`/`.update()` do Supabase sem `{count:"exact"}` **nos
+    argumentos desta call** (não numa irmã a N linhas — `count: "exact"`
+    de um `.select` ou de outro `.delete` no mesmo bloco não protege).
+    Cobre chain multi-linha (`.from("x")` numa linha e `.delete(...)` na
+    próxima). Distingue `Array.from` / `Set.delete`. Escape:
+    `// count-exact-ok`.
+  - `STATUS_COLOR` usado como `color:`.
+  Também avisa (não bloqueia) sobre 3+ literais hex em qualquer `.ts`/
+  `.tsx` tocado (a 1ª heurística exigia `COLORS` na mesma linha E path
+  com dashboard/chart — nenhum dos 5 arquivos-alvo batia nos dois).
+  **Limite conhecido, não fechado**: o check de `{count:"exact"}` confirma
+  que a opção está nesta call, não que o código realmente lê e rejeita
+  `count===0` — um call site que passa a opção mas ignora o valor
+  retornado passa no guardrail com o bug original ainda vivo (não dá pra
+  fechar isso com confiança via regex, precisaria de parser real).
 
 **`migration-harness.yml` foi retirado desta rodada.** A ideia (subir
 Supabase local via Docker e aplicar todas as migrations do zero antes do
@@ -104,13 +112,18 @@ sequencial/divergente ou heurística de forma de gráfico.
 ### Hooks do Claude Code — `.claude/settings.json` + `.claude/hooks/`
 
 - **`pre-commit-checks.sh`** (`PreToolUse`, matcher `Bash`): intercepta
-  `git commit` e roda, ANTES de permitir o commit: eslint nos arquivos
-  `.ts`/`.tsx` staged (não `npm run lint` no repo inteiro — o baseline
-  tinha ~560 erros pré-existentes fora do que estava sendo commitado;
-  rodar full-repo bloquearia qualquer commit pra sempre), `tsc --noEmit`
-  completo (baseline limpo hoje), e `deno test` nos `*.test.ts` staged
-  dentro de `supabase/functions/**`. Bloqueia o commit
-  (`permissionDecision: deny`) se qualquer um falhar.
+  `git commit` (inclusive `git -C <dir> commit`) e roda, ANTES de
+  permitir o commit, contra o **snapshot do índice** (`git write-tree` +
+  archive — o que o commit vai gravar, não o working tree): eslint nos
+  arquivos `.ts`/`.tsx` staged (não `npm run lint` no repo inteiro — o
+  baseline tinha ~560 erros pré-existentes fora do que estava sendo
+  commitado; rodar full-repo bloquearia qualquer commit pra sempre),
+  `tsc --noEmit` completo (baseline limpo hoje), e a suite `deno test
+  supabase/functions` inteira sempre que qualquer `.ts` em
+  `supabase/functions/**` estiver staged (a suite é pequena — 2 arquivos
+  — e assim uma mudança só no módulo de produção ainda dispara o teste
+  existente). Bloqueia o commit (`permissionDecision: deny`) se qualquer
+  um falhar.
 - **`pr-review-reminder.sh`** (`PreToolUse`, matcher `Bash`): lembrete
   não-bloqueante antes de `gh pr create` — não dá pra verificar de forma
   confiável que `/code-review`/`/security-review` rodaram, então isso é
@@ -125,14 +138,12 @@ própria PR #134):
   (`pattern-guardrails.yml`) + branch protection, não os hooks. Os hooks
   são a primeira linha (feedback mais rápido, antes até de existir
   commit), o CI é a linha que não depende de qual ferramenta foi usada.
-- `pre-commit-checks.sh` roda eslint/tsc contra o **working tree**, não
-  contra o snapshot exato que está staged — com staging parcial (`git add
-  -p`), uma correção não-staged pode fazer o check passar enquanto o
-  commit registra a versão staged ainda quebrada.
-- Se o comando for `git -C <outro-dir> commit`, o matcher dispara mas
-  `git diff --cached`/eslint/tsc continuam rodando no cwd original, não
-  em `<outro-dir>` — o hook pode aprovar um commit em outro checkout
-  (ex: `.claude/worktrees/`) usando o índice/arquivos do repo raiz.
+- `tsc --noEmit` no `tsconfig.json` raiz (`"files": []` + project
+  references) **não typechecka `src/`** — sempre passa. `tsc -p
+  tsconfig.app.json --noEmit` hoje falha em dezenas de erros
+  pré-existentes; endurecer o hook exigiria limpar esse débito (mesmo
+  raciocínio do eslint full-repo). O eslint nos arquivos staged continua
+  sendo o check de código que de fato pega regressão nova.
 
 ### PR template — `.github/pull_request_template.md`
 
@@ -205,4 +216,4 @@ segurança.
 
 ---
 
-**Última Atualização**: 2026-08-26
+**Última Atualização**: 2026-08-28

@@ -14,19 +14,22 @@ de cada padrão no próprio arquivo). Resumo:
   que a skill rodou de fato).
 - **Hook de commit já roda lint+typecheck+testes automaticamente**
   (`.claude/hooks/pre-commit-checks.sh`, via `PreToolUse` em
-  `.claude/settings.json`) — bloqueia `git commit` se falhar. Só vale
+  `.claude/settings.json`) — bloqueia `git commit` se falhar. Roda contra
+  o snapshot do índice (não o working tree) e honra `git -C`. Só vale
   dentro de sessão Claude Code com esse settings.json carregado; não
   substitui CI.
 - **CI (`pattern-guardrails.yml`) é o gate real**, independente de
-  ferramenta: grep só nas linhas adicionadas pelo diff, bloqueando
-  padrões de bug já recorrentes (`.eq("filial_id"` sem `.or(...is.null)`,
-  `.delete()`/`.update()` sem `{count:"exact"}`, `STATUS_COLOR` como
-  `color:`). `migration-harness.yml` (harness de Postgres aplicando toda
-  migration do zero antes do merge) foi desenhado mas **retirado** — a
-  história de migrations tem drift conhecido (`itens_reembolso` nunca
-  criada, `times_culto` referenciada após removida) que faz `supabase db
-  reset` falhar sempre; corrigir isso é sessão dedicada, nunca resetando/
-  dropando/truncando prod.
+  ferramenta: grep só numa janela em torno dos hunks do diff, bloqueando
+  padrões de bug já recorrentes (`.eq("filial_id"` — o `.eq` em si exclui
+  globais, um `.or(...)` por perto não basta porque o PostgREST ANDa;
+  `.delete()`/`.update()` sem `{count:"exact"}` **nesta** call, não numa
+  irmã; `STATUS_COLOR` como `color:`). Detectores + `--self-test` em
+  `.github/scripts/pattern-guardrails.sh`. `migration-harness.yml` (harness
+  de Postgres aplicando toda migration do zero antes do merge) foi
+  desenhado mas **retirado** — a história de migrations tem drift
+  conhecido (`itens_reembolso` nunca criada, `times_culto` referenciada
+  após removida) que faz `supabase db reset` falhar sempre; corrigir isso
+  é sessão dedicada, nunca resetando/dropando/truncando prod.
 - **Gráfico novo**: usar `src/lib/chartPalette.ts` (série categórica) ou
   `statusPalette.ts` (pill/status) — nunca hex hardcoded. Consultar a
   skill `dataviz` pra paleta sequencial/divergente ou forma de gráfico.
