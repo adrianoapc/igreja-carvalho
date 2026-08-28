@@ -10,13 +10,30 @@
 -- com e sem filial, admin global, claim via request.jwt.claim.igreja_id,
 -- anon sem JWT nenhum).
 --
--- SÓ RODAR CONTRA O STACK LOCAL (`supabase start`), NUNCA produção —
--- insere/apaga fixtures em public.profiles/user_roles com UUIDs
--- sentinela óbvios (0000...aaaa etc.), mas ainda assim é escrita real.
+-- **AUTOCONTIDO, roda contra um Postgres 17 DESCARTÁVEL — não `supabase
+-- start`** (achado real de `@codex review`, P1, PR #135: numa checkout
+-- limpa, `supabase start`/`supabase db reset` falha no meio do histórico
+-- de migrations com drift conhecido — ver AGENTS.md e
+-- docs/guardrails-financeiro.md — então o teste nunca chegaria a rodar).
+-- Este script cria só os stubs mínimos de que has_filial_access()
+-- depende (schema `auth`, tipo `app_role`, `profiles`/`user_roles`/
+-- `user_filial_access`, `has_role()`) e carrega as funções REAIS via
+-- `\ir` do próprio migration file — não uma cópia retypada — então o
+-- teste sempre valida o código de verdade que será deployado.
 --
---   supabase start
---   psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
---     -f supabase/tests/has_filial_access_test.sql
+--   docker run --rm -d --name hfa_test -e POSTGRES_PASSWORD=postgres \
+--     -p 55432:5432 postgres:17
+--   docker cp supabase/tests/has_filial_access_test.sql hfa_test:/tmp/
+--   docker cp supabase/migrations/20260827130000_fix_has_filial_access_legacy_claim_bypass.sql \
+--     hfa_test:/tmp/20260827130000_fix_has_filial_access_legacy_claim_bypass.sql
+--   docker exec -u postgres hfa_test psql -U postgres -d postgres -f /tmp/has_filial_access_test.sql
+--   docker rm -f hfa_test
+--
+-- (o `\ir` abaixo resolve relativo ao PRÓPRIO arquivo, então rodar via
+-- `psql -f supabase/tests/has_filial_access_test.sql` de dentro do
+-- checkout do repo — sem copiar pro container — também funciona, desde
+-- que o Postgres alvo seja descartável, nunca produção nem o stack
+-- local de outro projeto.)
 --
 -- Cada assert usa RAISE EXCEPTION on falha — o script inteiro para no
 -- primeiro erro (fail-fast). "PASS" no final = todos os 11 cenários OK.
@@ -28,6 +45,78 @@
 
 \set ON_ERROR_STOP on
 
+-- Stubs mínimos (schema completo real fica em supabase/migrations/;
+-- aqui só o suficiente pra has_filial_access() rodar isolada)
+CREATE SCHEMA IF NOT EXISTS auth;
+
+CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
+LANGUAGE sql STABLE AS $$
+  SELECT nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '')::uuid;
+$$;
+
+CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(current_setting('request.jwt.claims', true)::jsonb, '{}'::jsonb);
+$$;
+
+DO $$ BEGIN
+  CREATE TYPE public.app_role AS ENUM
+    ('admin','super_admin','admin_igreja','admin_filial','tesoureiro','lider','secretario','visitante');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS auth.users (
+  id uuid PRIMARY KEY,
+  email text
+);
+
+CREATE TABLE IF NOT EXISTS public.user_roles (
+  user_id uuid NOT NULL,
+  role public.app_role NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.profiles (
+  user_id uuid PRIMARY KEY REFERENCES auth.users(id),
+  nome text,
+  email text,
+  status text,
+  igreja_id uuid,
+  filial_id uuid
+);
+
+CREATE TABLE IF NOT EXISTS public.user_filial_access (
+  user_id uuid NOT NULL,
+  igreja_id uuid NOT NULL,
+  filial_id uuid NOT NULL,
+  can_view boolean NOT NULL DEFAULT true
+);
+
+CREATE OR REPLACE FUNCTION public.has_role(_user_id UUID, _role public.app_role)
+RETURNS BOOLEAN
+LANGUAGE SQL
+STABLE
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.user_roles
+    WHERE user_id = _user_id AND role = _role
+  )
+  OR (
+    _role = 'admin'::public.app_role
+    AND EXISTS (
+      SELECT 1
+      FROM public.user_roles
+      WHERE user_id = _user_id AND role IN ('admin_igreja'::public.app_role, 'admin_filial'::public.app_role)
+    )
+  )
+$$;
+
+-- Carrega has_filial_access()/get_jwt_igreja_id()/get_jwt_filial_id()
+-- REAIS do migration file (não uma cópia) — \ir resolve relativo a
+-- este próprio arquivo, independente do cwd de onde psql foi chamado.
+\ir ../migrations/20260827130000_fix_has_filial_access_legacy_claim_bypass.sql
+
 -- Fixtures (sentinelas óbvios, nunca colidem com dado real)
 DELETE FROM public.user_roles WHERE user_id IN (
   '00000000-0000-4000-8000-000000000004'
@@ -38,6 +127,19 @@ DELETE FROM public.profiles WHERE user_id IN (
   '00000000-0000-4000-8000-000000000003',
   '00000000-0000-4000-8000-000000000004'
 );
+DELETE FROM auth.users WHERE id IN (
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8000-000000000002',
+  '00000000-0000-4000-8000-000000000003',
+  '00000000-0000-4000-8000-000000000004'
+);
+
+INSERT INTO auth.users (id, email) VALUES
+  ('00000000-0000-4000-8000-000000000001', 'teste-visitante-hfa@example.invalid'),
+  ('00000000-0000-4000-8000-000000000002', 'teste-legado-hfa@example.invalid'),
+  ('00000000-0000-4000-8000-000000000003', 'teste-filial-hfa@example.invalid'),
+  ('00000000-0000-4000-8000-000000000004', 'teste-admin-hfa@example.invalid')
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.profiles (user_id, nome, email, status, igreja_id, filial_id) VALUES
   ('00000000-0000-4000-8000-000000000001', 'Teste Visitante', 'teste-visitante-hfa@example.invalid', 'visitante', NULL, NULL),
@@ -163,6 +265,12 @@ END $$;
 -- Cleanup
 DELETE FROM public.user_roles WHERE user_id = '00000000-0000-4000-8000-000000000004';
 DELETE FROM public.profiles WHERE user_id IN (
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8000-000000000002',
+  '00000000-0000-4000-8000-000000000003',
+  '00000000-0000-4000-8000-000000000004'
+);
+DELETE FROM auth.users WHERE id IN (
   '00000000-0000-4000-8000-000000000001',
   '00000000-0000-4000-8000-000000000002',
   '00000000-0000-4000-8000-000000000003',
