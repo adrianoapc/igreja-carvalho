@@ -42,15 +42,65 @@ deny() {
 
 ORIG_DIR=$(pwd)
 REPO_DIR="$ORIG_DIR"
-# Extrai o alvo de `git -C`, com ou sem aspas.
-if [[ "$CMD" =~ git[[:space:]]+-C[[:space:]]+(\"([^\"]+)\"|\'([^\']+)\'|([^[:space:]]+))[[:space:]]+commit ]]; then
-  REPO_DIR="${BASH_REMATCH[2]:-${BASH_REMATCH[3]:-${BASH_REMATCH[4]}}}"
+# Extrai o alvo de `git -C`, com ou sem aspas. **Âncora `(^|[;&|])`
+# obrigatória** (achado real, self-inflicted — bloqueou um commit de
+# verdade desta própria correção): sem âncora, a regex batia dentro do
+# TEXTO da mensagem de commit — ex.: uma mensagem citando "só `git -C
+# dir commit`" como exemplo virava, pro extrator, um -C de verdade
+# apontando pro diretório literal "dir". Mesma âncora do detector
+# primário (linha ~29), que já não sofre disso.
+if [[ "$CMD" =~ (^|[\;\&\|])[[:space:]]*git[[:space:]]+-C[[:space:]]+(\"([^\"]+)\"|\'([^\']+)\'|([^[:space:]]+))[[:space:]]+commit ]]; then
+  REPO_DIR="${BASH_REMATCH[3]:-${BASH_REMATCH[4]:-${BASH_REMATCH[5]}}}"
   if [ ! -d "$REPO_DIR" ]; then
     deny "Commit bloqueado — git -C $REPO_DIR não é um diretório."
     exit 0
   fi
   cd "$REPO_DIR" || exit 0
   REPO_DIR=$(pwd)
+elif [[ "$CMD" =~ (^|[\;\&\|])[[:space:]]*cd[[:space:]]+(\"([^\"]+)\"|\'([^\']+)\'|([^[:space:]]+))[[:space:]]*(\&\&|\;)[[:space:]]*git[[:space:]]+commit ]]; then
+  # `cd <dir> && git commit` (ou `;`) no MESMO comando — achado real de
+  # /code-review ultra local, PR #134: só `-C` era reconhecido; um `cd`
+  # explícito antes do `git commit` fazia todo check rodar no diretório
+  # ERRADO (o `cd` do comando ainda não rodou de verdade quando o hook
+  # PreToolUse é avaliado — roda ANTES da tool, não depois).
+  REPO_DIR="${BASH_REMATCH[3]:-${BASH_REMATCH[4]:-${BASH_REMATCH[5]}}}"
+  case "$REPO_DIR" in
+    /*) : ;;
+    *) REPO_DIR="$ORIG_DIR/$REPO_DIR" ;;
+  esac
+  if [ ! -d "$REPO_DIR" ]; then
+    deny "Commit bloqueado — cd $REPO_DIR não é um diretório."
+    exit 0
+  fi
+  cd "$REPO_DIR" || exit 0
+  REPO_DIR=$(pwd)
+fi
+
+# `-a`/`--all`/`--include`/`--only`/pathspec explícito fazem o commit
+# gravar MAIS (ou diferente) do que o índice atual — `git write-tree`
+# abaixo só reflete o que já está staged AGORA, não o que essas opções
+# vão adicionar durante o próprio `git commit`. Negar em vez de validar
+# um snapshot que não é o que será gravado de verdade (achado real de
+# /code-review ultra local, PR #134: `git commit -am "..."` com índice
+# limpo pulava todo check e commitava working-tree TS não validado).
+#
+# **Busca só na CABEÇA do comando, antes de `-m`/`--message`/heredoc**
+# (achado SELF-INFLICTED de verdade — bloqueou esta própria mensagem de
+# commit, que cita "-a/--all/--include/--only" como exemplo de texto: um
+# `grep` sem escopo bate no CONTEÚDO da mensagem também, não só nos
+# flags reais do comando invocado). Trunca em python3 [multi-linha,
+# `sed`/`grep` não cortam heredoc de várias linhas de forma confiável]
+# no primeiro `-m`/`--message`/`<<` — em qualquer commit real, os flags
+# de verdade vêm ANTES da mensagem, nunca depois.
+CMD_HEAD=$(printf '%s' "$CMD" | python3 -c '
+import re, sys
+s = sys.stdin.read()
+m = re.search(r"(--message\b|-m\b|<<)", s)
+sys.stdout.write(s[: m.start()] if m else s)
+')
+if printf '%s' "$CMD_HEAD" | grep -qE '(^|[;&|])[[:space:]]*git[[:space:]]+(-C[[:space:]]+\S+[[:space:]]+)?commit\b.*[[:space:]](-[a-zA-Z]*a[a-zA-Z]*\b|--all\b|--include\b|--only\b)'; then
+  deny "Commit bloqueado — 'git commit -a/--all/--include/--only' grava mais do que o índice atual, e este hook só valida o snapshot já staged. Rode 'git add' explícito nos arquivos e um 'git commit' simples (sem essas flags)."
+  exit 0
 fi
 
 echo "[pre-commit-checks] git commit detectado — rodando lint/typecheck/testes (snapshot do índice) em $REPO_DIR" >&2
@@ -141,13 +191,21 @@ fi
 # Suite deno é pequena (2 arquivos). Qualquer .ts staged em
 # supabase/functions/** dispara a suite inteira no snapshot do índice —
 # cobre regressão no módulo de produção sem o .test.ts ir junto.
+# **Também dispara se um .ts foi DELETADO** (achado real de
+# /code-review ultra local, PR #134, mesmo padrão do TS_DELETED do
+# tsc acima): apagar só `getnetExtratoParser.ts` enquanto
+# `getnetExtratoParser.test.ts` continua staged/existente não aparece
+# em ACMR — sem rodar a suite, ninguém percebe que o teste restante
+# agora importa um módulo que não existe mais no snapshot (rodar
+# deno test É a forma de pegar esse import quebrado).
 STAGED_FN_TS=()
 while IFS= read -r f; do
   [ -z "$f" ] && continue
   STAGED_FN_TS+=("$f")
 done < <(git diff --cached --name-only --diff-filter=ACMR -- 'supabase/functions/*.ts' 'supabase/functions/**/*.ts' 2>/dev/null || true)
+FN_TS_DELETED=$(git diff --cached --name-only --diff-filter=D -- 'supabase/functions/*.ts' 'supabase/functions/**/*.ts' 2>/dev/null || true)
 
-if [ ${#STAGED_FN_TS[@]} -gt 0 ]; then
+if [ ${#STAGED_FN_TS[@]} -gt 0 ] || [ -n "$FN_TS_DELETED" ]; then
   if ! command -v deno >/dev/null 2>&1; then
     FAIL_MSGS+=("deno não encontrado no PATH (necessário pra testar supabase/functions)")
   else

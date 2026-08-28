@@ -21,7 +21,11 @@ MUTATION_ARGS_PY="$SCRIPT_DIR/mutation-call-args.py"
 # call irmã não protege outra. Script separado (não heredoc) pra não
 # roubar o stdin do `while read` do detector.
 mutation_call_args() {
-  python3 "$MUTATION_ARGS_PY" "$1" "$2"
+  if [ -n "${3:-}" ]; then
+    python3 "$MUTATION_ARGS_PY" "$1" "$2" "$3"
+  else
+    python3 "$MUTATION_ARGS_PY" "$1" "$2"
+  fi
 }
 
 in_scope() {
@@ -46,7 +50,14 @@ check_filial_eq() {
   while IFS=: read -r lineno _; do
     [ -z "$lineno" ] && continue
     in_scope "$lineno" || continue
-    win=$(window "$f" "$lineno" 5 2)
+    # Janela MESMA LINHA só (achado real de /code-review ultra local,
+    # PR #134: janela de 5-antes/2-depois deixava um `//
+    # filial-global-ok` perto de UM .eq("filial_id"...) exemptar um
+    # SEGUNDO .eq("filial_id"...) diferente na mesma vizinhança —
+    # nenhum self-test precisa de escape fora da própria linha, então
+    # apertar não quebra nada legítimo, só fecha o vazamento entre
+    # calls vizinhas).
+    win=$(window "$f" "$lineno" 0 0)
     if echo "$win" | grep -q '// filial-global-ok'; then
       continue
     fi
@@ -63,25 +74,42 @@ is_supabase_mutation_ctx() {
 
 check_mutations() {
   local f="$1" fail=0
-  local lineno ctx_start ctx args win
+  local lineno ctx_start ctx args win nmatches idx line
+  # Itera por MATCH, não por linha (achado real de /code-review ultra
+  # local, PR #134): `grep -n` reporta uma linha que casa 1x mesmo com
+  # 2+ ocorrências (`Promise.all([a.delete(), b.delete({count:"exact"})])`)
+  # — um loop por linha só validaria a última call, deixando a primeira
+  # sem checar. mutation_call_args aceita índice (1-based) do match na
+  # linha pra isolar os argumentos de CADA call separadamente.
   while IFS=: read -r lineno _; do
     [ -z "$lineno" ] && continue
     in_scope "$lineno" || continue
+    line=$(sed -n "${lineno}p" "$f")
+    nmatches=$(printf '%s\n' "$line" | grep -oE '\.(delete|update)\(' | wc -l | tr -d ' ')
+    [ "${nmatches:-0}" -eq 0 ] && continue
     ctx_start=$((lineno > 10 ? lineno - 10 : 1))
     ctx=$(sed -n "${ctx_start},$((lineno + 3))p" "$f")
     # .from\(["'] exige aspas logo após o parêntese — bate em
     # .from("tabela") do Supabase, não em Array.from(x) (achado real:
     # Array.from(selectedChildren) perto de Set.delete disparava).
     is_supabase_mutation_ctx "$ctx" || continue
-    win=$(window "$f" "$lineno" 3 1)
+    # Janela MESMA LINHA só, mesma razão do check_filial_eq acima
+    # (achado real de /code-review ultra local, PR #134: `//
+    # count-exact-ok` de UMA call vazava pra proteger uma call
+    # DIFERENTE 1-3 linhas antes).
+    win=$(window "$f" "$lineno" 0 0)
     if echo "$win" | grep -q '// count-exact-ok'; then
       continue
     fi
-    args=$(mutation_call_args "$f" "$lineno" 2>/dev/null || true)
-    if ! printf '%s' "$args" | grep -qE 'count:[[:space:]]*["'"'"']exact["'"'"']'; then
-      echo "::error file=$f,line=$lineno::.delete()/.update() do Supabase sem { count: \"exact\" } NESTA call — se o RLS negar, retorna error:null/0 linhas e o código pode reportar sucesso falso (PR #126). Adicione { count: \"exact\" } no argumento desta call (não numa irmã) e cheque o count retornado, ou // count-exact-ok se a call já é auto-limitada por PK/id único."
-      fail=1
-    fi
+    idx=1
+    while [ "$idx" -le "$nmatches" ]; do
+      args=$(mutation_call_args "$f" "$lineno" "$idx" 2>/dev/null || true)
+      if ! printf '%s' "$args" | grep -qE 'count:[[:space:]]*["'"'"']exact["'"'"']'; then
+        echo "::error file=$f,line=$lineno::.delete()/.update() do Supabase sem { count: \"exact\" } NESTA call (match $idx de $nmatches nesta linha) — se o RLS negar, retorna error:null/0 linhas e o código pode reportar sucesso falso (PR #126). Adicione { count: \"exact\" } no argumento desta call (não numa irmã) e cheque o count retornado, ou // count-exact-ok se a call já é auto-limitada por PK/id único."
+        fail=1
+      fi
+      idx=$((idx + 1))
+    done
   done < <(grep -nE '\.(delete|update)\(' "$f" || true)
   return "$fail"
 }
@@ -203,6 +231,14 @@ const q = supabase.from("x").or(`filial_id.eq.${id},filial_id.is.null`);
 EOF
   expect_pass "filial .or substitui o .eq" "$tmp/filial-correct.ts" check_filial_eq
 
+  # 5b) escape de UMA call não pode vazar pra outra .eq("filial_id")
+  #     vizinha sem escape próprio (achado real de @codex review, PR #134).
+  cat >"$tmp/filial-leak.ts" <<'EOF'
+const a = supabase.from("x").eq("filial_id", id1); // filial-global-ok — só desta filial
+const b = supabase.from("y").eq("filial_id", id2);
+EOF
+  expect_fail "escape de uma call não protege a vizinha" "$tmp/filial-leak.ts" check_filial_eq
+
   # 6) delete sem count
   cat >"$tmp/del-bare.ts" <<'EOF'
 await supabase.from("fornecedores").delete().eq("id", id);
@@ -222,6 +258,15 @@ await supabase.from("a").delete({ count: "exact" }).eq("id", a);
 await supabase.from("b").delete().eq("id", b);
 EOF
   expect_fail "segunda mutation sem count, irmã protegida" "$tmp/del-sibling.ts" check_mutations
+
+  # 8b) 2 mutations NA MESMA linha, só a segunda tem count — a primeira
+  #     tem que falhar (achado real de @codex review, PR #134: `grep -n`
+  #     reporta a linha 1x mesmo com 2 matches; sem iterar por match, só
+  #     a última call era validada).
+  cat >"$tmp/del-same-line.ts" <<'EOF'
+Promise.all([supabase.from("a").delete().eq("id", a), supabase.from("b").delete({ count: "exact" }).eq("id", b)]);
+EOF
+  expect_fail "2 mutations na mesma linha, só a 2ª protegida" "$tmp/del-same-line.ts" check_mutations
 
   # 9) select count:exact NÃO protege delete() na linha seguinte
   cat >"$tmp/del-select-count.ts" <<'EOF'
@@ -261,6 +306,14 @@ await supabase.from("x").delete().eq("id", id); // count-exact-ok — PK única
 EOF
   expect_pass "delete escape // count-exact-ok" "$tmp/del-escape.ts" check_mutations
 
+  # 13b) escape de UMA call não pode vazar pra outra .delete()/.update()
+  #      vizinha sem escape próprio (achado real de @codex review, PR #134).
+  cat >"$tmp/del-leak.ts" <<'EOF'
+await supabase.from("a").delete().eq("id", ida); // count-exact-ok — PK única
+await supabase.from("b").delete().eq("id", idb);
+EOF
+  expect_fail "escape de uma call não protege a vizinha" "$tmp/del-leak.ts" check_mutations
+
   # 14) STATUS_COLOR como tinta
   cat >"$tmp/color.ts" <<'EOF'
 const style = { color: STATUS_COLOR.warning };
@@ -280,7 +333,7 @@ EOF
     return 1
   fi
   echo ""
-  echo "Self-test OK (15 casos)."
+  echo "Self-test OK (18 casos)."
   rm -rf "$tmp"
   return 0
 }
@@ -296,8 +349,15 @@ scan_pr() {
   fi
 
   local changed
+  # `src/**/*.tsx` NÃO casa arquivo direto em src/ (ex.: src/App.tsx,
+  # src/main.tsx) — `**` no pathspec do git exige pelo menos 1 nível de
+  # diretório abaixo (achado real de /code-review ultra local, PR #134,
+  # confirmado: `git ls-files 'src/**/*.tsx'` omite src/App.tsx, `git
+  # ls-files 'src/*.tsx'` inclui). Pathspec de topo + `**` cobre os 2
+  # níveis sem duplicar arquivo (git diff dedupa automaticamente).
   changed=$(git diff --name-only "$base_sha"...HEAD -- \
-    'src/**/*.ts' 'src/**/*.tsx' 'supabase/functions/**/*.ts' || true)
+    'src/*.ts' 'src/*.tsx' 'src/**/*.ts' 'src/**/*.tsx' \
+    'supabase/functions/*.ts' 'supabase/functions/**/*.ts' || true)
 
   if [ -z "$changed" ]; then
     echo "Nenhum arquivo relevante mudou."
