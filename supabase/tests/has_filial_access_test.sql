@@ -23,11 +23,22 @@
 --
 --   docker run --rm -d --name hfa_test -e POSTGRES_PASSWORD=postgres \
 --     -p 55432:5432 postgres:17
---   docker cp supabase/tests/has_filial_access_test.sql hfa_test:/tmp/
+--   docker exec -u postgres hfa_test mkdir -p /tmp/supabase/tests /tmp/supabase/migrations
+--   docker cp supabase/tests/has_filial_access_test.sql \
+--     hfa_test:/tmp/supabase/tests/has_filial_access_test.sql
 --   docker cp supabase/migrations/20260827130000_fix_has_filial_access_legacy_claim_bypass.sql \
---     hfa_test:/tmp/20260827130000_fix_has_filial_access_legacy_claim_bypass.sql
---   docker exec -u postgres hfa_test psql -U postgres -d postgres -f /tmp/has_filial_access_test.sql
+--     hfa_test:/tmp/supabase/migrations/20260827130000_fix_has_filial_access_legacy_claim_bypass.sql
+--   docker exec -u postgres hfa_test psql -U postgres -d postgres \
+--     -f /tmp/supabase/tests/has_filial_access_test.sql
 --   docker rm -f hfa_test
+--
+-- **A estrutura `tests/` + `../migrations/` irmã tem que ser preservada
+-- de verdade no destino** (achado real de `@codex review`, P1, PR #135:
+-- uma 1ª versão desta doc copiava os 2 arquivos flat em `/tmp/`, sem
+-- subpasta — `\ir` resolveria `../migrations/...` a partir de `/tmp/`,
+-- indo pra `/migrations/...`, que não existe, e o `ON_ERROR_STOP`
+-- encerrava antes de qualquer cenário rodar). Os comandos acima foram
+-- exatamente os usados pra validar este arquivo (11/11 cenários OK).
 --
 -- (o `\ir` abaixo resolve relativo ao PRÓPRIO arquivo, então rodar via
 -- `psql -f supabase/tests/has_filial_access_test.sql` de dentro do
