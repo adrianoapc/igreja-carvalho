@@ -14,87 +14,22 @@ set -uo pipefail
 INPUT=$(cat)
 CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')
 
-# Só age em comandos que efetivamente rodam `git commit` (aceita `git -C dir`
-# com dir citado ou não, encadeado com && / ; / |, sem espaço antes do
-# separador). Não bloqueia nenhum outro comando Bash.
-# Achado real de /code-review ultra local (PR #134): a versão anterior
-# exigia espaço ou fim-de-string logo após "commit" (`commit( |$)`), então
-# `git commit&&git push`/`git commit;git push` (sem espaço antes do
-# separador) bypassavam o gate inteiro sem erro nem aviso. Fix: qualquer
-# caractere NÃO-alfabético (ou fim de string) depois de "commit" conta como
-# boundary — `commit($|[^a-zA-Z-])` — hífen fica de fora pra não
-# disparar em `git commit-tree`/`git commit-graph`. -C aceita path
-# entre aspas (simples ou duplas) além de sem aspas, pra não perder
-# `git -C "dir com espaço" commit`.
-if ! printf '%s' "$CMD" | grep -qE '(^|[;&|]) *git( -C ("[^"]*"|'"'"'[^'"'"']*'"'"'|[^ ]+))? commit($|[^a-zA-Z-])'; then
-  exit 0
-fi
-
-deny() {
-  jq -n --arg reason "$1" '{
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: $reason
-    }
-  }'
-}
-
-ORIG_DIR=$(pwd)
-REPO_DIR="$ORIG_DIR"
-# Extrai o alvo de `git -C`, com ou sem aspas. **Âncora `(^|[;&|])`
-# obrigatória** (achado real, self-inflicted — bloqueou um commit de
-# verdade desta própria correção): sem âncora, a regex batia dentro do
-# TEXTO da mensagem de commit — ex.: uma mensagem citando "só `git -C
-# dir commit`" como exemplo virava, pro extrator, um -C de verdade
-# apontando pro diretório literal "dir". Mesma âncora do detector
-# primário (linha ~29), que já não sofre disso.
-if [[ "$CMD" =~ (^|[\;\&\|])[[:space:]]*git[[:space:]]+-C[[:space:]]+(\"([^\"]+)\"|\'([^\']+)\'|([^[:space:]]+))[[:space:]]+commit ]]; then
-  REPO_DIR="${BASH_REMATCH[3]:-${BASH_REMATCH[4]:-${BASH_REMATCH[5]}}}"
-  if [ ! -d "$REPO_DIR" ]; then
-    deny "Commit bloqueado — git -C $REPO_DIR não é um diretório."
-    exit 0
-  fi
-  cd "$REPO_DIR" || exit 0
-  REPO_DIR=$(pwd)
-elif [[ "$CMD" =~ (^|[\;\&\|])[[:space:]]*cd[[:space:]]+(\"([^\"]+)\"|\'([^\']+)\'|([^[:space:]]+))[[:space:]]*(\&\&|\;)[[:space:]]*git[[:space:]]+commit ]]; then
-  # `cd <dir> && git commit` (ou `;`) no MESMO comando — achado real de
-  # /code-review ultra local, PR #134: só `-C` era reconhecido; um `cd`
-  # explícito antes do `git commit` fazia todo check rodar no diretório
-  # ERRADO (o `cd` do comando ainda não rodou de verdade quando o hook
-  # PreToolUse é avaliado — roda ANTES da tool, não depois).
-  REPO_DIR="${BASH_REMATCH[3]:-${BASH_REMATCH[4]:-${BASH_REMATCH[5]}}}"
-  case "$REPO_DIR" in
-    /*) : ;;
-    *) REPO_DIR="$ORIG_DIR/$REPO_DIR" ;;
-  esac
-  if [ ! -d "$REPO_DIR" ]; then
-    deny "Commit bloqueado — cd $REPO_DIR não é um diretório."
-    exit 0
-  fi
-  cd "$REPO_DIR" || exit 0
-  REPO_DIR=$(pwd)
-fi
-
-# `-a`/`--all`/`--include`/`--only`/pathspec explícito fazem o commit
-# gravar MAIS (ou diferente) do que o índice atual — `git write-tree`
-# abaixo só reflete o que já está staged AGORA, não o que essas opções
-# vão adicionar durante o próprio `git commit`. Negar em vez de validar
-# um snapshot que não é o que será gravado de verdade (achado real de
-# /code-review ultra local, PR #134: `git commit -am "..."` com índice
-# limpo pulava todo check e commitava working-tree TS não validado).
-#
-# **Remove o CONTEÚDO de strings/heredoc antes de procurar flags** —
-# não trunca na primeira `-m`/heredoc (achado real de @codex review,
-# rodada seguinte ao fix anterior: `git commit -m "msg" -a` tem a flag
-# DEPOIS da mensagem — git aceita flag em qualquer ordem — e truncar
-# perdia esse `-a`; a própria correção anterior já tinha sido achada
-# SELF-INFLICTED, bloqueando uma mensagem de commit que só CITAVA os
-# nomes das flags como texto). Em vez de assumir uma ordem, apaga o
-# CONTEÚDO de aspas simples/duplas (mantendo as aspas em si, só pra
-# preservar posição) e de corpos de heredoc (`<<'"'"'EOF'"'"'`/`<<EOF`
-# até a linha que é só o delimitador) — sobra só a estrutura real do
-# comando (flags, operadores), nunca texto de mensagem.
+# **Remove o CONTEÚDO de strings/heredoc ANTES de qualquer detecção** —
+# não trunca na primeira `-m`/heredoc, apaga o conteúdo de aspas
+# simples/duplas (mantendo as aspas em si, só pra preservar posição/
+# vazio-mas-presente) e de corpos de heredoc (`<<EOF ... EOF`) até a
+# linha que é só o delimitador. Sobra só a estrutura real do comando
+# (flags, `-C`, operadores) — nunca texto de mensagem de commit.
+# Achados reais de @codex review, todos self-inflicted (bloquearam
+# commits de verdade DESTA própria correção, sessão a sessão): (1)
+# extrator de `-C` sem esse strip batia dentro do TEXTO da mensagem —
+# "só `git -C dir commit`" como exemplo virava um -C de verdade
+# apontando pro diretório literal "dir"; pior, uma mensagem citando
+# `; git -C /outro/repo commit` conseguia REDIRECIONAR os checks pra
+# rodar contra o índice de outro repositório real, não o que está
+# sendo commitado. (2) rejeição de -a/--all truncando na 1ª `-m`
+# perdia flags que vêm DEPOIS da mensagem (`git commit -m "msg" -a` é
+# válido, git aceita flag em qualquer ordem).
 CMD_STRIPPED=$(printf '%s' "$CMD" | python3 -c '
 import re, sys
 
@@ -138,12 +73,85 @@ while i < n:
     i += 1
 sys.stdout.write("".join(out))
 ')
-# -C aceita path entre aspas (com espaço) igual à extração acima —
-# achado real de @codex review: `\S+` sozinho parava no primeiro
-# espaço de `-C "repo with space"`, então esse caso não batia aqui e a
-# rejeição de -a/--all nunca disparava, mesmo com o -C real levando a
-# um diretório existente (testado: `git -C "dir com espaço" commit
-# -am x` passava sem deny antes deste fix).
+
+# Só age em comandos que efetivamente rodam `git commit` (aceita `git -C dir`
+# com dir citado ou não, encadeado com && / ; / |, sem espaço antes do
+# separador). Não bloqueia nenhum outro comando Bash. Roda contra
+# CMD_STRIPPED (não CMD) pela mesma razão acima — texto de mensagem não
+# deve conseguir simular um "git commit" real.
+# Achado real de /code-review ultra local (PR #134): a versão anterior
+# exigia espaço ou fim-de-string logo após "commit" (`commit( |$)`), então
+# `git commit&&git push`/`git commit;git push` (sem espaço antes do
+# separador) bypassavam o gate inteiro sem erro nem aviso. Fix: qualquer
+# caractere NÃO-alfabético (ou fim de string) depois de "commit" conta como
+# boundary — `commit($|[^a-zA-Z-])` — hífen fica de fora pra não
+# disparar em `git commit-tree`/`git commit-graph`. -C aceita path
+# entre aspas (simples ou duplas) além de sem aspas, pra não perder
+# `git -C "dir com espaço" commit`.
+if ! printf '%s' "$CMD_STRIPPED" | grep -qE '(^|[;&|]) *git( -C ("[^"]*"|'"'"'[^'"'"']*'"'"'|[^ ]+))? commit($|[^a-zA-Z-])'; then
+  exit 0
+fi
+
+deny() {
+  jq -n --arg reason "$1" '{
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: $reason
+    }
+  }'
+}
+
+ORIG_DIR=$(pwd)
+REPO_DIR="$ORIG_DIR"
+# Extrai o alvo de `git -C` a partir de CMD_STRIPPED (não CMD) — o
+# gate/âncora roda sobre texto onde mensagem/heredoc já viraram
+# aspas-vazias, então um `-C` "achado" ali é garantidamente um -C real
+# do comando, nunca conteúdo de mensagem. Se o valor capturado vier
+# vazio (`""`/`''` — era um -C real só que com path QUOTED, cujo
+# conteúdo o strip apagou), recupera o valor de verdade do CMD
+# original com a MESMA âncora — nesse ponto já sabemos que existe um
+# -C real nessa posição, então buscar o valor no CMD original é seguro.
+if [[ "$CMD_STRIPPED" =~ (^|[\;\&\|])[[:space:]]*git[[:space:]]+-C[[:space:]]+(\"([^\"]*)\"|\'([^\']*)\'|([^[:space:]]+))[[:space:]]+commit ]]; then
+  REPO_DIR="${BASH_REMATCH[3]:-${BASH_REMATCH[4]:-${BASH_REMATCH[5]}}}"
+  if [ -z "$REPO_DIR" ] && [[ "$CMD" =~ (^|[\;\&\|])[[:space:]]*git[[:space:]]+-C[[:space:]]+(\"([^\"]+)\"|\'([^\']+)\') ]]; then
+    REPO_DIR="${BASH_REMATCH[3]:-${BASH_REMATCH[4]}}"
+  fi
+  if [ -z "$REPO_DIR" ] || [ ! -d "$REPO_DIR" ]; then
+    deny "Commit bloqueado — git -C $REPO_DIR não é um diretório."
+    exit 0
+  fi
+  cd "$REPO_DIR" || exit 0
+  REPO_DIR=$(pwd)
+elif [[ "$CMD_STRIPPED" =~ (^|[\;\&\|])[[:space:]]*cd[[:space:]]+(\"([^\"]*)\"|\'([^\']*)\'|([^[:space:]]+))[[:space:]]*(\&\&|\;)[[:space:]]*git[[:space:]]+commit ]]; then
+  # `cd <dir> && git commit` (ou `;`) no MESMO comando — achado real de
+  # /code-review ultra local, PR #134: só `-C` era reconhecido; um `cd`
+  # explícito antes do `git commit` fazia todo check rodar no diretório
+  # ERRADO (o `cd` do comando ainda não rodou de verdade quando o hook
+  # PreToolUse é avaliado — roda ANTES da tool, não depois).
+  REPO_DIR="${BASH_REMATCH[3]:-${BASH_REMATCH[4]:-${BASH_REMATCH[5]}}}"
+  if [ -z "$REPO_DIR" ] && [[ "$CMD" =~ (^|[\;\&\|])[[:space:]]*cd[[:space:]]+(\"([^\"]+)\"|\'([^\']+)\') ]]; then
+    REPO_DIR="${BASH_REMATCH[3]:-${BASH_REMATCH[4]}}"
+  fi
+  case "$REPO_DIR" in
+    /*) : ;;
+    *) REPO_DIR="$ORIG_DIR/$REPO_DIR" ;;
+  esac
+  if [ ! -d "$REPO_DIR" ]; then
+    deny "Commit bloqueado — cd $REPO_DIR não é um diretório."
+    exit 0
+  fi
+  cd "$REPO_DIR" || exit 0
+  REPO_DIR=$(pwd)
+fi
+
+# `-a`/`--all`/`--include`/`--only`/pathspec explícito fazem o commit
+# gravar MAIS (ou diferente) do que o índice atual — `git write-tree`
+# abaixo só reflete o que já está staged AGORA, não o que essas opções
+# vão adicionar durante o próprio `git commit`. Negar em vez de validar
+# um snapshot que não é o que será gravado de verdade (achado real de
+# /code-review ultra local, PR #134: `git commit -am "..."` com índice
+# limpo pulava todo check e commitava working-tree TS não validado).
 if printf '%s' "$CMD_STRIPPED" | grep -qE '(^|[;&|])[[:space:]]*git[[:space:]]+(-C[[:space:]]+("[^"]*"|'"'"'[^'"'"']*'"'"'|\S+)[[:space:]]+)?commit\b.*[[:space:]](-[a-zA-Z]*a[a-zA-Z]*\b|--all\b|--include\b|--only\b)'; then
   deny "Commit bloqueado — 'git commit -a/--all/--include/--only' grava mais do que o índice atual, e este hook só valida o snapshot já staged. Rode 'git add' explícito nos arquivos e um 'git commit' simples (sem essas flags)."
   exit 0

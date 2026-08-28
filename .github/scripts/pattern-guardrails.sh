@@ -84,9 +84,37 @@ is_supabase_mutation_ctx() {
 # atual, para a busca; linha com `.from(["']`/`supabase\.` = achou o
 # início do chain. Statements terminados em `;` são o sinal de fronteira
 # real (um chain multi-linha não-terminado nunca tem `;` no meio).
-mutation_belongs_to_chain() {
-  local f="$1" lineno="$2" line prev i trimmed
+# Isola o trecho da linha ate' (e incluindo) o match `idx` (1-based) de
+# .delete(/.update(, cortando em `;` — evita que um 2º statement na
+# MESMA linha física herde o contexto supabase de um 1º statement
+# totalmente diferente (achado real de @codex review, PR #134:
+# `await supabase.from("items").select(); selectedIds.delete(id);` os
+# dois na mesma linha — sem isolar por segmento, o Set.delete via
+# supabase.from( no INÍCIO da mesma linha, mesmo depois do `;`).
+mutation_line_segment() {
+  local f="$1" lineno="$2" idx="$3" line seg running=0 n_in_seg
   line=$(sed -n "${lineno}p" "$f")
+  local IFS=';'
+  local -a segs
+  read -ra segs <<< "$line"
+  for seg in "${segs[@]}"; do
+    n_in_seg=$(printf '%s\n' "$seg" | grep -oE '\.(delete|update)\(' | wc -l | tr -d ' ')
+    if [ "$((running + n_in_seg))" -ge "$idx" ]; then
+      printf '%s' "$seg"
+      return 0
+    fi
+    running=$((running + n_in_seg))
+  done
+  printf '%s' "$line"
+}
+
+mutation_belongs_to_chain() {
+  local f="$1" lineno="$2" idx="${3:-}" line prev i trimmed
+  if [ -n "$idx" ]; then
+    line=$(mutation_line_segment "$f" "$lineno" "$idx")
+  else
+    line=$(sed -n "${lineno}p" "$f")
+  fi
   is_supabase_mutation_ctx "$line" && return 0
   i=$((lineno - 1))
   local floor=$((lineno > 10 ? lineno - 10 : 1))
@@ -126,12 +154,6 @@ check_mutations() {
     # .from\(["'] exige aspas logo após o parêntese — bate em
     # .from("tabela") do Supabase, não em Array.from(x) (achado real:
     # Array.from(selectedChildren) perto de Set.delete disparava).
-    # mutation_belongs_to_chain (não uma janela de N linhas) confirma
-    # que ESTA call pertence de fato ao chain Supabase, não só que
-    # "supabase"/.from( aparece em algum lugar perto (achado real de
-    # @codex review, PR #134: supabase.from("items").select(); seguido
-    # de Set.delete() de verdade um pouco depois classificava errado).
-    mutation_belongs_to_chain "$f" "$lineno" || continue
     # Janela MESMA LINHA só, mesma razão do check_filial_eq acima
     # (achado real de /code-review ultra local, PR #134: `//
     # count-exact-ok` de UMA call vazava pra proteger uma call
@@ -142,10 +164,19 @@ check_mutations() {
     fi
     idx=1
     while [ "$idx" -le "$nmatches" ]; do
-      args=$(mutation_call_args "$f" "$lineno" "$idx" 2>/dev/null || true)
-      if ! printf '%s' "$args" | grep -qE 'count:[[:space:]]*["'"'"']exact["'"'"']'; then
-        echo "::error file=$f,line=$lineno::.delete()/.update() do Supabase sem { count: \"exact\" } NESTA call (match $idx de $nmatches nesta linha) — se o RLS negar, retorna error:null/0 linhas e o código pode reportar sucesso falso (PR #126). Adicione { count: \"exact\" } no argumento desta call (não numa irmã) e cheque o count retornado, ou // count-exact-ok se a call já é auto-limitada por PK/id único."
-        fail=1
+      # mutation_belongs_to_chain checado POR MATCH (índice), não uma
+      # vez pra linha inteira — achado real de @codex review, PR #134:
+      # `await supabase.from("items").select(); selectedIds.delete(id);`
+      # tem os 2 statements na MESMA linha física; checar a linha
+      # inteira deixava o 1º supabase.from( "vazar" contexto pro
+      # Set.delete depois do `;`. mutation_line_segment isola só o
+      # trecho do statement ATÉ este match específico.
+      if mutation_belongs_to_chain "$f" "$lineno" "$idx"; then
+        args=$(mutation_call_args "$f" "$lineno" "$idx" 2>/dev/null || true)
+        if ! printf '%s' "$args" | grep -qE 'count:[[:space:]]*["'"'"']exact["'"'"']'; then
+          echo "::error file=$f,line=$lineno::.delete()/.update() do Supabase sem { count: \"exact\" } NESTA call (match $idx de $nmatches nesta linha) — se o RLS negar, retorna error:null/0 linhas e o código pode reportar sucesso falso (PR #126). Adicione { count: \"exact\" } no argumento desta call (não numa irmã) e cheque o count retornado, ou // count-exact-ok se a call já é auto-limitada por PK/id único."
+          fail=1
+        fi
       fi
       idx=$((idx + 1))
     done
@@ -182,16 +213,28 @@ check_chart_hex_warning() {
 scope_lines_for_file() {
   local f="$1" base_sha="$2"
   # Linhas em escopo: as que a PR ADICIONOU (número na versão nova) MAIS
-  # uma margem de 10 linhas em torno do ponto de cada hunk — cobre hunks
-  # só-de-remoção (ex.: apagar só `{ count: "exact" }` de um .delete()
-  # multi-linha). Padrão pré-existente fora de qualquer hunk nunca entra.
+  # uma margem de 10 linhas SÓ em torno de hunks só-de-remoção (ex.:
+  # apagar só `{ count: "exact" }` de um .delete() multi-linha, que não
+  # tem linha "adicionada" nenhuma pra ancorar o escopo). Hunk com linha
+  # adicionada de verdade usa EXATAMENTE as linhas adicionadas, sem
+  # margem — achado real de @codex review, PR #134: a margem de 10
+  # aplicada a QUALQUER hunk (inclusive addition-only) fazia adicionar
+  # 1 linha nova perto de um `.eq("filial_id"...)`/mutation/
+  # STATUS_COLOR legado (não tocado por esta PR) travar o check
+  # obrigatório mesmo sem essa PR ter introduzido ou alterado o padrão
+  # — este repo documenta ter várias ocorrências legadas assim.
+  # Padrão pré-existente fora de qualquer hunk nunca entra.
   git diff -U0 "$base_sha"...HEAD -- "$f" 2>/dev/null \
     | grep -oP '^@@ -[0-9]+(,[0-9]+)? \+\K[0-9]+(,[0-9]+)?(?= @@)' \
     | awk -F, '{
         start=$1; count=($2==""?1:$2);
-        lo=start-10; if (lo<1) lo=1;
-        hi=start+(count>0?count:1)+10;
-        for(i=lo;i<=hi;i++) print i
+        if (count > 0) {
+          for(i=start; i<start+count; i++) print i
+        } else {
+          lo=start-10; if (lo<1) lo=1;
+          hi=start+10;
+          for(i=lo;i<=hi;i++) print i
+        }
       }' | sort -nu
 }
 
@@ -332,6 +375,15 @@ selectedIds.delete(id);
 EOF
   expect_pass "Set.delete perto de supabase.select() não é mutation" "$tmp/set-delete-near-supabase.ts" check_mutations
 
+  # 10c) mesma coisa, mas os 2 statements na MESMA LINHA física,
+  # separados por `;` (achado real de @codex review, PR #134: checar a
+  # linha inteira, não o segmento até o match, deixava o 1º
+  # supabase.from( vazar contexto pro Set.delete depois do `;`).
+  cat >"$tmp/set-delete-same-line.ts" <<'EOF'
+await supabase.from("items").select(); selectedIds.delete(id);
+EOF
+  expect_pass "Set.delete na MESMA linha de um supabase.select() não é mutation" "$tmp/set-delete-same-line.ts" check_mutations
+
   # 11) chain multi-linha .from + .delete()
   cat >"$tmp/del-multiline.ts" <<'EOF'
 await supabase
@@ -383,7 +435,7 @@ EOF
     return 1
   fi
   echo ""
-  echo "Self-test OK (19 casos)."
+  echo "Self-test OK (20 casos)."
   rm -rf "$tmp"
   return 0
 }
