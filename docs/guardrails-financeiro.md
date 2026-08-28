@@ -1209,8 +1209,50 @@ generalizável pra qualquer tabela, não só financeiro.
    `get_current_user_filial_id()` ainda tem — funções irmãs ficaram
    assimétricas (não usada por `has_filial_access()`, que lê
    `get_jwt_*` direto).
+9. **Review do item 8 (`@cursoragent`, PR #135, 2026-08-28) — veredito
+   "fix correto, pode mergear", mais 4 pontos residuais.** Confirmou
+   linha a linha contra `handle_new_user`/`sync_user_jwt_metadata`/
+   `get_jwt_*`/`provisionar-admin-igreja` (nenhuma escrita legítima em
+   `user_metadata.igreja_id`), branch `service_role` intocado, e sem
+   `CREATE OR REPLACE` posterior em `main` que reverteria a função.
+   Endereçados nesta rodada:
+   - **Harness commitado**: `supabase/tests/has_filial_access_test.sql`
+     — os 10 cenários do item 8 + 1 novo (`has_filial_access(NULL,
+     NULL)` explícito) como assertions `RAISE EXCEPTION`/fail-fast,
+     validado rodando contra a versão COM o bug (falha rápido no
+     cenário 1) e contra o fix (11/11 passam) — fecha o gap "próxima
+     redefinição não tem como não reabrir Bug A/B sem perceber".
+   - **Parênteses explícitos**: o `AND` da cláusula de filial dependia
+     de precedência de operador (`A OR B OR C AND D`) pra ficar dentro
+     do mesmo `OR` da igreja, em vez de aninhamento explícito — correto
+     hoje, frágil a refactor futuro do `COALESCE`. Reestruturado pra
+     aninhar de propósito (mesmo padrão do `20260822130000` original);
+     11/11 cenários confirmam zero mudança de comportamento.
+   Documentados, não corrigidos nesta rodada (efeito colateral
+   verificado como INALCANÇÁVEL hoje, proteção incidental não
+   desenhada):
+   - `has_filial_access(NULL, NULL)` virou `false` — a policy de
+     UPDATE de `profiles` (`perf_merge_002_update_auth`,
+     `20260821200000`) não tem fallback "própria linha, tenant
+     qualquer", só `has_filial_access(...)`. Um visitante autocadastrado
+     não conseguiria mais fazer PATCH no próprio profile — MAS
+     `Perfil.tsx:149` já trava a página em loading eterno pra usuário
+     sem `igreja_id` (guard client-side pré-existente, não introduzido
+     por este fix) e `ForcedPasswordChange.tsx` só é alcançado com
+     `deve_trocar_senha=true`, que autocadastro nunca seta. Um fix
+     futuro nesse guard reabriria isso de verdade — a policy de UPDATE
+     em si não tem proteção própria.
+   - `profiles.igreja_id`/`filial_id` viraram raiz de confiança direta
+     pro shortcut de claim ausente, sem trigger `BEFORE UPDATE`
+     travando essas 2 colunas (padrão de `trg_convite_rsvp_restringe_
+     campos`, RSVP de convite) — RLS de UPDATE por dono não restringe
+     quais colunas mudam (ver item RLS-UPDATE mais abaixo no
+     documento). Como `sync_user_jwt_metadata` espelha profile →
+     `app_metadata`, um PATCH bem-sucedido nessas colunas vira claim de
+     verdade. Defesa em profundidade, PR dedicada.
 
-Referências: PR #126 (2026-08-21), PR #129 (2026-08-21).
+Referências: PR #126 (2026-08-21), PR #129 (2026-08-21), PR #135
+(2026-08-27/28).
 
 ---
 

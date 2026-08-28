@@ -58,6 +58,40 @@
 --   ainda tem — as duas funções irmãs ficaram assimétricas. Não usada
 --   por has_filial_access() (que já lê get_jwt_* diretamente), fica
 --   como achado separado.
+--
+-- Achados de review (`@cursoragent`, PR #135) — não bloqueiam o merge,
+-- efeito colateral verificado como NÃO alcançável hoje, não corrigidos
+-- nesta migration:
+-- - `has_filial_access(NULL, NULL)` passa de `true` pra `false` pra um
+--   visitante autocadastrado sem tenant. A policy de UPDATE de
+--   `profiles` (`perf_merge_002_update_auth`, última definição em
+--   20260821200000) não tem fallback de "própria linha, tenant
+--   qualquer" — só `(auth.uid() = user_id) AND has_filial_access(...)`
+--   — então esse visitante também não consegue mais fazer PATCH no
+--   próprio profile (avatar, `deve_trocar_senha`, etc.) via
+--   `has_filial_access`. Investigação (agente dedicado) confirmou que
+--   isso é INALCANÇÁVEL hoje por 2 motivos independentes e já
+--   existentes (nenhum dos dois introduzido por esta migration):
+--   `Perfil.tsx:149` tem um guard client-side (`if (!profile?.id ||
+--   !igrejaId) return`) que trava a página inteira em loading eterno
+--   pra usuário sem `igreja_id`, antes de qualquer RLS entrar em jogo;
+--   e `ForcedPasswordChange.tsx` só é alcançado quando
+--   `deve_trocar_senha=true`, que autocadastro nunca seta (só
+--   `criar_usuario_membro`/`resetar_senha_usuario_membro`, que exigem
+--   um profile PRÉ-EXISTENTE com `igreja_id` real). Fica documentado
+--   porque é proteção incidental, não desenhada — um fix futuro no
+--   guard de `Perfil.tsx` reabriria isso de verdade, já que a policy
+--   de UPDATE em si não tem fallback próprio.
+-- - `profiles.igreja_id`/`filial_id` viraram raiz de confiança direta
+--   pro shortcut de claim ausente (esta migration). RLS de UPDATE por
+--   dono não restringe QUAIS colunas mudam (guardrail já documentado,
+--   ver `docs/guardrails-financeiro.md` item RLS-UPDATE); não existe
+--   trigger `BEFORE UPDATE` travando `igreja_id`/`filial_id` em
+--   `profiles` no padrão de `trg_convite_rsvp_restringe_campos`
+--   (RSVP de convite). Como `sync_user_jwt_metadata` espelha profile →
+--   `app_metadata`, um PATCH bem-sucedido nessas 2 colunas vira claim
+--   de verdade. Defesa em profundidade, PR dedicada — fora do escopo
+--   aqui.
 
 CREATE OR REPLACE FUNCTION public.get_jwt_igreja_id()
 RETURNS uuid
@@ -128,70 +162,80 @@ AS $$
       -- legado de verdade (profile.igreja_id preenchido, claim ainda
       -- não sincronizado no JWT) continua batendo, só que agora
       -- restrito ao PRÓPRIO tenant, não a qualquer um.
+      -- Nota de robustez (achado real de `/code-review` local, review da
+      -- PR #135): o `AND` da filial fica DENTRO deste mesmo `OR (`, não
+      -- fora dele — a versão anterior fechava este parêntese antes do
+      -- `AND`, funcionando só porque `AND` tem precedência maior que
+      -- `OR` em SQL (`A OR B OR C AND D` ≡ `A OR B OR (C AND D)`).
+      -- Correto hoje, mas frágil a um refactor futuro que envolva os
+      -- argumentos do `COALESCE` de outro jeito — aninhar explícito
+      -- remove a dependência de precedência.
       (
-        _igreja_id = public.get_jwt_igreja_id()
-        OR (
-          public.get_jwt_igreja_id() IS NULL
-          AND (
-            (
-              auth.uid() IS NOT NULL
-              AND _igreja_id = (
-                SELECT p.igreja_id FROM public.profiles p
-                WHERE p.user_id = auth.uid()
-                LIMIT 1
+        (
+          _igreja_id = public.get_jwt_igreja_id()
+          OR (
+            public.get_jwt_igreja_id() IS NULL
+            AND (
+              (
+                auth.uid() IS NOT NULL
+                AND _igreja_id = (
+                  SELECT p.igreja_id FROM public.profiles p
+                  WHERE p.user_id = auth.uid()
+                  LIMIT 1
+                )
               )
+              OR COALESCE(auth.jwt() ->> 'role', '') = 'service_role'
             )
-            OR COALESCE(auth.jwt() ->> 'role', '') = 'service_role'
           )
         )
-      )
-    )
-    AND (
-      -- Admin da igreja tem acesso total na igreja
-      has_role(auth.uid(), 'admin_igreja'::app_role)
-      OR (
-        -- Filial compartilhada (sem dono) ou é a filial primária do JWT
-        _filial_id IS NULL
-        OR _filial_id = public.get_jwt_filial_id()
-        -- Permissão explícita na tabela user_filial_access decide por
-        -- conta própria. Escopada por igreja_id E filial_id (achado da
-        -- PR #97/#98 — ver 20260812160000).
-        OR EXISTS (
-          SELECT 1 FROM public.user_filial_access
-          WHERE user_id = auth.uid()
-          AND igreja_id = _igreja_id
-          AND filial_id = _filial_id
-          AND can_view = true
-        )
-        -- Legado: sem filial primária no JWT E sem NENHUMA restrição
-        -- granular configurada em user_filial_access NESTA igreja =>
-        -- acesso total. Só entra em jogo se a cláusula de igreja_id
-        -- acima já decidiu que a sessão é elegível (match direto,
-        -- legado com profile real, ou service_role) — com o fix acima,
-        -- _igreja_id já está garantidamente correto pro caso legado, não
-        -- mais um valor arbitrário.
-        --
-        -- CAVEAT service_role (apontado em review da PR #132, mantido
-        -- sem alteração nesta migration): pra essa sessão auth.uid() é
-        -- sempre NULL, então o NOT EXISTS abaixo nunca acha nenhuma row
-        -- (user_id = NULL não bate nada) — o shortcut dispara SEMPRE,
-        -- pra QUALQUER _filial_id, uma vez que a cláusula de igreja_id
-        -- já deixou o service_role entrar. Isso reproduz o
-        -- comportamento de sempre da função pro bot (não é regressão
-        -- desta migration), mas quer dizer que has_filial_access() não
-        -- faz scoping de filial nenhum pro canal service_role — quem
-        -- trava isso hoje é só fin_resolver_contexto validando o
-        -- p_contexto explícito ANTES de qualquer RPC chamar
-        -- has_filial_access(). Se uma RPC nova chamar
-        -- has_filial_access() sem passar por fin_resolver_contexto
-        -- primeiro, este vira um fallback que libera tudo silenciosamente
-        -- pro service_role.
-        OR (
-          public.get_jwt_filial_id() IS NULL
-          AND NOT EXISTS (
-            SELECT 1 FROM public.user_filial_access
-            WHERE user_id = auth.uid()
-            AND igreja_id = _igreja_id
+        AND (
+          -- Admin da igreja tem acesso total na igreja
+          has_role(auth.uid(), 'admin_igreja'::app_role)
+          OR (
+            -- Filial compartilhada (sem dono) ou é a filial primária do JWT
+            _filial_id IS NULL
+            OR _filial_id = public.get_jwt_filial_id()
+            -- Permissão explícita na tabela user_filial_access decide por
+            -- conta própria. Escopada por igreja_id E filial_id (achado da
+            -- PR #97/#98 — ver 20260812160000).
+            OR EXISTS (
+              SELECT 1 FROM public.user_filial_access
+              WHERE user_id = auth.uid()
+              AND igreja_id = _igreja_id
+              AND filial_id = _filial_id
+              AND can_view = true
+            )
+            -- Legado: sem filial primária no JWT E sem NENHUMA restrição
+            -- granular configurada em user_filial_access NESTA igreja =>
+            -- acesso total. Só entra em jogo se a cláusula de igreja_id
+            -- acima já decidiu que a sessão é elegível (match direto,
+            -- legado com profile real, ou service_role) — com o fix acima,
+            -- _igreja_id já está garantidamente correto pro caso legado, não
+            -- mais um valor arbitrário.
+            --
+            -- CAVEAT service_role (apontado em review da PR #132, mantido
+            -- sem alteração nesta migration): pra essa sessão auth.uid() é
+            -- sempre NULL, então o NOT EXISTS abaixo nunca acha nenhuma row
+            -- (user_id = NULL não bate nada) — o shortcut dispara SEMPRE,
+            -- pra QUALQUER _filial_id, uma vez que a cláusula de igreja_id
+            -- já deixou o service_role entrar. Isso reproduz o
+            -- comportamento de sempre da função pro bot (não é regressão
+            -- desta migration), mas quer dizer que has_filial_access() não
+            -- faz scoping de filial nenhum pro canal service_role — quem
+            -- trava isso hoje é só fin_resolver_contexto validando o
+            -- p_contexto explícito ANTES de qualquer RPC chamar
+            -- has_filial_access(). Se uma RPC nova chamar
+            -- has_filial_access() sem passar por fin_resolver_contexto
+            -- primeiro, este vira um fallback que libera tudo silenciosamente
+            -- pro service_role.
+            OR (
+              public.get_jwt_filial_id() IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM public.user_filial_access
+                WHERE user_id = auth.uid()
+                AND igreja_id = _igreja_id
+              )
+            )
           )
         )
       )

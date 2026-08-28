@@ -56,9 +56,14 @@ próprio arquivo):
   de tenant direto; fallback removido. **Nenhum código legítimo grava
   `user_metadata.igreja_id`/`filial_id`** — só `app_metadata`,
   server-side; não reintroduzir esse fallback achando que "cobre mais
-  casos". Ver `docs/guardrails-financeiro.md` item M.8 pro trace
-  completo e os 10 cenários de harness (Postgres 17 efêmero) que
-  provam o fix sem regressão.
+  casos". Harness commitado em `supabase/tests/
+  has_filial_access_test.sql` (11 cenários, fail-fast) — rodar de novo
+  a cada mudança nessa função, não confiar só em revisão visual. Ver
+  `docs/guardrails-financeiro.md` item M.9 pros 2 achados residuais do
+  review (`has_filial_access(NULL,NULL)` bloqueando PATCH de profile
+  de visitante — hoje inalcançável por guard de UI não relacionado,
+  não confiar nisso como proteção desenhada; falta trigger travando
+  `igreja_id`/`filial_id` em `profiles`).
 - **`origem_registro`**: literal novo numa RPC precisa da CHECK
   constraint na mesma PR (`manual`/`api`/`getnet_antecipacao_desagio`).
 - **Ação de escrita nova** num card que já gateia irmãs por filial
