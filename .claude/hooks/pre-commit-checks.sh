@@ -88,7 +88,13 @@ sys.stdout.write("".join(out))
 # disparar em `git commit-tree`/`git commit-graph`. -C aceita path
 # entre aspas (simples ou duplas) além de sem aspas, pra não perder
 # `git -C "dir com espaço" commit`.
-if ! printf '%s' "$CMD_STRIPPED" | grep -qE '(^|[;&|]) *git( -C ("[^"]*"|'"'"'[^'"'"']*'"'"'|[^ ]+))? commit($|[^a-zA-Z-])'; then
+# Também aceita opções globais entre `git` e `commit` (`-c key=val`,
+# `-C` repetido) e prefixo `VAR=val` — senão `git -c commit.gpgsign=false
+# commit -am ...` e `FOO=1 git commit` saíam do hook sem check nenhum
+# (achado real de @cursoragent review, PR #134).
+GIT_GLOBAL='( -C ("[^"]*"|'"'"'[^'"'"']*'"'"'|[^ ]+)| -c [^ ]+)*'
+GIT_COMMIT_AT='(^|[;&|]) *([A-Za-Z_][A-Za-Z0-9_]*=[^ ;&|]* )*git'"$GIT_GLOBAL"' commit($|[^a-zA-Z-])'
+if ! printf '%s' "$CMD_STRIPPED" | grep -qE "$GIT_COMMIT_AT"; then
   exit 0
 fi
 
@@ -112,9 +118,11 @@ REPO_DIR="$ORIG_DIR"
 # conteúdo o strip apagou), recupera o valor de verdade do CMD
 # original com a MESMA âncora — nesse ponto já sabemos que existe um
 # -C real nessa posição, então buscar o valor no CMD original é seguro.
-if [[ "$CMD_STRIPPED" =~ (^|[\;\&\|])[[:space:]]*git[[:space:]]+-C[[:space:]]+(\"([^\"]*)\"|\'([^\']*)\'|([^[:space:]]+))[[:space:]]+commit ]]; then
-  REPO_DIR="${BASH_REMATCH[3]:-${BASH_REMATCH[4]:-${BASH_REMATCH[5]}}}"
-  if [ -z "$REPO_DIR" ] && [[ "$CMD" =~ (^|[\;\&\|])[[:space:]]*git[[:space:]]+-C[[:space:]]+(\"([^\"]+)\"|\'([^\']+)\') ]]; then
+if [[ "$CMD_STRIPPED" =~ (^|[\;\&\|])[[:space:]]*git[[:space:]]+((-c[[:space:]]+[^[:space:]]+[[:space:]]+)*)-C[[:space:]]+(\"([^\"]*)\"|\'([^\']*)\'|([^[:space:]]+))[[:space:]]+((-c[[:space:]]+[^[:space:]]+[[:space:]]+)*)commit ]]; then
+  # Grupos: (1) prefixo (2-3) `-c` antes do `-C` (4) path com aspas
+  # (5) duplas (6) simples (7) sem aspas.
+  REPO_DIR="${BASH_REMATCH[5]:-${BASH_REMATCH[6]:-${BASH_REMATCH[7]}}}"
+  if [ -z "$REPO_DIR" ] && [[ "$CMD" =~ (^|[\;\&\|])[[:space:]]*git[[:space:]].*-C[[:space:]]+(\"([^\"]+)\"|\'([^\']+)\') ]]; then
     REPO_DIR="${BASH_REMATCH[3]:-${BASH_REMATCH[4]}}"
   fi
   if [ -z "$REPO_DIR" ] || [ ! -d "$REPO_DIR" ]; then
@@ -123,7 +131,7 @@ if [[ "$CMD_STRIPPED" =~ (^|[\;\&\|])[[:space:]]*git[[:space:]]+-C[[:space:]]+(\
   fi
   cd "$REPO_DIR" || exit 0
   REPO_DIR=$(pwd)
-elif [[ "$CMD_STRIPPED" =~ (^|[\;\&\|])[[:space:]]*cd[[:space:]]+(\"([^\"]*)\"|\'([^\']*)\'|([^[:space:]]+))[[:space:]]*(\&\&|\;)[[:space:]]*git[[:space:]]+commit ]]; then
+elif [[ "$CMD_STRIPPED" =~ (^|[\;\&\|])[[:space:]]*cd[[:space:]]+(\"([^\"]*)\"|\'([^\']*)\'|([^[:space:]]+))[[:space:]]*(\&\&|\;)[[:space:]]*git[[:space:]]+((-C[[:space:]]+(\"([^\"]*)\"|\'([^\']*)\'|[^[:space:]]+)|-c[[:space:]]+[^[:space:]]+)[[:space:]]+)*commit ]]; then
   # `cd <dir> && git commit` (ou `;`) no MESMO comando — achado real de
   # /code-review ultra local, PR #134: só `-C` era reconhecido; um `cd`
   # explícito antes do `git commit` fazia todo check rodar no diretório
@@ -145,15 +153,23 @@ elif [[ "$CMD_STRIPPED" =~ (^|[\;\&\|])[[:space:]]*cd[[:space:]]+(\"([^\"]*)\"|\
   REPO_DIR=$(pwd)
 fi
 
-# `-a`/`--all`/`--include`/`--only`/pathspec explícito fazem o commit
-# gravar MAIS (ou diferente) do que o índice atual — `git write-tree`
-# abaixo só reflete o que já está staged AGORA, não o que essas opções
-# vão adicionar durante o próprio `git commit`. Negar em vez de validar
-# um snapshot que não é o que será gravado de verdade (achado real de
-# /code-review ultra local, PR #134: `git commit -am "..."` com índice
-# limpo pulava todo check e commitava working-tree TS não validado).
-if printf '%s' "$CMD_STRIPPED" | grep -qE '(^|[;&|])[[:space:]]*git[[:space:]]+(-C[[:space:]]+("[^"]*"|'"'"'[^'"'"']*'"'"'|\S+)[[:space:]]+)?commit\b.*[[:space:]](-[a-zA-Z]*a[a-zA-Z]*\b|--all\b|--include\b|--only\b)'; then
-  deny "Commit bloqueado — 'git commit -a/--all/--include/--only' grava mais do que o índice atual, e este hook só valida o snapshot já staged. Rode 'git add' explícito nos arquivos e um 'git commit' simples (sem essas flags)."
+# `-a`/`--all`/`--include`/`--only`/`--patch`/`-p`/`--interactive` e
+# pathspec depois de `--` fazem o commit gravar MAIS (ou diferente) do
+# que o índice atual — `git write-tree` abaixo só reflete o que já está
+# staged AGORA, não o que essas opções vão adicionar durante o próprio
+# `git commit`. Negar em vez de validar um snapshot que não é o que será
+# gravado de verdade (achado real de /code-review ultra local, PR #134:
+# `git commit -am "..."` com índice limpo pulava todo check e commitava
+# working-tree TS não validado). `--patch`/`-p`/`--interactive` implicam
+# `--include` (git commit -h) e não estavam no deny — o hook validava o
+# índice e o git depois stageava hunks extra (achado real de
+# @cursoragent review, PR #134). Flags são procuradas no comando
+# STRIPPED inteiro (não só coladas em `git commit`) pra `git -c x=y
+# commit -am` não escapar do deny.
+if printf '%s' "$CMD_STRIPPED" | grep -qE '(^|[[:space:]])(--all|--include|--only|--patch|--interactive)($|[[:space:]=])' \
+  || printf '%s' "$CMD_STRIPPED" | grep -qE '[[:space:]]-[a-zA-Z]*[ap][a-zA-Z]*($|[[:space:]])' \
+  || printf '%s' "$CMD_STRIPPED" | grep -qE 'commit($|[^a-zA-Z-])([^;&|]*)[[:space:]]--[[:space:]]+[^[:space:]]'; then
+  deny "Commit bloqueado — 'git commit -a/--all/--include/--only/--patch/-p/--interactive' (ou pathspec depois de --) grava mais do que o índice atual, e este hook só valida o snapshot já staged. Rode 'git add' explícito nos arquivos e um 'git commit' simples (sem essas flags)."
   exit 0
 fi
 
@@ -170,7 +186,7 @@ fi
 # 2ª chamada (só `git commit`) faz este hook rodar de novo, agora com
 # o índice já staged de verdade.
 if printf '%s' "$CMD_STRIPPED" | grep -qE '(^|[;&|])[[:space:]]*git[[:space:]]+(add|rm|reset|stage)\b' \
-  && printf '%s' "$CMD_STRIPPED" | grep -qE '(^|[;&|])[[:space:]]*git[[:space:]]+(-C[[:space:]]+("[^"]*"|'"'"'[^'"'"']*'"'"'|\S+)[[:space:]]+)?commit\b'; then
+  && printf '%s' "$CMD_STRIPPED" | grep -qE "$GIT_COMMIT_AT"; then
   deny "Commit bloqueado — este comando mistura 'git add/rm/reset/stage' com 'git commit' numa chamada só. Este hook roda ANTES do comando executar, então o índice validado seria o de ANTES do add/rm/reset — não o que será commitado de verdade. Rode o add/rm/reset numa chamada separada, depois um 'git commit' simples numa segunda chamada."
   exit 0
 fi

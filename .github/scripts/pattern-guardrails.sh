@@ -88,6 +88,24 @@ is_supabase_mutation_ctx() {
   echo "$ctx" | grep -qE '\.from\(["'"'"']|supabase[A-Za-z]*\.'
 }
 
+# Apaga um `// ...` no fim da linha (// com whitespace na frente, pra
+# `https://` em string sobreviver). Linha que É só comentário o caller
+# pula via `js_line_is_comment`.
+code_without_line_comment() {
+  printf '%s' "$1" | sed -E 's|[[:space:]]+//.*$||'
+}
+
+# Comentário de linha / bloco começando a linha — não é statement, não
+# pode religar um Set.delete ao `.from("` que alguém citou no comentário
+# (achado real de @cursoragent review, PR #134).
+js_line_is_comment() {
+  local t="$1"
+  case "$t" in
+    //*|/\**) return 0 ;;
+  esac
+  return 1
+}
+
 # Confirma que o .delete()/.update() na linha `lineno` de fato pertence a
 # um chain do Supabase, não só que "supabase"/.from( aparece em algum
 # lugar dentro de uma janela de N linhas (achado real de @codex review,
@@ -125,19 +143,28 @@ mutation_line_segment() {
 }
 
 mutation_belongs_to_chain() {
-  local f="$1" lineno="$2" idx="${3:-}" line prev i trimmed
+  local f="$1" lineno="$2" idx="${3:-}" line prev i trimmed code
   if [ -n "$idx" ]; then
     line=$(mutation_line_segment "$f" "$lineno" "$idx")
   else
     line=$(sed -n "${lineno}p" "$f")
   fi
+  line=$(code_without_line_comment "$line")
   is_supabase_mutation_ctx "$line" && return 0
   i=$((lineno - 1))
   local floor=$((lineno > 10 ? lineno - 10 : 1))
   while [ "$i" -ge "$floor" ]; do
     prev=$(sed -n "${i}p" "$f")
     trimmed=$(printf '%s' "$prev" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
-    if [ -z "$trimmed" ]; then
+    if [ -z "$trimmed" ] || js_line_is_comment "$trimmed"; then
+      i=$((i - 1))
+      continue
+    fi
+    # `select(); // supabase.from("x")` — o `//` não é código; o `;`
+    # no trecho de código ainda fecha o statement anterior.
+    code=$(code_without_line_comment "$trimmed")
+    code=$(printf '%s' "$code" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
+    if [ -z "$code" ]; then
       i=$((i - 1))
       continue
     fi
@@ -147,10 +174,10 @@ mutation_belongs_to_chain() {
     # classifica o Set.delete como mutation (achado real de @codex
     # review, PR #134: o check de supabase vinha ANTES do check de `;`,
     # então a linha do select "vazava" pro delete da linha seguinte).
-    case "$trimmed" in
+    case "$code" in
       *\;) return 1 ;;
     esac
-    if is_supabase_mutation_ctx "$trimmed"; then
+    if is_supabase_mutation_ctx "$code"; then
       return 0
     fi
     i=$((i - 1))
@@ -465,6 +492,18 @@ selectedIds.delete(id);
 EOF
   expect_pass "Set.delete na linha seguinte de um select(); não é mutation" "$tmp/set-delete-next-line.ts" check_mutations
 
+  # 10e) comentário com `.from("` entre um select(); e um Set.delete
+  # não pode religar o chain — mutation_belongs_to_chain lia a linha
+  # anterior CRUA, então `// leftover: supabase.from("x")` fazia o
+  # Set.delete ser classificado como mutation (achado real de
+  # @cursoragent review, PR #134).
+  cat >"$tmp/set-delete-comment-from.ts" <<'EOF'
+await supabase.from("items").select();
+// leftover: supabase.from("x")
+selectedIds.delete(id);
+EOF
+  expect_pass "Set.delete depois de comentário com .from( não é mutation" "$tmp/set-delete-comment-from.ts" check_mutations
+
   # 11) chain multi-linha .from + .delete()
   cat >"$tmp/del-multiline.ts" <<'EOF'
 await supabase
@@ -473,6 +512,18 @@ await supabase
   .eq("id", id);
 EOF
   expect_fail "delete() multi-linha sem count" "$tmp/del-multiline.ts" check_mutations
+
+  # 11b) comentário no MEIO de um chain real não pode fazer o walker
+  # pular o `.from(` de verdade (o skip de comentário é só pra linha
+  # que É comentário, não pra desligar o chain).
+  cat >"$tmp/del-multiline-comment.ts" <<'EOF'
+await supabase
+  // drop the row next
+  .from("fornecedores")
+  .delete()
+  .eq("id", id);
+EOF
+  expect_fail "delete() multi-linha com comentário no meio ainda é mutation" "$tmp/del-multiline-comment.ts" check_mutations
 
   # 12) update multi-linha com count no 2º arg
   cat >"$tmp/upd-ok.ts" <<'EOF'
@@ -535,7 +586,7 @@ EOF
     return 1
   fi
   echo ""
-  echo "Self-test OK (26 casos)."
+  echo "Self-test OK (28 casos)."
   rm -rf "$tmp"
   return 0
 }

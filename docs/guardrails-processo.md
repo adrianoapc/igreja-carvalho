@@ -69,7 +69,8 @@ de série de gráfico.
     Cobre chain multi-linha (`.from("x")` numa linha e `.delete(...)` na
     próxima). Distingue `Array.from` / `Set.delete` — um statement
     anterior terminado em `;` (mesmo com `supabase.from(`) **não** é o
-    chain desta call. Escape: `// count-exact-ok`.
+    chain desta call; comentário com `.from("` também não religa o chain.
+    Escape: `// count-exact-ok`.
   - `STATUS_COLOR` usado como `color:`.
   Matches só disparam se o início está em **código** (não string nem
   comentário) — `const note = '.eq("filial_id", id)'` não trava a PR.
@@ -115,9 +116,10 @@ sequencial/divergente ou heurística de forma de gráfico.
 ### Hooks do Claude Code — `.claude/settings.json` + `.claude/hooks/`
 
 - **`pre-commit-checks.sh`** (`PreToolUse`, matcher `Bash`): intercepta
-  `git commit` (inclusive `git -C <dir> commit`) e roda, ANTES de
-  permitir o commit, contra o **snapshot do índice** (`git write-tree` +
-  archive — o que o commit vai gravar, não o working tree): eslint nos
+  `git commit` (inclusive `git -C <dir> commit`, `git -c key=val commit`,
+  prefixo `VAR=val`) e roda, ANTES de permitir o commit, contra o
+  **snapshot do índice** (`git write-tree` + archive — o que o commit vai
+  gravar, não o working tree): eslint nos
   arquivos `.ts`/`.tsx` staged (não `npm run lint` no repo inteiro — o
   baseline tinha ~560 erros pré-existentes fora do que estava sendo
   commitado; rodar full-repo bloquearia qualquer commit pra sempre),
@@ -126,7 +128,9 @@ sequencial/divergente ou heurística de forma de gráfico.
   `supabase/functions/**` estiver staged (a suite é pequena — 2 arquivos
   — e assim uma mudança só no módulo de produção ainda dispara o teste
   existente). Bloqueia o commit (`permissionDecision: deny`) se qualquer
-  um falhar.
+  um falhar. Recusa `-a`/`--all`/`--include`/`--only`/`--patch`/`-p`/
+  `--interactive` e pathspec depois de `--` — essas flags gravariam
+  mais do que o snapshot do índice que o hook valida.
 - **`pr-review-reminder.sh`** (`PreToolUse`, matcher `Bash`): lembrete
   não-bloqueante antes de `gh pr create` — não dá pra verificar de forma
   confiável que `/code-review`/`/security-review` rodaram, então isso é
@@ -147,6 +151,11 @@ própria PR #134):
   pré-existentes; endurecer o hook exigiria limpar esse débito (mesmo
   raciocínio do eslint full-repo). O eslint nos arquivos staged continua
   sendo o check de código que de fato pega regressão nova.
+- `git commit <arquivo>` sem `--` (pathspec implícito, implica
+  `--only`) ainda não é recusado com confiança — a mensagem `-m` e
+  `-F`/`--file` também consomem argumentos; o deny cobre pathspec só
+  depois de `--` explícito, mais `-a`/`-p`/`--all`/`--patch`/
+  `--include`/`--only`/`--interactive`.
 
 ### PR template — `.github/pull_request_template.md`
 
