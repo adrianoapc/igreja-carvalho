@@ -16,6 +16,16 @@ set -uo pipefail
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 MUTATION_ARGS_PY="$SCRIPT_DIR/mutation-call-args.py"
 STRIP_TS_TEXT_PY="$SCRIPT_DIR/strip-ts-text.py"
+MUTATION_ESCAPE_PY="$SCRIPT_DIR/mutation-escape-scope.py"
+
+# Decide se o match `idx` de .delete(/.update( na linha `lineno` tem um
+# escape `count-exact-ok` que pertence A ELE (não a uma call vizinha na
+# MESMA linha física) — ver docstring de mutation-escape-scope.py.
+mutation_match_escaped() {
+  local f="$1" lineno="$2" idx="$3" nmatches="$4" line
+  line=$(sed -n "${lineno}p" "$f")
+  python3 "$MUTATION_ESCAPE_PY" "$line" "$idx" "$nmatches"
+}
 
 # Extrai o texto entre o `(` do `.delete(` / `.update(` na linha dada e
 # o `)` que fecha ESSA call (pula strings). Assim `count: "exact"` duma
@@ -139,7 +149,7 @@ mutation_belongs_to_chain() {
 
 check_mutations() {
   local f="$1" fail=0
-  local lineno args win nmatches idx line
+  local lineno args nmatches idx line
   # Itera por MATCH, não por linha (achado real de /code-review ultra
   # local, PR #134): `grep -n` reporta uma linha que casa 1x mesmo com
   # 2+ ocorrências (`Promise.all([a.delete(), b.delete({count:"exact"})])`)
@@ -152,19 +162,26 @@ check_mutations() {
     line=$(sed -n "${lineno}p" "$f")
     nmatches=$(printf '%s\n' "$line" | grep -oE '\.(delete|update)\(' | wc -l | tr -d ' ')
     [ "${nmatches:-0}" -eq 0 ] && continue
-    # .from\(["'] exige aspas logo após o parêntese — bate em
-    # .from("tabela") do Supabase, não em Array.from(x) (achado real:
-    # Array.from(selectedChildren) perto de Set.delete disparava).
-    # Janela MESMA LINHA só, mesma razão do check_filial_eq acima
-    # (achado real de /code-review ultra local, PR #134: `//
-    # count-exact-ok` de UMA call vazava pra proteger uma call
-    # DIFERENTE 1-3 linhas antes).
-    win=$(window "$f" "$lineno" 0 0)
-    if echo "$win" | grep -q '// count-exact-ok'; then
-      continue
-    fi
     idx=1
     while [ "$idx" -le "$nmatches" ]; do
+      # .from\(["'] exige aspas logo após o parêntese — bate em
+      # .from("tabela") do Supabase, não em Array.from(x) (achado real:
+      # Array.from(selectedChildren) perto de Set.delete disparava).
+      #
+      # Escape checado POR MATCH via mutation_match_escaped, não na
+      # linha inteira antes do loop (achado real de @codex review, PR
+      # #134: um `continue` de linha inteira antes do loop por-match
+      # fazia UM escape numa call exemptar TODAS as calls da mesma
+      # linha física — ex.: `Promise.all([a.delete(), b.delete()]); //
+      # count-exact-ok` não validava nem a() nem b(), mesmo a() sendo
+      # desguarnecida e sem relação com o comentário). Um `//` comment
+      # sempre vai até o fim da linha física — só pode, sem ambiguidade,
+      # pertencer à ÚLTIMA call da linha; `/* count-exact-ok */` inline
+      # pode ficar entre 2 calls específicas. Ver mutation-escape-scope.py.
+      if mutation_match_escaped "$f" "$lineno" "$idx" "$nmatches"; then
+        idx=$((idx + 1))
+        continue
+      fi
       # mutation_belongs_to_chain checado POR MATCH (índice), não uma
       # vez pra linha inteira — achado real de @codex review, PR #134:
       # `await supabase.from("items").select(); selectedIds.delete(id);`
@@ -214,27 +231,49 @@ check_chart_hex_warning() {
 scope_lines_for_file() {
   local f="$1" base_sha="$2"
   # Linhas em escopo: as que a PR ADICIONOU (número na versão nova) MAIS
-  # uma margem de 10 linhas SÓ em torno de hunks só-de-remoção (ex.:
-  # apagar só `{ count: "exact" }` de um .delete() multi-linha, que não
-  # tem linha "adicionada" nenhuma pra ancorar o escopo). Hunk com linha
-  # adicionada de verdade usa EXATAMENTE as linhas adicionadas, sem
-  # margem — achado real de @codex review, PR #134: a margem de 10
-  # aplicada a QUALQUER hunk (inclusive addition-only) fazia adicionar
-  # 1 linha nova perto de um `.eq("filial_id"...)`/mutation/
-  # STATUS_COLOR legado (não tocado por esta PR) travar o check
-  # obrigatório mesmo sem essa PR ter introduzido ou alterado o padrão
-  # — este repo documenta ter várias ocorrências legadas assim.
-  # Padrão pré-existente fora de qualquer hunk nunca entra.
+  # uma margem de 10 linhas em torno de QUALQUER hunk que tenha REMOVIDO
+  # pelo menos 1 linha do lado velho (ex.: apagar só `{ count: "exact" }`
+  # de um .delete() multi-linha — seja um hunk só-de-remoção, seja um
+  # hunk de "substituição" que também adiciona uma linha não relacionada
+  # no mesmo hunk). Hunk 100% de adição (nada removido do lado velho)
+  # usa EXATAMENTE as linhas adicionadas, sem margem — achado real de
+  # @codex review, PR #134: a margem de 10 aplicada a QUALQUER hunk
+  # (inclusive addition-only) fazia adicionar 1 linha nova perto de um
+  # `.eq("filial_id"...)`/mutation/STATUS_COLOR legado (não tocado por
+  # esta PR) travar o check obrigatório mesmo sem essa PR ter
+  # introduzido ou alterado o padrão — este repo documenta ter várias
+  # ocorrências legadas assim. Padrão pré-existente fora de qualquer
+  # hunk nunca entra.
+  #
+  # 2ª rodada (achado real de @codex review, PR #134): usar só a
+  # contagem do lado NOVO pra decidir "hunk é addition-only" é errado —
+  # um hunk de SUBSTITUIÇÃO (remove `{ count: "exact" }`, adiciona um
+  # comentário no lugar) também tem contagem nova > 0, então caía no
+  # branch "sem margem" e a `.delete({ ... })` ao redor (não tocada
+  # diretamente, só a linha do count) nunca entrava em SCOPE_LINES.
+  # Fix: parsear as DUAS contagens do cabeçalho do hunk (`-X,Y +A,B`) —
+  # Y (lado velho) > 0 é o sinal real de "este hunk removeu algo",
+  # independente de quantas linhas o lado novo também adicionou.
   git diff -U0 "$base_sha"...HEAD -- "$f" 2>/dev/null \
-    | grep -oP '^@@ -[0-9]+(,[0-9]+)? \+\K[0-9]+(,[0-9]+)?(?= @@)' \
-    | awk -F, '{
-        start=$1; count=($2==""?1:$2);
-        if (count > 0) {
-          for(i=start; i<start+count; i++) print i
-        } else {
+    | grep -oP '^@@ -[0-9]+(,[0-9]+)? \+[0-9]+(,[0-9]+)?(?= @@)' \
+    | while IFS= read -r hdr; do
+        old_part="${hdr%% +*}"
+        new_part="${hdr#*+}"
+        old_count="${old_part#*,}"
+        [ "$old_count" = "$old_part" ] && old_count=1
+        new_start="${new_part%%,*}"
+        new_count="${new_part#*,}"
+        [ "$new_count" = "$new_part" ] && new_count=1
+        echo "$old_count $new_start $new_count"
+      done \
+    | awk '{
+        old_count=$1; start=$2; count=$3;
+        if (old_count > 0) {
           lo=start-10; if (lo<1) lo=1;
-          hi=start+10;
+          hi=start+(count>0?count:1)+10;
           for(i=lo;i<=hi;i++) print i
+        } else if (count > 0) {
+          for(i=start; i<start+count; i++) print i
         }
       }' | sort -nu
 }
@@ -445,6 +484,25 @@ await supabase.from("b").delete().eq("id", idb);
 EOF
   expect_fail "escape de uma call não protege a vizinha" "$tmp/del-leak.ts" check_mutations
 
+  # 13c) `// count-exact-ok` no FIM de uma linha com 2 matches só pode
+  # exemptar a ÚLTIMA call, sem ambiguidade (um `//` comment sempre vai
+  # até o fim da linha física) — a 1ª call, desguarnecida e sem relação
+  # com o comentário, tem que continuar falhando (achado real de @codex
+  # review, PR #134: o `continue` de linha inteira, ANTES do loop
+  # por-match, deixava esse `// count-exact-ok` exemptar as 2 calls).
+  cat >"$tmp/del-trailing-escape-last-only.ts" <<'EOF'
+Promise.all([supabase.from("a").delete(), supabase.from("b").delete()]); // count-exact-ok
+EOF
+  expect_fail "escape no fim da linha só exempta o último match, não os anteriores" "$tmp/del-trailing-escape-last-only.ts" check_mutations
+
+  # 13d) `/* count-exact-ok */` inline (block comment) pode ficar entre
+  # 2 tokens na mesma linha, ao contrário de `//` — exempta a call
+  # específica junto da qual está.
+  cat >"$tmp/del-inline-block-escape.ts" <<'EOF'
+await supabase.from("x").delete() /* count-exact-ok */.eq("id", id);
+EOF
+  expect_pass "delete escape via /* count-exact-ok */ inline block comment" "$tmp/del-inline-block-escape.ts" check_mutations
+
   # 14) STATUS_COLOR como tinta
   cat >"$tmp/color.ts" <<'EOF'
 const style = { color: STATUS_COLOR.warning };
@@ -464,7 +522,7 @@ EOF
     return 1
   fi
   echo ""
-  echo "Self-test OK (22 casos)."
+  echo "Self-test OK (24 casos)."
   rm -rf "$tmp"
   return 0
 }
