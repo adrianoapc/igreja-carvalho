@@ -15,8 +15,8 @@ set -uo pipefail
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 MUTATION_ARGS_PY="$SCRIPT_DIR/mutation-call-args.py"
-STRIP_TS_TEXT_PY="$SCRIPT_DIR/strip-ts-text.py"
 MUTATION_ESCAPE_PY="$SCRIPT_DIR/mutation-escape-scope.py"
+FIND_CODE_PY="$SCRIPT_DIR/find-code-matches.py"
 
 # Decide se o match `idx` de .delete(/.update( na linha `lineno` tem um
 # escape `count-exact-ok` que pertence A ELE (não a uma call vizinha na
@@ -58,6 +58,11 @@ window() {
 check_filial_eq() {
   local f="$1" fail=0
   local lineno win
+  # Só matches cujo INÍCIO está em código (não string/comentário) —
+  # achado real de @codex review, PR #134: `const note = '.eq("filial_id",
+  # id) must include globals'` disparava o detector. `.eq("filial_id"`
+  # real continua pegando porque o match começa em `.eq`, que é código;
+  # só o argumento é string. Ver find-code-matches.py.
   while IFS=: read -r lineno _; do
     [ -z "$lineno" ] && continue
     in_scope "$lineno" || continue
@@ -74,7 +79,7 @@ check_filial_eq() {
     fi
     echo "::error file=${REPORT_FILE:-$f},line=$lineno::.eq(\"filial_id\"...) exclui filial_id IS NULL mesmo se houver .or(...) no mesmo chain (PostgREST ANDa os filtros). Substitua o .eq por .or(\"filial_id.eq.X,filial_id.is.null\"), ou // filial-global-ok se a exclusão de globais for intencional. Ver CLAUDE.md §Filial compartilhada."
     fail=1
-  done < <(grep -n '\.eq(["'"'"']filial_id["'"'"']' "$f" || true)
+  done < <(python3 "$FIND_CODE_PY" '\.eq\(["'"'"']filial_id["'"'"']' "$f" || true)
   return "$fail"
 }
 
@@ -136,12 +141,18 @@ mutation_belongs_to_chain() {
       i=$((i - 1))
       continue
     fi
+    # Statement anterior COMPLETO (termina em `;`) não pode ser o início
+    # deste chain, mesmo que contenha `supabase.from(` — senão
+    # `await supabase.from("items").select();\nselectedIds.delete(id)`
+    # classifica o Set.delete como mutation (achado real de @codex
+    # review, PR #134: o check de supabase vinha ANTES do check de `;`,
+    # então a linha do select "vazava" pro delete da linha seguinte).
+    case "$trimmed" in
+      *\;) return 1 ;;
+    esac
     if is_supabase_mutation_ctx "$trimmed"; then
       return 0
     fi
-    case "$trimmed" in
-      *\;) return 1 ;;  # statement anterior completo — não é meu chain
-    esac
     i=$((i - 1))
   done
   return 1
@@ -156,49 +167,38 @@ check_mutations() {
   # — um loop por linha só validaria a última call, deixando a primeira
   # sem checar. mutation_call_args aceita índice (1-based) do match na
   # linha pra isolar os argumentos de CADA call separadamente.
-  while IFS=: read -r lineno _; do
+  while IFS=: read -r lineno idx; do
     [ -z "$lineno" ] && continue
+    [ -z "$idx" ] && continue
     in_scope "$lineno" || continue
     line=$(sed -n "${lineno}p" "$f")
     nmatches=$(printf '%s\n' "$line" | grep -oE '\.(delete|update)\(' | wc -l | tr -d ' ')
     [ "${nmatches:-0}" -eq 0 ] && continue
-    idx=1
-    while [ "$idx" -le "$nmatches" ]; do
-      # .from\(["'] exige aspas logo após o parêntese — bate em
-      # .from("tabela") do Supabase, não em Array.from(x) (achado real:
-      # Array.from(selectedChildren) perto de Set.delete disparava).
-      #
-      # Escape checado POR MATCH via mutation_match_escaped, não na
-      # linha inteira antes do loop (achado real de @codex review, PR
-      # #134: um `continue` de linha inteira antes do loop por-match
-      # fazia UM escape numa call exemptar TODAS as calls da mesma
-      # linha física — ex.: `Promise.all([a.delete(), b.delete()]); //
-      # count-exact-ok` não validava nem a() nem b(), mesmo a() sendo
-      # desguarnecida e sem relação com o comentário). Um `//` comment
-      # sempre vai até o fim da linha física — só pode, sem ambiguidade,
-      # pertencer à ÚLTIMA call da linha; `/* count-exact-ok */` inline
-      # pode ficar entre 2 calls específicas. Ver mutation-escape-scope.py.
-      if mutation_match_escaped "$f" "$lineno" "$idx" "$nmatches"; then
-        idx=$((idx + 1))
-        continue
+    # Escape checado POR MATCH via mutation_match_escaped, não na
+    # linha inteira (achado real de @codex review, PR #134: um
+    # `continue` de linha inteira fazia UM escape numa call exemptar
+    # TODAS as calls da mesma linha física). Um `//` comment sempre vai
+    # até o fim da linha física — só pode, sem ambiguidade, pertencer à
+    # ÚLTIMA call da linha; `/* count-exact-ok */` inline pode ficar
+    # entre 2 calls específicas. Ver mutation-escape-scope.py.
+    if mutation_match_escaped "$f" "$lineno" "$idx" "$nmatches"; then
+      continue
+    fi
+    # mutation_belongs_to_chain checado POR MATCH (índice), não uma
+    # vez pra linha inteira — achado real de @codex review, PR #134:
+    # `await supabase.from("items").select(); selectedIds.delete(id);`
+    # tem os 2 statements na MESMA linha física; checar a linha
+    # inteira deixava o 1º supabase.from( "vazar" contexto pro
+    # Set.delete depois do `;`. mutation_line_segment isola só o
+    # trecho do statement ATÉ este match específico.
+    if mutation_belongs_to_chain "$f" "$lineno" "$idx"; then
+      args=$(mutation_call_args "$f" "$lineno" "$idx" 2>/dev/null || true)
+      if ! printf '%s' "$args" | grep -qE 'count:[[:space:]]*["'"'"']exact["'"'"']'; then
+        echo "::error file=${REPORT_FILE:-$f},line=$lineno::.delete()/.update() do Supabase sem { count: \"exact\" } NESTA call (match $idx de $nmatches nesta linha) — se o RLS negar, retorna error:null/0 linhas e o código pode reportar sucesso falso (PR #126). Adicione { count: \"exact\" } no argumento desta call (não numa irmã) e cheque o count retornado, ou // count-exact-ok se a call já é auto-limitada por PK/id único."
+        fail=1
       fi
-      # mutation_belongs_to_chain checado POR MATCH (índice), não uma
-      # vez pra linha inteira — achado real de @codex review, PR #134:
-      # `await supabase.from("items").select(); selectedIds.delete(id);`
-      # tem os 2 statements na MESMA linha física; checar a linha
-      # inteira deixava o 1º supabase.from( "vazar" contexto pro
-      # Set.delete depois do `;`. mutation_line_segment isola só o
-      # trecho do statement ATÉ este match específico.
-      if mutation_belongs_to_chain "$f" "$lineno" "$idx"; then
-        args=$(mutation_call_args "$f" "$lineno" "$idx" 2>/dev/null || true)
-        if ! printf '%s' "$args" | grep -qE 'count:[[:space:]]*["'"'"']exact["'"'"']'; then
-          echo "::error file=${REPORT_FILE:-$f},line=$lineno::.delete()/.update() do Supabase sem { count: \"exact\" } NESTA call (match $idx de $nmatches nesta linha) — se o RLS negar, retorna error:null/0 linhas e o código pode reportar sucesso falso (PR #126). Adicione { count: \"exact\" } no argumento desta call (não numa irmã) e cheque o count retornado, ou // count-exact-ok se a call já é auto-limitada por PK/id único."
-          fail=1
-        fi
-      fi
-      idx=$((idx + 1))
-    done
-  done < <(grep -nE '\.(delete|update)\(' "$f" || true)
+    fi
+  done < <(python3 "$FIND_CODE_PY" '\.(delete|update)\(' "$f" || true)
   return "$fail"
 }
 
@@ -210,7 +210,7 @@ check_status_color() {
     in_scope "$lineno" || continue
     echo "::error file=${REPORT_FILE:-$f},line=$lineno::STATUS_COLOR é cor de FUNDO de pill, não tinta de texto — usar como \`color:\` falha contraste WCAG 3:1 em card claro (PR #114). Use pillStyle(tone) de statusPalette.ts."
     fail=1
-  done < <(grep -nE 'color:[[:space:]]*STATUS_COLOR' "$f" || true)
+  done < <(python3 "$FIND_CODE_PY" 'color:\s*STATUS_COLOR' "$f" || true)
   return "$fail"
 }
 
@@ -279,23 +279,16 @@ scope_lines_for_file() {
 }
 
 scan_file() {
-  local f="$1" fail=0 stripped
+  local f="$1" fail=0
   [ -f "$f" ] || return 0
   [ -z "$SCOPE_LINES" ] && return 0
-  # Escaneia uma cópia com COMENTÁRIOS apagados (não strings — apagar
-  # string quebraria a detecção real, ver strip-ts-text.py), mesma
-  # contagem de linha (blank preserva `\n`) — achado real de @codex
-  # review, PR #134: texto de comentário mencionando o padrão como
-  # exemplo/doc disparava os detectores igual a código de verdade.
-  # `file=` nas mensagens de erro continua apontando pro arquivo REAL
-  # (via REPORT_FILE), não pra cópia temporária.
-  stripped=$(mktemp)
-  python3 "$STRIP_TS_TEXT_PY" < "$f" > "$stripped" 2>/dev/null || cp "$f" "$stripped"
+  # Detectores usam find-code-matches.py (só dispara se o match começa
+  # em código, não em string/comentário) — não precisa mais pré-apagar
+  # comentários numa cópia temporária.
   REPORT_FILE="$f"
-  check_filial_eq "$stripped" || fail=1
-  check_mutations "$stripped" || fail=1
-  check_status_color "$stripped" || fail=1
-  rm -f "$stripped"
+  check_filial_eq "$f" || fail=1
+  check_mutations "$f" || fail=1
+  check_status_color "$f" || fail=1
   return "$fail"
 }
 
@@ -381,6 +374,15 @@ const q = supabase.from("x").eq("filial_id", id);
 EOF
   expect_fail "scan_file ainda detecta .eq(\"filial_id\"...) real" "$tmp/filial-real-via-scan.ts" scan_file
 
+  # 5e) STRING contendo o padrão como texto (não código) não dispara —
+  # achado real de @codex review, PR #134. Comentários já eram
+  # ignorados; strings de documentação ainda não.
+  cat >"$tmp/filial-string.ts" <<'EOF'
+const note = '.eq("filial_id", id) must include globals';
+const q = supabase.from("x").or(`filial_id.eq.${id},filial_id.is.null`);
+EOF
+  expect_pass "string citando .eq(\"filial_id\"...) como texto não dispara" "$tmp/filial-string.ts" scan_file
+
   # 5b) escape de UMA call não pode vazar pra outra .eq("filial_id")
   #     vizinha sem escape próprio (achado real de @codex review, PR #134).
   cat >"$tmp/filial-leak.ts" <<'EOF'
@@ -452,6 +454,17 @@ await supabase.from("items").select(); selectedIds.delete(id);
 EOF
   expect_pass "Set.delete na MESMA linha de um supabase.select() não é mutation" "$tmp/set-delete-same-line.ts" check_mutations
 
+  # 10d) Set.delete na LINHA SEGUINTE de um select() terminado em `;`
+  # (sem linha intermediária) — achado real de @codex review, PR #134:
+  # mutation_belongs_to_chain checava supabase.from( na linha anterior
+  # ANTES de ver se ela terminava em `;`, então o select "vazava" e o
+  # Set.delete era classificado como mutation Supabase.
+  cat >"$tmp/set-delete-next-line.ts" <<'EOF'
+await supabase.from("items").select();
+selectedIds.delete(id);
+EOF
+  expect_pass "Set.delete na linha seguinte de um select(); não é mutation" "$tmp/set-delete-next-line.ts" check_mutations
+
   # 11) chain multi-linha .from + .delete()
   cat >"$tmp/del-multiline.ts" <<'EOF'
 await supabase
@@ -522,7 +535,7 @@ EOF
     return 1
   fi
   echo ""
-  echo "Self-test OK (24 casos)."
+  echo "Self-test OK (26 casos)."
   rm -rf "$tmp"
   return 0
 }

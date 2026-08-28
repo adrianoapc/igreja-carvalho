@@ -67,9 +67,12 @@ de série de gráfico.
     argumentos desta call** (não numa irmã a N linhas — `count: "exact"`
     de um `.select` ou de outro `.delete` no mesmo bloco não protege).
     Cobre chain multi-linha (`.from("x")` numa linha e `.delete(...)` na
-    próxima). Distingue `Array.from` / `Set.delete`. Escape:
-    `// count-exact-ok`.
+    próxima). Distingue `Array.from` / `Set.delete` — um statement
+    anterior terminado em `;` (mesmo com `supabase.from(`) **não** é o
+    chain desta call. Escape: `// count-exact-ok`.
   - `STATUS_COLOR` usado como `color:`.
+  Matches só disparam se o início está em **código** (não string nem
+  comentário) — `const note = '.eq("filial_id", id)'` não trava a PR.
   Também avisa (não bloqueia) sobre 3+ literais hex em qualquer `.ts`/
   `.tsx` tocado (a 1ª heurística exigia `COLORS` na mesma linha E path
   com dashboard/chart — nenhum dos 5 arquivos-alvo batia nos dois).
