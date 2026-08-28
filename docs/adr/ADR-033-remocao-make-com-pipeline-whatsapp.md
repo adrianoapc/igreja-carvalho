@@ -111,7 +111,15 @@ Lookup em `whatsapp_numeros` **pelo `phone_number_id`** (índice único),
 não só por `display_phone_number`. Sem row com `igreja_id NOT NULL`,
 não roteia (5xx) — `chatbot-triagem` hoje insere sessão com tenant
 nulo em vez de falhar, e o número `745419461981790` não tem seed
-commitado (bloqueio de cutover; ver plano §Passo 1).
+commitado (bloqueio de cutover; ver plano §Passo 1). **`filial_id`
+resolvido aqui não chega ponta a ponta pros dois chatbots** (achado
+real de `/code-review ultra` local, PR #133, clarificando esta
+decisão): `chatbot-triagem` aceita `body.filial_id`, mas
+`chatbot-financeiro` **ignora** esse campo e deriva a própria filial
+via `resolverIgrejaEFilialWhatsApp` por `display_phone_number` — ver
+plano §Passo 1 pro detalhe completo. Quem só lê este resumo não
+saberia que a filial resolvida aqui é descartada num dos dois
+caminhos.
 
 ### 2. Handshake e assinatura da Meta, hoje delegados ao conector nativo do Make
 
@@ -175,7 +183,26 @@ serão chamados pela nova função depois do corte — este é o momento
 natural de fechar os dois com validação `x-webhook-secret` fail-closed,
 reaproveitando o `MAKE_WEBHOOK_SECRET` já existente.
 
-### 7. Escalas e Feelings ficam pra Fase 2; Liturgia/geo/pedido/testemunho pra Fase 3
+### 7. Reclaim de lease expirado não pode depender só de redelivery da Meta
+
+A máquina de estado de dedup/lease (`queued`→`processing`→`chatbot_done`→
+`completed`, ver plano de execução §Passo 1) só reclama um lease expirado
+quando uma NOVA requisição HTTP toca o mesmo `wamid` — e a única fonte
+dessa requisição nova é a própria Meta reentregando o webhook. Sem
+`EdgeRuntime.waitUntil` em uso em nenhuma function do repo, não existe
+worker nenhum rodando fora do ciclo de vida de uma requisição HTTP
+(achado real de `/code-review ultra` local, PR #133). Se o isolate que
+enfileirou uma mensagem morrer antes de desenfileirar, ou uma mensagem
+ficar presa atrás de outra por mais que o lease de espera, o único jeito
+de reclamar é a Meta reentregar — sem garantia formal disso acontecer
+dentro da janela de lease. Fase 1 adiciona um job `pg_cron` (extensão já
+disponível no Supabase Postgres) que varre periodicamente leases
+expirados sem depender de tráfego HTTP novo, reinvocando via `pg_net`
+ou, no mínimo, alertando — fechando a lacuna entre "a máquina de estado
+foi desenhada pra sobreviver a lease travado" e "na prática só sobrevive
+se a Meta cooperar".
+
+### 8. Escalas e Feelings ficam pra Fase 2; Liturgia/geo/pedido/testemunho pra Fase 3
 
 Esta ADR cobre o cenário "Waba Chatbot" (triagem + financeiro) como Fase 1
 porque é o único com export validado ponta a ponta nesta sessão. Escalas e
@@ -263,6 +290,42 @@ Feelings e o restante entram como fases seguintes, com este ADR servindo
 de modelo de investigação (exportar → comparar contra código → só depois
 decidir).
 
+### 4. `pgmq` (Supabase Queues) em vez de lease/fencing hand-rolled
+❌ **Rejeitada por ora, registrada por transparência** (achado real de
+`/code-review ultra` local, PR #133 — a extensão nunca tinha sido
+avaliada nas ~28 rodadas de review anteriores, que só endureceram o
+mecanismo hand-rolled sem questionar a base). `pgmq` (extensão mantida,
+já disponível no Postgres do Supabase) cobre boa parte do que o dedup
+por `wamid` reimplementa manualmente: `pgmq.read` com visibility timeout
+≈ claim com `lease_until`, `pgmq.set_vt` ≈ heartbeat de renovação,
+`pgmq.archive`/`delete` ≈ marcar `completed`. Não foi escolhida porque
+(a) o mecanismo hand-rolled já passou por ~28 rodadas de review
+adversarial e está bem verificado especificamente pros dois eixos de
+concorrência deste domínio (dedup por `wamid` E lock por CONVERSA — dois
+recursos diferentes que `pgmq` sozinho não modela, já que é uma fila
+genérica, não um lock por chave arbitrária), e trocar de mecanismo nesta
+fase jogaria fora essa verificação; (b) o modo de pooling de conexão do
+Supabase (PgBouncer transaction mode) quebra locks de sessão Postgres
+mantidos entre statements (`pg_advisory_lock`/`FOR UPDATE` fora de uma
+única transação) — plausivelmente o motivo original de ter escolhido
+lease numa tabela de dados em vez de um lock nativo, embora este motivo
+nunca tivesse sido escrito explicitamente até agora. Fast-follow real:
+avaliar `pgmq` especificamente pro lock de CONVERSA (que É uma fila,
+diferente do dedup por `wamid`) numa sessão dedicada, fora do escopo
+desta fase.
+
+### 5. Tabela normalizada de entregas em vez de array JSONB por `wamid`
+❌ **Rejeitada por ora, mesma razão da alternativa 4** (achado real de
+`/code-review ultra` local, PR #133): `chatbot_result` como
+`[{alvo,payload,status}]` exige `jsonb_set` condicionado por índice pra
+claim atômico por item (ver plano §Passo 1, item de dedup #4) — uma
+tabela `wamid_entregas` (1 linha por item) seria mais simples de manter
+atômica e ganharia `FOR UPDATE SKIP LOCKED` de graça. Não escolhida
+porque hoje só existem 2 itens fixos por `wamid` (membro/pastor) — o
+ganho de uma tabela normalizada é proporcional ao número de itens e ao
+quanto a lógica de claim json cresce; reavaliar se um fluxo futuro
+precisar de mais de ~2-3 destinatários por mensagem.
+
 ## Implementação
 
 Ver plano de execução detalhado em
@@ -342,18 +405,25 @@ Ver plano de execução detalhado em
    sequência de chegada, não só o `timestamp`, decide a ordem)
 10. ⬜ Payload de imagem/documento (pro número financeiro) e áudio (pro
     número de triagem) no formato bruto real da Meta (só `id` do
-    anexo, sem URL) → resolução de mídia via Graph, `url_anexo`
-    repassado certo pra `chatbot-financeiro`, transcrição funcionando
-    em `chatbot-triagem` (achado real de `@codex review`, P2, 13ª
-    rodada — nenhum dos 9 cenários anteriores exercita mídia; a lógica
-    de resolução de media ID é implementação nova, hoje feita pelo
-    conector do Make, e só seria testada de verdade em produção sem
-    este cenário). **Exercitar com `WHATSAPP_TOKEN` e
-    `WHATSAPP_API_TOKEN` configurados como valores DIFERENTES**
-    (achado real de `@codex review`, P1, 24ª rodada — se os dois
-    tokens coincidirem em ambiente de teste por acaso, o bug de usar o
-    token errado no lookup de mídia [ver Decisão 5] passa despercebido;
-    o teste só prova algo se os valores divergirem de propósito)
+    anexo, sem URL) → `whatsapp-webhook` repassa o `id` cru como
+    `url_anexo`/`media_id` SEM chamar a Graph API ela mesma (achado
+    real de `@codex review`, P2, 13ª rodada, **corrigido na 28ª**:
+    versões anteriores deste cenário assumiam que a `whatsapp-webhook`
+    precisava resolver `media_id` → URL antes de chamar
+    `chatbot-financeiro` — na verdade `chatbot-financeiro` já resolve
+    um `media_id` cru sozinha, `resolverMediaUrl`
+    [`chatbot-financeiro/index.ts:111-149`], então basta repassar o
+    `id` bruto; ver plano de execução §Passo 1). Confirmar que
+    `chatbot-financeiro` baixa o anexo usando `WHATSAPP_API_TOKEN`
+    (não `WHATSAPP_TOKEN`, que a `whatsapp-webhook` usa só pra
+    resposta de saída — Decisão 5) e que a transcrição de áudio em
+    `chatbot-triagem` continua funcionando com `media_id` cru. **Exercitar
+    com `WHATSAPP_TOKEN` e `WHATSAPP_API_TOKEN` configurados como
+    valores DIFERENTES** (achado real de `@codex review`, P1, 24ª
+    rodada — se os dois tokens coincidirem em ambiente de teste por
+    acaso, um bug de token errado dentro de `chatbot-financeiro`/
+    `chatbot-triagem` passa despercebido; o teste só prova algo se os
+    valores divergirem de propósito)
 11. ⬜ Renovação de heartbeat falha durante processamento (`UPDATE` do
     lease afeta 0 linhas porque outro worker já reclamou) → a invocação
     **do chatbot** aborta sem persistir sessão/`atendimentos_bot` (409
@@ -375,6 +445,33 @@ Ver plano de execução detalhado em
     sessão com `igreja_id = NULL` — 5xx, sem insert (achado real de
     `@codex review`, P1, 26ª rodada). Confirmar a row de produção
     antes do cutover; ver plano §Passo 1.
+14. ⬜ `wamid` fica `queued`/`processing` com lease expirado e NENHUMA
+    nova requisição HTTP toca esse `wamid` de novo (sem redelivery da
+    Meta simulado) → o job `pg_cron` de reclaim (Decisão 7) encontra a
+    row na próxima varredura e reinvoca/alerta, sem depender de
+    nenhuma requisição HTTP nova (achado real de `/code-review ultra`
+    local, PR #133 — nenhum cenário anterior exercita reclaim sem
+    tráfego HTTP tocando o `wamid`; todos os cenários de lease/
+    redelivery acima simulam uma NOVA entrega da Meta como gatilho, o
+    que mascara justamente a lacuna que este cenário fecha).
+15. ⬜ POST em `chatbot-triagem`/`chatbot-financeiro` **sem** `x-webhook-
+    secret` (ou com valor errado), depois do corte (Passo 2 completo)
+    → 401, sem processar (achado real de `/code-review ultra` local,
+    PR #133: nenhum cenário anterior exercita o gate fail-closed em si
+    — o cenário 2 testa a assinatura EXTERNA Meta→`whatsapp-webhook`,
+    não esse gate INTERNO `whatsapp-webhook`→chatbots; uma regressão
+    que reabrisse o fail-open original passaria despercebida por todos
+    os 14 cenários acima).
+16. ⬜ POST em `chatbot-triagem`/`chatbot-financeiro` com `x-webhook-
+    secret` válido mas **sem** `owner_token` (simulando o Make na
+    janela pré-cutover, Passo 2) → processa normalmente, sem cair no
+    409 de revalidação de lock (achado real de `/code-review ultra`
+    local, PR #133: o plano trata isso como risco reconhecido — mesmo
+    padrão do bug do `wamid` ausente achado na 25ª rodada — mas nenhum
+    cenário confirma o comportamento; uma regressão que passasse a
+    exigir `owner_token` incondicionalmente derrubaria produção real
+    ainda em trânsito pelo Make, sem nenhum teste acusando antes do
+    deploy).
 
 ### Bake period
 
@@ -407,5 +504,5 @@ validado). Substituir ou marcar como histórico na Fase 1.
 
 ---
 
-**Última Atualização**: 2026-08-27 (27ª rodada — `/code-review` do merge)
+**Última Atualização**: 2026-08-28 (28ª rodada — `/code-review ultra` local)
 **Próxima Revisão**: Depois da Fase 1 em produção, antes de iniciar a Fase 2

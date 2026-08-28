@@ -131,38 +131,44 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
       `tipo_mensagem === "audio"`, e já resolve sozinha via Graph API
       dado um `media_id` bruto (`processarAudio`, `index.ts:388`) — pra
       esse caso, repassar `media_id` cru, sem resolver antes.
-    - `chatbot-financeiro` (`index.ts:676-685`) **não lê `media_id`
-      nenhum** — só aceita `url_anexo` (ou aliases) já como URL
-      resolvida. Pra imagem/documento indo pro número financeiro, a
-      `whatsapp-webhook` precisa resolver o `media_id` → URL via Graph
-      API ela mesma, ANTES de chamar `chatbot-financeiro`, e mandar o
-      resultado como `url_anexo` — não repassar o `id` cru. **Esse
-      lookup novo tem que usar `WHATSAPP_API_TOKEN`, não `WHATSAPP_TOKEN`**
-      (achado real de `@codex review`, P1, 24ª rodada — a ADR (Decisão 5)
-      define `WHATSAPP_TOKEN` só pra resposta de saída da
-      `whatsapp-webhook`; o caminho de mídia que já funciona hoje nos
-      dois chatbots autentica com `WHATSAPP_API_TOKEN`
-      [`chatbot-financeiro/index.ts:605,170-175`,
-      `chatbot-triagem/index.ts:61,388-395`] — os dois tokens **podem
-      divergir de verdade**, é por isso que o passo de revogação em
-      Fase 1 checa os 2 nomes separadamente (ver item de revogação mais
-      abaixo). Se o lookup novo usar `WHATSAPP_TOKEN` por padrão, texto
-      sai funcionando mas imagem/documento financeiro falha silenciosamente
-      sempre que os tokens não coincidirem). Usar `WHATSAPP_API_TOKEN`
-      pro lookup/download de mídia, igual ao que já funciona hoje —
-      manter `WHATSAPP_TOKEN` só pra envio de resposta — e cobrir esse
-      caminho explicitamente no cenário de teste que exercita mídia
-      (ADR-033 §Validação).
+    - `chatbot-financeiro` (`index.ts:676-685`) só EXTRAI `url_anexo`
+      (ou aliases) do body ali — mas **já sabe resolver um `media_id`
+      cru sozinha, sem precisar de URL pré-resolvida** (correção de
+      achado real de `/code-review ultra` local, PR #133: o texto
+      anterior desta doc dizia "não lê `media_id` nenhum", o que é
+      impreciso). `persistirAnexo` → `resolverMediaUrl`
+      (`index.ts:111-149`) recebe exatamente o valor de `url_anexo` e
+      testa `/^\d+$/` — se for só dígitos (um `media_id` da Meta, não
+      uma URL), resolve via `GET /v21.0/{media-id}` usando
+      `WHATSAPP_API_TOKEN` (`index.ts:605`) antes de baixar o arquivo.
+      Ou seja: **a `whatsapp-webhook` NÃO precisa fazer resolução de
+      mídia nenhuma pro número financeiro** — só extrair o `id` bruto
+      do payload da Meta (`image.id`/`document.id`) e mandar como
+      `url_anexo`, exatamente como já manda pra `chatbot-triagem` com
+      `media_id` de áudio (item acima). Isso elimina uma chamada Graph
+      API inteira do desenho da `whatsapp-webhook`, e junto com ela a
+      preocupação de qual token usar nesse lookup — `WHATSAPP_API_TOKEN`
+      já é o token que `resolverMediaUrl` usa internamente
+      (`chatbot-triagem/index.ts:61,388-395` resolve áudio do mesmo
+      jeito, próprio token). **Cobrir esse caminho explicitamente no
+      cenário de teste que exercita mídia** (ADR-033 §Validação, cenário
+      10): mandar `media_id` cru (string só de dígitos) como `url_anexo`
+      pro número financeiro e confirmar que `chatbot-financeiro` resolve
+      e baixa sozinha, sem a `whatsapp-webhook` ter feito Graph API
+      nenhuma antes.
   - **Filtra eventos que não são mensagem, E tipos de mensagem sem
     suporte** (achado real de `@codex review`, P2, 14ª rodada — o
     filtro original só cobria `statuses[]`; a Meta também entrega
     `messages[].type` como `interactive`/`button`/`reaction`/
     `location`/`contacts`/`sticker`, nenhum coberto pela extração de
     `text.body`/mídia acima. Sem allowlist, esses tipos passam com
-    `mensagem=""` e são roteados mesmo assim — `chatbot-triagem`
-    processa string vazia contra a sessão ativa,
-    `index.ts:987-994`, gerando resposta sem sentido ou avançando
-    histórico com "mensagem" vazia do usuário). Allowlist explícita de
+    `mensagem=""` e são roteados mesmo assim — a string vazia vira
+    `conteudo_texto` (fallback chain, `index.ts:987-993`) e daí segue
+    pro fluxo normal: busca a sessão ativa (`index.ts:1042-1063`) e
+    passa pela checagem de idempotência que compara com a última
+    mensagem do usuário no histórico (`index.ts:1089-1112`) — achando
+    resposta sem sentido ou avançando histórico com "mensagem" vazia do
+    usuário quando não bate com a idempotência). Allowlist explícita de
     tipos suportados (`text`, `audio`, `image`, `document`) globalmente;
     qualquer outro tipo responde 200 sem rotear, igual ao tratamento de
     `statuses[]`. **A allowlist certa é POR ROTA, não uma lista global
@@ -270,8 +276,15 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   a function já resolve o plantão via
   `resolverTelefonePlantaoPastoral`, `index.ts:1567-1575`, e devolve
   esse campo; o blueprint placeholder antigo usava
-  `telefone_admin_destino` com fallback `5517988216456`,
-  `MAKE_WHATSAPP_PHONE_NUMBER_ID.md:271`. Sem ler o campo, o alerta
+  `telefone_admin_destino` com fallback `5517988216456`
+  (`make-whatsapp-chatbots-blueprint.json:467`,
+  `MAKE_BLUEPRINT_SETUP.md:113` — **correção de citação**, achado real
+  de `/code-review ultra` local, PR #133: uma rodada anterior citou
+  `MAKE_WHATSAPP_PHONE_NUMBER_ID.md:271`, que só tem
+  `"to": "{{4.telefone_admin_destino}}"`, sem fallback nenhum; o
+  literal `5517988216456` vive nos 2 arquivos certos acima — e também
+  no código de produção, `TELEFONE_PASTOR_PLANTAO_FALLBACK` em
+  `chatbot-triagem/index.ts:72`). Sem ler o campo, o alerta
   pastoral sai pro número errado ou pra ninguém).
   **`notificar_admin: true` tem um SEGUNDO produtor que os dois
   documentos não distinguiam — falha técnica de IA, não só
@@ -280,7 +293,7 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   status explícito em `respostaJson`, default 200) com
   `notificar_admin: true` e `dados_contato.motivo = "Falha técnica:
   ${motivo}"` em TODO timeout/erro HTTP/conteúdo vazio da IA
-  (`:1310,1327,1332,1335` — gateway Lovable falhou, OpenAI falhou,
+  (`:1316,1339,1345,1349` — gateway Lovable falhou, OpenAI falhou,
   exceção/timeout de 30s, ou resposta vazia), não só no branch
   `SOLICITACAO_PASTORAL` (`:1502`). Os dois produtores são
   distinguíveis (`erro_ia: true` só existe no payload de
@@ -401,6 +414,29 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   fazer fencing do lease de conversa durante TODA a operação a jusante,
   no mesmo heartbeat que renova o lease do `wamid` — não são dois
   mecanismos independentes, é o mesmo heartbeat renovando os dois.
+  **A condição de LIBERAÇÃO do lock de conversa nunca foi
+  especificada — só aquisição, heartbeat e roubo por expiração**
+  (achado real de `/code-review ultra` local, PR #133: sem uma
+  liberação ativa definida, o comportamento fica ambíguo entre 3
+  leituras possíveis do texto acima — liberar já no `chatbot_done`
+  [antes dos envios Graph], só depois do `completed` [depois dos
+  envios], ou nunca liberar ativamente e deixar o próximo item da
+  fila esperar o lease inteiro expirar mesmo com o anterior já
+  terminado em milissegundos. As 3 têm consequência real: a 2ª e a 3ª
+  adicionam latência de fila proporcional ao tempo de envio Graph/ao
+  lease inteiro pra CADA mensagem de uma conversa ativa, não só a
+  primeira). Liberar (UPDATE pra `status=livre`, ou `DELETE` da row,
+  dependendo da escolha de schema) **assim que o `wamid` atingir
+  `chatbot_done`** — não esperar `completed`: a partir de
+  `chatbot_done`, o `chatbot_result` já está persistido e os envios
+  Graph restantes (`pendente`→`enviando`→`enviado`, item 3 abaixo) não
+  tocam mais `atendimentos_bot`/sessão nenhuma, que é exatamente o
+  recurso que este lock protege — segurar o lock até `completed`
+  só adicionaria latência de fila sem fechar nenhuma corrida a mais.
+  Se o passo de liberação em si falhar (row já reclamada por outro
+  worker via lease expirado, por exemplo), tratar como no-op — quem
+  já roubou o lock não deve ser derrubado por uma liberação tardia da
+  invocação anterior.
 - [ ] **Deduplica por `wamid` (`value.messages[].id`) antes de chamar
   qualquer chatbot — máquina de estado com fencing, não claim binário**
   (achado real de `@codex review`, P1 — promovido de "fora de escopo"
@@ -485,7 +521,25 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      `owner_token` só protege a ROW de orquestração no próximo write de
      ESTADO, não desfaz mutação que já aconteceu rio abaixo nem cancela
      a chamada ao Graph/chatbot em voo). Tratar renovação com 0 linhas
-     afetadas como sinal de perda de posse. **A flag local no
+     afetadas como sinal de perda de posse. **"O mesmo heartbeat renova
+     os dois leases" (achado da 17ª rodada) não implica checagem
+     unificada de falha — são 2 `UPDATE`s, 2 contagens de linha pra
+     checar separadamente** (achado real de `/code-review ultra` local, PR
+     #133: o heartbeat unificado (item 17ª rodada, acima) dispara um
+     `UPDATE` no lease do `wamid` E um `UPDATE` no lease da CONVERSA a
+     cada tick — mas são 2 statements contra 2 rows/tabelas diferentes;
+     nada garante que os dois sempre sucedem ou falham juntos. Se só o
+     `UPDATE` do `wamid` for checado quanto a 0 linhas [porque é o que
+     está explicitamente descrito acima], e o da CONVERSA falhar
+     sozinho [outro `wamid` da mesma conversa roubou o lock expirado
+     enquanto o lease do `wamid` atual ainda está saudável], o
+     orquestrador segue achando que tem posse — fencing do `wamid`
+     intacto — enquanto o lock de CONVERSA já foi roubado, permitindo
+     a exata invocação concorrente do chatbot que esse lock existe pra
+     evitar, sem o orquestrador nunca detectar). O heartbeat precisa
+     checar a contagem de linhas dos 2 `UPDATE`s independentemente, e
+     tratar `perdeuPosse=true` se QUALQUER um dos dois afetar 0 linhas
+     — não só o do `wamid`. **A flag local no
      orquestrador NÃO fecha o buraco** (achado real de `@codex review`,
      P1, 24ª rodada, **ainda aberto no `/code-review` local da 26ª** —
      `atendimentos_bot` é escrito DENTRO de `chatbot-financeiro`/
@@ -592,7 +646,34 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
        (ex.: `"pendente"` → `"enviando"` com lease próprio → `"enviado"`)
        e só quem ganha a transição atômica pra `"enviando"` — igual ao
        padrão de fencing do claim original, aplicado por item, não só
-       pela row — manda pro Graph de fato; item já `"enviando"` com
+       pela row — manda pro Graph de fato. **"Transição atômica por
+       item" precisa de UM statement condicionado, não read-modify-
+       write em 2 passos** (achado real de `/code-review ultra` local,
+       PR #133: a especificação diz QUE cada item precisa de claim
+       atômico, mas não FIXA a forma SQL — um `SELECT
+       chatbot_result`, mutar o array em memória na aplicação, depois
+       `UPDATE chatbot_result = $array_mutado` é exatamente o padrão
+       que reabre a mesma corrida que este item existe pra fechar:
+       2 retentativas concorrentes cada uma lê o array com o item
+       ainda `"pendente"`, cada uma muta um elemento DIFERENTE
+       localmente, e o segundo `UPDATE` sobrescreve o array inteiro —
+       inclusive a transição que a 1ª retentativa já tinha gravado pro
+       OUTRO item, revertendo-a pra `"pendente"` e reabrindo envio
+       duplicado nesse item também). Usar um `UPDATE` único
+       condicionado no valor atual do item específico via `jsonb_path`/
+       índice, ex.: `UPDATE wamid_dedup SET chatbot_result =
+       jsonb_set(chatbot_result, '{N,status}', '"enviando"') WHERE
+       wamid = $1 AND chatbot_result->N->>'status' = 'pendente'
+       RETURNING chatbot_result->N` — `N` é o índice do item na lista
+       (membro=0, pastor=1); `0` linhas afetadas = outra tentativa já
+       reclamou esse item específico, mesmo que o array inteiro tenha
+       sido tocado por outra transação no meio. Se a lista de entregas
+       crescer além de 2 itens fixos no futuro, considerar migrar pra
+       tabela normalizada (`wamid_entregas`, 1 linha por item) em vez
+       de continuar aninhando `jsonb_set` por índice — mais simples de
+       manter atômico e ganha `FOR UPDATE SKIP LOCKED` de graça, mas
+       reescrever isso agora é desproporcional pros 2 itens fixos de
+       hoje (membro/pastor). Item já `"enviando"` com
        lease válido é pulado por qualquer outra tentativa concorrente,
        **que responde 5xx, não 200** (achado real de `@codex review`,
        P1, 13ª rodada — mesma lógica do branch `processing`: se a
@@ -617,6 +698,24 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
        `"falhou"` direto, sem reconciliação manual — esse item conta
        como "resolvido" (não vai ter sucesso nunca, alertar mas seguir),
        não bloqueia o `wamid` de fechar `completed`.
+       **A classificação "4xx = falhou definitivo" precisa excluir 401/
+       403 explicitamente** (achado real de `/code-review ultra` local,
+       PR #133: `401`/`403` são 4xx, mas significam token
+       expirado/revogado — uma condição SISTÊMICA e corrigível [rotação
+       de `WHATSAPP_TOKEN`], não um defeito da mensagem específica como
+       template/destinatário inválido. Se a regra for "todo 4xx não-
+       rate-limit vira `falhou` direto", um incidente de token
+       corrompido marcaria PERMANENTEMENTE como `"falhou"` toda entrega
+       em voo no momento — sem reconciliação manual nenhuma, por
+       desenho — mesmo depois do token ser corrigido; isso é uma
+       regressão de disponibilidade pior que duplicar/atrasar entrega,
+       que é o cenário que o resto deste desenho já trata como "menos
+       grave que duplicar lançamento financeiro"). `401`/`403` do Graph
+       ficam em `"enviando"` (ou um 5º estado `"erro_credencial"`, se
+       fizer diferença operacional alertar esse caso separado) — sujeito
+       a alerta operacional imediato (é sinal de token quebrado pra
+       TODA a integração, não só esse item) e SEM transição automática
+       pra `"falhou"`; só reconciliação manual depois do token corrigido.
        **Lease de `"enviando"` expirado NÃO reenvia automaticamente**
        (achado real de `@codex review`, P1, 8ª rodada — se o Graph
        aceitou o envio mas a resposta HTTP se perdeu, ou o runtime
@@ -640,6 +739,43 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
        5xx/timeout — deixa a própria Meta reentregar mais tarde; quando
        reentregar, ou acha `completed` (deu certo, responde 200 à toa
        mas sem efeito) ou acha o lease expirado e reclama pra valer.
+  4.5. **Todo reclaim de lease expirado acima depende de uma NOVA
+     requisição HTTP tocar o mesmo `wamid` — não existe reclaim
+     autônomo, promovido de "aceitável" pra obrigatório** (achado real
+     de `/code-review ultra` local, PR #133, P1: o repo não usa
+     `EdgeRuntime.waitUntil` em lugar nenhum — item já documentado no
+     Passo 4 sobre "200 rápido" — e o lease de `queued` é
+     explicitamente NÃO renovado por heartbeat, só o de `processing`
+     [item 2 acima]. Se o isolate que fez o `INSERT ... status=queued`
+     morrer ANTES de desenfileirar, ou se uma mensagem ficar presa
+     atrás de outra na fila por mais que os 15min do lease de espera, a
+     ÚNICA forma de alguém reclamar essa row é uma nova requisição
+     HTTP real bater no MESMO `wamid` de novo — e isso só acontece se
+     a Meta reentregar. A documentação oficial da Meta Cloud API
+     descreve reentrega por até ~7 dias em teoria, mas na prática
+     comercial (rate limits, circuit breakers do lado da Meta, o
+     próprio endpoint respondendo 5xx repetidamente) não é uma garantia
+     confiável de "sempre vai retentar dentro do lease" — e mesmo
+     quando reentrega, se for a MESMA pessoa que não manda outra
+     mensagem, não existe ATO NENHUM que dispare a reentrega antes do
+     limite da Meta. Resultado no pior caso: mensagem perdida
+     silenciosamente pra sempre, sem alerta, sem reconciliação — o
+     oposto do que essa máquina de estado inteira foi desenhada pra
+     evitar). Fase 1 precisa de um sweep independente de tráfego HTTP
+     novo: job agendado (`pg_cron`, já disponível no Supabase Postgres)
+     rodando a cada poucos minutos que (a) encontra `wamid` em `queued`/
+     `processing` com lease expirado E sem nenhuma atividade recente, e
+     (b) reinvoca o processamento via `pg_net.http_post` contra a
+     própria `whatsapp-webhook` (ou uma rota interna dedicada de
+     reconciliação), passando o `wamid`/payload já persistido — não
+     precisa esperar a Meta reentregar pra destravar. Alternativa mais
+     simples, se o volume real justificar adiar o cron: alertar
+     (`log_edge_function_with_metrics` + alerta operacional) sempre que
+     o sweep encontrar uma row assim, mesmo sem reprocessar
+     automaticamente — fecha a parte "silencioso" do problema (alguém
+     fica sabendo) mesmo que não feche "automático" ainda. Qualquer uma
+     das duas é melhor que a garantia atual de zero, que é "só se a
+     Meta reentregar por conta própria".
   5. **Idempotência não pode viver só no orquestrador — mas cobertura
      100% de todo efeito colateral é maior que o escopo da Fase 1**
      (achado real de `@codex review`, P1, 4ª e 9ª rodadas). Se a
@@ -877,7 +1013,7 @@ mesmo sem qualquer mudança na Meta ainda. Ordem correta:
 
 - [ ] Deployar e testar isoladamente handshake `GET` + POST sintético,
   antes de tocar em qualquer configuração do Meta.
-- [ ] Rodar os 13 cenários de teste da ADR-033 (§Validação — inclui
+- [ ] Rodar os 16 cenários de teste da ADR-033 (§Validação — inclui
   reenvio de `wamid` simulado com 2 sessões reais, lock por conversa,
   payload real de mídia, retry de turno financeiro no meio do fluxo e
   tenant do número de triagem, achados de `@codex review`) contra a nova
