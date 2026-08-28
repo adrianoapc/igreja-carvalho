@@ -110,8 +110,10 @@ existe no cenário real; era suposição da versão anterior deste plano).
 Lookup em `whatsapp_numeros` **pelo `phone_number_id`** (índice único),
 não só por `display_phone_number`. Sem row com `igreja_id NOT NULL`,
 não roteia (5xx) — `chatbot-triagem` hoje insere sessão com tenant
-nulo em vez de falhar, e o número `745419461981790` não tem seed
-commitado (bloqueio de cutover; ver plano §Passo 1). **`filial_id`
+nulo em vez de falhar; o número `745419461981790` não tinha seed
+commitado, mas o bloqueio de cutover foi fechado (confirmado contra o
+banco real 2026-08-28 — row existe, `igreja_id`/`filial_id` corretos,
+mesmo tenant do número financeiro; ver plano §Passo 1). **`filial_id`
 resolvido aqui não chega ponta a ponta pros dois chatbots** (achado
 real de `/code-review ultra` local, PR #133, clarificando esta
 decisão): `chatbot-triagem` aceita `body.filial_id`, mas
@@ -386,9 +388,11 @@ Ver plano de execução detalhado em
   §Passo 1). Único ponto onde a Fase 1 toca lógica de negócio
   existente, e só o mínimo necessário.
 - Fechamento de `chatbot-triagem` e `chatbot-financeiro` (secret fail-closed)
-- Confirmação (ou seed) da row de `whatsapp_numeros` do número de
-  triagem `745419461981790` com `igreja_id` preenchido — bloqueio de
-  cutover; lookup por `phone_number_id` e fail-closed se faltar tenant
+- ~~Confirmação (ou seed) da row de `whatsapp_numeros` do número de
+  triagem `745419461981790` com `igreja_id` preenchido~~ — confirmado
+  contra o banco real 2026-08-28 (row existe, tenant correto, ver
+  plano §Passo 1); lookup por `phone_number_id` e fail-closed se
+  faltar tenant continuam obrigatórios como defesa em profundidade
 - Fix do `notificar_admin` via template `igreja_alerta_lider` (segunda
   mensagem ao pastor, `to` = `telefone_admin_destino`)
 - Migration restringindo a policy de SELECT de `edge_function_logs` a
@@ -482,8 +486,9 @@ Ver plano de execução detalhado em
     preenchido) e grava sessão/pedido **com** esse tenant. Payload no
     mesmo formato com `phone_number_id` desconhecido **não** cria
     sessão com `igreja_id = NULL` — 5xx, sem insert (achado real de
-    `@codex review`, P1, 26ª rodada). Confirmar a row de produção
-    antes do cutover; ver plano §Passo 1.
+    `@codex review`, P1, 26ª rodada). Row de produção já confirmada
+    (2026-08-28, ver plano §Passo 1); este cenário ainda precisa
+    rodar de verdade antes do cutover, como os demais.
 14. ⬜ `wamid` fica `queued`/`processing` com lease expirado e NENHUMA
     nova requisição HTTP toca esse `wamid` de novo (sem redelivery da
     Meta simulado) → o job `pg_cron` de reclaim (Decisão 7) encontra a

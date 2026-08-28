@@ -242,32 +242,33 @@ interna (`{action: "reclaim"}`) tem que viver **no handler**, senão
   **Lição pro resto do plano**: qualquer achado baseado só no seed de
   uma migration precisa ser confirmado contra o banco real antes de
   virar bloqueio — a migration é o estado inicial, não o estado atual.
-  **O número de triagem `745419461981790` NÃO teve a mesma confirmação
-  — é bloqueio de cutover, não o mesmo caso** (achado real de `@codex
+  **O número de triagem `745419461981790` NÃO tinha a mesma confirmação
+  — era bloqueio de cutover, não o mesmo caso** (achado real de `@codex
   review`, P1, 26ª rodada): busca no repo por esse `phone_number_id`
-  só acha estes documentos novos; **não existe** seed em
+  só achava estes documentos novos; **não existia** seed em
   `whatsapp_numeros` (o financeiro pelo menos tinha um `INSERT`, ainda
   que com `igreja_id` NULL). `chatbot-triagem` **não** rejeita com 400
   quando o tenant falta — omite o predicado de `igreja_id` da query de
   sessão (`index.ts:1053-1055`) e **insere sessão com `igreja_id =
-  NULL`** (`:1114-1127`). Pedidos/testemunhos/pastorais saem sem
-  tenant; sessões de igrejas diferentes no mesmo número colapsam.
+  NULL`** (`:1114-1127`). Pedidos/testemunhos/pastorais sairiam sem
+  tenant; sessões de igrejas diferentes no mesmo número colapsariam.
   Os dois chatbots hoje buscam tenant só por `display_phone_number`
   (`financeiro-core.ts:430-435`, `chatbot-triagem/index.ts:1014-1019`),
   não por `phone_number_id` — se o metadata da Meta não bater com o
   valor gravado, o lookup falha mesmo com a row existindo.
-  **Antes de trocar a URL no Meta**, confirmar contra o banco real
-  (mesmo método da 23ª rodada):
-  `SELECT igreja_id, filial_id, display_phone_number, enabled FROM
-  whatsapp_numeros WHERE phone_number_id = '745419461981790'`.
-  - Row com `igreja_id` preenchido e `enabled=true`: registrar o valor
-    nesta doc (igual ao financeiro) e seguir.
-  - Row ausente, `igreja_id IS NULL` ou `enabled=false`: **não cortar**.
-    Inserir/corrigir a row de produção **e** uma migration de seed na
-    PR de implementação da Fase 1, com o tenant do número financeiro
-    (`d5be1965-b3dc-4b65-b847-b6d395543533` /
-    `86134a25-1dea-44df-9ccb-3350032ee8ab`) a menos que o time confirme
-    outro.
+  **Confirmado contra o banco real (SQL Editor, 2026-08-28, mesmo
+  método da 23ª rodada)**: a row de produção tem
+  `igreja_id=d5be1965-b3dc-4b65-b847-b6d395543533`,
+  `filial_id=86134a25-1dea-44df-9ccb-3350032ee8ab`,
+  `display_phone_number=5517996559063`, `enabled=true` — mesmo tenant
+  do número financeiro (mesma WABA "Waba Chatbot - OakOS", dois
+  números do mesmo departamento/igreja). **Bloqueio de cutover
+  fechado**: a row já existe e está correta, sem precisar de
+  INSERT/UPDATE de produção nem migration de seed nova pra este
+  número — mesmo desfecho do achado da 23ª rodada, confirmando a
+  lição registrada acima (achado baseado só em ausência de seed no
+  repo precisa ser confirmado contra o banco real antes de virar
+  bloqueio de verdade).
   A `whatsapp-webhook` resolve tenant por `phone_number_id` (índice
   único `whatsapp_numeros_phone_number_id_key`) e **repassa
   `igreja_id` já resolvido no body** (os dois chatbots já aceitam
