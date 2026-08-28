@@ -203,8 +203,19 @@ rota interna `{action: "reclaim", wamid}` autenticada com
 `vault.decrypted_secrets` (`cron_service_role_key`), o mesmo padrão
 que consertou os crons `getnet-sync`/`buscar-pix`
 (`20260813020100_fix_cron_service_role_key_vault.sql` — GUC
-`app.settings.*` nunca funcionou neste projeto). O envelope
-normalizado tem que estar persistido no enqueue (`request_payload`);
+`app.settings.*` nunca funcionou neste projeto). **Copiar só o
+caller não basta** (achado real de `/code-review` local, 30ª
+rodada): `getnet-sftp`/`buscar-pix-cron` não estão em
+`config.toml` com `verify_jwt=false`, então o *gateway* valida o
+Bearer `service_role` antes do isolate. `whatsapp-webhook` **tem**
+que ser `verify_jwt=false` (Meta não manda JWT — Decisão 2); o
+gateway não checa o Bearer do cron. Sem comparação **dentro** da
+function (`token === SUPABASE_SERVICE_ROLE_KEY`, padrão
+`getnet-sftp/index.ts:468-473`) **antes** de pular o HMAC, um POST
+público `{action: "reclaim", wamid}` reprocessa PII sem assinatura
+Meta. O envelope normalizado tem que estar persistido no enqueue
+(`request_payload` = body exato do chatbot, inclusive `filial_id` e
+`wamid`; `owner_token` **não** vive aí — é injetado no dequeue);
 sem isso o cron não tem o que reprocessar. Escopo: só
 `queued`/`processing` expirados — não reenvia `enviando` às cegas.
 Timeout do `net.http_post` 120s, não o default de 5s.
@@ -346,9 +357,12 @@ Ver plano de execução detalhado em
   Graph — repassa `media_id` cru (`url_anexo`/`media_id`); os
   chatbots já resolvem com `WHATSAPP_API_TOKEN`. Rota interna
   `{action: "reclaim"}` autenticada via Vault
-  (`cron_service_role_key`) + job `pg_cron` (Decisão 7) pra leases
-  `queued`/`processing` expirados; `request_payload` persistido no
-  enqueue.
+  (`cron_service_role_key`) no **caller** (pg_cron) **e** Bearer
+  `SUPABASE_SERVICE_ROLE_KEY` **dentro** da function (Decisão 7 —
+  `verify_jwt=false` faz o gateway não checar) + job `pg_cron` pra
+  leases `queued`/`processing` expirados; `request_payload` = body
+  exato do chatbot persistido no enqueue (`filial_id`/`wamid`
+  inclusos; `owner_token` injetado no dequeue, não gravado).
 - `chatbot-triagem`/`chatbot-financeiro` recebem `wamid` **e, quando
   o caller é a `whatsapp-webhook`, `owner_token` do lock de
   conversa** como campos de entrada novos: claim de idempotência na
@@ -488,6 +502,21 @@ Ver plano de execução detalhado em
     exigir `owner_token` incondicionalmente derrubaria produção real
     ainda em trânsito pelo Make, sem nenhum teste acusando antes do
     deploy).
+17. ⬜ POST `{action: "reclaim", wamid}` **sem** `Authorization: Bearer`
+    da service_role (ou com token errado) na `whatsapp-webhook`
+    (`verify_jwt=false`) → 401, sem tocar a row, sem invocar
+    chatbot/Graph. POST Meta sem `X-Hub-Signature-256` válida
+    continua 401 **mesmo se o JSON tiver `action: "reclaim"`** —
+    o campo `action` sozinho não pula o HMAC (achado real de
+    `/code-review` local, PR #133, 30ª rodada: o cenário 14 exercita
+    o reclaim *autenticado* pelo cron; o cenário 2 exercita HMAC na
+    rota Meta; nenhum dos dois cobre o buraco em que `verify_jwt=
+    false` + branch `action===reclaim` antes do HMAC vira
+    backdoor público). Também: reclaim autenticado reinvoca o
+    chatbot com `owner_token` **novo** (do claim de dequeue), não
+    com o JSON cru de `request_payload` — payload persistido no
+    enqueue não tem token; replay cru cairia no caminho Make
+    (cenário 16) e pularia o fencing.
 
 ### Bake period
 
@@ -520,5 +549,5 @@ validado). Substituir ou marcar como histórico na Fase 1.
 
 ---
 
-**Última Atualização**: 2026-08-28 (29ª rodada — `/code-review` do sweep)
+**Última Atualização**: 2026-08-28 (30ª rodada — `/code-review` do reclaim)
 **Próxima Revisão**: Depois da Fase 1 em produção, antes de iniciar a Fase 2

@@ -54,13 +54,38 @@ aqui só o checklist de execução.
 ### Passo 1 — Nova Edge Function `whatsapp-webhook`
 
 Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
-`verify_jwt=false` em `supabase/config.toml`.
+`verify_jwt=false` em `supabase/config.toml` (obrigatório — a Meta não
+manda JWT; igual `pix-webhook`). **`verify_jwt=false` não é o mesmo
+que nos crons existentes** (achado real de `/code-review` local, 30ª
+rodada): `getnet-sftp` e `buscar-pix-cron` **não** estão listados em
+`config.toml` com `verify_jwt=false`, então o default do hosted
+(`verify_jwt=true`) faz o *gateway* rejeitar POST sem Bearer JWT
+**antes** do isolate — o `Authorization: Bearer <service_role>` do
+`pg_cron` (`20260813020100`) é o que passa nessa checagem. Nesta
+function o gateway **não** faz essa checagem. Qualquer auth de rota
+interna (`{action: "reclaim"}`) tem que viver **no handler**, senão
+é backdoor público. Ver item 4.5.
 
 - [ ] `GET` — handshake `hub.verify_token`/`hub.challenge` contra novo
   segredo `WHATSAPP_VERIFY_TOKEN`. Sem `hub.mode`, responde 200 simples
   (health check).
-- [ ] `POST` — valida `X-Hub-Signature-256` com `META_APP_SECRET` **antes**
-  de fazer parse do corpo (validação nova — o Make não faz isso hoje).
+- [ ] `POST` — lê o corpo **cru** (`req.text()`, não `req.json()` —
+  `json()` consome o stream e impede HMAC depois). Despacho **não**
+  é "HMAC em todo POST" nem "se `action===reclaim` pula HMAC"
+  (achado real de `/code-review` local, 30ª rodada — as duas
+  leituras ingênuas quebram):
+  1. Se `Authorization: Bearer` bate com
+     `SUPABASE_SERVICE_ROLE_KEY` (comparação no isolate, padrão
+     `getnet-sftp/index.ts:468-473`) **e** o JSON parseado do cru é
+     exatamente `{action: "reclaim", wamid}` (sem `entry`/`object`
+     da Meta) → rota interna, sem HMAC. Bearer ausente/errado neste
+     formato → 401, não cai no caminho Meta.
+  2. Qualquer outro POST → valida `X-Hub-Signature-256` com
+     `META_APP_SECRET` **sobre os bytes crus**. Campo `action` no
+     JSON **não** pula essa checagem — um envelope Meta forjado
+     com `"action": "reclaim"` extra ainda precisa de HMAC válido.
+     HMAC inválido → 401. (Validação nova — o Make não faz isso
+     hoje.)
 - [ ] **Normaliza o envelope bruto da Meta antes de rotear** (achado real
   de `@codex review`, P1 — sem isso mensagem comum chega sem telefone/
   conteúdo e falha ou cria sessão inválida). O `POST` da Meta chega como
@@ -445,7 +470,7 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   IA/Graph; sem isso a mesma mensagem pode rodar 2x em paralelo).
   **4 rodadas de review acharam problema numa versão anterior desta
   mesma lógica — o desenho abaixo é o que sobrou depois de fechar
-  todos**.   Tabela dedicada por `wamid`: `status`, `owner_token` (UUID
+  todos**. Tabela dedicada por `wamid`: `status`, `owner_token` (UUID
   gerado por tentativa), `lease_until`, `chatbot_result` (JSONB,
   nullable), **`request_payload` (JSONB, obrigatório no enqueue)**.
   **Sem o payload persistido o sweep da Decisão 7 não consegue
@@ -453,12 +478,30 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
   rodada — as colunas listadas até a 28ª não incluíam o envelope
   normalizado; "passar o payload já persistido" no item 4.5 não
   tinha onde persistir. Sem isso o cron só consegue alertar, nunca
-  reinvocar). Gravar no `INSERT` do enqueue o recado já achatado
-  (`telefone`, `mensagem`/`media_id`/`url_anexo`, `phone_number_id`,
-  `display_phone_number`, `nome_perfil`, `tipo`, `origem_canal`,
-  `igreja_id` resolvido) — o mesmo JSON que a `whatsapp-webhook`
-  mandaria ao chatbot. Mesma restrição de acesso do resto da
-  tabela: PII de conversa. **Sem SELECT nenhum via PostgREST — nem pra admin, nem pra
+  reinvocar). Gravar no `INSERT` do enqueue **o JSON exato que a
+  `whatsapp-webhook` postaria no chatbot naquele instante** — não
+  um subset. A lista da 29ª (`telefone`, `mensagem`/`media_id`/
+  `url_anexo`, `phone_number_id`, `display_phone_number`,
+  `nome_perfil`, `tipo`, `origem_canal`, `igreja_id`) **omitia
+  campos que o Passo 1 já exige na chamada ao vivo** (achado real
+  de `/code-review` local, 30ª rodada):
+  - `filial_id` resolvido (chave do lock de conversa; triagem lê
+    `body.filial_id` em `index.ts:1007` — sem persistir, o reclaim
+    não reconstrói o mesmo lock e a triagem reabre lookup por
+    `display_phone_number`).
+  - `wamid` (claim na entrada dos dois chatbots; Passo 2).
+  - os **dois** aliases de texto (`mensagem` **e** `conteudo_texto`)
+    e de tipo (`tipo` **e** `tipo_mensagem`) — cada chatbot lê um.
+  - `whatsapp_number` (financeiro deriva filial disso, não de
+    `filial_id`).
+  **`owner_token` NÃO entra no `request_payload` gravado.** O token
+  só existe depois do dequeue/aquisição do lock. Replay cru do JSON
+  persistido cai no caminho Make (campo ausente = pular fencing,
+  cenário 16 da ADR) — exatamente na retomada por reclaim, que é
+  quando o fencing mais precisa valer. No dequeue **e** no reclaim:
+  clonar o JSON persistido, injetar o `owner_token` **corrente** do
+  claim (wamid + conversa), aí sim chamar o chatbot. Mesma restrição
+  de acesso do resto da tabela: PII de conversa. **Sem SELECT nenhum via PostgREST — nem pra admin, nem pra
   super_admin** (achado real de `@codex review`, P1, 8ª rodada: essa
   tabela guarda telefone + conteúdo completo de mensagem/resposta; se
   for criada em `public` sem RLS ou sem revogar o `EXECUTE`/`SELECT` de
@@ -774,14 +817,15 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      oposto do que essa máquina de estado inteira foi desenhada pra
      evitar). Fase 1 precisa de um sweep independente de tráfego HTTP
      novo: job `pg_cron` a cada poucos minutos. **Não postar na
-     rota pública da `whatsapp-webhook`** (achado real de `/code-review`
-     local, 29ª rodada — essa rota valida `X-Hub-Signature-256` no
-     body cru da Meta ANTES de parsear; um `pg_net.http_post` com
-     `{wamid}` falha a assinatura, e fabricar um envelope Meta
-     assinado com `META_APP_SECRET` de dentro do Postgres é o caminho
-     errado). Rota interna na mesma function (ex.: `POST .../whatsapp-webhook`
+     rota pública da `whatsapp-webhook` como se fosse envelope Meta**
+     (achado real de `/code-review` local, 29ª rodada — o caminho
+     Meta valida `X-Hub-Signature-256` no body cru; um
+     `pg_net.http_post` com `{wamid}` falha a assinatura, e fabricar
+     um envelope Meta assinado com `META_APP_SECRET` de dentro do
+     Postgres é o caminho errado; a 30ª rodada abaixo é o que
+     impede o `{action: "reclaim"}` de virar bypass desse HMAC). Rota interna na mesma function (ex.: `POST .../whatsapp-webhook`
      com `{action: "reclaim", wamid}`), autenticada como os crons que
-     já existem: `Authorization: Bearer` lido de
+     já existem **no lado do caller**: `Authorization: Bearer` lido de
      `vault.decrypted_secrets` onde `name = 'cron_service_role_key'`
      — **nunca** `current_setting('app.settings.service_role_key')`.
      Essa GUC nunca existiu neste projeto; os jobs
@@ -790,9 +834,23 @@ Arquivo novo: `supabase/functions/whatsapp-webhook/index.ts`,
      `20260813020100_fix_cron_service_role_key_vault.sql` apontar pro
      Vault. Copiar o padrão dessa migration (URL pública hardcoded,
      `timeout_milliseconds := 120000` — o default do `net.http_post`
-     é 5s, insuficiente pra chatbot+Graph). O body do reclaim usa o
-     `request_payload` gravado no enqueue (item da tabela acima); sem
-     essa coluna o cron não tem o que reprocessar.
+     é 5s, insuficiente pra chatbot+Graph).
+     **O isolate tem que revalidar o Bearer — o gateway desta
+     function não faz isso** (achado real de `/code-review` local,
+     30ª rodada): com `verify_jwt=false` (obrigatório pra Meta),
+     qualquer um na URL pública postando `{action: "reclaim",
+     wamid}` pula o HMAC da Decisão 2. Comparar o token com
+     `Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")` no handler (o Vault
+     não é acessível do isolate; a env **é** o mesmo valor que o
+     cron lê no Vault), igual `getnet-sftp/index.ts:468-473`. Sem
+     Bearer válido → 401, não processa. O `action` sozinho nunca
+     autoriza. Ver despacho do `POST` no início do Passo 1.
+     O POST do cron carrega **só** `{action, wamid}` (não o PII —
+     `pg_cron`/`net._http_response` loga body). A function lê
+     `request_payload` da row, injeta o `owner_token` corrente do
+     dequeue (item da tabela acima; o JSON persistido **não** traz
+     token) e entra no MESMO switch de status. Sem a coluna o cron
+     não tem o que reprocessar.
      **Escopo do sweep: só `queued`/`processing` com lease expirado.**
      Não tocar `enviando` com lease expirado nem `erro_credencial`
      (401/403) — esses continuam reconciliação manual (8ª rodada:
@@ -1045,11 +1103,12 @@ mesmo sem qualquer mudança na Meta ainda. Ordem correta:
 
 - [ ] Deployar e testar isoladamente handshake `GET` + POST sintético,
   antes de tocar em qualquer configuração do Meta.
-- [ ] Rodar os 16 cenários de teste da ADR-033 (§Validação — inclui
+- [ ] Rodar os 17 cenários de teste da ADR-033 (§Validação — inclui
   reenvio de `wamid` simulado com 2 sessões reais, lock por conversa,
-  payload real de mídia, retry de turno financeiro no meio do fluxo e
-  tenant do número de triagem, achados de `@codex review`) contra a nova
-  função.
+  payload real de mídia, retry de turno financeiro no meio do fluxo,
+  tenant do número de triagem, reclaim autenticado **e** 401 do
+  reclaim sem Bearer, achados de `@codex review` / `/code-review`
+  local) contra a nova função.
 - [ ] Trocar a URL do webhook no Meta Business Manager (de Make pra
   Supabase) — **sem apagar** o scenario "Waba Chatbot - OakOS" no Make,
   só desligar.
