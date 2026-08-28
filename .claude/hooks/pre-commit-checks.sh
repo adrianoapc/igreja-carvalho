@@ -157,6 +157,24 @@ if printf '%s' "$CMD_STRIPPED" | grep -qE '(^|[;&|])[[:space:]]*git[[:space:]]+(
   exit 0
 fi
 
+# `git add ... && git commit ...` (ou `git rm --cached`/`git reset`/
+# `git stage` antes de commit) no MESMO comando — achado real de
+# @codex review, PR #134: este hook PreToolUse roda ANTES de QUALQUER
+# parte do comando executar de verdade, então `git write-tree` acima
+# materializa o índice de ANTES do `git add` acontecer — o snapshot
+# validado é o ERRADO (índice antigo/vazio), e o `git add` real que
+# segue stage o arquivo sem NUNCA ter sido validado. Não dá pra
+# reconstruir com segurança o índice que esses comandos vão produzir
+# sem executá-los de verdade antes da hora (efeito colateral indevido
+# num hook Pre); nega e pede pra rodar em 2 chamadas separadas — a
+# 2ª chamada (só `git commit`) faz este hook rodar de novo, agora com
+# o índice já staged de verdade.
+if printf '%s' "$CMD_STRIPPED" | grep -qE '(^|[;&|])[[:space:]]*git[[:space:]]+(add|rm|reset|stage)\b' \
+  && printf '%s' "$CMD_STRIPPED" | grep -qE '(^|[;&|])[[:space:]]*git[[:space:]]+(-C[[:space:]]+("[^"]*"|'"'"'[^'"'"']*'"'"'|\S+)[[:space:]]+)?commit\b'; then
+  deny "Commit bloqueado — este comando mistura 'git add/rm/reset/stage' com 'git commit' numa chamada só. Este hook roda ANTES do comando executar, então o índice validado seria o de ANTES do add/rm/reset — não o que será commitado de verdade. Rode o add/rm/reset numa chamada separada, depois um 'git commit' simples numa segunda chamada."
+  exit 0
+fi
+
 echo "[pre-commit-checks] git commit detectado — rodando lint/typecheck/testes (snapshot do índice) em $REPO_DIR" >&2
 
 FAIL_MSGS=()

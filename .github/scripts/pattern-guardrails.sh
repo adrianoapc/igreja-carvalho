@@ -15,6 +15,7 @@ set -uo pipefail
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 MUTATION_ARGS_PY="$SCRIPT_DIR/mutation-call-args.py"
+STRIP_TS_TEXT_PY="$SCRIPT_DIR/strip-ts-text.py"
 
 # Extrai o texto entre o `(` do `.delete(` / `.update(` na linha dada e
 # o `)` que fecha ESSA call (pula strings). Assim `count: "exact"` duma
@@ -61,7 +62,7 @@ check_filial_eq() {
     if echo "$win" | grep -q '// filial-global-ok'; then
       continue
     fi
-    echo "::error file=$f,line=$lineno::.eq(\"filial_id\"...) exclui filial_id IS NULL mesmo se houver .or(...) no mesmo chain (PostgREST ANDa os filtros). Substitua o .eq por .or(\"filial_id.eq.X,filial_id.is.null\"), ou // filial-global-ok se a exclusão de globais for intencional. Ver CLAUDE.md §Filial compartilhada."
+    echo "::error file=${REPORT_FILE:-$f},line=$lineno::.eq(\"filial_id\"...) exclui filial_id IS NULL mesmo se houver .or(...) no mesmo chain (PostgREST ANDa os filtros). Substitua o .eq por .or(\"filial_id.eq.X,filial_id.is.null\"), ou // filial-global-ok se a exclusão de globais for intencional. Ver CLAUDE.md §Filial compartilhada."
     fail=1
   done < <(grep -n '\.eq(["'"'"']filial_id["'"'"']' "$f" || true)
   return "$fail"
@@ -174,7 +175,7 @@ check_mutations() {
       if mutation_belongs_to_chain "$f" "$lineno" "$idx"; then
         args=$(mutation_call_args "$f" "$lineno" "$idx" 2>/dev/null || true)
         if ! printf '%s' "$args" | grep -qE 'count:[[:space:]]*["'"'"']exact["'"'"']'; then
-          echo "::error file=$f,line=$lineno::.delete()/.update() do Supabase sem { count: \"exact\" } NESTA call (match $idx de $nmatches nesta linha) — se o RLS negar, retorna error:null/0 linhas e o código pode reportar sucesso falso (PR #126). Adicione { count: \"exact\" } no argumento desta call (não numa irmã) e cheque o count retornado, ou // count-exact-ok se a call já é auto-limitada por PK/id único."
+          echo "::error file=${REPORT_FILE:-$f},line=$lineno::.delete()/.update() do Supabase sem { count: \"exact\" } NESTA call (match $idx de $nmatches nesta linha) — se o RLS negar, retorna error:null/0 linhas e o código pode reportar sucesso falso (PR #126). Adicione { count: \"exact\" } no argumento desta call (não numa irmã) e cheque o count retornado, ou // count-exact-ok se a call já é auto-limitada por PK/id único."
           fail=1
         fi
       fi
@@ -190,7 +191,7 @@ check_status_color() {
   while IFS=: read -r lineno _; do
     [ -z "$lineno" ] && continue
     in_scope "$lineno" || continue
-    echo "::error file=$f,line=$lineno::STATUS_COLOR é cor de FUNDO de pill, não tinta de texto — usar como \`color:\` falha contraste WCAG 3:1 em card claro (PR #114). Use pillStyle(tone) de statusPalette.ts."
+    echo "::error file=${REPORT_FILE:-$f},line=$lineno::STATUS_COLOR é cor de FUNDO de pill, não tinta de texto — usar como \`color:\` falha contraste WCAG 3:1 em card claro (PR #114). Use pillStyle(tone) de statusPalette.ts."
     fail=1
   done < <(grep -nE 'color:[[:space:]]*STATUS_COLOR' "$f" || true)
   return "$fail"
@@ -239,12 +240,23 @@ scope_lines_for_file() {
 }
 
 scan_file() {
-  local f="$1" fail=0
+  local f="$1" fail=0 stripped
   [ -f "$f" ] || return 0
   [ -z "$SCOPE_LINES" ] && return 0
-  check_filial_eq "$f" || fail=1
-  check_mutations "$f" || fail=1
-  check_status_color "$f" || fail=1
+  # Escaneia uma cópia com COMENTÁRIOS apagados (não strings — apagar
+  # string quebraria a detecção real, ver strip-ts-text.py), mesma
+  # contagem de linha (blank preserva `\n`) — achado real de @codex
+  # review, PR #134: texto de comentário mencionando o padrão como
+  # exemplo/doc disparava os detectores igual a código de verdade.
+  # `file=` nas mensagens de erro continua apontando pro arquivo REAL
+  # (via REPORT_FILE), não pra cópia temporária.
+  stripped=$(mktemp)
+  python3 "$STRIP_TS_TEXT_PY" < "$f" > "$stripped" 2>/dev/null || cp "$f" "$stripped"
+  REPORT_FILE="$f"
+  check_filial_eq "$stripped" || fail=1
+  check_mutations "$stripped" || fail=1
+  check_status_color "$stripped" || fail=1
+  rm -f "$stripped"
   return "$fail"
 }
 
@@ -312,6 +324,23 @@ EOF
 const q = supabase.from("x").or(`filial_id.eq.${id},filial_id.is.null`);
 EOF
   expect_pass "filial .or substitui o .eq" "$tmp/filial-correct.ts" check_filial_eq
+
+  # 5c) texto de COMENTÁRIO mencionando o padrão como exemplo/doc não
+  # pode disparar o detector — achado real de @codex review, PR #134.
+  # Usa scan_file (não check_filial_eq direto) pra exercitar o pipeline
+  # de strip de comentário inteiro, incluindo REPORT_FILE.
+  cat >"$tmp/filial-comment.ts" <<'EOF'
+// Bug antigo: .eq("filial_id", id) excluía os globais. Corrigido abaixo.
+const q = supabase.from("x").or(`filial_id.eq.${id},filial_id.is.null`);
+EOF
+  expect_pass "comentário citando .eq(\"filial_id\"...) como exemplo não dispara" "$tmp/filial-comment.ts" scan_file
+
+  # 5d) sanity check: scan_file ainda pega o padrão de VERDADE (prova
+  # que o strip de comentário não também apaga código real).
+  cat >"$tmp/filial-real-via-scan.ts" <<'EOF'
+const q = supabase.from("x").eq("filial_id", id);
+EOF
+  expect_fail "scan_file ainda detecta .eq(\"filial_id\"...) real" "$tmp/filial-real-via-scan.ts" scan_file
 
   # 5b) escape de UMA call não pode vazar pra outra .eq("filial_id")
   #     vizinha sem escape próprio (achado real de @codex review, PR #134).
@@ -435,7 +464,7 @@ EOF
     return 1
   fi
   echo ""
-  echo "Self-test OK (20 casos)."
+  echo "Self-test OK (22 casos)."
   rm -rf "$tmp"
   return 0
 }
