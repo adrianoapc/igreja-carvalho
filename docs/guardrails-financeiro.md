@@ -1140,8 +1140,119 @@ generalizável pra qualquer tabela, não só financeiro.
    escopo desta migration. Ver
    `project-vulnerabilidade-critica-escrita-anonima-has-filial-access` na
    memória de sessão.
+8. **O fix do item 7 (`auth.uid() IS NOT NULL` = "sessão legada")
+   ainda era exploitável: qualquer usuário AUTOCADASTRADO (sem
+   convite) batia no shortcut, pra QUALQUER `_igreja_id` — e
+   `get_jwt_igreja_id()`/`get_jwt_filial_id()` liam `user_metadata`,
+   gravável pelo próprio cliente via `updateUser`.** Achado real por
+   `/code-review` local (2026-08-27), verificado contra o código antes
+   de virar migration (não simulação hipotética):
+   - **Bug A**: cadastro público (`src/pages/Auth.tsx` →
+     `supabase.auth.signUp`, sem convite) cria profile via
+     `handle_new_user` (`20251208190100`) com `igreja_id`/`filial_id`
+     NULL, status=`'visitante'`. `sync_user_jwt_metadata`
+     (`20260105114450:41-43`) só grava o claim em `app_metadata`
+     quando o profile JÁ tem valor não-nulo — então o JWT desse
+     usuário NUNCA ganha o claim `igreja_id`, só o `sub`. Como o
+     shortcut do item 7 aceitava `auth.uid() IS NOT NULL` sozinho como
+     prova de "legado", `has_filial_access(<qualquer_igreja_id>, ...)`
+     retornava `true` pra QUALQUER usuário recém-cadastrado, sem
+     convite, sem ação administrativa nenhuma — pras ~12 tabelas com
+     policy `PUBLIC` que usam `has_filial_access()` como gate único
+     (as do item 7 mais `forma_pagamento_contas`, `import_jobs`,
+     `reclass_jobs`, achadas nesta rodada) e potencialmente qualquer
+     RPC não-`fin_*` que chame a função direto.
+   - **Bug B**: `get_jwt_igreja_id()`/`get_jwt_filial_id()`
+     (`20260117150559`) tinham `{user_metadata,igreja_id}` /
+     `{user_metadata,filial_id}` como último fallback do `COALESCE` —
+     reintroduzido DEPOIS que `20260105114450` já tinha migrado
+     explicitamente de `user_metadata` (cliente) pra `app_metadata`
+     (servidor) por esse exato motivo de confiança. `user_metadata` é
+     gravável por QUALQUER usuário autenticado via
+     `supabase.auth.updateUser({data:{igreja_id:...}})` — sem
+     privilégio nenhum, sem passar por `profiles`/trigger algum.
+     Qualquer conta logada podia forjar o claim de tenant direto,
+     satisfazendo o branch de igualdade `_igreja_id =
+     get_jwt_igreja_id()` sem precisar nem do Bug A.
+   Fix (`20260827130000`): (1) remove o fallback `user_metadata` de
+   `get_jwt_igreja_id()`/`get_jwt_filial_id()` — investigação prévia
+   confirmou que nenhum código do repo grava `user_metadata.igreja_id`/
+   `filial_id` legitimamente hoje, só `app_metadata`; (2) no shortcut de
+   claim ausente, troca `auth.uid() IS NOT NULL` sozinho por
+   `auth.uid() IS NOT NULL AND _igreja_id = (SELECT igreja_id FROM
+   profiles WHERE user_id = auth.uid())` — compara contra o
+   `igreja_id` REAL do profile em vez de aceitar qualquer alvo. Um
+   visitante sem igreja (`profiles.igreja_id` NULL) nunca bate
+   `_igreja_id = NULL` pra nenhum UUID real; um legado de verdade
+   (profile com igreja preenchida, claim ainda não sincronizado)
+   continua passando, só que restrito ao PRÓPRIO tenant. O branch
+   `service_role`/bot não foi tocado.
+   Validado em harness Postgres 17 efêmero (réplica mínima da função +
+   dependências — sem harness commitado no repo, ver item 7): 10
+   cenários, incluindo os 2 exploits acima confirmados `true` ANTES do
+   fix e `false` DEPOIS, e 7 casos legítimos (legado próprio tenant,
+   claim direto, `service_role`/bot com/sem filial, admin global, claim
+   via `request.jwt.claim.igreja_id`, anon sem JWT nenhum) idênticos
+   antes/depois — nenhuma regressão. **Achado de harness, não de
+   código**: `set_config(guc, NULL, false)`/`RESET` num GUC ad-hoc já
+   tocado na sessão volta pra `''` (string vazia), não `NULL` —
+   `''::jsonb` explode; testar "GUC genuinamente ausente" exige conexão
+   nova por cenário (mesma lição já registrada no item 7).
+   Acompanha (achados relacionados, NÃO corrigidos nesta migration):
+   `midias` além de `midia_tags` também tem o `OR (true)` do item 7
+   (achado novo, só `midia_tags` estava documentado antes);
+   `liturgia_recursos` tem uma 2ª policy `TO anon,authenticated USING
+   (true)` própria (pro Telão) que já tornava `has_filial_access()`
+   moot pra leitura dessa tabela, independente deste bug;
+   `get_current_user_igreja_id()` foi sobrescrita por `20260223223125`
+   (fix de recursão em RLS de `profiles`) e perdeu o fallback JWT que
+   `get_current_user_filial_id()` ainda tem — funções irmãs ficaram
+   assimétricas (não usada por `has_filial_access()`, que lê
+   `get_jwt_*` direto).
+9. **Review do item 8 (`@cursoragent`, PR #135, 2026-08-28) — veredito
+   "fix correto, pode mergear", mais 4 pontos residuais.** Confirmou
+   linha a linha contra `handle_new_user`/`sync_user_jwt_metadata`/
+   `get_jwt_*`/`provisionar-admin-igreja` (nenhuma escrita legítima em
+   `user_metadata.igreja_id`), branch `service_role` intocado, e sem
+   `CREATE OR REPLACE` posterior em `main` que reverteria a função.
+   Endereçados nesta rodada:
+   - **Harness commitado**: `supabase/tests/has_filial_access_test.sql`
+     — os 10 cenários do item 8 + 1 novo (`has_filial_access(NULL,
+     NULL)` explícito) como assertions `RAISE EXCEPTION`/fail-fast,
+     validado rodando contra a versão COM o bug (falha rápido no
+     cenário 1) e contra o fix (11/11 passam) — fecha o gap "próxima
+     redefinição não tem como não reabrir Bug A/B sem perceber".
+   - **Parênteses explícitos**: o `AND` da cláusula de filial dependia
+     de precedência de operador (`A OR B OR C AND D`) pra ficar dentro
+     do mesmo `OR` da igreja, em vez de aninhamento explícito — correto
+     hoje, frágil a refactor futuro do `COALESCE`. Reestruturado pra
+     aninhar de propósito (mesmo padrão do `20260822130000` original);
+     11/11 cenários confirmam zero mudança de comportamento.
+   Documentados, não corrigidos nesta rodada (efeito colateral
+   verificado como INALCANÇÁVEL hoje, proteção incidental não
+   desenhada):
+   - `has_filial_access(NULL, NULL)` virou `false` — a policy de
+     UPDATE de `profiles` (`perf_merge_002_update_auth`,
+     `20260821200000`) não tem fallback "própria linha, tenant
+     qualquer", só `has_filial_access(...)`. Um visitante autocadastrado
+     não conseguiria mais fazer PATCH no próprio profile — MAS
+     `Perfil.tsx:149` já trava a página em loading eterno pra usuário
+     sem `igreja_id` (guard client-side pré-existente, não introduzido
+     por este fix) e `ForcedPasswordChange.tsx` só é alcançado com
+     `deve_trocar_senha=true`, que autocadastro nunca seta. Um fix
+     futuro nesse guard reabriria isso de verdade — a policy de UPDATE
+     em si não tem proteção própria.
+   - `profiles.igreja_id`/`filial_id` viraram raiz de confiança direta
+     pro shortcut de claim ausente, sem trigger `BEFORE UPDATE`
+     travando essas 2 colunas (padrão de `trg_convite_rsvp_restringe_
+     campos`, RSVP de convite) — RLS de UPDATE por dono não restringe
+     quais colunas mudam (ver item RLS-UPDATE mais abaixo no
+     documento). Como `sync_user_jwt_metadata` espelha profile →
+     `app_metadata`, um PATCH bem-sucedido nessas colunas vira claim de
+     verdade. Defesa em profundidade, PR dedicada.
 
-Referências: PR #126 (2026-08-21), PR #129 (2026-08-21).
+Referências: PR #126 (2026-08-21), PR #129 (2026-08-21), PR #135
+(2026-08-27/28).
 
 ---
 
