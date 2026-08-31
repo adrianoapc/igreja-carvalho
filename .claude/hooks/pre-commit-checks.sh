@@ -62,7 +62,15 @@ grep_ere() {
 
 if [ "${1:-}" = "--self-test" ]; then
   fail=0
-  HOOK_SRC="${BASH_SOURCE[0]}"
+  # Caminho ABSOLUTO — achado real (CI, GitHub Actions): BASH_SOURCE[0]
+  # preserva a forma como o script foi invocado; `bash .claude/hooks/
+  # pre-commit-checks.sh --self-test` (como o workflow chama, relativo
+  # ao repo root) deixa HOOK_SRC relativo, e os testes e2e abaixo, que
+  # fazem `cd` pra um diretório de fixture antes de re-invocar o hook,
+  # quebravam com "No such file or directory" (só reproduzia em CI —
+  # localmente eu sempre testei com caminho absoluto). HOOK_DIR (linha
+  # 14) já é absoluto via `cd -- ... && pwd`.
+  HOOK_SRC="$HOOK_DIR/$(basename -- "${BASH_SOURCE[0]}")"
   echo "[pre-commit-checks] self-test" >&2
   # GNU grep aceita a classe descendente; o check que o CI consegue
   # reproduzir é o TEXTO da classe com Z maiúsculo em linha que não é
