@@ -356,10 +356,32 @@ ganho de uma tabela normalizada é proporcional ao número de itens e ao
 quanto a lógica de claim json cresce; reavaliar se um fluxo futuro
 precisar de mais de ~2-3 destinatários por mensagem.
 
+### 6. Fase 1 inteira numa única PR (fatiamento original)
+❌ **Rejeitada**: mesmo escopo "1 fase" do guardrail de processo, a Fase 1
+sozinha mistura riscos e critérios de teste muito diferentes num commit
+só — schema, idempotência de chatbot (aditiva, segura a qualquer momento),
+gate fail-closed (deploy coordenado com o blueprint do Make, quebra
+produção se sair de ordem), esqueleto do webhook (dark), dedup/lease de 1
+mensagem, lock de conversa/FIFO (o eixo de concorrência mais revisado de
+todos, ~15 das 32 rodadas de achados), fix do `notificar_admin`, cron de
+reclaim, e o corte em si. Revisar/testar tudo isso de uma vez teria o
+mesmo problema que motivou fatiar as 8 automações em fases (Alternativa
+2) — só que dentro de 1 fase. **Escolhida**: 9 PRs empilhadas (PR0-PR8,
+[`PLANO_REMOCAO_MAKE_WHATSAPP.md`§Fatiamento em PRs
+empilhadas](../automacoes/PLANO_REMOCAO_MAKE_WHATSAPP.md)), cada uma com
+escopo/dependência/cenário de teste próprios, a maioria "dark" (sem
+tráfego real) até a PR de corte. Não reabre o desenho técnico decidido
+acima — é só como ele chega em produção.
+
 ## Implementação
 
 Ver plano de execução detalhado em
 [`docs/automacoes/PLANO_REMOCAO_MAKE_WHATSAPP.md`](../automacoes/PLANO_REMOCAO_MAKE_WHATSAPP.md).
+A Fase 1 abaixo é entregue em 9 PRs empilhadas (PR0-PR8), não numa PR só —
+ver §Fatiamento em PRs empilhadas no plano pra escopo, dependências e
+cenário de teste de cada uma; a maioria fica "dark" (código no repo, sem
+tráfego real) até a PR de corte trocar a URL do webhook no Meta Business
+Manager.
 
 ### Escopo desta primeira fase
 
@@ -587,5 +609,6 @@ validado). Substituir ou marcar como histórico na Fase 1.
 
 ---
 
-**Última Atualização**: 2026-08-28 (32ª rodada — `/code-review` do batch/FIFO)
+**Última Atualização**: 2026-08-31 (Alternativa 6 — fatiamento da Fase 1
+em 9 PRs empilhadas, ver plano de execução)
 **Próxima Revisão**: Depois da Fase 1 em produção, antes de iniciar a Fase 2
