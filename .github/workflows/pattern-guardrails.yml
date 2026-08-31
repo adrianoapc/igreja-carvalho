@@ -21,10 +21,27 @@ name: Pattern Guardrails
 # `{ count: "exact" }` de um `.delete()` multi-linha é uma regressão real
 # — reintroduz o bug de sucesso falso — mas não aparece como linha
 # adicionada nenhuma; sem a margem, o arquivo inteiro seria pulado).
+#
+# Detectores (e o --self-test) vivem em
+# `.github/scripts/pattern-guardrails.sh` — regras mais finas que o grep
+# da 1ª versão:
+#   - `.eq("filial_id"` é o bug em si; um `.or(filial_id.is.null)` por
+#     perto NÃO basta (PostgREST ANDa os filtros e as linhas globais
+#     continuam excluídas). Escape: `// filial-global-ok`.
+#   - `count: "exact"` tem que estar NOS ARGUMENTOS desta `.delete(`/
+#     `.update(`, não numa call irmã a 12 linhas. Escape: `// count-exact-ok`.
+#
+# Lista de arquivos via `git diff --name-only` (não tj-actions/changed-files):
+# a Action de terceiro já sofreu comprometimento real de tag re-apontada,
+# e interpolar a lista via ${{ }} no bash é o vetor de injeção documentado
+# do GitHub Actions. `git diff` no checkout da PR não tem nenhum dos dois.
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
 
 jobs:
   pattern_guardrails:
@@ -34,135 +51,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get changed files
-        id: changed
-        uses: tj-actions/changed-files@v45
-        with:
-          files: |
-            src/**/*.ts
-            src/**/*.tsx
-            supabase/functions/**/*.ts
+      - name: Self-test pattern detectors
+        run: bash .github/scripts/pattern-guardrails.sh --self-test
 
-      - name: Scan added lines for known-bug patterns
-        shell: bash
+      - name: Self-test pre-commit hook regexes
+        run: bash .claude/hooks/pre-commit-checks.sh --self-test
+
+      - name: Scan PR diff for known-bug patterns
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          set -uo pipefail
-
-          FAIL=0
-          changed="${{ steps.changed.outputs.all_changed_files }}"
-
-          if [ -z "$changed" ]; then
-            echo "Nenhum arquivo relevante mudou."
-            exit 0
-          fi
-
-          echo "Arquivos em checagem:"
-          echo "$changed" | tr ' ' '\n'
-          echo ""
-
-          for f in $changed; do
-            [ -f "$f" ] || continue
-
-            # Linhas em escopo: as que a PR ADICIONOU (número na versão
-            # nova) MAIS uma margem de 10 linhas em torno do ponto de
-            # cada hunk — cobre hunks só-de-remoção (ex.: apagar só a
-            # linha `{ count: "exact" }` de um .delete() multi-linha,
-            # que não conta como "adicionada" mas é uma regressão real).
-            # Padrão pré-existente fora de qualquer hunk nunca entra
-            # aqui, então nunca bloqueia uma PR que não tocou perto dele.
-            SCOPE_LINES=$(git diff -U0 "$BASE_SHA"...HEAD -- "$f" 2>/dev/null \
-              | grep -oP '^@@ -[0-9]+(,[0-9]+)? \+\K[0-9]+(,[0-9]+)?(?= @@)' \
-              | awk -F, '{
-                  start=$1; count=($2==""?1:$2);
-                  lo=start-10; if (lo<1) lo=1;
-                  hi=start+(count>0?count:1)+10;
-                  for(i=lo;i<=hi;i++) print i
-                }' | sort -nu)
-
-            if [ -z "$SCOPE_LINES" ]; then
-              continue
-            fi
-
-            # ------------------------------------------------------------
-            # 1) .eq("filial_id" sem .or(...is.null) por perto — esconde
-            #    recurso compartilhado (filial_id IS NULL). PRs #82/#92/
-            #    #95/#97/#103.
-            # ------------------------------------------------------------
-            while IFS=: read -r lineno _; do
-              [ -z "$lineno" ] && continue
-              echo "$SCOPE_LINES" | grep -qx "$lineno" || continue
-              start=$(( lineno > 5 ? lineno - 5 : 1 ))
-              end=$(( lineno + 5 ))
-              window=$(sed -n "${start},${end}p" "$f")
-              if ! echo "$window" | grep -q 'filial_id\.is\.null\|filial_id.*IS NULL\|// filial-global-ok'; then
-                echo "::error file=$f,line=$lineno::.eq(\"filial_id\"...) sem .or(...filial_id.is.null) nem comentário // filial-global-ok por perto — pode esconder recurso compartilhado (filial_id IS NULL). Ver CLAUDE.md §Filial compartilhada. Se for intencional, adicione o comentário // filial-global-ok na mesma linha ou até 5 linhas acima."
-                FAIL=1
-              fi
-            done < <(grep -n '\.eq(["'"'"']filial_id["'"'"']' "$f" || true)
-
-            # ------------------------------------------------------------
-            # 2) .delete()/.update() do Supabase sem { count: "exact" } —
-            #    sucesso falso quando RLS nega silenciosamente. PR #126.
-            #    Contexto amplo (10 linhas antes) detecta chain multi-linha
-            #    tipo .from("x") numa linha e .delete(...) na próxima —
-            #    achado real de @codex review, a 1ª versão só olhava a
-            #    mesma linha e perdia esse formato (o mais comum no repo).
-            # ------------------------------------------------------------
-            while IFS=: read -r lineno _; do
-              [ -z "$lineno" ] && continue
-              echo "$SCOPE_LINES" | grep -qx "$lineno" || continue
-              ctx_start=$(( lineno > 10 ? lineno - 10 : 1 ))
-              ctx_end=$(( lineno + 3 ))
-              ctx=$(sed -n "${ctx_start},${ctx_end}p" "$f")
-              # .from\(["'] exige aspas logo após o parêntese — bate em
-              # .from("tabela") do Supabase, não em Array.from(x) (achado
-              # real de @codex review: Array.from(selectedChildren) perto
-              # de um Set.delete() qualquer disparava falso positivo).
-              echo "$ctx" | grep -qE '\.from\(["'"'"']|supabase[A-Za-z]*\.' || continue
-              start=$(( lineno > 3 ? lineno - 3 : 1 ))
-              end=$(( lineno + 8 ))
-              window=$(sed -n "${start},${end}p" "$f")
-              if ! echo "$window" | grep -q 'count:\s*["'"'"']exact["'"'"']\|// count-exact-ok'; then
-                echo "::error file=$f,line=$lineno::.delete()/.update() do Supabase sem { count: \"exact\" } por perto — se o RLS negar, a call retorna error:null/0 linhas e o código pode reportar sucesso falso (achado real: PR #126, Todos.tsx/Fornecedores.tsx). Adicione { count: \"exact\" } e cheque o count (não só error), ou // count-exact-ok se a call já é auto-limitada por PK/id único."
-                FAIL=1
-              fi
-            done < <(grep -nE '\.(delete|update)\(' "$f" || true)
-
-            # ------------------------------------------------------------
-            # 3) STATUS_COLOR usado como `color` de texto (não fundo de
-            #    pill) — falha WCAG 3:1 em card claro. PR #114.
-            # ------------------------------------------------------------
-            while IFS=: read -r lineno _; do
-              [ -z "$lineno" ] && continue
-              echo "$SCOPE_LINES" | grep -qx "$lineno" || continue
-              echo "::error file=$f,line=$lineno::STATUS_COLOR é cor de FUNDO de pill, não tinta de texto — usar como \`color:\` falha contraste WCAG 3:1 em card claro (achado real: PR #114). Use pillStyle(tone) de statusPalette.ts."
-              FAIL=1
-            done < <(grep -nE 'color:\s*STATUS_COLOR' "$f" || true)
-          done
-
-          # ------------------------------------------------------------
-          # 4) Aviso (não bloqueia): hex fixo em array de cores de gráfico,
-          #    em vez de chartPalette.ts. Heurística ruidosa de propósito —
-          #    só avisa, não falha o job. Não restrito a linha adicionada
-          #    (é aviso, não bloqueio — não há custo de falso positivo).
-          # ------------------------------------------------------------
-          for f in $changed; do
-            [ -f "$f" ] || continue
-            case "$f" in
-              *dashboard*|*Dashboard*|*chart*|*Chart*)
-                if grep -nE '#[0-9A-Fa-f]{6}' "$f" | grep -qE 'COLORS|colors\s*='; then
-                  echo "::warning file=$f::Array de cores hex hardcoded num componente de dashboard/chart — considere usar src/lib/chartPalette.ts (CHART_SERIES_COLORS/chartColor) em vez de hex fixo, pra herdar dark mode automaticamente."
-                fi
-                ;;
-            esac
-          done
-
-          if [ "$FAIL" -eq 1 ]; then
-            echo ""
-            echo "::error::Padrões de bug conhecido encontrados (nas linhas adicionadas por esta PR). Corrija ou adicione o comentário de escape explícito se for falso positivo."
-            exit 1
-          fi
-
-          echo "Nenhum padrão de bug conhecido encontrado nas linhas adicionadas."
+        run: bash .github/scripts/pattern-guardrails.sh

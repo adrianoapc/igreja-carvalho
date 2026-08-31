@@ -1,0 +1,706 @@
+#!/usr/bin/env bash
+# Scanner dos 3 padrões de bug recorrente. Invocado por
+# `.github/workflows/pattern-guardrails.yml`. Também aceita `--self-test`
+# pra validar os detectores sem um diff de PR.
+#
+# Regras (com PRs de origem em docs/guardrails-processo.md):
+#   1. `.eq("filial_id"` é o bug — PostgREST ANDa filtros, então um
+#      `.or("filial_id.is.null")` por perto NÃO reabilita as linhas
+#      globais. Escape: `// filial-global-ok`.
+#   2. `.delete(` / `.update(` do Supabase precisa de `count: "exact"`
+#      NOS ARGUMENTOS DESTA call, não numa irmã a 12 linhas. Escape:
+#      `// count-exact-ok`.
+#   3. `color: STATUS_COLOR` (tinta, não fundo de pill).
+set -uo pipefail
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+MUTATION_ARGS_PY="$SCRIPT_DIR/mutation-call-args.py"
+MUTATION_ESCAPE_PY="$SCRIPT_DIR/mutation-escape-scope.py"
+MUTATION_SEGMENT_PY="$SCRIPT_DIR/mutation-line-segment.py"
+FIND_CODE_PY="$SCRIPT_DIR/find-code-matches.py"
+
+# Decide se o match `idx` de .delete(/.update( na linha `lineno` tem um
+# escape `count-exact-ok` que pertence A ELE (não a uma call vizinha na
+# MESMA linha física) — ver docstring de mutation-escape-scope.py.
+mutation_match_escaped() {
+  local f="$1" lineno="$2" idx="$3" nmatches="$4" line
+  line=$(sed -n "${lineno}p" "$f")
+  python3 "$MUTATION_ESCAPE_PY" "$line" "$idx" "$nmatches"
+}
+
+# Extrai o texto entre o `(` do `.delete(` / `.update(` na linha dada e
+# o `)` que fecha ESSA call (pula strings). Assim `count: "exact"` duma
+# call irmã não protege outra. Script separado (não heredoc) pra não
+# roubar o stdin do `while read` do detector.
+mutation_call_args() {
+  if [ -n "${3:-}" ]; then
+    python3 "$MUTATION_ARGS_PY" "$1" "$2" "$3"
+  else
+    python3 "$MUTATION_ARGS_PY" "$1" "$2"
+  fi
+}
+
+in_scope() {
+  local lineno="$1"
+  printf '%s\n' "$SCOPE_LINES" | command grep -qx "$lineno"
+}
+
+window() {
+  local file="$1" lineno="$2" before="$3" after="$4"
+  local start end
+  start=$((lineno > before ? lineno - before : 1))
+  end=$((lineno + after))
+  sed -n "${start},${end}p" "$file"
+}
+
+# ------------------------------------------------------------
+# Detectores. Imprimem `::error` e retornam 1 se achar.
+# ------------------------------------------------------------
+check_filial_eq() {
+  local f="$1" fail=0
+  local lineno win
+  # Só matches cujo INÍCIO está em código (não string/comentário) —
+  # achado real de @codex review, PR #134: `const note = '.eq("filial_id",
+  # id) must include globals'` disparava o detector. `.eq("filial_id"`
+  # real continua pegando porque o match começa em `.eq`, que é código;
+  # só o argumento é string. Ver find-code-matches.py.
+  while IFS=: read -r lineno _; do
+    [ -z "$lineno" ] && continue
+    in_scope "$lineno" || continue
+    # Janela MESMA LINHA só (achado real de /code-review ultra local,
+    # PR #134: janela de 5-antes/2-depois deixava um `//
+    # filial-global-ok` perto de UM .eq("filial_id"...) exemptar um
+    # SEGUNDO .eq("filial_id"...) diferente na mesma vizinhança —
+    # nenhum self-test precisa de escape fora da própria linha, então
+    # apertar não quebra nada legítimo, só fecha o vazamento entre
+    # calls vizinhas).
+    win=$(window "$f" "$lineno" 0 0)
+    if echo "$win" | command grep -q '// filial-global-ok'; then
+      continue
+    fi
+    echo "::error file=${REPORT_FILE:-$f},line=$lineno::.eq(\"filial_id\"...) exclui filial_id IS NULL mesmo se houver .or(...) no mesmo chain (PostgREST ANDa os filtros). Substitua o .eq por .or(\"filial_id.eq.X,filial_id.is.null\"), ou // filial-global-ok se a exclusão de globais for intencional. Ver CLAUDE.md §Filial compartilhada."
+    fail=1
+  done < <(python3 "$FIND_CODE_PY" '\.eq\(["'"'"']filial_id["'"'"']' "$f" || true)
+  return "$fail"
+}
+
+is_supabase_mutation_ctx() {
+  local ctx="$1"
+  echo "$ctx" | command grep -qE '\.from\(["'"'"']|supabase[A-Za-z]*\.'
+}
+
+# Apaga um `// ...` no fim da linha (// com whitespace na frente, pra
+# `https://` em string sobreviver). Linha que É só comentário o caller
+# pula via `js_line_is_comment`.
+code_without_line_comment() {
+  printf '%s' "$1" | sed -E 's|[[:space:]]+//.*$||'
+}
+
+# Comentário de linha / bloco começando a linha — não é statement, não
+# pode religar um Set.delete ao `.from("` que alguém citou no comentário
+# (achado real de @cursoragent review, PR #134).
+js_line_is_comment() {
+  local t="$1"
+  case "$t" in
+    //*|/\**) return 0 ;;
+  esac
+  return 1
+}
+
+# Confirma que o .delete()/.update() na linha `lineno` de fato pertence a
+# um chain do Supabase, não só que "supabase"/.from( aparece em algum
+# lugar dentro de uma janela de N linhas (achado real de @codex review,
+# PR #134: `await supabase.from("items").select();` seguido, um pouco
+# depois, de `selectedIds.delete(id)` [Set.delete de verdade] classificava
+# o Set.delete como mutation Supabase, só por estar na mesma janela de 13
+# linhas — nenhuma relação de chain real entre os dois). Anda pra trás a
+# partir da linha da call: linha em branco pula; linha terminada em `;`
+# é um statement COMPLETO anterior — não pode ser continuação do chain
+# atual, para a busca; linha com `.from(["']`/`supabase\.` = achou o
+# início do chain. Statements terminados em `;` são o sinal de fronteira
+# real (um chain multi-linha não-terminado nunca tem `;` no meio).
+# Isola o trecho da linha ate' (e incluindo) o match `idx` (1-based) de
+# .delete(/.update(, cortando em `;` — evita que um 2º statement na
+# MESMA linha física herde o contexto supabase de um 1º statement
+# totalmente diferente (achado real de @codex review, PR #134:
+# `await supabase.from("items").select(); selectedIds.delete(id);` os
+# dois na mesma linha — sem isolar por segmento, o Set.delete via
+# supabase.from( no INÍCIO da mesma linha, mesmo depois do `;`). Split
+# de `;` movido pra mutation-line-segment.py (achado real de @codex
+# review xhigh, PR #134): `IFS=';' read -ra` bash cortava em QUALQUER
+# `;` literal, inclusive um dentro do TEXTO de um argumento de string
+# (`.from("obs; nota").update(...)`) — separava o `.from(` do seu
+# próprio `.update(` na mesma chain, e o check count:"exact" saía sem
+# rodar pra essa call (bypass silencioso). O .py só corta em `;` que
+# está fora de string/template literal.
+mutation_line_segment() {
+  local f="$1" lineno="$2" idx="$3" line
+  line=$(sed -n "${lineno}p" "$f")
+  python3 "$MUTATION_SEGMENT_PY" "$line" "$idx"
+}
+
+mutation_belongs_to_chain() {
+  local f="$1" lineno="$2" idx="${3:-}" line prev i trimmed code
+  if [ -n "$idx" ]; then
+    line=$(mutation_line_segment "$f" "$lineno" "$idx")
+  else
+    line=$(sed -n "${lineno}p" "$f")
+  fi
+  line=$(code_without_line_comment "$line")
+  is_supabase_mutation_ctx "$line" && return 0
+  i=$((lineno - 1))
+  local floor=$((lineno > 10 ? lineno - 10 : 1))
+  while [ "$i" -ge "$floor" ]; do
+    prev=$(sed -n "${i}p" "$f")
+    trimmed=$(printf '%s' "$prev" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
+    if [ -z "$trimmed" ] || js_line_is_comment "$trimmed"; then
+      i=$((i - 1))
+      continue
+    fi
+    # `select(); // supabase.from("x")` — o `//` não é código; o `;`
+    # no trecho de código ainda fecha o statement anterior.
+    code=$(code_without_line_comment "$trimmed")
+    code=$(printf '%s' "$code" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
+    if [ -z "$code" ]; then
+      i=$((i - 1))
+      continue
+    fi
+    # Statement anterior COMPLETO (termina em `;`) não pode ser o início
+    # deste chain, mesmo que contenha `supabase.from(` — senão
+    # `await supabase.from("items").select();\nselectedIds.delete(id)`
+    # classifica o Set.delete como mutation (achado real de @codex
+    # review, PR #134: o check de supabase vinha ANTES do check de `;`,
+    # então a linha do select "vazava" pro delete da linha seguinte).
+    case "$code" in
+      *\;) return 1 ;;
+    esac
+    if is_supabase_mutation_ctx "$code"; then
+      return 0
+    fi
+    i=$((i - 1))
+  done
+  return 1
+}
+
+check_mutations() {
+  local f="$1" fail=0
+  local lineno args nmatches idx line
+  # Itera por MATCH, não por linha (achado real de /code-review ultra
+  # local, PR #134): `grep -n` reporta uma linha que casa 1x mesmo com
+  # 2+ ocorrências (`Promise.all([a.delete(), b.delete({count:"exact"})])`)
+  # — um loop por linha só validaria a última call, deixando a primeira
+  # sem checar. mutation_call_args aceita índice (1-based) do match na
+  # linha pra isolar os argumentos de CADA call separadamente.
+  while IFS=: read -r lineno idx; do
+    [ -z "$lineno" ] && continue
+    [ -z "$idx" ] && continue
+    in_scope "$lineno" || continue
+    line=$(sed -n "${lineno}p" "$f")
+    nmatches=$(printf '%s\n' "$line" | command grep -oE '\.(delete|update)\(' | wc -l | tr -d ' ')
+    [ "${nmatches:-0}" -eq 0 ] && continue
+    # Escape checado POR MATCH via mutation_match_escaped, não na
+    # linha inteira (achado real de @codex review, PR #134: um
+    # `continue` de linha inteira fazia UM escape numa call exemptar
+    # TODAS as calls da mesma linha física). Um `//` comment sempre vai
+    # até o fim da linha física — só pode, sem ambiguidade, pertencer à
+    # ÚLTIMA call da linha; `/* count-exact-ok */` inline pode ficar
+    # entre 2 calls específicas. Ver mutation-escape-scope.py.
+    if mutation_match_escaped "$f" "$lineno" "$idx" "$nmatches"; then
+      continue
+    fi
+    # mutation_belongs_to_chain checado POR MATCH (índice), não uma
+    # vez pra linha inteira — achado real de @codex review, PR #134:
+    # `await supabase.from("items").select(); selectedIds.delete(id);`
+    # tem os 2 statements na MESMA linha física; checar a linha
+    # inteira deixava o 1º supabase.from( "vazar" contexto pro
+    # Set.delete depois do `;`. mutation_line_segment isola só o
+    # trecho do statement ATÉ este match específico.
+    if mutation_belongs_to_chain "$f" "$lineno" "$idx"; then
+      args=$(mutation_call_args "$f" "$lineno" "$idx" 2>/dev/null || true)
+      if ! printf '%s' "$args" | command grep -qE 'count:[[:space:]]*["'"'"']exact["'"'"']'; then
+        echo "::error file=${REPORT_FILE:-$f},line=$lineno::.delete()/.update() do Supabase sem { count: \"exact\" } NESTA call (match $idx de $nmatches nesta linha) — se o RLS negar, retorna error:null/0 linhas e o código pode reportar sucesso falso (PR #126). Adicione { count: \"exact\" } no argumento desta call (não numa irmã) e cheque o count retornado, ou // count-exact-ok se a call já é auto-limitada por PK/id único."
+        fail=1
+      fi
+    fi
+  done < <(python3 "$FIND_CODE_PY" '\.(delete|update)\(' "$f" || true)
+  return "$fail"
+}
+
+check_status_color() {
+  local f="$1" fail=0
+  local lineno
+  while IFS=: read -r lineno _; do
+    [ -z "$lineno" ] && continue
+    in_scope "$lineno" || continue
+    echo "::error file=${REPORT_FILE:-$f},line=$lineno::STATUS_COLOR é cor de FUNDO de pill, não tinta de texto — usar como \`color:\` falha contraste WCAG 3:1 em card claro (PR #114). Use pillStyle(tone) de statusPalette.ts."
+    fail=1
+  done < <(python3 "$FIND_CODE_PY" 'color:\s*STATUS_COLOR' "$f" || true)
+  return "$fail"
+}
+
+check_chart_hex_warning() {
+  local f="$1" hex_count
+  # Aviso (não bloqueia): 3+ literais hex em QUALQUER .ts/.tsx tocado.
+  # Achado real de /code-review ultra local (PR #134): exigir
+  # COLORS/colors= na MESMA linha E path com dashboard/chart fazia o
+  # aviso nunca disparar nos 5 arquivos que chartPalette.ts cita
+  # (Insights.tsx tem array multi-linha; Candidatos.tsx nem tem
+  # "dashboard"/"chart" no path).
+  hex_count=$(command grep -oE '#[0-9A-Fa-f]{6}' "$f" 2>/dev/null | wc -l | tr -d ' ')
+  if [ "${hex_count:-0}" -ge 3 ]; then
+    echo "::warning file=$f::${hex_count} cores hex hardcoded — considere usar src/lib/chartPalette.ts (CHART_SERIES_COLORS/chartColor) em vez de hex fixo, pra herdar dark mode automaticamente."
+  fi
+}
+
+scope_lines_for_file() {
+  local f="$1" base_sha="$2"
+  # Linhas em escopo: as que a PR ADICIONOU (número na versão nova) MAIS
+  # uma margem de 10 linhas em torno de QUALQUER hunk que tenha REMOVIDO
+  # pelo menos 1 linha do lado velho (ex.: apagar só `{ count: "exact" }`
+  # de um .delete() multi-linha — seja um hunk só-de-remoção, seja um
+  # hunk de "substituição" que também adiciona uma linha não relacionada
+  # no mesmo hunk). Hunk 100% de adição (nada removido do lado velho)
+  # usa EXATAMENTE as linhas adicionadas, sem margem — achado real de
+  # @codex review, PR #134: a margem de 10 aplicada a QUALQUER hunk
+  # (inclusive addition-only) fazia adicionar 1 linha nova perto de um
+  # `.eq("filial_id"...)`/mutation/STATUS_COLOR legado (não tocado por
+  # esta PR) travar o check obrigatório mesmo sem essa PR ter
+  # introduzido ou alterado o padrão — este repo documenta ter várias
+  # ocorrências legadas assim. Padrão pré-existente fora de qualquer
+  # hunk nunca entra.
+  #
+  # 2ª rodada (achado real de @codex review, PR #134): usar só a
+  # contagem do lado NOVO pra decidir "hunk é addition-only" é errado —
+  # um hunk de SUBSTITUIÇÃO (remove `{ count: "exact" }`, adiciona um
+  # comentário no lugar) também tem contagem nova > 0, então caía no
+  # branch "sem margem" e a `.delete({ ... })` ao redor (não tocada
+  # diretamente, só a linha do count) nunca entrava em SCOPE_LINES.
+  # Fix: parsear as DUAS contagens do cabeçalho do hunk (`-X,Y +A,B`) —
+  # Y (lado velho) > 0 é o sinal real de "este hunk removeu algo",
+  # independente de quantas linhas o lado novo também adicionou.
+  # `grep -oP` (lookahead `(?= @@)`) é PCRE, GNU-only — achado real de
+  # @codex review xhigh, PR #134: BSD grep do macOS recusa `-P`
+  # ("invalid option -- P", exit 2) e, como este script só tem `set
+  # -uo pipefail` (sem -e), a falha não aborta — SCOPE_LINES fica
+  # vazio, scan_pr() trata como "nada pra checar" e pula o arquivo em
+  # silêncio total, sem erro. `--self-test` não pega (bypassa
+  # scope_lines_for_file inteiro). Fix: troca por `grep -oE` (POSIX
+  # ERE, sem lookahead) capturando o ` @@` final junto, removido
+  # depois via parameter expansion — funciona em BSD e GNU grep.
+  git diff -U0 "$base_sha"...HEAD -- "$f" 2>/dev/null \
+    | command grep -oE '^@@ -[0-9]+(,[0-9]+)? \+[0-9]+(,[0-9]+)? @@' \
+    | while IFS= read -r hdr; do
+        hdr="${hdr#@@ }"
+        hdr="${hdr% @@}"
+        old_part="${hdr%% +*}"
+        new_part="${hdr#*+}"
+        old_count="${old_part#*,}"
+        [ "$old_count" = "$old_part" ] && old_count=1
+        new_start="${new_part%%,*}"
+        new_count="${new_part#*,}"
+        [ "$new_count" = "$new_part" ] && new_count=1
+        echo "$old_count $new_start $new_count"
+      done \
+    | awk '{
+        old_count=$1; start=$2; count=$3;
+        if (old_count > 0) {
+          lo=start-10; if (lo<1) lo=1;
+          hi=start+(count>0?count:1)+10;
+          for(i=lo;i<=hi;i++) print i
+        } else if (count > 0) {
+          for(i=start; i<start+count; i++) print i
+        }
+      }' | sort -nu
+}
+
+scan_file() {
+  local f="$1" fail=0
+  [ -f "$f" ] || return 0
+  [ -z "$SCOPE_LINES" ] && return 0
+  # Detectores usam find-code-matches.py (só dispara se o match começa
+  # em código, não em string/comentário) — não precisa mais pré-apagar
+  # comentários numa cópia temporária.
+  REPORT_FILE="$f"
+  check_filial_eq "$f" || fail=1
+  check_mutations "$f" || fail=1
+  check_status_color "$f" || fail=1
+  return "$fail"
+}
+
+# ------------------------------------------------------------
+# Self-test dos detectores (sem git diff — SCOPE_LINES = arquivo todo).
+# ------------------------------------------------------------
+self_test() {
+  local tmp fail=0
+  tmp=$(mktemp -d)
+
+  expect_fail() {
+    local name="$1" file="$2" checker="$3"
+    SCOPE_LINES=$(awk '{print NR}' "$file")
+    if "$checker" "$file" >"$tmp/out" 2>&1; then
+      echo "FAIL expected detector to fire: $name"
+      cat "$tmp/out"
+      fail=1
+    else
+      echo "OK  (fail as expected) $name"
+    fi
+  }
+
+  expect_pass() {
+    local name="$1" file="$2" checker="$3"
+    SCOPE_LINES=$(awk '{print NR}' "$file")
+    if "$checker" "$file" >"$tmp/out" 2>&1; then
+      echo "OK  (pass as expected) $name"
+    else
+      echo "FAIL expected detector to stay silent: $name"
+      cat "$tmp/out"
+      fail=1
+    fi
+  }
+
+  # 1) .eq("filial_id") puro
+  cat >"$tmp/filial-eq.ts" <<'EOF'
+const q = supabase.from("x").eq("filial_id", id);
+EOF
+  expect_fail "filial .eq puro" "$tmp/filial-eq.ts" check_filial_eq
+
+  # 2) .eq + .or(filial_id.is.null) no mesmo chain — AINDA é bug
+  #    (PostgREST ANDa). Achado @codex na PR #134.
+  cat >"$tmp/filial-and.ts" <<'EOF'
+const q = supabase
+  .from("x")
+  .eq("filial_id", id)
+  .or("filial_id.eq." + id + ",filial_id.is.null");
+EOF
+  expect_fail "filial .eq AND .or (ainda exclui globais)" "$tmp/filial-and.ts" check_filial_eq
+
+  # 3) .or de outro campo não é escape
+  cat >"$tmp/filial-other-or.ts" <<'EOF'
+const q = supabase.from("x").eq("filial_id", id).or("data_fim.is.null,data_fim.gte.now");
+EOF
+  expect_fail "filial .eq perto de .or(data_fim.is.null)" "$tmp/filial-other-or.ts" check_filial_eq
+
+  # 4) escape explícito
+  cat >"$tmp/filial-ok.ts" <<'EOF'
+const q = supabase.from("x").eq("filial_id", id); // filial-global-ok — só desta filial
+EOF
+  expect_pass "filial escape // filial-global-ok" "$tmp/filial-ok.ts" check_filial_eq
+
+  # 5) forma correta: .or no lugar do .eq, sem .eq nenhum
+  cat >"$tmp/filial-correct.ts" <<'EOF'
+const q = supabase.from("x").or(`filial_id.eq.${id},filial_id.is.null`);
+EOF
+  expect_pass "filial .or substitui o .eq" "$tmp/filial-correct.ts" check_filial_eq
+
+  # 5c) texto de COMENTÁRIO mencionando o padrão como exemplo/doc não
+  # pode disparar o detector — achado real de @codex review, PR #134.
+  # Usa scan_file (não check_filial_eq direto) pra exercitar o pipeline
+  # de strip de comentário inteiro, incluindo REPORT_FILE.
+  cat >"$tmp/filial-comment.ts" <<'EOF'
+// Bug antigo: .eq("filial_id", id) excluía os globais. Corrigido abaixo.
+const q = supabase.from("x").or(`filial_id.eq.${id},filial_id.is.null`);
+EOF
+  expect_pass "comentário citando .eq(\"filial_id\"...) como exemplo não dispara" "$tmp/filial-comment.ts" scan_file
+
+  # 5d) sanity check: scan_file ainda pega o padrão de VERDADE (prova
+  # que o strip de comentário não também apaga código real).
+  cat >"$tmp/filial-real-via-scan.ts" <<'EOF'
+const q = supabase.from("x").eq("filial_id", id);
+EOF
+  expect_fail "scan_file ainda detecta .eq(\"filial_id\"...) real" "$tmp/filial-real-via-scan.ts" scan_file
+
+  # 5e) STRING contendo o padrão como texto (não código) não dispara —
+  # achado real de @codex review, PR #134. Comentários já eram
+  # ignorados; strings de documentação ainda não.
+  cat >"$tmp/filial-string.ts" <<'EOF'
+const note = '.eq("filial_id", id) must include globals';
+const q = supabase.from("x").or(`filial_id.eq.${id},filial_id.is.null`);
+EOF
+  expect_pass "string citando .eq(\"filial_id\"...) como texto não dispara" "$tmp/filial-string.ts" scan_file
+
+  # 5b) escape de UMA call não pode vazar pra outra .eq("filial_id")
+  #     vizinha sem escape próprio (achado real de @codex review, PR #134).
+  cat >"$tmp/filial-leak.ts" <<'EOF'
+const a = supabase.from("x").eq("filial_id", id1); // filial-global-ok — só desta filial
+const b = supabase.from("y").eq("filial_id", id2);
+EOF
+  expect_fail "escape de uma call não protege a vizinha" "$tmp/filial-leak.ts" check_filial_eq
+
+  # 6) delete sem count
+  cat >"$tmp/del-bare.ts" <<'EOF'
+await supabase.from("fornecedores").delete().eq("id", id);
+EOF
+  expect_fail "delete() sem count" "$tmp/del-bare.ts" check_mutations
+
+  # 7) delete com count nesta call
+  cat >"$tmp/del-ok.ts" <<'EOF'
+const { error, count } = await supabase.from("fornecedores").delete({ count: "exact" }).eq("id", id);
+EOF
+  expect_pass "delete({ count: exact }) nesta call" "$tmp/del-ok.ts" check_mutations
+
+  # 8) duas mutations: só a primeira tem count — a segunda tem que falhar
+  #    (achado @codex: janela de 12 linhas deixava a irmã passar).
+  cat >"$tmp/del-sibling.ts" <<'EOF'
+await supabase.from("a").delete({ count: "exact" }).eq("id", a);
+await supabase.from("b").delete().eq("id", b);
+EOF
+  expect_fail "segunda mutation sem count, irmã protegida" "$tmp/del-sibling.ts" check_mutations
+
+  # 8b) 2 mutations NA MESMA linha, só a segunda tem count — a primeira
+  #     tem que falhar (achado real de @codex review, PR #134: `grep -n`
+  #     reporta a linha 1x mesmo com 2 matches; sem iterar por match, só
+  #     a última call era validada).
+  cat >"$tmp/del-same-line.ts" <<'EOF'
+Promise.all([supabase.from("a").delete().eq("id", a), supabase.from("b").delete({ count: "exact" }).eq("id", b)]);
+EOF
+  expect_fail "2 mutations na mesma linha, só a 2ª protegida" "$tmp/del-same-line.ts" check_mutations
+
+  # 9) select count:exact NÃO protege delete() na linha seguinte
+  cat >"$tmp/del-select-count.ts" <<'EOF'
+await supabase.from("a").select("id", { count: "exact", head: true });
+await supabase.from("a").delete().eq("id", id);
+EOF
+  expect_fail "select count:exact não protege delete()" "$tmp/del-select-count.ts" check_mutations
+
+  # 10) Array.from + Set.delete não é mutation Supabase
+  cat >"$tmp/set-delete.ts" <<'EOF'
+const ids = Array.from(selectedChildren);
+newSelected.delete(childId);
+EOF
+  expect_pass "Set.delete / Array.from não é supabase" "$tmp/set-delete.ts" check_mutations
+
+  # 10b) Set.delete DEPOIS de uma call supabase real (statement completo,
+  #      terminado em `;`) não pode ser classificado como mutation
+  #      Supabase só por estar na mesma janela (achado real de @codex
+  #      review, PR #134).
+  cat >"$tmp/set-delete-near-supabase.ts" <<'EOF'
+await supabase.from("items").select();
+const selectedIds = new Set([1, 2, 3]);
+selectedIds.delete(id);
+EOF
+  expect_pass "Set.delete perto de supabase.select() não é mutation" "$tmp/set-delete-near-supabase.ts" check_mutations
+
+  # 10c) mesma coisa, mas os 2 statements na MESMA LINHA física,
+  # separados por `;` (achado real de @codex review, PR #134: checar a
+  # linha inteira, não o segmento até o match, deixava o 1º
+  # supabase.from( vazar contexto pro Set.delete depois do `;`).
+  cat >"$tmp/set-delete-same-line.ts" <<'EOF'
+await supabase.from("items").select(); selectedIds.delete(id);
+EOF
+  expect_pass "Set.delete na MESMA linha de um supabase.select() não é mutation" "$tmp/set-delete-same-line.ts" check_mutations
+
+  # 10d) Set.delete na LINHA SEGUINTE de um select() terminado em `;`
+  # (sem linha intermediária) — achado real de @codex review, PR #134:
+  # mutation_belongs_to_chain checava supabase.from( na linha anterior
+  # ANTES de ver se ela terminava em `;`, então o select "vazava" e o
+  # Set.delete era classificado como mutation Supabase.
+  cat >"$tmp/set-delete-next-line.ts" <<'EOF'
+await supabase.from("items").select();
+selectedIds.delete(id);
+EOF
+  expect_pass "Set.delete na linha seguinte de um select(); não é mutation" "$tmp/set-delete-next-line.ts" check_mutations
+
+  # 10e) comentário com `.from("` entre um select(); e um Set.delete
+  # não pode religar o chain — mutation_belongs_to_chain lia a linha
+  # anterior CRUA, então `// leftover: supabase.from("x")` fazia o
+  # Set.delete ser classificado como mutation (achado real de
+  # @cursoragent review, PR #134).
+  cat >"$tmp/set-delete-comment-from.ts" <<'EOF'
+await supabase.from("items").select();
+// leftover: supabase.from("x")
+selectedIds.delete(id);
+EOF
+  expect_pass "Set.delete depois de comentário com .from( não é mutation" "$tmp/set-delete-comment-from.ts" check_mutations
+
+  # 11) chain multi-linha .from + .delete()
+  cat >"$tmp/del-multiline.ts" <<'EOF'
+await supabase
+  .from("fornecedores")
+  .delete()
+  .eq("id", id);
+EOF
+  expect_fail "delete() multi-linha sem count" "$tmp/del-multiline.ts" check_mutations
+
+  # 11b) comentário no MEIO de um chain real não pode fazer o walker
+  # pular o `.from(` de verdade (o skip de comentário é só pra linha
+  # que É comentário, não pra desligar o chain).
+  cat >"$tmp/del-multiline-comment.ts" <<'EOF'
+await supabase
+  // drop the row next
+  .from("fornecedores")
+  .delete()
+  .eq("id", id);
+EOF
+  expect_fail "delete() multi-linha com comentário no meio ainda é mutation" "$tmp/del-multiline-comment.ts" check_mutations
+
+  # 12) update multi-linha com count no 2º arg
+  cat >"$tmp/upd-ok.ts" <<'EOF'
+await supabase
+  .from("x")
+  .update({ status: "ok" }, { count: "exact" })
+  .eq("id", id);
+EOF
+  expect_pass "update(..., { count: exact })" "$tmp/upd-ok.ts" check_mutations
+
+  # 13) escape count-exact-ok
+  cat >"$tmp/del-escape.ts" <<'EOF'
+await supabase.from("x").delete().eq("id", id); // count-exact-ok — PK única
+EOF
+  expect_pass "delete escape // count-exact-ok" "$tmp/del-escape.ts" check_mutations
+
+  # 13b) escape de UMA call não pode vazar pra outra .delete()/.update()
+  #      vizinha sem escape próprio (achado real de @codex review, PR #134).
+  cat >"$tmp/del-leak.ts" <<'EOF'
+await supabase.from("a").delete().eq("id", ida); // count-exact-ok — PK única
+await supabase.from("b").delete().eq("id", idb);
+EOF
+  expect_fail "escape de uma call não protege a vizinha" "$tmp/del-leak.ts" check_mutations
+
+  # 13c) `// count-exact-ok` no FIM de uma linha com 2 matches só pode
+  # exemptar a ÚLTIMA call, sem ambiguidade (um `//` comment sempre vai
+  # até o fim da linha física) — a 1ª call, desguarnecida e sem relação
+  # com o comentário, tem que continuar falhando (achado real de @codex
+  # review, PR #134: o `continue` de linha inteira, ANTES do loop
+  # por-match, deixava esse `// count-exact-ok` exemptar as 2 calls).
+  cat >"$tmp/del-trailing-escape-last-only.ts" <<'EOF'
+Promise.all([supabase.from("a").delete(), supabase.from("b").delete()]); // count-exact-ok
+EOF
+  expect_fail "escape no fim da linha só exempta o último match, não os anteriores" "$tmp/del-trailing-escape-last-only.ts" check_mutations
+
+  # 13d) `/* count-exact-ok */` inline (block comment) pode ficar entre
+  # 2 tokens na mesma linha, ao contrário de `//` — exempta a call
+  # específica junto da qual está.
+  cat >"$tmp/del-inline-block-escape.ts" <<'EOF'
+await supabase.from("x").delete() /* count-exact-ok */.eq("id", id);
+EOF
+  expect_pass "delete escape via /* count-exact-ok */ inline block comment" "$tmp/del-inline-block-escape.ts" check_mutations
+
+  # 13e) achado real de @codex review xhigh, PR #134 (confirmado por 2
+  # agentes independentes via execução): mutation-call-args.py usava
+  # `\s*` (tolerava espaço antes do parêntese) enquanto find-code-
+  # matches.py/mutation-escape-scope.py/o nmatches de check_mutations
+  # não — numa linha com estilo misto, os 3 scripts contavam matches
+  # DIFERENTES, e `idx` resolvia pros argumentos da call ERRADA
+  # (bypass silencioso do count:"exact"). Guarda de regressão: as 4
+  # regexes que definem "o que conta como match" têm que ficar
+  # BYTE-IDÊNTICAS entre os 3 arquivos.
+  MUTATION_MATCH_RE='\.(delete|update)\('
+  regex_consistency_fail=0
+  for py in "$MUTATION_ARGS_PY" "$MUTATION_ESCAPE_PY"; do
+    if ! command grep -qF "$MUTATION_MATCH_RE" "$py"; then
+      echo "FAIL regex de match em $py diverge de '$MUTATION_MATCH_RE' (idx desalinha entre scripts)"
+      regex_consistency_fail=1
+    fi
+  done
+  if [ "$regex_consistency_fail" -eq 1 ]; then
+    fail=1
+  else
+    echo "OK  regex de match idêntica em mutation-call-args.py/mutation-escape-scope.py/check_mutations"
+  fi
+
+  # 13f) achado real de @codex review xhigh, PR #134: `IFS=';' read
+  # -ra` em mutation_line_segment cortava em QUALQUER `;` literal,
+  # inclusive um dentro do TEXTO de um argumento de string — separava
+  # o `.from(` do seu próprio `.update(` na mesma chain, e o check
+  # count:"exact" saía sem rodar (mutation-line-segment.py agora só
+  # corta em `;` fora de string/template).
+  cat >"$tmp/del-semicolon-in-string.ts" <<'EOF'
+await supabase.from("obs; nota").update({ status: "x" }).eq("id", id);
+EOF
+  expect_fail "ponto-e-vírgula dentro de string não corta a chain" "$tmp/del-semicolon-in-string.ts" check_mutations
+
+  # 14) STATUS_COLOR como tinta
+  cat >"$tmp/color.ts" <<'EOF'
+const style = { color: STATUS_COLOR.warning };
+EOF
+  expect_fail "color: STATUS_COLOR" "$tmp/color.ts" check_status_color
+
+  # 15) STATUS_COLOR como fundo (não bate no regex color:)
+  cat >"$tmp/bg.ts" <<'EOF'
+const style = { backgroundColor: STATUS_COLOR.warning };
+EOF
+  expect_pass "backgroundColor: STATUS_COLOR" "$tmp/bg.ts" check_status_color
+
+  if [ "$fail" -eq 1 ]; then
+    echo ""
+    echo "Self-test FALHOU."
+    rm -rf "$tmp"
+    return 1
+  fi
+  echo ""
+  echo "Self-test OK (30 casos)."
+  rm -rf "$tmp"
+  return 0
+}
+
+scan_pr() {
+  local base_sha="${BASE_SHA:-}"
+  local fail=0
+  local f
+
+  if [ -z "$base_sha" ]; then
+    echo "::error::BASE_SHA não definido."
+    return 1
+  fi
+
+  local changed
+  # `src/**/*.tsx` NÃO casa arquivo direto em src/ (ex.: src/App.tsx,
+  # src/main.tsx) — `**` no pathspec do git exige pelo menos 1 nível de
+  # diretório abaixo (achado real de /code-review ultra local, PR #134,
+  # confirmado: `git ls-files 'src/**/*.tsx'` omite src/App.tsx, `git
+  # ls-files 'src/*.tsx'` inclui). Pathspec de topo + `**` cobre os 2
+  # níveis sem duplicar arquivo (git diff dedupa automaticamente).
+  # `-c core.quotepath=false` — achado real (@codex review xhigh, PR
+  # #134): sem isso, um arquivo com caractere não-ASCII no nome
+  # (comum neste repo PT-BR, ex. "relatório.ts") sai C-quoted/escapado
+  # (`"src/relat\303\263rio.ts"`) em vez do path literal; o `[ -f "$f"
+  # ]` mais abaixo nunca bate contra essa string, e o arquivo é
+  # pulado em silêncio de TODOS os 3 detectores — bug real, mas
+  # introduzido por um bug de PR NUM arquivo assim ainda passaria sem
+  # aviso nenhum.
+  changed=$(git -c core.quotepath=false diff --name-only "$base_sha"...HEAD -- \
+    'src/*.ts' 'src/*.tsx' 'src/**/*.ts' 'src/**/*.tsx' \
+    'supabase/functions/*.ts' 'supabase/functions/**/*.ts' || true)
+
+  if [ -z "$changed" ]; then
+    echo "Nenhum arquivo relevante mudou."
+    return 0
+  fi
+
+  echo "Arquivos em checagem:"
+  echo "$changed"
+  echo ""
+
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    [ -f "$f" ] || continue
+    SCOPE_LINES=$(scope_lines_for_file "$f" "$base_sha")
+    if [ -z "$SCOPE_LINES" ]; then
+      continue
+    fi
+    scan_file "$f" || fail=1
+  done <<< "$changed"
+
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    [ -f "$f" ] || continue
+    check_chart_hex_warning "$f"
+  done <<< "$changed"
+
+  if [ "$fail" -eq 1 ]; then
+    echo ""
+    echo "::error::Padrões de bug conhecido encontrados (nas linhas adicionadas por esta PR, ou numa margem de hunk só-de-remoção). Corrija ou adicione o comentário de escape explícito se for falso positivo."
+    return 1
+  fi
+
+  echo "Nenhum padrão de bug conhecido encontrado nas linhas adicionadas."
+  return 0
+}
+
+if [ "${1:-}" = "--self-test" ]; then
+  self_test
+  exit $?
+fi
+
+scan_pr
+exit $?

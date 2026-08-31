@@ -4,18 +4,22 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
+permissions:
+  contents: read
+
 jobs:
   docs_guard:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Get changed files
-        id: changed
-        uses: tj-actions/changed-files@v45
+        with:
+          fetch-depth: 0
 
       - name: Enforce documentation discipline
         shell: bash
+        env:
+          FIX_MODE_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'doc:fix') }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
 
@@ -23,15 +27,41 @@ jobs:
           echo "Docs Guard — Hard + Fix Mode"
           echo "==============================="
 
-          changed="${{ steps.changed.outputs.all_changed_files }}"
+          # Lista de arquivos via `git diff --name-only` (não
+          # tj-actions/changed-files) — mesma razão do
+          # pattern-guardrails.yml (achado real de /code-review ultra
+          # local, PR #134, reforçado por um bug real reproduzido nesta
+          # correção: interpolar `json: true` num bloco `env:` faz o
+          # runtime do GitHub Actions re-escapar a string JSON — o array
+          # com aspas vira aspas escapadas de verdade no valor final do
+          # env var, quebrando `jq -r '.[]'` com "Invalid numeric
+          # literal" — fora do risco de supply-chain/injeção que já
+          # motivava tirar a Action de terceiro daqui). `git diff` no
+          # checkout da PR não tem nenhum desses problemas. `-c
+          # core.quotepath=false` — achado real (@codex review xhigh,
+          # PR #134): sem isso, um path não-ASCII sai C-quoted
+          # ("docs/relat\303\263rio.md"), e os `grep -E "^docs/"`/
+          # matchers de módulo mais abaixo nunca batem contra essa
+          # string — um docs file ou módulo de código com nome
+          # acentuado fica invisível pra este gate (fail-aberto pro
+          # requisito de docs, ou fail-fechado bloqueando PR que já
+          # documentou).
+          changed=$(git -c core.quotepath=false diff --name-only "$BASE_SHA"...HEAD)
           echo "Changed files:"
-          echo "$changed" | tr ' ' '\n'
+          echo "$changed"
 
           # --------------------------------
           # Detect PR labels
           # --------------------------------
-          PR_LABELS="${{ github.event.pull_request.labels.*.name }}"
-          FIX_MODE=$(echo "$PR_LABELS" | tr ' ' '\n' | grep -E '^doc:fix$' || true)
+          # Bug histórico: "${{ github.event.pull_request.labels.*.name }}"
+          # serializa como a string literal "Array" nesse contexto, então o
+          # grep nunca batia e FIX MODE nunca ativava. Fix: resolver via
+          # contains() (expressão do próprio GitHub Actions, roda no
+          # runner antes do shell) e passar já avaliado por env var.
+          FIX_MODE=""
+          if [ "$FIX_MODE_LABEL" = "true" ]; then
+            FIX_MODE="doc:fix"
+          fi
 
           if [ -n "$FIX_MODE" ]; then
             echo "PR label detected: doc:fix → FIX MODE enabled"
@@ -42,9 +72,9 @@ jobs:
           # --------------------------------
           # Detect documentation changes
           # --------------------------------
-          DOCS_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/' || true)
-          DIAGRAM_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/diagramas/' || true)
-          TEXT_DOC_CHANGED=$(echo "$changed" | tr ' ' '\n' | grep -E '^docs/(manual-usuario\.md|funcionalidades\.md|produto/|01-Arquitetura/|adr/|arquitetura-financeiro\.md|guardrails-financeiro\.md)' || true)
+          DOCS_CHANGED=$(echo "$changed" | grep -E '^docs/' || true)
+          DIAGRAM_CHANGED=$(echo "$changed" | grep -E '^docs/diagramas/' || true)
+          TEXT_DOC_CHANGED=$(echo "$changed" | grep -E '^docs/(manual-usuario\.md|funcionalidades\.md|produto/|01-Arquitetura/|adr/|arquitetura-financeiro\.md|guardrails-financeiro\.md)' || true)
 
           # --------------------------------
           # Module path mapping (REAL paths)
@@ -77,7 +107,7 @@ jobs:
 
           touched=()
           for m in "${!MODULES[@]}"; do
-            if echo "$changed" | tr ' ' '\n' | grep -E "${MODULES[$m]}" >/dev/null 2>&1; then
+            if echo "$changed" | grep -E "${MODULES[$m]}" >/dev/null 2>&1; then
               touched+=("$m")
             fi
           done

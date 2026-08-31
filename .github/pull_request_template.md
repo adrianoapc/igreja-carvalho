@@ -19,5 +19,12 @@
 - [ ] Atualizei/Criei ADR em `docs/adr/` (se houve decisão)
 - [ ] Atualizei `docs/README.MD` (se adicionei novos arquivos)
 
+## Review (obrigatório) — ver `docs/guardrails-processo.md`
+- [ ] Rodei `/code-review` local e resolvi os achados (ou justifiquei os que ficaram)
+- [ ] Se toquei RLS, auth, secrets ou dado cross-tenant: rodei `/security-review`
+- [ ] Se a PR tocou migration: testei num harness Postgres real isolado (Docker), não só `deno check`/`tsc` — **não** use `supabase db reset`/`supabase start` full-history, a história de migrations tem drift conhecido e o reset sempre falha do zero (ver `docs/guardrails-processo.md` §Fora de escopo e `AGENTS.md`)
+- [ ] Se criei/alterei gráfico ou dashboard: usei `src/lib/chartPalette.ts` (ou a skill `dataviz` para paleta sequencial/divergente), não hex hardcoded
+- [ ] Conferi que `@codex review`/Cursor Bugbot realmente rodou (não só "usage limit reached") antes de mergear
+
 ## Prompt sugerido para Copilot (cole no Copilot Chat)
 > “Atualize a documentação do(s) módulo(s) afetado(s), sem mover/renomear arquivos, apenas complementando os docs existentes em /docs. Gere/atualize Mermaid em docs/diagramas e crie ADR apenas se houver decisão.”
