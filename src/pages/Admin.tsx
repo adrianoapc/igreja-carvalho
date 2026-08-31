@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import {
   Search,
   UserCog,
@@ -134,6 +135,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
 export default function Admin() {
   const { toast } = useToast();
   const { hasAccess, loading: authLoading } = useAuth();
+  const { isSuperAdmin, loading: superAdminLoading } = useSuperAdmin();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -606,10 +608,12 @@ export default function Admin() {
             <Settings className="w-4 h-4 mr-2" />
             Configurações
           </TabsTrigger>
-          <TabsTrigger value="monitoring">
-            <Activity className="w-4 h-4 mr-2" />
-            Monitoramento
-          </TabsTrigger>
+          {isSuperAdmin && (
+            <TabsTrigger value="monitoring">
+              <Activity className="w-4 h-4 mr-2" />
+              Monitoramento
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="users" className="space-y-4">
@@ -1153,7 +1157,10 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="monitoring" className="space-y-4">
-          <EdgeFunctionMonitoring />
+          <EdgeFunctionMonitoring
+            isSuperAdmin={isSuperAdmin}
+            superAdminLoading={superAdminLoading}
+          />
         </TabsContent>
       </Tabs>
     </div>

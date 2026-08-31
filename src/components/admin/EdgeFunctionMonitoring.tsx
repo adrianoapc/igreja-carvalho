@@ -81,7 +81,15 @@ const chartConfig = {
   },
 };
 
-export default function EdgeFunctionMonitoring() {
+interface EdgeFunctionMonitoringProps {
+  isSuperAdmin: boolean;
+  superAdminLoading: boolean;
+}
+
+export default function EdgeFunctionMonitoring({
+  isSuperAdmin,
+  superAdminLoading,
+}: EdgeFunctionMonitoringProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<FunctionStats[]>([]);
@@ -92,8 +100,9 @@ export default function EdgeFunctionMonitoring() {
   const [timeRange, setTimeRange] = useState<string>("7");
 
   useEffect(() => {
+    if (superAdminLoading || !isSuperAdmin) return;
     loadAllData();
-  }, []);
+  }, [superAdminLoading, isSuperAdmin]);
 
   const loadAllData = async () => {
     setIsLoading(true);
@@ -147,9 +156,12 @@ export default function EdgeFunctionMonitoring() {
   };
 
   const loadRecentLogs = async () => {
+    // Nunca .select("*") aqui: request_payload/response_payload podem
+    // conter PII de outra igreja (edge_function_logs não tem igreja_id,
+    // ver policy de super_admin) e esta lista não os exibe.
     const { data, error } = await supabase
       .from("edge_function_logs")
-      .select("*")
+      .select("id, function_name, execution_time_ms, status, error_message, created_at")
       .order("created_at", { ascending: false })
       .limit(50);
     
@@ -209,6 +221,28 @@ export default function EdgeFunctionMonitoring() {
         return <Badge variant="secondary">{status}</Badge>;
     }
   };
+
+  if (superAdminLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!isSuperAdmin) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-muted-foreground">
+          <p className="font-medium text-foreground">Acesso restrito</p>
+          <p className="text-sm mt-1">
+            O monitoramento de execuções de Edge Functions é visível só
+            pra Super Admin.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isLoading) {
     return (

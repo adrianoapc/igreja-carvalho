@@ -70,6 +70,14 @@ export function useSuperAdmin() {
 
   // Verificar se é super_admin
   const checkSuperAdmin = useCallback(async () => {
+    // Reseta loading=true a cada invocação (não só na 1ª): sem isso, a
+    // transição user=null→user real (comum no 1º mount, antes do listener
+    // de auth resolver) reusa o loading=false já setado pelo branch acima,
+    // deixando isSuperAdmin=false "estável" por um instante mesmo pra quem
+    // é super_admin de verdade — consumidores que gateiam UI só em
+    // `loading` (sem também esperar `authLoading`) piscam acesso negado.
+    setLoading(true);
+
     if (!user) {
       setIsSuperAdmin(false);
       setLoading(false);
