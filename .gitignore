@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+__pycache__/
 
 # Editor directories and files
 .vscode/*
@@ -31,3 +32,17 @@ supabase/.temp/
 imports/
 Imports/
 migrate_auth.js
+
+# Worktrees do Claude Code — eslint.config.js e
+# .claude/hooks/pre-commit-checks.sh assumem que arquivos aqui dentro
+# nunca entram no índice/tracked set. Achado real (@codex review
+# xhigh, PR #134): essa suposição só era garantida pelo
+# .git/info/exclude LOCAL (não versionado) deste desenvolvedor — num
+# clone novo ou runner de CI sem essa mesma exclusão local, um
+# arquivo perdido sob .claude/worktrees/... (ex.: via `git worktree
+# add` apontando pra dentro do repo) não seria ignorado e poderia ser
+# commitado como qualquer outro arquivo tracked — depois disso, tanto
+# o eslint quanto o hook o pulariam permanentemente e em silêncio,
+# mesmo se fosse código real de src/ ou supabase/functions/ aninhado
+# ali.
+.claude/worktrees/

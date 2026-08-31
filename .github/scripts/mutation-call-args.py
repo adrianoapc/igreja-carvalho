@@ -26,7 +26,16 @@ def mutation_call_args(path: str, lineno: int, match_index: int = -1) -> str:
     if lineno < 1 or lineno > len(lines):
         raise SystemExit(2)
     line = lines[lineno - 1]
-    matches = list(re.finditer(r"\.(?:delete|update)\s*\(", line))
+    # Regex tem que ser IDÊNTICA à usada por todo caller que computa/
+    # conta `idx` (find-code-matches.py, o nmatches de check_mutations,
+    # mutation-escape-scope.py) — achado real (@codex review xhigh, PR
+    # #134, confirmado por 2 agentes independentes via execução): esta
+    # função usava `\s*` (tolerava espaço antes do parêntese,
+    # ex. ".delete ("), as outras 3 não. Numa linha com 1 call espaçada
+    # e 1 sem, esta função enxergava um match a MAIS/MENOS que o
+    # caller, e `matches[idx-1]` resolvia pros argumentos da call
+    # ERRADA — bypass silencioso do check count:"exact" (PR #126).
+    matches = list(re.finditer(r"\.(delete|update)\(", line))
     if not matches:
         raise SystemExit(3)
     try:

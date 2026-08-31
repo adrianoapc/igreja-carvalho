@@ -16,6 +16,7 @@ set -uo pipefail
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 MUTATION_ARGS_PY="$SCRIPT_DIR/mutation-call-args.py"
 MUTATION_ESCAPE_PY="$SCRIPT_DIR/mutation-escape-scope.py"
+MUTATION_SEGMENT_PY="$SCRIPT_DIR/mutation-line-segment.py"
 FIND_CODE_PY="$SCRIPT_DIR/find-code-matches.py"
 
 # Decide se o match `idx` de .delete(/.update( na linha `lineno` tem um
@@ -124,22 +125,18 @@ js_line_is_comment() {
 # totalmente diferente (achado real de @codex review, PR #134:
 # `await supabase.from("items").select(); selectedIds.delete(id);` os
 # dois na mesma linha — sem isolar por segmento, o Set.delete via
-# supabase.from( no INÍCIO da mesma linha, mesmo depois do `;`).
+# supabase.from( no INÍCIO da mesma linha, mesmo depois do `;`). Split
+# de `;` movido pra mutation-line-segment.py (achado real de @codex
+# review xhigh, PR #134): `IFS=';' read -ra` bash cortava em QUALQUER
+# `;` literal, inclusive um dentro do TEXTO de um argumento de string
+# (`.from("obs; nota").update(...)`) — separava o `.from(` do seu
+# próprio `.update(` na mesma chain, e o check count:"exact" saía sem
+# rodar pra essa call (bypass silencioso). O .py só corta em `;` que
+# está fora de string/template literal.
 mutation_line_segment() {
-  local f="$1" lineno="$2" idx="$3" line seg running=0 n_in_seg
+  local f="$1" lineno="$2" idx="$3" line
   line=$(sed -n "${lineno}p" "$f")
-  local IFS=';'
-  local -a segs
-  read -ra segs <<< "$line"
-  for seg in "${segs[@]}"; do
-    n_in_seg=$(printf '%s\n' "$seg" | command grep -oE '\.(delete|update)\(' | wc -l | tr -d ' ')
-    if [ "$((running + n_in_seg))" -ge "$idx" ]; then
-      printf '%s' "$seg"
-      return 0
-    fi
-    running=$((running + n_in_seg))
-  done
-  printf '%s' "$line"
+  python3 "$MUTATION_SEGMENT_PY" "$line" "$idx"
 }
 
 mutation_belongs_to_chain() {
@@ -281,9 +278,20 @@ scope_lines_for_file() {
   # Fix: parsear as DUAS contagens do cabeçalho do hunk (`-X,Y +A,B`) —
   # Y (lado velho) > 0 é o sinal real de "este hunk removeu algo",
   # independente de quantas linhas o lado novo também adicionou.
+  # `grep -oP` (lookahead `(?= @@)`) é PCRE, GNU-only — achado real de
+  # @codex review xhigh, PR #134: BSD grep do macOS recusa `-P`
+  # ("invalid option -- P", exit 2) e, como este script só tem `set
+  # -uo pipefail` (sem -e), a falha não aborta — SCOPE_LINES fica
+  # vazio, scan_pr() trata como "nada pra checar" e pula o arquivo em
+  # silêncio total, sem erro. `--self-test` não pega (bypassa
+  # scope_lines_for_file inteiro). Fix: troca por `grep -oE` (POSIX
+  # ERE, sem lookahead) capturando o ` @@` final junto, removido
+  # depois via parameter expansion — funciona em BSD e GNU grep.
   git diff -U0 "$base_sha"...HEAD -- "$f" 2>/dev/null \
-    | command grep -oP '^@@ -[0-9]+(,[0-9]+)? \+[0-9]+(,[0-9]+)?(?= @@)' \
+    | command grep -oE '^@@ -[0-9]+(,[0-9]+)? \+[0-9]+(,[0-9]+)? @@' \
     | while IFS= read -r hdr; do
+        hdr="${hdr#@@ }"
+        hdr="${hdr% @@}"
         old_part="${hdr%% +*}"
         new_part="${hdr#*+}"
         old_count="${old_part#*,}"
@@ -567,6 +575,40 @@ await supabase.from("x").delete() /* count-exact-ok */.eq("id", id);
 EOF
   expect_pass "delete escape via /* count-exact-ok */ inline block comment" "$tmp/del-inline-block-escape.ts" check_mutations
 
+  # 13e) achado real de @codex review xhigh, PR #134 (confirmado por 2
+  # agentes independentes via execução): mutation-call-args.py usava
+  # `\s*` (tolerava espaço antes do parêntese) enquanto find-code-
+  # matches.py/mutation-escape-scope.py/o nmatches de check_mutations
+  # não — numa linha com estilo misto, os 3 scripts contavam matches
+  # DIFERENTES, e `idx` resolvia pros argumentos da call ERRADA
+  # (bypass silencioso do count:"exact"). Guarda de regressão: as 4
+  # regexes que definem "o que conta como match" têm que ficar
+  # BYTE-IDÊNTICAS entre os 3 arquivos.
+  MUTATION_MATCH_RE='\.(delete|update)\('
+  regex_consistency_fail=0
+  for py in "$MUTATION_ARGS_PY" "$MUTATION_ESCAPE_PY"; do
+    if ! command grep -qF "$MUTATION_MATCH_RE" "$py"; then
+      echo "FAIL regex de match em $py diverge de '$MUTATION_MATCH_RE' (idx desalinha entre scripts)"
+      regex_consistency_fail=1
+    fi
+  done
+  if [ "$regex_consistency_fail" -eq 1 ]; then
+    fail=1
+  else
+    echo "OK  regex de match idêntica em mutation-call-args.py/mutation-escape-scope.py/check_mutations"
+  fi
+
+  # 13f) achado real de @codex review xhigh, PR #134: `IFS=';' read
+  # -ra` em mutation_line_segment cortava em QUALQUER `;` literal,
+  # inclusive um dentro do TEXTO de um argumento de string — separava
+  # o `.from(` do seu próprio `.update(` na mesma chain, e o check
+  # count:"exact" saía sem rodar (mutation-line-segment.py agora só
+  # corta em `;` fora de string/template).
+  cat >"$tmp/del-semicolon-in-string.ts" <<'EOF'
+await supabase.from("obs; nota").update({ status: "x" }).eq("id", id);
+EOF
+  expect_fail "ponto-e-vírgula dentro de string não corta a chain" "$tmp/del-semicolon-in-string.ts" check_mutations
+
   # 14) STATUS_COLOR como tinta
   cat >"$tmp/color.ts" <<'EOF'
 const style = { color: STATUS_COLOR.warning };
@@ -586,7 +628,7 @@ EOF
     return 1
   fi
   echo ""
-  echo "Self-test OK (28 casos)."
+  echo "Self-test OK (30 casos)."
   rm -rf "$tmp"
   return 0
 }
@@ -608,7 +650,15 @@ scan_pr() {
   # confirmado: `git ls-files 'src/**/*.tsx'` omite src/App.tsx, `git
   # ls-files 'src/*.tsx'` inclui). Pathspec de topo + `**` cobre os 2
   # níveis sem duplicar arquivo (git diff dedupa automaticamente).
-  changed=$(git diff --name-only "$base_sha"...HEAD -- \
+  # `-c core.quotepath=false` — achado real (@codex review xhigh, PR
+  # #134): sem isso, um arquivo com caractere não-ASCII no nome
+  # (comum neste repo PT-BR, ex. "relatório.ts") sai C-quoted/escapado
+  # (`"src/relat\303\263rio.ts"`) em vez do path literal; o `[ -f "$f"
+  # ]` mais abaixo nunca bate contra essa string, e o arquivo é
+  # pulado em silêncio de TODOS os 3 detectores — bug real, mas
+  # introduzido por um bug de PR NUM arquivo assim ainda passaria sem
+  # aviso nenhum.
+  changed=$(git -c core.quotepath=false diff --name-only "$base_sha"...HEAD -- \
     'src/*.ts' 'src/*.tsx' 'src/**/*.ts' 'src/**/*.tsx' \
     'supabase/functions/*.ts' 'supabase/functions/**/*.ts' || true)
 

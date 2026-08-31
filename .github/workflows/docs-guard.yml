@@ -37,8 +37,16 @@ jobs:
           # env var, quebrando `jq -r '.[]'` com "Invalid numeric
           # literal" — fora do risco de supply-chain/injeção que já
           # motivava tirar a Action de terceiro daqui). `git diff` no
-          # checkout da PR não tem nenhum desses problemas.
-          changed=$(git diff --name-only "$BASE_SHA"...HEAD)
+          # checkout da PR não tem nenhum desses problemas. `-c
+          # core.quotepath=false` — achado real (@codex review xhigh,
+          # PR #134): sem isso, um path não-ASCII sai C-quoted
+          # ("docs/relat\303\263rio.md"), e os `grep -E "^docs/"`/
+          # matchers de módulo mais abaixo nunca batem contra essa
+          # string — um docs file ou módulo de código com nome
+          # acentuado fica invisível pra este gate (fail-aberto pro
+          # requisito de docs, ou fail-fechado bloqueando PR que já
+          # documentou).
+          changed=$(git -c core.quotepath=false diff --name-only "$BASE_SHA"...HEAD)
           echo "Changed files:"
           echo "$changed"
 

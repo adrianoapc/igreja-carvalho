@@ -11,6 +11,9 @@
 # node_modules baixa o pacote errado `tsc@2.0.4` em vez de typescript).
 set -uo pipefail
 
+HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+STRIP_PY="$HOOK_DIR/strip-bash-command.py"
+
 # Regexes do gate — definidas ANTES de ler stdin pra `--self-test` não
 # bloquear no `cat`. Classe POSIX tem que ser `[A-Za-z]` (z minúsculo).
 # `[A-Z` + `a-Z]` (Z maiúsculo) é range descendente: no BSD grep do
@@ -19,8 +22,23 @@ set -uo pipefail
 # commit 3e6fc776, corrigido em 9f770c5d). GNU grep no CI NÃO reproduz
 # o erro de compilação; o `--self-test` recusa essa classe em
 # linha de código e trata grep exit ≥2 como deny, não como "não é commit".
-GIT_GLOBAL='( -C ("[^"]*"|'"'"'[^'"'"']*'"'"'|[^ ]+)| -c [^ ]+)*'
-GIT_COMMIT_AT='(^|[;&|]) *([A-Za-z_][A-Za-z0-9_]*=[^ ;&|]* )*git'"$GIT_GLOBAL"' commit($|[^a-zA-Z-])'
+# Separadores usam `[[:space:]]+`, nunca espaço literal — achado real
+# (@codex review xhigh, PR #134): esta regex era a ÚNICA do arquivo
+# ainda usando ' ' literal entre tokens (as outras 4 já usavam
+# [[:space:]]); `git  commit` (2 espaços) ou uma tab entre `git` e
+# `commit` não batia, e como esta é o GATE MESTRE (decide se roda
+# QUALQUER outro check), qualquer espaçamento não-single-space fazia
+# o hook inteiro virar no-op.
+GIT_GLOBAL='([[:space:]]+-C[[:space:]]+("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:]]+)|[[:space:]]+-c[[:space:]]+[^[:space:]]+)*'
+# Âncora inclui `(` além de `^`/`;`/`&`/`|` — achado real (@codex
+# review xhigh, PR #134): `$(...)` (e subshell `(...)` puro) abre um
+# contexto de comando novo tanto quanto `;`/`&&`/`|`; sem `(` na
+# âncora, um `git commit` de verdade escondido dentro de `$(...)`
+# (ex.: `echo "$(git commit -am x)"`) já sobrevivia ao strip (o
+# stripper preserva `$(...)` por ser bash live) mas a âncora não
+# reconhecia `git` logo depois de `$(` como início de comando válido,
+# então o gate ainda não disparava.
+GIT_COMMIT_AT='(^|[;&|(])[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|]*[[:space:]]+)*git'"$GIT_GLOBAL"'[[:space:]]+commit($|[^a-zA-Z-])'
 RE_FLAG_LONG='(^|[[:space:]])(--all|--include|--only|--patch|--interactive)($|[[:space:]=])'
 RE_FLAG_SHORT='[[:space:]]-[a-zA-Z]*[ap][a-zA-Z]*($|[[:space:]])'
 RE_FLAG_PATHSPEC='commit($|[^a-zA-Z-])([^;&|]*)[[:space:]]--[[:space:]]+[^[:space:]]'
@@ -115,11 +133,19 @@ if [ "${1:-}" = "--self-test" ]; then
     fi
   }
   expect_match 'git commit -m foo' 'git commit simples'
+  expect_match 'echo "$(git commit -m foo)"' 'git commit dentro de $(...) — achado real, PR #134'
   expect_match 'FOO=1 git commit -m foo' 'prefixo VAR='
   expect_match 'git -c commit.gpgsign=false commit -m foo' 'git -c … commit'
   expect_match 'git commit&&echo x' 'commit sem espaço antes de &&'
   expect_no_match 'git status' 'git status'
   expect_no_match 'git commit-tree HEAD' 'commit-tree'
+  # Achado real de @codex review xhigh, PR #134: GIT_COMMIT_AT era a
+  # única regex do arquivo ainda usando espaço literal em vez de
+  # [[:space:]]+ — 2 espaços ou uma tab entre tokens faziam o GATE
+  # MESTRE não bater, e o hook inteiro virava no-op.
+  expect_match "$(printf 'git  commit -m foo')" 'dois espaços entre git e commit'
+  expect_match "$(printf 'git\tcommit -m foo')" 'tab entre git e commit'
+  expect_match "$(printf 'FOO=1  git commit -m foo')" 'dois espaços depois do prefixo VAR='
   expect_flag 'git commit --patch -m foo' '--patch'
   expect_flag 'git commit -p -m foo' '-p'
   expect_flag 'git commit -pm foo' '-pm'
@@ -128,6 +154,84 @@ if [ "${1:-}" = "--self-test" ]; then
   expect_flag 'git commit -m foo -- src/x.ts' 'pathspec depois de --'
   expect_no_flag 'git commit -m foo' 'commit simples sem flag perigosa'
   expect_no_flag 'git commit --amend -m foo' '--amend não é --all'
+
+  # Testes de PIPELINE COMPLETO — roda o hook DE VERDADE (não só as
+  # regexes isoladas) contra repositórios git reais em diretórios
+  # temporários, cobrindo a resolução de -C/cd e o strip-bash-
+  # command.py ponta a ponta. Achado real (@codex review xhigh, PR
+  # #134): --self-test só testava match/no-match de regex isolada;
+  # nenhum desses achados (hijack de -C via texto de mensagem, cd +
+  # -C relativo resolvendo no diretório errado, cd falhando depois do
+  # -d passar, git commit escondido dentro de $(...), heredoc
+  # aninhado com aspa solta vazando texto) era exercitado de verdade.
+  E2E_TMP=$(mktemp -d)
+  trap 'rm -rf "$E2E_TMP"' RETURN 2>/dev/null || true
+  mkdir -p "$E2E_TMP/real_repo" "$E2E_TMP/outer/target_repo" "$E2E_TMP/decoy"
+  for d in real_repo outer/target_repo decoy; do
+    (cd "$E2E_TMP/$d" && git init -q && git config user.email t@t.com && git config user.name t)
+  done
+
+  run_hook() {
+    # Invoca o script DE VERDADE (não --self-test) num subprocesso,
+    # simulando o payload JSON que o Claude Code manda pro hook.
+    local cmd="$1"
+    python3 -c '
+import json, sys
+print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}}))
+' "$cmd" | bash "$HOOK_SRC" 2>&1
+  }
+
+  expect_e2e_repo_dir() {
+    # A mensagem "... em $REPO_DIR" só sai em stderr — run_hook
+    # funde stderr em stdout (achado real desta rodada: descartar
+    # stderr fazia este teste nunca ver o REPO_DIR de verdade,
+    # passando "verde" mesmo se a resolução tivesse regredido).
+    local label="$1" cmd="$2" want_dir="$3"
+    local out
+    out=$(run_hook "$cmd")
+    if printf '%s' "$out" | command grep -qF "$want_dir"; then
+      echo "OK  e2e: $label" >&2
+    else
+      echo "FAIL e2e ($label): esperava REPO_DIR conter '$want_dir', saída: $out" >&2
+      fail=1
+    fi
+  }
+
+  expect_e2e_no_string() {
+    local label="$1" cmd="$2" must_not="$3"
+    local out
+    out=$(run_hook "$cmd")
+    if printf '%s' "$out" | command grep -qF "$must_not"; then
+      echo "FAIL e2e ($label): saída não deveria conter '$must_not' — $out" >&2
+      fail=1
+    else
+      echo "OK  e2e: $label" >&2
+    fi
+  }
+
+  # -C hijack via texto de mensagem (achado real): a mensagem cita um
+  # -C de outro diretório — o hook NUNCA pode validar o índice desse
+  # decoy.
+  expect_e2e_no_string '-C hijack via texto de mensagem não redireciona' \
+    "git -C \"$E2E_TMP/real_repo\" commit -m 'note: also tried -C \"$E2E_TMP/decoy\" earlier'" \
+    "$E2E_TMP/decoy"
+  # cd + -C relativo resolve contra o diretório do cd, não ORIG_DIR.
+  expect_e2e_repo_dir 'cd + -C relativo resolve no diretório certo' \
+    "cd \"$E2E_TMP/outer\" && git -C target_repo commit -m x" \
+    "$E2E_TMP/outer/target_repo"
+  # git commit escondido dentro de $(...) precisa disparar os checks —
+  # antes desta correção, o hook saía em silêncio total (stdout vazio,
+  # exit 0, indistinguível de "não reconheci como git commit"). O
+  # sinal de que reconheceu é a linha "git commit detectado" em
+  # stderr, então roda com stderr redirecionado pro mesmo stream.
+  out=$(cd "$E2E_TMP/real_repo" && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"echo \"$(git commit -m clean)\""}}' | bash "$HOOK_SRC" 2>&1)
+  if printf '%s' "$out" | command grep -q "git commit detectado"; then
+    echo "OK  e2e: git commit escondido em \$(...) é reconhecido" >&2
+  else
+    echo "FAIL e2e: git commit escondido em \$(...) não foi reconhecido — $out" >&2
+    fail=1
+  fi
+
   if [ "$fail" -eq 1 ]; then
     echo "Self-test do hook FALHOU." >&2
     exit 1
@@ -154,50 +258,19 @@ CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')
 # rodar contra o índice de outro repositório real, não o que está
 # sendo commitado. (2) rejeição de -a/--all truncando na 1ª `-m`
 # perdia flags que vêm DEPOIS da mensagem (`git commit -m "msg" -a` é
-# válido, git aceita flag em qualquer ordem).
-CMD_STRIPPED=$(printf '%s' "$CMD" | python3 -c '
-import re, sys
-
-s = sys.stdin.read()
-out = []
-i, n = 0, len(s)
-while i < n:
-    c = s[i]
-    if c == "\"":
-        j = i + 1
-        while j < n:
-            if s[j] == "\\" and j + 1 < n:
-                j += 2
-                continue
-            if s[j] == "\"":
-                j += 1
-                break
-            j += 1
-        out.append("\"\"")
-        i = j
-        continue
-    if c == "'"'"'":
-        j = i + 1
-        while j < n and s[j] != "'"'"'":
-            j += 1
-        j += 1
-        out.append("'"'"''"'"'")
-        i = j
-        continue
-    if s[i : i + 2] == "<<":
-        m = re.match(r"<<-?\s*([\"'"'"']?)([A-Za-z_][A-Za-z0-9_]*)\1", s[i:])
-        if m:
-            delim = m.group(2)
-            body_start = i + m.end()
-            end_re = re.compile(r"(?m)^[ \t]*" + re.escape(delim) + r"[ \t]*$")
-            em = end_re.search(s, body_start)
-            out.append(s[i:body_start])
-            i = em.end() if em else n
-            continue
-    out.append(c)
-    i += 1
-sys.stdout.write("".join(out))
-')
+# válido, git aceita flag em qualquer ordem). Lógica movida pra
+# strip-bash-command.py (round 11, @codex review xhigh, PR #134):
+# viver como heredoc bash-single-quote-escapado dentro DESTE arquivo
+# foi a causa raiz de vários desses achados self-inflicted — um .py
+# separado não tem escaping de aspas nenhum pra errar. Também fecha 2
+# achados novos: `$(...)` dentro de aspas duplas é bash LIVE (pode
+# esconder um `git commit` de verdade) mas a versão anterior apagava
+# o conteúdo inteiro das aspas duplas, incluindo a substituição —
+# agora recursa nela. E o heredoc só reconhecia delimitador citado
+# (`'EOF'`/`"EOF"`); `<<\EOF` (escape de barra) também suprime
+# expansão em bash de verdade e não era reconhecido, deixando o corpo
+# inteiro sem strip.
+CMD_STRIPPED=$(printf '%s' "$CMD" | python3 "$STRIP_PY")
 
 # Só age em comandos que efetivamente rodam `git commit` (aceita `git -C dir`
 # com dir citado ou não, encadeado com && / ; / |, sem espaço antes do
@@ -235,48 +308,62 @@ fi
 
 ORIG_DIR=$(pwd)
 REPO_DIR="$ORIG_DIR"
-# Extrai o alvo de `git -C` a partir de CMD_STRIPPED (não CMD) — o
-# gate/âncora roda sobre texto onde mensagem/heredoc já viraram
-# aspas-vazias, então um `-C` "achado" ali é garantidamente um -C real
-# do comando, nunca conteúdo de mensagem. Se o valor capturado vier
-# vazio (`""`/`''` — era um -C real só que com path QUOTED, cujo
-# conteúdo o strip apagou), recupera o valor de verdade do CMD
-# original com a MESMA âncora — nesse ponto já sabemos que existe um
-# -C real nessa posição, então buscar o valor no CMD original é seguro.
+# Resolução de diretório em 2 passos SEQUENCIAIS (reescrito, achado real
+# de @codex review xhigh, PR #134): (1) um `cd <dir> &&`/`;` líder,
+# ANTES do `git`, define a base — some se não existir, senão vira o
+# novo REPO_DIR. (2) um `-C <dir>` explícito, se existir, SOBRESCREVE
+# REPO_DIR, resolvido relativo à base já calculada no passo 1 (não
+# direto de ORIG_DIR). Unifica os 2 branches se/elif antigos, que
+# tinham 2 bugs: (a) o branch de `-C` (checado PRIMEIRO, e que casava
+# sempre que havia `-C`, com ou sem `cd` líder — `cd X && git -C Y
+# commit` cai nele, não no elif) nunca considerava um `cd` líder,
+# então um `-C` RELATIVO resolvia contra ORIG_DIR em vez da base real
+# em tempo de execução (`cd /tmp/outer && git -C ../target commit`
+# validava o índice do diretório ERRADO). (b) o branch cd-only
+# (elif, só alcançável sem `-C`) ficava morto pro caso combinado.
+# Extrai sempre de CMD_STRIPPED (não CMD) — mensagem/heredoc já
+# viraram aspas-vazias ali, então um match é garantidamente estrutura
+# real, nunca texto de mensagem. Valor `""`/`''` vazio (era um alvo
+# QUOTED cujo conteúdo o strip apagou) recupera do CMD original com a
+# MESMA âncora — nesse ponto já sabemos que existe um `-C`/`cd` real
+# nessa posição, então buscar o VALOR no CMD original é seguro (não
+# usa `.*` guloso — âncora fixa no MESMO ponto já confirmado real).
+if [[ "$CMD_STRIPPED" =~ (^|[\;\&\|])[[:space:]]*cd[[:space:]]+(\"([^\"]*)\"|\'([^\']*)\'|([^[:space:]]+))[[:space:]]*(\&\&|\;) ]]; then
+  CD_TARGET="${BASH_REMATCH[3]:-${BASH_REMATCH[4]:-${BASH_REMATCH[5]}}}"
+  if [ -z "$CD_TARGET" ] && [[ "$CMD" =~ (^|[\;\&\|])[[:space:]]*cd[[:space:]]+(\"([^\"]+)\"|\'([^\']+)\') ]]; then
+    CD_TARGET="${BASH_REMATCH[3]:-${BASH_REMATCH[4]}}"
+  fi
+  case "$CD_TARGET" in
+    /*) REPO_DIR="$CD_TARGET" ;;
+    *) REPO_DIR="$ORIG_DIR/$CD_TARGET" ;;
+  esac
+fi
 if [[ "$CMD_STRIPPED" =~ (^|[\;\&\|])[[:space:]]*git[[:space:]]+((-c[[:space:]]+[^[:space:]]+[[:space:]]+)*)-C[[:space:]]+(\"([^\"]*)\"|\'([^\']*)\'|([^[:space:]]+))[[:space:]]+((-c[[:space:]]+[^[:space:]]+[[:space:]]+)*)commit ]]; then
   # Grupos: (1) prefixo (2-3) `-c` antes do `-C` (4) path com aspas
   # (5) duplas (6) simples (7) sem aspas.
-  REPO_DIR="${BASH_REMATCH[5]:-${BASH_REMATCH[6]:-${BASH_REMATCH[7]}}}"
-  if [ -z "$REPO_DIR" ] && [[ "$CMD" =~ (^|[\;\&\|])[[:space:]]*git[[:space:]].*-C[[:space:]]+(\"([^\"]+)\"|\'([^\']+)\') ]]; then
-    REPO_DIR="${BASH_REMATCH[3]:-${BASH_REMATCH[4]}}"
+  C_VAL="${BASH_REMATCH[5]:-${BASH_REMATCH[6]:-${BASH_REMATCH[7]}}}"
+  if [ -z "$C_VAL" ] && [[ "$CMD" =~ (^|[\;\&\|])[[:space:]]*git[[:space:]]+(-c[[:space:]]+[^[:space:]]+[[:space:]]+)*-C[[:space:]]+(\"([^\"]+)\"|\'([^\']+)\') ]]; then
+    C_VAL="${BASH_REMATCH[4]:-${BASH_REMATCH[5]}}"
   fi
-  if [ -z "$REPO_DIR" ] || [ ! -d "$REPO_DIR" ]; then
-    deny "Commit bloqueado — git -C $REPO_DIR não é um diretório."
+  if [ -z "$C_VAL" ]; then
+    deny "Commit bloqueado — git -C sem valor reconhecível."
     exit 0
   fi
-  cd "$REPO_DIR" || exit 0
-  REPO_DIR=$(pwd)
-elif [[ "$CMD_STRIPPED" =~ (^|[\;\&\|])[[:space:]]*cd[[:space:]]+(\"([^\"]*)\"|\'([^\']*)\'|([^[:space:]]+))[[:space:]]*(\&\&|\;)[[:space:]]*git[[:space:]]+((-C[[:space:]]+(\"([^\"]*)\"|\'([^\']*)\'|[^[:space:]]+)|-c[[:space:]]+[^[:space:]]+)[[:space:]]+)*commit ]]; then
-  # `cd <dir> && git commit` (ou `;`) no MESMO comando — achado real de
-  # /code-review ultra local, PR #134: só `-C` era reconhecido; um `cd`
-  # explícito antes do `git commit` fazia todo check rodar no diretório
-  # ERRADO (o `cd` do comando ainda não rodou de verdade quando o hook
-  # PreToolUse é avaliado — roda ANTES da tool, não depois).
-  REPO_DIR="${BASH_REMATCH[3]:-${BASH_REMATCH[4]:-${BASH_REMATCH[5]}}}"
-  if [ -z "$REPO_DIR" ] && [[ "$CMD" =~ (^|[\;\&\|])[[:space:]]*cd[[:space:]]+(\"([^\"]+)\"|\'([^\']+)\') ]]; then
-    REPO_DIR="${BASH_REMATCH[3]:-${BASH_REMATCH[4]}}"
-  fi
-  case "$REPO_DIR" in
-    /*) : ;;
-    *) REPO_DIR="$ORIG_DIR/$REPO_DIR" ;;
+  case "$C_VAL" in
+    /*) REPO_DIR="$C_VAL" ;;
+    *) REPO_DIR="$REPO_DIR/$C_VAL" ;;
   esac
-  if [ ! -d "$REPO_DIR" ]; then
-    deny "Commit bloqueado — cd $REPO_DIR não é um diretório."
-    exit 0
-  fi
-  cd "$REPO_DIR" || exit 0
-  REPO_DIR=$(pwd)
 fi
+if [ ! -d "$REPO_DIR" ]; then
+  deny "Commit bloqueado — $REPO_DIR não é um diretório."
+  exit 0
+fi
+# Fail-CLOSED se o cd falhar mesmo depois do -d acima passar (achado
+# real de @codex review xhigh, PR #134: permissão negada / TOCTOU
+# entre o -d e o cd deixava `|| exit 0` aprovar o commit sem check
+# nenhum, único caminho de falha deste arquivo que não negava).
+cd "$REPO_DIR" || { deny "Commit bloqueado — falha ao entrar em $REPO_DIR (permissão negada ou removido entre o check e o cd)."; exit 0; }
+REPO_DIR=$(pwd)
 
 # `-a`/`--all`/`--include`/`--only`/`--patch`/`-p`/`--interactive` e
 # pathspec depois de `--` fazem o commit gravar MAIS (ou diferente) do
