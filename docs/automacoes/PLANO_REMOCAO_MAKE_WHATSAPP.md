@@ -1,7 +1,8 @@
 # 📋 PLANO: Remoção do Make.com do Pipeline WhatsApp
 
 **Data de criação:** 26/08/2026
-**Status:** 🟡 Fase 1 planejada (aguardando execução)
+**Status:** 🟡 Fase 1 planejada — fatiada em 9 PRs empilhadas (PR0-PR8, ver
+§Fatiamento em PRs empilhadas), aguardando execução da PR0/PR1
 **ADR relacionada:** [ADR-033](../adr/ADR-033-remocao-make-com-pipeline-whatsapp.md)
 **Prioridade:** Média — custo recorrente + ponto de falha externo sem visibilidade
 
@@ -50,6 +51,34 @@ ficaram órfãs quando a lógica migrou pra dentro de `chatbot-triagem`, mas
 Único cenário com export real validado ponta a ponta. Detalhe completo das
 decisões de design está na [ADR-033](../adr/ADR-033-remocao-make-com-pipeline-whatsapp.md);
 aqui só o checklist de execução.
+
+### Fatiamento em PRs empilhadas
+
+A Fase 1 sozinha (checklist completo abaixo) é grande demais pra "1 fase =
+1 PR" (guardrail em CLAUDE.md) — o dedup por `wamid`, o lock de conversa/
+FIFO, o fix do `notificar_admin`, o fechamento dos endpoints e o corte em
+si têm riscos e critérios de teste bem diferentes entre si, e boa parte
+pode ficar "apagada" (código no repo, sem tráfego real batendo nela — a
+Meta só passa a apontar pro endpoint novo na última PR) até o corte de
+verdade. Fatiada em 9 PRs empilhadas — cada uma depende só da(s)
+anterior(es) listada(s) na coluna "Depende de", não de todas; PRs sem
+dependência entre si podem ser abertas em paralelo. Os Passos 1-4 abaixo
+continuam sendo a referência detalhada de cada achado (a numeração de
+cenário de teste é a da ADR-033 §Validação); esta tabela é o mapeamento
+de qual PR cobre qual parte.
+
+| PR | Escopo | Depende de | Estado após merge | Cenários de teste cobertos |
+|---|---|---|---|---|
+| **PR0** | Fix da policy de SELECT de `edge_function_logs` (Passo 3 completo) — vazamento cross-tenant confirmado, não hipotético | — | **Ativo imediatamente** — não é dark, é fix de segurança standalone sem relação nenhuma com o resto do corte; pode subir a qualquer momento, inclusive antes de qualquer outra PR desta lista | fora da lista de 18 — validar que `admin` não-`super_admin` perde a aba `monitoring` (esperado) e `super_admin` mantém acesso completo |
+| **PR1** | Migration: tabela de dedup/lease por `wamid` (`status`, `owner_token`, `lease_until`, `chatbot_result` JSONB, `request_payload` JSONB) + tabela de lock de conversa (chave `igreja_id`+`filial_id`+`phone_number_id`+`telefone`, `UNIQUE NULLS NOT DISTINCT` ou sentinela `COALESCE`), RLS `service_role`-only nas duas (sem policy de SELECT, `REVOKE ... FROM PUBLIC`). Sem código de function ainda | — | Dark — schema só, nenhum caller aponta pra ela | — (harness SQL: constraint de unicidade com componentes `NULL`, RLS negando SELECT de `anon`/`authenticated`/`admin`/`super_admin`) |
+| **PR2a** | `chatbot-triagem`/`chatbot-financeiro`: idempotência de ENTRADA por `wamid` (registro append-only próprio de cada chatbot, com o mesmo padrão de fencing do claim externo — não "existe = já processado"), aditiva — só ativa quando `wamid` vem no body. Guardas de unicidade no ledger: `wamid` em `solicitacoes_reembolso`, `wamid + item_id/índice` no loop de `criarLancamento`, propagação até as RPCs `fin_*` chamadas por `criarLancamento`/`criarTransferencia` | — | **Seguro de deployar a qualquer momento** — campo `wamid` é opcional; ausente (Make hoje não manda), comportamento idêntico ao atual | 8 (parcial — retry do mesmo `wamid` sem concorrência real), 12 |
+| **PR2b** | `chatbot-triagem`/`chatbot-financeiro`: gate fail-closed de `x-webhook-secret` (reaproveitando `MAKE_WEBHOOK_SECRET`) + aceitar `owner_token`/`filial_id` passthrough, com revalidação condicional do lock de conversa só quando `owner_token` vier preenchido | PR2a | **Deploy coordenado, não dark** — só pode ir pra produção DEPOIS do blueprint do Make ser atualizado (Passo 2, item 1: `x-webhook-secret` + `wamid` nos 2 módulos) e confirmado mandando os dois de verdade; fora dessa ordem, quebra o tráfego real do Make com 401 no momento do deploy | 15, 16 |
+| **PR3** | Function nova `whatsapp-webhook`: handshake `GET` (`hub.verify_token`/`hub.challenge`), validação de assinatura `POST` (`X-Hub-Signature-256` sobre o corpo cru), normalização do envelope Meta (itera todos os `entry[]`/`changes[]`/`messages[]` do batch, correlaciona `contacts[]`×`messages[]` por `wa_id` — não por posição —, allowlist de tipo por rota). **Sem** dedup/roteamento/dispatch ainda — responde 200 sem chamar nenhum chatbot. `verify_jwt=false` pra esta function já entra em `config.toml` aqui (necessário pra bater POST sintético sem JWT nos testes das PRs seguintes) | — | Dark — function existe e é deployável, mas não está registrada como callback no Meta Business Manager | 1, 2, parcial de 13 (extração de `phone_number_id`, sem persistir tenant ainda) |
+| **PR4** | Máquina de estado de dedup/lease por `wamid` (`queued`→`processing`→`chatbot_done`→`completed`, fencing por `owner_token`, heartbeat com renovação DURANTE cada `await` longo, reclaim só via redelivery HTTP nova — sem o job `pg_cron` ainda), roteamento por `phone_number_id` (repassando `igreja_id`/`filial_id`/`whatsapp_number`/aliases de texto e tipo/`origem_canal` fixo pro financeiro), `chatbot_result` como lista genérica de entregas com claim atômico por item (`jsonb_set` condicionado, não read-modify-write), estados terminais `enviando`/`enviado`/`falhou`/`erro_credencial`, normalização de resposta dos 2 formatos, decisão texto/imagem por presença de `qr_image`. Cobre só o caso de **1 mensagem por vez — sem lock de conversa** | PR1, PR2b, PR3 | Dark | 3, 4, 6, 7, 10, 11, 13 |
+| **PR5** | Lock de conversa/FIFO: serialização por `igreja_id`+`filial_id`+`phone_number_id`+`telefone`, heartbeat unificado com os 2 `UPDATE`s (lease do `wamid` e da conversa) checados independentemente, liberação do lock em `chatbot_done` (não em `completed`), drenagem da FIFO na mesma request de quem termina um `wamid` (reaquisição do lock + claim em transaction, sem 5xx cego pra quem está `queued` com lease válido), enfileiramento de todas as mensagens do batch da Meta antes de processar qualquer uma | PR4 | Dark | 8 (completo, com 2 sessões `psql`/requisições reais concorrentes), 9, 18 |
+| **PR6** | Fix do `notificar_admin`: dispara template aprovado `igreja_alerta_lider` (não mensagem free-form) só quando `notificar_admin: true` E `erro_ia` ausente/`false` (distingue `SOLICITACAO_PASTORAL` de falha técnica de IA), `to` = `telefone_admin_destino` do retorno de `chatbot-triagem` | PR4 (usa a lista de entregas genérica já pronta) | Dark | 5 |
+| **PR7** | Job `pg_cron` de reclaim (varredura periódica de `queued`/`processing` com lease expirado) + rota interna `{action:"reclaim", wamid}` na mesma function, com dupla autenticação: `Authorization: Bearer` via Vault (`cron_service_role_key`) no lado do caller (cron), revalidado **dentro do handler** contra `SUPABASE_SERVICE_ROLE_KEY` antes de pular o HMAC — `action` sozinho nunca autoriza | PR4 (pode abrir em paralelo à PR5/PR6, não depende delas) | Dark | 14, 17 |
+| **PR8** | Corte: rodar os 18 cenários de teste fim a fim contra a function completa, trocar a URL do callback no Meta Business Manager (passo manual/operacional, não código), atualizar `docs/automacoes/catalogo-automacoes.md` marcando "Waba Chatbot - OakOS" como desativado, checar `WHATSAPP_TOKEN` **e** `WHATSAPP_API_TOKEN` (são 2 segredos diferentes) antes de revogar qualquer credencial do Make, iniciar bake period acompanhando `edge_function_logs` | PR0-PR7 todas | **É o ponto de corte real** — é aqui que o Make para de receber tráfego de verdade; rollback documentado na ADR-033 §Decisão não é 1 clique | Todos os 18 (regressão completa, incluindo os já cobertos nas PRs anteriores) |
 
 ### Passo 1 — Nova Edge Function `whatsapp-webhook`
 
@@ -1078,7 +1107,7 @@ interna (`{action: "reclaim"}`) tem que viver **no handler**, senão
   perde essa mensagem pra sempre (não há row pro sweep). Drenar um
   `wamid` que **não** veio neste envelope não entra nessa conta.
 
-### Passo 2 — Fechar os endpoints hoje abertos
+### Passo 2 — Fechar os endpoints hoje abertos (PR2a + PR2b)
 
 **Ordem importa — fail-closed antes da hora derruba o Make que ainda
 está em produção** (achado real de `@codex review`, P1, 15ª rodada):
@@ -1126,7 +1155,7 @@ mesmo sem qualquer mudança na Meta ainda. Ordem correta:
    mandar o header, ver Passo 1) e o Make atualizado vão chamar essas
    duas — nenhum outro caller externo.
 
-### Passo 3 — Visibilidade de execução
+### Passo 3 — Visibilidade de execução (PR0)
 
 - [ ] Sem tabela nova — `edge_function_logs` já cobre; `EdgeFunctionMonitoring.tsx`
   já lista com filtro por função/período.
@@ -1180,7 +1209,7 @@ mesmo sem qualquer mudança na Meta ainda. Ordem correta:
   `super_admin` em vez de deixar os cards quebrarem silenciosamente
   (query vazia sem erro, já que RLS nega linhas, não a query).
 
-### Passo 4 — Corte (cutover)
+### Passo 4 — Corte (cutover) (PR8)
 
 - [ ] Deployar e testar isoladamente handshake `GET` + POST sintético,
   antes de tocar em qualquer configuração do Meta.
@@ -1338,3 +1367,13 @@ O plano só é considerado concluído quando:
   mecanismo de auth interna entre orquestrador e chatbots — fica.
 - `docs/automacoes/catalogo-automacoes.md` refletir o estado final (o que
   foi migrado, o que foi removido, o que foi mantido e por quê).
+
+---
+
+**Última Atualização**: 2026-08-31 (fatiamento da Fase 1 em 9 PRs
+empilhadas — PR0-PR8, ver §Fatiamento em PRs empilhadas; sem mudança nos
+achados de design, só na entrega). Fase 2 (Escalas + Feelings) e Fase 3
+(auditoria) devem repetir o mesmo padrão de fatiamento quando abertas —
+schema/idempotência primeiro (dark), function/roteamento depois (dark),
+corte por último — em vez de reproduzir o erro de escopo de "1 fase = 1
+PR" que motivou este fatiamento.
