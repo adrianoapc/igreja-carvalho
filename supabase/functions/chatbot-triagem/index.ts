@@ -5,6 +5,7 @@ import {
 } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { buscarLoteAtivo } from "../_shared/lotes.ts"; // ADR-026: Integração de lotes
 import { normalizarTelefone, formatarParaWhatsApp } from "../_shared/telefone-utils.ts";
+import { withWamidClaim } from "../_shared/wamid-claim.ts";
 
 // --- INTERFACES ---
 interface RequestBody {
@@ -22,6 +23,8 @@ interface RequestBody {
   igreja_id?: string;
   filial_id?: string;
   media_id?: string;
+  /** Idempotência de entrada (ADR-033 PR2a) — opcional, ausente no Make hoje. */
+  wamid?: string;
 }
 
 interface ChatbotConfig {
@@ -965,22 +968,19 @@ async function iniciarFluxoInscricao(
   );
 }
 
-// --- SERVIDOR PRINCIPAL ---
-serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
+// --- PROCESSAMENTO PRINCIPAL ---
+// Extraído do handler HTTP (ver serve() abaixo) pra permitir o claim de
+// idempotência por wamid (ADR-033 PR2a) envolver TODA a lógica de
+// negócio, inclusive os vários `return` antecipados de fluxo direto que
+// existem aqui dentro — cada um deles agora só retorna desta function,
+// não mais do handler HTTP inteiro, então o claim consegue capturar a
+// resposta final não importa qual caminho interno foi tomado.
+async function processTriagemRequest(body: RequestBody): Promise<Response> {
   const startTime = Date.now();
-  let requestPayload: RequestBody = {} as RequestBody;
 
-  try {
-    const body = (await req.json()) as RequestBody;
-    requestPayload = body;
-
-    console.log(
-      `[Triagem] Payload recebido - campos: ${Object.keys(body).join(", ")}`,
-    );
+  console.log(
+    `[Triagem] Payload recebido - campos: ${Object.keys(body).join(", ")}`,
+  );
 
     const { telefone, nome_perfil, tipo_mensagem, media_id } = body;
 
@@ -1257,7 +1257,7 @@ serve(async (req: Request) => {
           p_function_name: FUNCTION_NAME,
           p_status: "error",
           p_execution_time_ms: Date.now() - startTime,
-          p_request_payload: requestPayload,
+          p_request_payload: body,
           p_response_payload: { reply: FALLBACK_ERRO_IA, erro: motivo },
         });
       } catch {
@@ -1556,7 +1556,7 @@ serve(async (req: Request) => {
         p_function_name: FUNCTION_NAME,
         p_status: "success",
         p_execution_time_ms: executionTime,
-        p_request_payload: requestPayload,
+        p_request_payload: body,
         p_response_payload: { reply: responseMessage, admin: notificarAdmin },
       });
     } catch {
@@ -1580,6 +1580,31 @@ serve(async (req: Request) => {
         },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+}
+
+// --- SERVIDOR PRINCIPAL ---
+// Idempotência de entrada por wamid via withWamidClaim (ADR-033 PR2a-1,
+// _shared/wamid-claim.ts) — aditiva, ver comentário do módulo.
+serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const body = (await req.json()) as RequestBody;
+    // Normaliza antes de vincular ao claim (achado real de /code-review
+    // local): telefone_match compara string crua — sem normalizar, um
+    // redelivery com formatação diferente (+55, espaços, etc.) do mesmo
+    // número perderia o cache por engano.
+    const telefoneClaim = normalizarTelefone(body.telefone) ?? body.telefone;
+    return await withWamidClaim(
+      supabase,
+      "triagem",
+      body,
+      telefoneClaim,
+      corsHeaders,
+      () => processTriagemRequest(body),
     );
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Erro desconhecido";

@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { decode as decodeBase64 } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import {
   getWebhookSecret,
@@ -12,6 +12,23 @@ import {
   resolverIgrejaEFilialWhatsApp,
   type FinContexto,
 } from "../_shared/financeiro-core.ts";
+import { withWamidClaim } from "../_shared/wamid-claim.ts";
+
+/**
+ * Extrai o telefone do payload do Make — usada tanto pelo claim de
+ * idempotência (wrapper em serve(), pro vínculo de segurança
+ * telefone_match) quanto pelo processamento de negócio dentro de
+ * processFinanceiroRequest, numa função só (achado real de /code-review
+ * local: as 2 cópias divergindo silenciosamente enfraqueceria o vínculo
+ * sem nenhum teste acusando).
+ */
+// deno-lint-ignore no-explicit-any
+function extrairTelefoneMake(body: any): string | null { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const makeMsg = Array.isArray(body?.messages) ? body.messages[0] : null;
+  return (
+    body?.telefone ?? makeMsg?.from ?? body?.from ?? body?.contacts?.[0]?.wa_id ?? null
+  );
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -151,7 +168,7 @@ async function resolverMediaUrl(
 
 async function persistirAnexo(
   // deno-lint-ignore no-explicit-any
-  supabase: any,
+  supabase: any, // eslint-disable-line @typescript-eslint/no-explicit-any
   urlOriginalOrMediaId: string,
   sessaoId: string,
   whatsappToken?: string
@@ -331,7 +348,7 @@ async function processarNotaFiscal(
 // Função para deletar anexos do Storage (rollback)
 async function deletarAnexosSessao(
   // deno-lint-ignore no-explicit-any
-  supabase: any,
+  supabase: any, // eslint-disable-line @typescript-eslint/no-explicit-any
   itens: ItemProcessado[]
 ): Promise<number> {
   let removidos = 0;
@@ -428,7 +445,7 @@ function mensagemErroParaUsuario(mensagem: string): string {
 // primeiro comprovante quanto para os que chegam enquanto há revisão pendente.
 async function processarComprovanteRecebido(
   // deno-lint-ignore no-explicit-any
-  supabase: any,
+  supabase: any, // eslint-disable-line @typescript-eslint/no-explicit-any
   supabaseUrl: string,
   supabaseKey: string,
   urlAnexo: string,
@@ -518,7 +535,7 @@ function montarMensagemRevisaoItem(item: ItemProcessado, numero: number): string
 // (usuário pediu Fechar mas ainda havia itens pendentes/na fila).
 async function finalizarRecebimentoComprovantes(
   // deno-lint-ignore no-explicit-any
-  supabase: any,
+  supabase: any, // eslint-disable-line @typescript-eslint/no-explicit-any
   sessaoId: string,
   igrejaId: string,
   metaDados: MetaDados,
@@ -572,43 +589,33 @@ async function finalizarRecebimentoComprovantes(
   );
 }
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  // Shared secret do Make (x-webhook-secret, timing-safe). Rollout seguro:
-  // enquanto MAKE_WEBHOOK_SECRET não estiver configurado no ambiente, apenas
-  // loga o aviso — configure o secret aqui e no cenário Make para enforçar.
-  const expectedSecret = Deno.env.get("MAKE_WEBHOOK_SECRET");
-  if (expectedSecret) {
-    const providedSecret = req.headers.get("x-webhook-secret") ?? "";
-    if (!timingSafeEqual(providedSecret, expectedSecret)) {
-      console.warn("[Financeiro] x-webhook-secret inválido ou ausente");
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-  } else {
-    console.warn(
-      "[Financeiro] MAKE_WEBHOOK_SECRET não configurado — webhook aberto (configurar para enforçar)"
-    );
-  }
-
-  try {
+// --- PROCESSAMENTO PRINCIPAL ---
+// Extraído do handler HTTP (ver serve() abaixo) pra permitir o claim de
+// idempotência por wamid (ADR-033 PR2a-1) envolver TODA a lógica de
+// negócio — os vários `return` antecipados de estado da máquina de
+// estados aqui dentro agora só retornam desta function, não mais do
+// handler HTTP inteiro, então o claim consegue capturar a resposta final
+// não importa qual `estadoAtual` foi tomado. `supabase` é criado 1x no
+// wrapper (serve()) e repassado — não recriado aqui.
+async function processFinanceiroRequest(
+  req: Request,
+  supabase: SupabaseClient,
+  // deno-lint-ignore no-explicit-any
+  body: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+): Promise<Response> {
+    // Reconstituídos aqui (só as strings, `supabase` já vem pronto do
+    // wrapper) porque processarNotaFiscal() precisa deles crus, não do
+    // client já instanciado.
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Token WhatsApp global como fallback (será substituído por multi-tenant quando tivermos igreja_id)
-    let whatsappToken = Deno.env.get("WHATSAPP_API_TOKEN");
+    const whatsappToken = Deno.env.get("WHATSAPP_API_TOKEN");
 
-    // 1. Recebe o Payload do Make
+    // 1. Payload do Make, já parseado e recebido via parâmetro `body`.
     // Suporta 2 formatos:
     // (a) Payload "flat" que já vem normalizado pelo Make
     // (b) Payload bruto do webhook do WhatsApp (messages[].document.url, etc.)
-    const body = await req.json();
 
     // Extrair whatsapp_number do body (vem do Make)
     const whatsappNumber =
@@ -656,12 +663,7 @@ serve(async (req) => {
     const makeMsg = Array.isArray(body?.messages) ? body.messages[0] : null;
     const makeTipo = makeMsg?.type ?? null;
 
-    const telefone =
-      body.telefone ??
-      makeMsg?.from ??
-      body.from ??
-      body?.contacts?.[0]?.wa_id ??
-      null;
+    const telefone = extrairTelefoneMake(body);
     const origem_canal =
       body.origem_canal ?? body.origem ?? body.messaging_product ?? "whatsapp";
     const nome_perfil =
@@ -1493,7 +1495,7 @@ serve(async (req) => {
       }
 
       // Correções pontuais: valor, fornecedor ou data
-      const matchValor = texto.match(/valor\s*[:\-]?\s*(?:r\$\s*)?([\d.,]+)/i);
+      const matchValor = texto.match(/valor\s*[:-]?\s*(?:r\$\s*)?([\d.,]+)/i);
       if (matchValor) {
         const valorNormalizado = matchValor[1].replace(/\./g, "").replace(",", ".");
         const novoValor = parseFloat(valorNormalizado);
@@ -1515,7 +1517,7 @@ serve(async (req) => {
         }
       }
 
-      const matchFornecedor = texto.match(/(?:fornecedor|empresa|loja|prestador)\s*[:\-]?\s*(.+)/i);
+      const matchFornecedor = texto.match(/(?:fornecedor|empresa|loja|prestador)\s*[:-]?\s*(.+)/i);
       if (matchFornecedor) {
         const novoFornecedor = matchFornecedor[1].trim();
         if (novoFornecedor) {
@@ -1539,7 +1541,7 @@ serve(async (req) => {
         }
       }
 
-      const matchData = texto.match(/data\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})/i);
+      const matchData = texto.match(/data\s*[:-]?\s*(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})/i);
       if (matchData) {
         itemPendente.data_emissao = matchData[1];
 
@@ -1621,7 +1623,7 @@ serve(async (req) => {
           .eq("igreja_id", igrejaId);
 
         const qtdItens = metaDados.itens.length;
-        let msgObs = observacaoFinal ? `📝 Obs: ${observacaoFinal}\n\n` : "";
+        const msgObs = observacaoFinal ? `📝 Obs: ${observacaoFinal}\n\n` : "";
         
         return new Response(
           JSON.stringify({
@@ -2154,6 +2156,7 @@ serve(async (req) => {
 
     // ========== ESTADO: TRANSFERENCIA_AGUARDANDO_CONTA_ORIGEM ==========
     if (estadoAtual === "TRANSFERENCIA_AGUARDANDO_CONTA_ORIGEM") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const contasDisponiveis = ((metaDados as any).contas_disponiveis || []) as Array<{
         id: string;
         nome: string;
@@ -2161,6 +2164,7 @@ serve(async (req) => {
         banco: string | null;
         cnpj_banco: string | null;
       }>;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mapeamentos = ((metaDados as any).mapeamentos_transferencia || []) as Array<{
         conta_origem_id: string;
         conta_destino_id: string;
@@ -2381,6 +2385,7 @@ serve(async (req) => {
 
     // ========== ESTADO: TRANSFERENCIA_AGUARDANDO_CONFIRMACAO ==========
     if (estadoAtual === "TRANSFERENCIA_AGUARDANDO_CONFIRMACAO") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const contasDisponiveis = ((metaDados as any).contas_disponiveis || []) as Array<{
         id: string;
         nome: string;
@@ -2388,6 +2393,7 @@ serve(async (req) => {
         banco: string | null;
         cnpj_banco: string | null;
       }>;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const contasDestinoDisponiveis = ((metaDados as any).contas_destino_disponiveis || []) as typeof contasDisponiveis;
 
       // Cancelamento
@@ -2648,6 +2654,59 @@ serve(async (req) => {
         text: "⚠️ Sessão em estado inválido. Digite *Cancelar* para reiniciar.",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+}
+
+// --- SERVIDOR PRINCIPAL ---
+// Idempotência de entrada por wamid via withWamidClaim (ADR-033 PR2a-1,
+// _shared/wamid-claim.ts) — aditiva, ver comentário do módulo.
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  // Shared secret do Make (x-webhook-secret, timing-safe). Rollout seguro:
+  // enquanto MAKE_WEBHOOK_SECRET não estiver configurado no ambiente, apenas
+  // loga o aviso — configure o secret aqui e no cenário Make para enforçar.
+  const expectedSecret = Deno.env.get("MAKE_WEBHOOK_SECRET");
+  if (expectedSecret) {
+    const providedSecret = req.headers.get("x-webhook-secret") ?? "";
+    if (!timingSafeEqual(providedSecret, expectedSecret)) {
+      console.warn("[Financeiro] x-webhook-secret inválido ou ausente");
+      return new Response(JSON.stringify({ error: "Não autorizado" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  } else {
+    console.warn(
+      "[Financeiro] MAKE_WEBHOOK_SECRET não configurado — webhook aberto (configurar para enforçar)"
+    );
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const body = await req.json();
+
+    // Normaliza antes de vincular ao claim (achado real de /code-review
+    // local): telefone_match compara string crua — sem normalizar, um
+    // redelivery com formatação diferente (+55, espaços, etc.) do mesmo
+    // número perderia o cache por engano. Só nesse ponto — o `telefone`
+    // usado dentro de processFinanceiroRequest continua cru, sem mudar
+    // o comportamento de busca/gravação já existente ali.
+    const telefoneMake = extrairTelefoneMake(body);
+    const telefoneClaim = normalizarTelefone(telefoneMake) ?? telefoneMake;
+
+    return await withWamidClaim(
+      supabase,
+      "financeiro",
+      body,
+      telefoneClaim,
+      corsHeaders,
+      () => processFinanceiroRequest(req, supabase, body),
     );
   } catch (error: unknown) {
     console.error("Erro crítico:", error);
