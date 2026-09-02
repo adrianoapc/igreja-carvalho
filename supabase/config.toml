@@ -80,3 +80,6 @@ verify_jwt = false
 
 [functions.automacao-duplicidade-pessoas]
 verify_jwt = false
+
+[functions.whatsapp-webhook]
+verify_jwt = false
