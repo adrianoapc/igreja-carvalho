@@ -13,6 +13,7 @@ import {
   type FinContexto,
 } from "../_shared/financeiro-core.ts";
 import { withWamidClaim } from "../_shared/wamid-claim.ts";
+import { timingSafeEqual } from "../_shared/crypto-utils.ts";
 
 /**
  * Extrai o telefone do payload do Make — usada tanto pelo claim de
@@ -36,16 +37,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-webhook-secret",
 };
 
-// Comparação tempo-constante (mesmo padrão de receber-pedido-make/pix-webhook)
-function timingSafeEqual(a: string, b: string): boolean {
-  const enc = new TextEncoder();
-  const ba = enc.encode(a);
-  const bb = enc.encode(b);
-  let diff = ba.length ^ bb.length;
-  const len = Math.max(ba.length, bb.length);
-  for (let i = 0; i < len; i++) diff |= (ba[i] ?? 0) ^ (bb[i] ?? 0);
-  return diff === 0;
-}
 
 // Estados da máquina de estados
 type EstadoSessao =
@@ -2665,23 +2656,21 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Shared secret do Make (x-webhook-secret, timing-safe). Rollout seguro:
-  // enquanto MAKE_WEBHOOK_SECRET não estiver configurado no ambiente, apenas
-  // loga o aviso — configure o secret aqui e no cenário Make para enforçar.
+  // Shared secret do Make (x-webhook-secret, timing-safe). Fail-closed
+  // (ADR-033 PR2b — Passo 2 item 3): sem MAKE_WEBHOOK_SECRET configurado
+  // OU sem header válido, 401. Antes desta PR era fail-open (só logava
+  // aviso se a env var estivesse ausente) — deploy coordenado com a
+  // atualização do blueprint do Make (mandar o header) *antes* deste
+  // código ir pra produção, senão o tráfego real do Make quebra na hora
+  // do deploy (ver Passo 2, ordem 1→2→3 no plano de execução).
   const expectedSecret = Deno.env.get("MAKE_WEBHOOK_SECRET");
-  if (expectedSecret) {
-    const providedSecret = req.headers.get("x-webhook-secret") ?? "";
-    if (!timingSafeEqual(providedSecret, expectedSecret)) {
-      console.warn("[Financeiro] x-webhook-secret inválido ou ausente");
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-  } else {
-    console.warn(
-      "[Financeiro] MAKE_WEBHOOK_SECRET não configurado — webhook aberto (configurar para enforçar)"
-    );
+  const providedSecret = req.headers.get("x-webhook-secret") ?? "";
+  if (!expectedSecret || !timingSafeEqual(providedSecret, expectedSecret)) {
+    console.warn("[Financeiro] x-webhook-secret inválido ou ausente");
+    return new Response(JSON.stringify({ error: "Não autorizado" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   try {
