@@ -44,7 +44,19 @@ CREATE TABLE public.whatsapp_chatbot_wamid_claim (
   -- sem esse vínculo, quem descobrisse/reusasse um wamid alheio
   -- receberia a resposta pastoral/financeira de outra pessoa em cache,
   -- sem precisar reautenticar nem provar que é o mesmo remetente).
-  telefone TEXT NOT NULL,
+  -- NULLABLE (achado real de /code-review local, 4 rodadas
+  -- independentes convergindo no mesmo ponto): um payload sem telefone
+  -- extraível (formato inesperado/malformado) faria o INSERT violar
+  -- NOT NULL, virando erro de claim — e o caller trata falha de claim
+  -- como "defesa em profundidade indisponível, processa sem proteção"
+  -- (fail-open deliberado, pra nunca bloquear uma mensagem real por
+  -- causa do mecanismo de idempotência). Isso desligava a proteção
+  -- inteira bem no caso onde ela mais importa (payload malformado =
+  -- mais provável de ser reentregue). NULL vira uma "identidade fraca"
+  -- válida (2 requisições sem telefone nenhum ainda combinam entre si
+  -- via telefone_match, ver IS NOT DISTINCT FROM abaixo) em vez de
+  -- travar o claim inteiro.
+  telefone TEXT,
   response_payload JSONB,
   response_status INTEGER,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -168,13 +180,17 @@ BEGIN
   -- suprimidos (NULL) em qualquer mismatch, pra um bug futuro no código
   -- TS caller (esquecer de checar telefone_match) não conseguir vazar a
   -- resposta cacheada de outra conversa mesmo sem querer.
+  -- IS NOT DISTINCT FROM (não =): telefone é NULLABLE agora — com `=`
+  -- puro, NULL = NULL avalia NULL (nem true nem false), e 2 replays
+  -- legítimos do mesmo wamid SEM telefone nenhum (payload malformado
+  -- nos 2) cairiam no branch de "mismatch" por engano.
   RETURN QUERY
   SELECT
     (c.owner_token = p_owner_token) AS owned,
     c.status,
-    (c.telefone = p_telefone) AS telefone_match,
-    CASE WHEN c.telefone = p_telefone THEN c.response_payload ELSE NULL END,
-    CASE WHEN c.telefone = p_telefone THEN c.response_status ELSE NULL END
+    (c.telefone IS NOT DISTINCT FROM p_telefone) AS telefone_match,
+    CASE WHEN c.telefone IS NOT DISTINCT FROM p_telefone THEN c.response_payload ELSE NULL END,
+    CASE WHEN c.telefone IS NOT DISTINCT FROM p_telefone THEN c.response_status ELSE NULL END
   FROM public.whatsapp_chatbot_wamid_claim c
   WHERE c.wamid = p_wamid AND c.chatbot = p_chatbot;
 END;

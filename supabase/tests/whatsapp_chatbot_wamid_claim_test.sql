@@ -222,6 +222,37 @@ DO $$ BEGIN
   RAISE NOTICE 'PASS cenario 12: p_lease_seconds/p_cache_seconds <= 0 sao rejeitados';
 END $$;
 
+-- Scenario 14: telefone NULL (payload malformado, sem telefone extraivel) NAO quebra o claim
+-- (achado real de /code-review local, 4 rodadas independentes convergindo no mesmo ponto:
+-- telefone era NOT NULL, um p_telefone NULL fazia o INSERT falhar -> claimError -> fail-open
+-- total, desligando a idempotencia justo no caso onde mais importa).
+DO $$ DECLARE r RECORD; BEGIN
+  SELECT * INTO r FROM claim_whatsapp_chatbot_wamid(
+    'wamid-4', 'triagem', 'e0000000-0000-4000-8000-000000000001'::uuid, NULL, 150);
+  IF NOT r.owned THEN
+    RAISE EXCEPTION 'FAIL cenario 14a: claim com telefone NULL deveria funcionar (owned=true), nao estourar erro';
+  END IF;
+  RAISE NOTICE 'PASS cenario 14a: claim com telefone NULL nao quebra (NOT NULL removido)';
+END $$;
+
+-- Scenario 15: 2 replays do MESMO wamid, ambos SEM telefone (mesmo payload malformado
+-- reentregue) -> telefone_match=true (IS NOT DISTINCT FROM, nao =) -> resposta cacheada
+-- servida normalmente, nao cai em "mismatch" por NULL = NULL avaliar NULL.
+DO $$ BEGIN
+  PERFORM complete_whatsapp_chatbot_wamid(
+    'wamid-4', 'triagem', 'e0000000-0000-4000-8000-000000000001'::uuid,
+    '{"reply_message":"sem telefone"}'::jsonb, 200, 3600);
+END $$;
+DO $$ DECLARE r RECORD; BEGIN
+  SELECT * INTO r FROM claim_whatsapp_chatbot_wamid(
+    'wamid-4', 'triagem', 'e0000000-0000-4000-8000-000000000002'::uuid, NULL, 150);
+  IF r.owned OR r.status <> 'completed' OR NOT r.telefone_match OR r.response_payload IS NULL THEN
+    RAISE EXCEPTION 'FAIL cenario 15: replay com telefone NULL nos 2 lados deveria bater telefone_match=true e servir o cache (got owned=%, status=%, match=%, payload=%)',
+      r.owned, r.status, r.telefone_match, r.response_payload;
+  END IF;
+  RAISE NOTICE 'PASS cenario 15: telefone NULL nos 2 lados combina (IS NOT DISTINCT FROM) e serve o cache';
+END $$;
+
 RESET ROLE;
 
 -- Scenario 13: RLS — authenticated nao le nem escreve nada na tabela (nem com GRANT nenhum,
@@ -248,6 +279,6 @@ END $$;
 RESET ROLE;
 
 -- Cleanup
-DELETE FROM public.whatsapp_chatbot_wamid_claim WHERE wamid IN ('wamid-1', 'wamid-2', 'wamid-3', 'wamid-attack');
+DELETE FROM public.whatsapp_chatbot_wamid_claim WHERE wamid IN ('wamid-1', 'wamid-2', 'wamid-3', 'wamid-4', 'wamid-attack');
 
 \echo 'whatsapp_chatbot_wamid_claim_test.sql: TODOS OS CENARIOS PASSARAM'

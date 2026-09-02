@@ -12,6 +12,23 @@
  * extração de telefone que alimenta o vínculo de segurança
  * (telefone_match) — 2 cópias divergindo silenciosamente enfraqueceria
  * essa proteção sem nenhum teste acusando.
+ *
+ * Limitação conhecida, aceita por ora (achado real de /code-review
+ * local): CLAIM_LEASE_SECONDS é fixo, sem heartbeat/renovação durante
+ * processFn(). Se o processamento real (OCR/IA num lote grande de
+ * comprovantes, por ex.) passar de 150s, um redelivery legítimo da
+ * Meta pode reclamar o lease e rodar processFn() concorrente com a
+ * tentativa original ainda em voo — a guarda de ledger (ADR-033
+ * PR2a-2, unique index em transacoes_financeiras/transferencias_
+ * contas) impede duplicar DINHEIRO nesse cenário, mas não protege
+ * writes não-financeiros (inscrições, pedidos pastorais) nem evita
+ * mandar a resposta de WhatsApp 2x. Um heartbeat de verdade (renovar
+ * lease_until periodicamente enquanto processFn() roda) fica pro
+ * desenho completo do orquestrador (ADR-033, Fase 2+) — mesmo padrão
+ * já especificado lá pro lease de conversa; não replicado aqui porque
+ * esta claim é deliberadamente leve (só HTTP-replay, não a máquina de
+ * estado completa) e o teto de execução do runtime Deno já limita o
+ * pior caso na prática.
  */
 
 // deno-lint-ignore no-explicit-any
@@ -26,6 +43,23 @@ interface WamidClaimRow {
 }
 
 const CLAIM_LEASE_SECONDS = 150;
+
+/**
+ * Extrai e normaliza `wamid` de um body de request — exportada (achado
+ * real de /code-review local) pra chatbot-financeiro/chatbot-triagem
+ * reusarem o MESMO valor tanto pro claim de entrada (aqui) quanto pra
+ * idempotência de ledger (ADR-033 PR2a-2, `p_extras.wamid` em
+ * fin_criar_lancamento/fin_criar_transferencia) — 2 cópias da regra de
+ * trim/truthiness divergindo silenciosamente reabriria exatamente o
+ * tipo de bug que este módulo existe pra fechar.
+ */
+export function extractWamid(
+  // deno-lint-ignore no-explicit-any
+  body: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+): string | null {
+  const trimmed = typeof body?.wamid === "string" ? body.wamid.trim() : "";
+  return trimmed ? trimmed : null;
+}
 
 function jsonResponse(
   body: unknown,
@@ -62,13 +96,7 @@ export async function withWamidClaim(
   corsHeaders: Record<string, string>,
   processFn: () => Promise<Response>,
 ): Promise<Response> {
-  // Usa o valor JÁ TRIMADO, não o cru (achado real de /code-review
-  // local): checar truthiness do trim mas guardar/comparar o original
-  // deixaria 2 entregas do mesmo wamid com espaço incidental diferente
-  // (ex.: "abc" vs "abc ") virarem chaves diferentes, furando o dedup.
-  const wamidTrimmed =
-    typeof body?.wamid === "string" ? body.wamid.trim() : "";
-  const wamid = wamidTrimmed ? wamidTrimmed : null;
+  const wamid = extractWamid(body);
   if (!wamid) {
     return await processFn();
   }
