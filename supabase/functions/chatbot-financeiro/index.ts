@@ -664,6 +664,14 @@ async function processFinanceiroRequest(
     const makeTipo = makeMsg?.type ?? null;
 
     const telefone = extrairTelefoneMake(body);
+    // Idempotência de ledger (ADR-033 PR2a-2) — mesmo wamid que
+    // withWamidClaim (serve()) já leu do body; repassado pras RPCs
+    // fin_criar_lancamento/fin_criar_transferencia como guarda de
+    // unicidade no ledger, defesa em profundidade separada do claim de
+    // entrada (que já teria devolvido a resposta cacheada antes de
+    // chegar aqui, no caso comum).
+    const wamid =
+      typeof body?.wamid === "string" && body.wamid.trim() ? body.wamid.trim() : null;
     const origem_canal =
       body.origem_canal ?? body.origem ?? body.messaging_product ?? "whatsapp";
     const nome_perfil =
@@ -1678,7 +1686,7 @@ async function processFinanceiroRequest(
       // Criar transações para cada item
       const transacoesCriadas: string[] = [];
       const falhasCriacao: { item: ItemProcessado; motivo: string }[] = [];
-      for (const item of metaDados.itens) {
+      for (const [itemIndex, item] of metaDados.itens.entries()) {
         // Converter data de DD/MM/YYYY para YYYY-MM-DD
         let dataVencimento = new Date().toISOString().split("T")[0];
         if (item.data_emissao) {
@@ -1735,6 +1743,22 @@ async function processFinanceiroRequest(
                 anexo_url: item.anexo_storage,
                 observacoes: observacoesTransacao,
                 filial_id: filialIdFromWhatsApp,
+                // Idempotência de ledger (ADR-033 PR2a-2) — item_key
+                // desempata os N itens do MESMO wamid (este loop roda 1x
+                // por comprovante do lote). Usa anexo_storage_path (path
+                // do Storage, único por item, capturado 1x no upload e
+                // nunca mais alterado) em vez do índice do loop (achado
+                // real de /code-review local): o índice só é estável
+                // hoje porque metaDados.itens é append-only por
+                // convenção não garantida — qualquer feature futura que
+                // reordene/filtre itens antes deste loop mudaria os
+                // índices sem o dev perceber que isso corrompe a chave
+                // de idempotência. Fallback pro índice só por defesa em
+                // profundidade (anexo_storage_path é campo obrigatório
+                // em ItemProcessado, nunca deveria faltar).
+                ...(wamid
+                  ? { wamid, item_key: item.anexo_storage_path || String(itemIndex) }
+                  : {}),
               },
             },
             finContexto
@@ -1981,6 +2005,15 @@ async function processFinanceiroRequest(
         : `Solicitação via WhatsApp\n${metaDados.itens.length} comprovante(s)`;
 
       // 1. Criar solicitação de reembolso (status rascunho para RLS, depois pendente)
+      // ⚠️ SEM guarda de idempotência por wamid (achado real de /code-review
+      // local, ADR-033 PR2a-2 §cabeçalho do migration 20260902000000):
+      // diferente de criarLancamento/criarTransferencia, este insert direto
+      // (sem RPC fin_*) e o loop de itens logo abaixo podem duplicar
+      // solicitação+itens+notificação ao tesoureiro numa retentativa do
+      // mesmo wamid. Deliberadamente fora do escopo desta PR — replay
+      // correto aqui exige pular o loop de itens E a notificação inteiros
+      // no conflito, não só recuperar 1 id (ver comentário completo no
+      // migration). Fica pra PR2a-3, sessão dedicada.
       const { data: solicitacao, error: solError } = await supabase
         .from("solicitacoes_reembolso")
         .insert({
@@ -2586,6 +2619,10 @@ async function processFinanceiroRequest(
                 criado_por: metaDados.pessoa_id,
                 sessao_bot_id: sessao.id,
                 filial_id: filialIdFromWhatsApp,
+                // Idempotência de ledger (ADR-033 PR2a-2) — transferência
+                // é 1 chamada só (nunca em loop), wamid sozinho já é
+                // chave suficiente; ausente = igual a antes desta PR.
+                ...(wamid ? { wamid } : {}),
               },
             },
             {
