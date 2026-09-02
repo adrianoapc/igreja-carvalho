@@ -688,8 +688,13 @@ operação). As RPCs de leitura agregada reimpõem o requisito da RLS
 — `SECURITY DEFINER` não pode ampliar quem lê os agregados; `get_dre_anual`
 ganhou o mesmo guarda (antes qualquer authenticated lia o DRE). Toda RPC de
 escrita grava em `fin_audit_log` (quem/quando/canal/payload).
-`chatbot-financeiro` valida `x-webhook-secret` timing-safe quando
-`MAKE_WEBHOOK_SECRET` estiver configurado (rollout sem quebrar o Make).
+`chatbot-financeiro` e `chatbot-triagem` validam `x-webhook-secret`
+timing-safe contra `MAKE_WEBHOOK_SECRET`, fail-closed (ADR-033 PR2b —
+401 se a env var estiver ausente ou o header não bater; antes só
+`chatbot-financeiro` validava, e só quando a env var estava configurada
+— rollout fail-open descontinuado). Deploy coordenado com o blueprint
+do Make mandando o header — ver `docs/automacoes/
+PLANO_REMOCAO_MAKE_WHATSAPP.md` §Passo 2.
 
 **Deploy:** as migrations `20260710*` e as edges alteradas ainda dependem
 do workflow manual `supabase-deploy.yml` (não há

@@ -123,7 +123,7 @@ própria function; funções que importam `_shared/internal-auth.ts` também exi
 | buscar-pix-recebidos | ENCRYPTION_KEY |
 | set-webhook-secret | WEBHOOK_ENCRYPTION_KEY |
 | chatbot-financeiro | MAKE_WEBHOOK_SECRET, WHATSAPP_API_TOKEN |
-| chatbot-triagem | APP_URL, LOVABLE_API_KEY, OPENAI_API_KEY, WHATSAPP_API_TOKEN |
+| chatbot-triagem | APP_URL, LOVABLE_API_KEY, MAKE_WEBHOOK_SECRET, OPENAI_API_KEY, WHATSAPP_API_TOKEN |
 | checkin-whatsapp-geo | MAKE_WEBHOOK_SECRET |
 | criar-usuario | MAKE_WEBHOOK_URL, (+INTERNAL_FUNCTION_SECRET) |
 | receber-pedido-make | CLOUDFLARE_TURNSTILE_SECRET_KEY, MAKE_WEBHOOK_SECRET |
@@ -139,6 +139,14 @@ própria function; funções que importam `_shared/internal-auth.ts` também exi
 
 Outras funções com `_shared/internal-auth.ts` (exigem `INTERNAL_FUNCTION_SECRET`):
 `disparar-escala`, `verificar-escalas-pendentes`, `automacao-duplicidade-pessoas`.
+
+**`chatbot-financeiro`/`chatbot-triagem` exigem `MAKE_WEBHOOK_SECRET`
+configurado de verdade** (ADR-033 PR2b, 2026-09-01): validação
+fail-closed — sem a env var, ou com header `x-webhook-secret` errado,
+401 sem processar. Antes só `chatbot-financeiro` validava (e só quando
+a env var estava presente, fail-open se ausente); `chatbot-triagem` não
+validava nada. Deploy coordenado com o blueprint do Make mandando o
+header — ver `docs/automacoes/PLANO_REMOCAO_MAKE_WHATSAPP.md` §Passo 2.
 
 **`pix-webhook` não usa `PIX_WEBHOOK_SECRET`** (removido em 2026-08-14,
 ver `docs/arquitetura-financeiro.md` §9.113 / ADR-024): o Santander/BACEN

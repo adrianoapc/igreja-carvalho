@@ -6,6 +6,7 @@ import {
 import { buscarLoteAtivo } from "../_shared/lotes.ts"; // ADR-026: Integração de lotes
 import { normalizarTelefone, formatarParaWhatsApp } from "../_shared/telefone-utils.ts";
 import { withWamidClaim } from "../_shared/wamid-claim.ts";
+import { timingSafeEqual } from "../_shared/crypto-utils.ts";
 
 // --- INTERFACES ---
 interface RequestBody {
@@ -57,8 +58,9 @@ interface Evento {
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-webhook-secret",
 };
+
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 const WHATSAPP_API_TOKEN = Deno.env.get("WHATSAPP_API_TOKEN");
@@ -1589,6 +1591,23 @@ async function processTriagemRequest(body: RequestBody): Promise<Response> {
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Shared secret do Make (x-webhook-secret, timing-safe), fail-closed
+  // (ADR-033 PR2b — Passo 2 item 2): esta function nunca validou secret
+  // nenhum antes desta PR — qualquer um podia POSTar direto nela. Deploy
+  // coordenado com a atualização do blueprint do Make (mandar o header)
+  // *antes* deste código ir pra produção, senão o tráfego real do Make
+  // quebra na hora do deploy (ver Passo 2, ordem 1→2→3 no plano de
+  // execução).
+  const expectedSecret = Deno.env.get("MAKE_WEBHOOK_SECRET");
+  const providedSecret = req.headers.get("x-webhook-secret") ?? "";
+  if (!expectedSecret || !timingSafeEqual(providedSecret, expectedSecret)) {
+    console.warn("[Triagem] x-webhook-secret inválido ou ausente");
+    return new Response(JSON.stringify({ error: "Não autorizado" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   try {
