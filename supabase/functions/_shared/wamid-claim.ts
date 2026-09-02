@@ -62,8 +62,13 @@ export async function withWamidClaim(
   corsHeaders: Record<string, string>,
   processFn: () => Promise<Response>,
 ): Promise<Response> {
-  const wamid =
-    typeof body?.wamid === "string" && body.wamid.trim() ? body.wamid : null;
+  // Usa o valor JÁ TRIMADO, não o cru (achado real de /code-review
+  // local): checar truthiness do trim mas guardar/comparar o original
+  // deixaria 2 entregas do mesmo wamid com espaço incidental diferente
+  // (ex.: "abc" vs "abc ") virarem chaves diferentes, furando o dedup.
+  const wamidTrimmed =
+    typeof body?.wamid === "string" ? body.wamid.trim() : "";
+  const wamid = wamidTrimmed ? wamidTrimmed : null;
   if (!wamid) {
     return await processFn();
   }
