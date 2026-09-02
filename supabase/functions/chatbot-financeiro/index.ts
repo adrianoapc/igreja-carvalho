@@ -12,7 +12,7 @@ import {
   resolverIgrejaEFilialWhatsApp,
   type FinContexto,
 } from "../_shared/financeiro-core.ts";
-import { withWamidClaim } from "../_shared/wamid-claim.ts";
+import { withWamidClaim, extractWamid } from "../_shared/wamid-claim.ts";
 
 /**
  * Extrai o telefone do payload do Make — usada tanto pelo claim de
@@ -665,13 +665,14 @@ async function processFinanceiroRequest(
 
     const telefone = extrairTelefoneMake(body);
     // Idempotência de ledger (ADR-033 PR2a-2) — mesmo wamid que
-    // withWamidClaim (serve()) já leu do body; repassado pras RPCs
-    // fin_criar_lancamento/fin_criar_transferencia como guarda de
-    // unicidade no ledger, defesa em profundidade separada do claim de
-    // entrada (que já teria devolvido a resposta cacheada antes de
-    // chegar aqui, no caso comum).
-    const wamid =
-      typeof body?.wamid === "string" && body.wamid.trim() ? body.wamid.trim() : null;
+    // withWamidClaim (serve()) já leu do body (extractWamid
+    // compartilhado, achado do /code-review — evita 2 cópias da regra
+    // de trim divergindo); repassado pras RPCs fin_criar_lancamento/
+    // fin_criar_transferencia como guarda de unicidade no ledger,
+    // defesa em profundidade separada do claim de entrada (que já
+    // teria devolvido a resposta cacheada antes de chegar aqui, no
+    // caso comum).
+    const wamid = extractWamid(body);
     const origem_canal =
       body.origem_canal ?? body.origem ?? body.messaging_product ?? "whatsapp";
     const nome_perfil =
