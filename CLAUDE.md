@@ -1,3 +1,67 @@
+# Onde a mudança pousa: worktree e branch
+
+**Invariante deste repo:** o checkout primário (`/Development/igreja-
+carvalho`) fica sempre em `main` e sempre limpo. Todo trabalho de feature
+mora num worktree próprio, um por PR:
+
+```bash
+git fetch origin
+git worktree add .claude/worktrees/<nome> -b <branch> origin/main
+```
+
+A branch nasce de `origin/main`, nunca do HEAD atual — foi assim que um PR
+carregou o diff de outro por engano de base.
+
+Sem essa invariante não existe nada pra conferir: o primário flutua entre
+branches, cada sessão nova abre nele herdando o que a sessão anterior
+deixou, e a única pergunta que importa ("essa edição vai pousar no PR
+certo?") não tem resposta observável. Achado ao vivo nesta sessão
+(2026-09-04): o checkout primário estava em `feat/whatsapp-webhook-
+skeleton` (5 commits à frente de `origin/main`, work-in-progress real, não
+lixo) enquanto 3 outros worktrees (`fix-midias-or-true`,
+`fix-supabase-erros-alertas`, `reconciliacao-extratos`) já existiam em
+paralelo — exatamente o estado que este guardrail existe pra prevenir, e a
+motivação direta de trazê-lo pra este repo.
+
+**Antes de editar qualquer arquivo**, confirme os três:
+
+1. `git worktree list` — existe worktree para este trabalho? Um worktree com
+   WIP não commitado é trabalho de outra sessão, não mexa nele.
+2. `git branch --show-current` — é a branch do PR que você vai atualizar?
+   Para PR já aberto, confira com `gh pr view <n> --json headRefName`.
+3. `git status --short` — sujeira que você não reconhece é de outra sessão.
+
+Dois mecanismos aplicam isso automaticamente, e nenhum substitui os três
+comandos acima:
+
+- **Statusline** (`.claude/statusline.sh`): mostra worktree, branch,
+  ahead/behind e nº de arquivos sujos o tempo todo; marca `⚠ (primário)`
+  quando o checkout principal não está em `main`. Não é ligada pelo
+  settings do projeto — statusline é preferência pessoal e vale para todo
+  repo, então instale copiando: `cp .claude/statusline.sh
+  ~/.claude/statusline.sh` e aponte `"statusLine": {"type": "command",
+  "command": "bash ~/.claude/statusline.sh"}` no seu `~/.claude/settings.json`.
+- **Hook bloqueante** (`.claude/hooks/branch-guard.sh`, `PreToolUse` em
+  `Write|Edit` **e** `Bash`): registra a branch de cada worktree que a
+  sessão toca e recusa a escrita se aquele worktree trocou de branch depois
+  (estado em `.claude/hooks/.branch-guard-state/`, gitignored — a mensagem
+  de recusa diz o `rm` exato pra liberar quando a troca for intencional).
+  Em `Write|Edit` também recusa qualquer escrita num worktree em
+  `main`/`master`. No matcher `Bash`, só dispara pra um subconjunto
+  deliberadamente conservador de comandos que mutam git/arquivo (`git add/
+  commit/push/merge/rebase/reset/checkout/switch/stash/rm/mv/cherry-pick/
+  revert/clean`, `sed -i`, redirecionamento `>`/`>>`) resolvendo `cd`/`git
+  -C` líder da mesma forma já testada em `pre-commit-checks.sh` — comando
+  de leitura passa direto. Limitações conhecidas documentadas no fim do
+  próprio arquivo (não é cobertura exaustiva de "todo comando que escreve",
+  e um único comando que troca de branch E escreve na mesma invocação não é
+  recusado por essa combinação específica). `--self-test` roda e2e contra
+  worktrees git reais em diretório temporário.
+
+Ao terminar: `git worktree remove <path>` só depois do merge. Worktree
+limpo e sem commits à frente de `main` é lixo; worktree sujo é trabalho de
+alguém.
+
 # Guardrails de processo (review, CI, dataviz)
 
 Antes de commitar ou abrir PR, leia
@@ -168,3 +232,104 @@ próprio arquivo):
 Este arquivo é o resumo. O detalhe (com exemplos de bug real por item) está em
 `docs/guardrails-financeiro.md`, que cresce a cada rodada de review que achar
 um padrão novo — atualize os dois juntos.
+
+# Mandatory ADR Phase Workflow
+
+Ao implementar uma fase de uma ADR aceita (ou qualquer mudança grande o
+suficiente pra merecer fases — ver `docs/development/change-lifecycle.md`
+pra quando isso se aplica), NÃO comece editando código de implementação
+direto.
+
+O fluxo completo, incluindo o bloco Discovery/Decision que produz uma ADR
+aceita e o que acontece depois do review, está mapeado em
+`docs/development/change-lifecycle.md`.
+
+```
+ADR aceita
+    ↓
+Fase
+    ↓
+Phase Preflight
+    ↓
+Implementation Contract
+    ↓
+Implementação
+    ↓
+Testes + verificação determinística
+    ↓
+Phase Self Check
+    ↓
+PASS com evidência
+    ↓
+Review interno (/code-review, /security-review)
+    ↓
+Review externo (Codex/Cursor)
+```
+
+### Antes da implementação
+
+1. Leia a fase da ADR pedida e sua acceptance criteria.
+2. Inspecione a implementação atual do repositório relevante pra essa fase.
+3. Rode o Phase Preflight definido em `docs/development/phase-preflight.md`.
+4. Leia os guardrails do repositório que o Preflight apontou como
+   aplicáveis.
+5. Estabeleça o Implementation Contract: invariantes que precisam continuar
+   verdadeiras; comportamento que não pode ocorrer; caminhos afetados que
+   precisam ficar consistentes; casos de borda a tratar; testes/evidência
+   necessários pra provar a implementação.
+
+Só depois dessa análise o código de implementação deve ser modificado.
+
+Não pule o preflight porque a ADR já tem um plano detalhado, uma fase
+anterior já foi analisada, a mudança parece pequena, ou um código parecido
+já foi implementado antes — ver a seção "Não pule o Preflight porque..." em
+`docs/development/phase-preflight.md` pro porquê cada uma dessas já falhou
+neste repo.
+
+A ADR descreve intenção. O repositório atual descreve realidade. Os
+guardrails descrevem modo de falha já acumulado. A implementação precisa
+reconciliar os três.
+
+### Durante a implementação
+
+Implemente a invariante, não só o cenário relatado.
+
+Quando uma invariante afeta uma entidade ou transição de estado, inspecione
+todos os caminhos relevantes, quando aplicável: leitura, insert, update,
+delete, retry, replay/reprocessamento, fallback, execução concorrente,
+migration/backfill.
+
+Não implemente um fix local quando o requisito real é uma invariante de
+repositório ou de domínio.
+
+Adicione os testes identificados no preflight como parte da implementação,
+não depois que o review pedir.
+
+### Depois da implementação
+
+1. Rode os testes relevantes.
+2. Rode lint, typecheck e verificação de formatação.
+3. Rode o Phase Self Check definido em `docs/development/phase-self-check.md`.
+4. Compare a implementação final contra as MESMAS invariantes declaradas no
+   preflight.
+5. Dê evidência concreta de código/teste pra cada invariante.
+6. Corrija todo FAIL.
+7. Investigue todo UNPROVEN.
+
+Não declare a fase completa enquanto qualquer invariante aplicável
+continuar FAIL ou UNPROVEN.
+
+### Review de IA
+
+Review de IA acontece só depois de implementação, testes e Phase Self
+Check completos.
+
+Critério de quando rodar `/code-review` (`high`) e `/security-review` já
+está em `docs/guardrails-processo.md` — aplicar, não duplicar.
+
+Review interno precisa terminar antes de abrir a implementação pro review
+externo (Codex/Cursor).
+
+Não espere o Codex/Cursor reportar o primeiro achado pra só então rodar o
+review interno obrigatório — o objetivo é evitar pagar múltiplas rodadas de
+review por violação que já devia ter sido identificada antes.

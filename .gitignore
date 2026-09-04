@@ -46,3 +46,7 @@ migrate_auth.js
 # mesmo se fosse código real de src/ ou supabase/functions/ aninhado
 # ali.
 .claude/worktrees/
+
+# Estado local do branch-guard.sh (branch por worktree, por máquina) —
+# nunca deve ser commitado nem compartilhado entre clones.
+.claude/hooks/.branch-guard-state/
