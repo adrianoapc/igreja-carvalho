@@ -1,0 +1,138 @@
+name: Revisor Gemini (ChatOps)
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: gemini-review-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  revisao_sob_demanda:
+    if: >
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/gemini revisar') &&
+      (
+        github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'COLLABORATOR'
+      )
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Marcar comentário como em análise (Olhos)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST \
+          -H "Accept: application/vnd.github+json" \
+          /repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+          -f content='eyes'
+
+      - name: Checkout da PR
+        uses: actions/checkout@v4
+
+      - name: Configurar Ambiente Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar Dependências
+        run: pip install google-genai requests
+
+      - name: Criar Script de Revisão
+        run: |
+          cat << 'EOF' > review.py
+          import os, requests, sys
+          from google import genai
+
+          # Novo SDK
+          client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+          gh_token = os.environ["GH_TOKEN"]
+          repo = os.environ["REPO"]
+          pr_number = os.environ["PR_NUMBER"]
+
+          # Já sabemos pelo seu log que este modelo está disponível na sua chave
+          model_name = "gemini-3.1-pro-preview"
+
+          headers = {"Authorization": f"token {gh_token}", "Accept": "application/vnd.github.v3.diff"}
+          diff_resp = requests.get(f"https://api.github.com/repos/{repo}/pulls/{pr_number}", headers=headers)
+
+          if diff_resp.status_code != 200:
+              print(f"Erro ao obter diff: {diff_resp.status_code}")
+              sys.exit(1)
+
+          diff = diff_resp.text
+
+          prompt = f"""Você é o revisor de código para o repositório {repo}.
+          Revise o diff fornecido e aponte melhorias focando em:
+          - Bugs e regressões lógicas;
+          - Boas práticas de programação e Clean Code;
+          - Otimização de performance;
+          - Vulnerabilidades de segurança.
+
+          Se encontrar problemas, classifique-os:
+          [P0] Crítico (quebra o sistema ou segurança)
+          [P1] Importante (bugs lógicos ou vazamento de memória)
+          [P2] Sugestão (melhoria de legibilidade, design ou arquitetura)
+
+          Se o código estiver excelente e sem nenhum ponto de melhoria, responda apenas:
+          "Nenhum finding acionável foi identificado. O código está excelente."
+
+          Responda sempre em Português do Brasil de forma clara e objetiva.
+
+          DIFF DA PR:
+          {diff[:3000000]} 
+          """
+
+          # Nova sintaxe de chamada
+          response = client.models.generate_content(
+              model=model_name,
+              contents=prompt
+          )
+
+          review_url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews"
+          review_data = {"body": response.text, "event": "COMMENT"}
+          post_headers = {"Authorization": f"token {gh_token}", "Accept": "application/vnd.github.v3+json"}
+          r = requests.post(review_url, json=review_data, headers=post_headers)
+
+          if r.status_code != 200:
+              print(f"Erro ao postar review: {r.text}")
+              sys.exit(1)
+          EOF
+          
+      - name: Executar Revisão com Gemini
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: python review.py
+
+      - name: Marcar como concluída (Joinha)
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST \
+          -H "Accept: application/vnd.github+json" \
+          /repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+          -f content='+1'
+
+      - name: Avisar falha na revisão
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh api --method POST \
+          /repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
+          -f body="❌ **Gemini não conseguiu concluir a revisão.** [Ver logs da execução]($RUN_URL)"
